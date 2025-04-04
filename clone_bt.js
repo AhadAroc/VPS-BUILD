@@ -32,7 +32,13 @@ if (!fs.existsSync(BOTS_DIR)) {
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
-
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot', { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true 
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 // Set up a simple route for health checks
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
@@ -137,38 +143,8 @@ process.once('SIGTERM', () => {
             
             fs.writeFileSync(botFilePath, botFileContent);
             
-            // Deploy the bot to Heroku
-            ctx.reply('⏳ جاري تنصيب البوت على Heroku...');
-            const herokuUrl = await deployBotToHeroku({
-                id: botInfo.id,
-                name: botInfo.first_name,
-                username: botInfo.username,
-                token: token
-            });
-            
-            // Start the bot process locally (you might want to remove this if running on Heroku)
+            // Start the bot process
             const botProcess = fork(botFilePath);
-
-botProcess.on('message', (message) => {
-    console.log(`Message from bot ${botInfo.username}:`, message);
-});
-
-botProcess.on('error', (error) => {
-    console.error(`Error in bot ${botInfo.username}:`, error);
-    delete activeBots[botInfo.id];
-});
-
-botProcess.on('exit', (code, signal) => {
-    if (code !== 0) {
-        console.error(`Bot ${botInfo.username} exited with error code ${code}`);
-        // You might want to attempt to restart the bot here
-    } else if (signal) {
-        console.log(`Bot ${botInfo.username} was killed with signal ${signal}`);
-    } else {
-        console.log(`Bot ${botInfo.username} exited normally`);
-    }
-    delete activeBots[botInfo.id];
-});
             
             // Store bot details
             activeBots[botInfo.id] = {
@@ -178,8 +154,7 @@ botProcess.on('exit', (code, signal) => {
                 expiry: EXPIRY_DATE,
                 process: botProcess,
                 configPath: configPath,
-                botFilePath: botFilePath,
-                herokuUrl: herokuUrl
+                botFilePath: botFilePath
             };
             
             // Handle bot process events
@@ -204,7 +179,6 @@ botProcess.on('exit', (code, signal) => {
 - ايدي البوت: ${botInfo.id}
 - معرف البوت: @${botInfo.username}
 - توكن البوت: <code>${token}</code>
-- رابط Heroku: ${herokuUrl}
 
 ~ <b>تاريخ انتهاء الاشتراك</b>: ${EXPIRY_DATE}
 - يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
@@ -299,78 +273,7 @@ async function cloneBot(originalBotToken, newBotToken) {
     // Create a new database entry for the clone
     await createCloneDbEntry(cloneId, newBotToken);
   }
-// Function to deploy bot to Heroku
-async function deployBotToHeroku(botInfo) {
-    try {
-        // Generate a unique app name
-        const uniqueId = crypto.randomBytes(4).toString('hex'); // 8 character unique ID
-        const appName = `lorsiv-${uniqueId}`;
 
-        console.log(`Attempting to create Heroku app with name: ${appName}`);
-
-        // Create a new Heroku app
-        const app = await heroku.post('/apps', {
-            body: {
-                name: appName,
-                region: 'us'
-            }
-        });
-
-        console.log(`Created Heroku app: ${app.name}`);
-
-        // Set config vars (environment variables)
-        await heroku.patch(`/apps/${app.name}/config-vars`, {
-            body: {
-                BOT_TOKEN: botInfo.token,
-                NODE_ENV: 'production',
-                BOT_USERNAME: botInfo.username // Store the bot's username for reference
-            }
-        });
-
-        console.log(`Set config vars for ${app.name}`);
-
-        // Add Node.js buildpack
-        try {
-            await heroku.post(`/apps/${app.name}/buildpacks`, {
-                body: {
-                    buildpack: 'heroku/nodejs'
-                }
-            });
-            console.log(`Added Node.js buildpack to ${app.name}`);
-        } catch (buildpackError) {
-            console.error('Error adding buildpack:', buildpackError);
-            // If adding buildpack fails, we'll continue with the deployment
-        }
-
-        // Create a Git remote for the app
-        const remoteUrl = `https://git.heroku.com/${app.name}.git`;
-        console.log(`Heroku Git remote: ${remoteUrl}`);
-
-        // Here you would typically push your code to this remote
-        // This part depends on how you've set up your project structure
-        console.log(`TODO: Push bot code to ${remoteUrl}`);
-
-        // You might want to use a Git library or spawn a child process to push the code
-        // For example:
-        // await exec(`git init && git add . && git commit -m "Initial commit" && git push ${remoteUrl} master`);
-
-        console.log(`Bot deployed to Heroku: ${app.web_url}`);
-
-        return {
-            appName: app.name,
-            webUrl: app.web_url,
-            gitUrl: remoteUrl
-        };
-    } catch (error) {
-        console.error('Error deploying to Heroku:', error);
-        
-        if (error.statusCode) {
-            console.error(`Heroku API Error (Status ${error.statusCode}):`, error.body);
-        }
-        
-        throw error;
-    }
-}
 // Load existing bots on startup
 function loadExistingBots() {
     if (!fs.existsSync(BOTS_DIR)) return;
