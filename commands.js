@@ -1203,7 +1203,7 @@ bot.action('back_to_main', async (ctx) => {
     try {
         await ctx.answerCbQuery();
         // Get the original photo URL
-        const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c';
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
         
         // Edit the message to show the main menu again
         await ctx.editMessageMedia(
