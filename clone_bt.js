@@ -94,86 +94,53 @@ module.exports = {
             const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
             const botFileContent = `
 const { Telegraf } = require('telegraf');
-const database = require('../database');
-const { setupActions } = require('../actions');
-const { setupMiddlewares } = require('../middlewares');
-const { setupCommands } = require('../commands');
-
-// Load the bot-specific config
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
 
-// Create a new bot instance
 const bot = new Telegraf(token);
 
-// Initialize database
-async function initializeApp() {
-    try {
-        // Setup database first
-        await database.setupDatabase();
-        console.log('Database initialized successfully');
-        
-        // Setup middlewares and actions
-        setupMiddlewares(bot);
-        setupCommands(bot);
-        setupActions(bot);
-        
-        // Start the bot
-        await bot.launch();
-        console.log(\`Bot \${config.botUsername} started successfully\`);
-    } catch (error) {
-        console.error('Error initializing application:', error);
-        process.exit(1);
-    }
-}
+bot.start((ctx) => ctx.reply('Welcome to your protection bot!'));
 
-// Start the application
-initializeApp();
+bot.launch();
 
-// Enable graceful stop
-process.once('SIGINT', () => {
-    bot.stop('SIGINT');
-    database.client.close();
-});
-process.once('SIGTERM', () => {
-    bot.stop('SIGTERM');
-    database.client.close();
-});
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
             `;
             
             fs.writeFileSync(botFilePath, botFileContent);
             
-            // Start the bot process
-            const botProcess = fork(botFilePath);
-            
-            // Store bot details
-            activeBots[botInfo.id] = {
-                name: botInfo.first_name,
-                username: botInfo.username,
-                token: token,
-                expiry: EXPIRY_DATE,
-                process: botProcess,
-                configPath: configPath,
-                botFilePath: botFilePath
-            };
-            
-            // Handle bot process events
-            botProcess.on('message', (message) => {
-                console.log(`Message from bot ${botInfo.username}:`, message);
-            });
-            
-            botProcess.on('error', (error) => {
-                console.error(`Error in bot ${botInfo.username}:`, error);
-                delete activeBots[botInfo.id];
-            });
-            
-            botProcess.on('exit', (code) => {
-                console.log(`Bot ${botInfo.username} exited with code ${code}`);
-                delete activeBots[botInfo.id];
-            });
+            // Start the bot using PM2
+            const pm2 = require('pm2');
+            pm2.connect((err) => {
+                if (err) {
+                    console.error(err);
+                    return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+                }
 
-            // Send confirmation message using HTML formatting
-            ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
+                pm2.start({
+                    script: botFilePath,
+                    name: `bot_${botInfo.id}`,
+                    autorestart: true,
+                }, (err) => {
+                    if (err) {
+                        console.error(err);
+                        return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+                    }
+
+                    // Store bot details
+                    activeBots[botInfo.id] = {
+                        name: botInfo.first_name,
+                        username: botInfo.username,
+                        token: token,
+                        expiry: EXPIRY_DATE,
+                        configPath: configPath,
+                        botFilePath: botFilePath
+                    };
+
+                    // Create database entry
+                    createCloneDbEntry(botInfo.id, token);
+
+                    ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
 - اسم البوت: ${botInfo.first_name}
 - ايدي البوت: ${botInfo.id}
@@ -182,14 +149,11 @@ process.once('SIGTERM', () => {
 
 ~ <b>تاريخ انتهاء الاشتراك</b>: ${EXPIRY_DATE}
 - يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
-                parse_mode: 'HTML',
-                disable_web_page_preview: true 
+                        parse_mode: 'HTML',
+                        disable_web_page_preview: true 
+                    });
+                });
             });
-
-            ctx.reply('هل تريد إنشاء بوت آخر؟', Markup.inlineKeyboard([
-                [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
-                [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
-            ]));
         } else {
             ctx.reply('❌ التوكن غير صالح أو البوت غير متاح.');
         }
@@ -218,29 +182,26 @@ bot.action('show_active_bots', (ctx) => {
     });
 });
 
-async function createCloneDbEntry(cloneId, botToken) {
-    const CloneSchema = new mongoose.Schema({
-      cloneId: String,
-      botToken: String,
-      createdAt: Date,
-      statistics: {
-        messagesProcessed: { type: Number, default: 0 },
-        commandsExecuted: { type: Number, default: 0 },
-        // Add other statistics as needed
-      }
-    });
-  
-    const CloneModel = mongoose.model('Clone', CloneSchema);
-  
+async function createCloneDbEntry(botId, botToken) {
+    const CloneModel = mongoose.model('Clone', new mongoose.Schema({
+        botId: String,
+        botToken: String,
+        createdAt: Date,
+        statistics: {
+            messagesProcessed: { type: Number, default: 0 },
+            commandsExecuted: { type: Number, default: 0 },
+        }
+    }));
+
     const newClone = new CloneModel({
-      cloneId,
-      botToken,
-      createdAt: new Date(),
+        botId,
+        botToken,
+        createdAt: new Date(),
     });
-  
+
     await newClone.save();
-    console.log(`Database entry created for clone ${cloneId}`);
-  }
+    console.log(`Database entry created for bot ${botId}`);
+}
 async function cloneBot(originalBotToken, newBotToken) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
@@ -286,87 +247,42 @@ function loadExistingBots() {
             const config = require(configPath);
             const botId = config.botId;
             
-            // Check if the bot file exists
             const botFilePath = path.join(BOTS_DIR, `bot_${botId}.js`);
             if (!fs.existsSync(botFilePath)) {
-                // Create the bot file if it doesn't exist
-                const botFileContent = `
-const { Telegraf } = require('telegraf');
-const database = require('../database');
-const { setupActions } = require('../actions');
-const { setupMiddlewares } = require('../middlewares');
-const { setupCommands } = require('../commands');
-
-// Load the bot-specific config
-const config = require('./${botId}_config.js');
-const token = config.token;
-
-// Create a new bot instance
-const bot = new Telegraf(token);
-
-// Initialize database
-async function initializeApp() {
-    try {
-        // Setup database first
-        await database.setupDatabase();
-        console.log('Database initialized successfully');
-        
-        // Setup middlewares and actions
-        setupMiddlewares(bot);
-        setupCommands(bot);
-        setupActions(bot);
-        
-        // Start the bot
-        await bot.launch();
-        console.log(\`Bot \${config.botUsername} started successfully\`);
-    } catch (error) {
-        console.error('Error initializing application:', error);
-        process.exit(1);
-    }
-}
-
-// Start the application
-initializeApp();
-
-// Enable graceful stop
-process.once('SIGINT', () => {
-    bot.stop('SIGINT');
-    database.client.close();
-});
-process.once('SIGTERM', () => {
-    bot.stop('SIGTERM');
-    database.client.close();
-});
-                `;
-                
-                fs.writeFileSync(botFilePath, botFileContent);
+                console.error(`Bot file not found for ${config.botUsername}`);
+                return;
             }
             
-            // Start the bot process
-            const botProcess = fork(botFilePath);
-            
-            // Store bot details
-            activeBots[botId] = {
-                name: config.botName,
-                username: config.botUsername,
-                token: config.token,
-                expiry: config.expiryDate,
-                process: botProcess,
-                configPath: configPath,
-                botFilePath: botFilePath
-            };
-            
-            console.log(`Loaded existing bot: @${config.botUsername}`);
-            
-            // Handle bot process events
-            botProcess.on('error', (error) => {
-                console.error(`Error in bot ${config.botUsername}:`, error);
-                delete activeBots[botId];
-            });
-            
-            botProcess.on('exit', (code) => {
-                console.log(`Bot ${config.botUsername} exited with code ${code}`);
-                delete activeBots[botId];
+            // Start the bot using PM2
+            const pm2 = require('pm2');
+            pm2.connect((err) => {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+
+                pm2.start({
+                    script: botFilePath,
+                    name: `bot_${botId}`,
+                    autorestart: true,
+                }, (err) => {
+                    if (err) {
+                        console.error(`Failed to start bot ${config.botUsername}:`, err);
+                        return;
+                    }
+
+                    // Store bot details
+                    activeBots[botId] = {
+                        name: config.botName,
+                        username: config.botUsername,
+                        token: config.token,
+                        expiry: config.expiryDate,
+                        configPath: configPath,
+                        botFilePath: botFilePath
+                    };
+                    
+                    console.log(`Loaded existing bot: @${config.botUsername}`);
+                });
             });
         } catch (error) {
             console.error(`Error loading bot from config file ${file}:`, error);
