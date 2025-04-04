@@ -45,7 +45,7 @@ let mongoClient = null;
 // ✅ Display main menu
 // ✅ Display main menu
 function showMainMenu(ctx) {
-    ctx.replyWithPhoto('https://postimg.cc/QBJ4V7hg/5c655f5c', {
+    ctx.replyWithPhoto('https://i.postimg.cc/R0jjs1YY/bot.jpg', {
         caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
         reply_markup: {
             inline_keyboard: [
