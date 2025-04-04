@@ -6,13 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const express = require('express');
-const Heroku = require('heroku-client');
+//const Heroku = require('heroku-client');
 const mongoose = require('mongoose');
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
 // Heroku API key
-const HEROKU_API_KEY = 'HRKU-f72294ab-1a52-467d-a9ef-1405ecb9345d';
-const heroku = new Heroku({ token: HEROKU_API_KEY });
+//const HEROKU_API_KEY = 'HRKU-f72294ab-1a52-467d-a9ef-1405ecb9345d';
+//const heroku = new Heroku({ token: HEROKU_API_KEY });
 
 // ... (rest of your existing code)
 // ===== Configuration =====
