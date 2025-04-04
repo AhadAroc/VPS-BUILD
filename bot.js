@@ -5,64 +5,83 @@ const database = require('./database');
 const { setupActions } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
 const { setupCommands } = require('./commands');
+const mongoose = require('mongoose');
+const BOT_TOKEN = process.env.BOT_TOKEN;
 
+
+// Use this function to get the bot's data and update statistics
 // Create a new bot instance
 const bot = new Telegraf(token);
 const app = express(); // Create Express app
 
+async function getBotData() {
+    const CloneModel = mongoose.model('Clone');
+    let botData = await CloneModel.findOne({ botToken: BOT_TOKEN });
+    
+    if (!botData) {
+      // If no entry found, this might be the original bot, not a clone
+      // Handle this case as appropriate for your use case
+      console.log('No clone data found for this bot token');
+      // You might want to create a default entry here
+    }
+  
+    return botData;
+  }
 // Initialize database
 async function initializeApp() {
     try {
         // Setup database first
         await database.setupDatabase();
         console.log('Database initialized successfully');
-        
-        // Setup middlewares and actions
-        setupMiddlewares(bot);
-        setupCommands(bot);
-        
-        // Pass session and Scenes to setupActions
-        setupActions(bot, session, Scenes);
-        
-        // Get port from environment or use 3000 as default
-        const PORT = process.env.PORT || 3000;
-        
-        // Set up the server
-        app.use(express.json());
-        
-        // Simple route for checking if the bot is running
-        app.get('/', (req, res) => {
-            res.send('Bot is running!');
-        });
-        
-        // Start the bot based on environment
-        if (process.env.NODE_ENV === 'production') {
-            // Set webhook path
-            const webhookPath = '/webhook';
-            
-            // Use webhook in production (Heroku)
-            app.use(bot.webhookCallback(webhookPath));
-            
-            // Set the webhook
-            const HEROKU_URL = process.env.HEROKU_URL || 'https://apiclonetest-12345.herokuapp.com';
-            bot.telegram.setWebhook(`${HEROKU_URL}${webhookPath}`);
-            console.log(`Webhook set to: ${HEROKU_URL}${webhookPath}`);
-        } else {
-            // Use polling in development
-            await bot.launch();
-            console.log('Bot started with polling');
+
+        // Check if bot data exists, create if not
+        const botData = await getBotData();
+        if (!botData) {
+            // Create new entry for this bot
+            // This depends on how you've structured your Clone model
+            const CloneModel = mongoose.model('Clone');
+            const newBotData = new CloneModel({
+                botToken: BOT_TOKEN,
+                createdAt: new Date(),
+                statistics: { messagesProcessed: 0, commandsExecuted: 0 }
+            });
+            await newBotData.save();
+            console.log('Created new database entry for this bot');
         }
-        
-        // Start express server
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-        });
+
+        // Rest of your initialization code...
     } catch (error) {
         console.error('Error initializing application:', error);
         process.exit(1);
     }
 }
-
+async function getBotData() {
+    try {
+        const CloneModel = mongoose.model('Clone');
+        let botData = await CloneModel.findOne({ botToken: BOT_TOKEN });
+        
+        if (!botData) {
+            console.log('No clone data found for this bot token');
+            // You might want to create a default entry here
+        }
+    
+        return botData;
+    } catch (error) {
+        console.error('Error fetching bot data:', error);
+        return null;
+    }
+}
+async function updateBotStats(stat, increment = 1) {
+    try {
+        const CloneModel = mongoose.model('Clone');
+        await CloneModel.findOneAndUpdate(
+            { botToken: BOT_TOKEN },
+            { $inc: { [`statistics.${stat}`]: increment } }
+        );
+    } catch (error) {
+        console.error('Error updating bot statistics:', error);
+    }
+}
 // Start the application
 initializeApp();
 
