@@ -99,15 +99,43 @@ const token = config.token;
 
 const bot = new Telegraf(token);
 
-bot.start((ctx) => ctx.reply('Welcome to your protection bot!'));
+// Import protection bot functionalities
+const { setupCommands } = require('../commands');
+const { setupMiddlewares } = require('../middlewares');
+const { setupActions } = require('../actions');
+const database = require('../database');
 
-bot.launch();
+// Initialize bot
+async function initBot() {
+    try {
+        // Setup database
+        await database.setupDatabase();
+        
+        // Setup middlewares, commands, and actions
+        setupMiddlewares(bot);
+        setupCommands(bot);
+        setupActions(bot);
+        
+        // Add your custom protection bot logic here
+        
+        bot.start((ctx) => ctx.reply('Welcome to your personalized protection bot!'));
+        
+        // Launch the bot
+        await bot.launch();
+        console.log(\`Bot \${config.botUsername} started successfully\`);
+    } catch (error) {
+        console.error('Error initializing bot:', error);
+    }
+}
 
+initBot();
+
+// Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-            `;
-            
-            fs.writeFileSync(botFilePath, botFileContent);
+`;
+
+fs.writeFileSync(botFilePath, botFileContent);
             
             // Start the bot using PM2
             const pm2 = require('pm2');
