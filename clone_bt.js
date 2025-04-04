@@ -1,10 +1,13 @@
 const { Telegraf, Markup } = require('telegraf');
 const { fork } = require('child_process');
+const { exec } = require('child_process');
+const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const express = require('express');
 const Heroku = require('heroku-client');
+const mongoose = require('mongoose');
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
 // Heroku API key
@@ -240,6 +243,62 @@ bot.action('show_active_bots', (ctx) => {
         disable_web_page_preview: true 
     });
 });
+
+async function createCloneDbEntry(cloneId, botToken) {
+    const CloneSchema = new mongoose.Schema({
+      cloneId: String,
+      botToken: String,
+      createdAt: Date,
+      statistics: {
+        messagesProcessed: { type: Number, default: 0 },
+        commandsExecuted: { type: Number, default: 0 },
+        // Add other statistics as needed
+      }
+    });
+  
+    const CloneModel = mongoose.model('Clone', CloneSchema);
+  
+    const newClone = new CloneModel({
+      cloneId,
+      botToken,
+      createdAt: new Date(),
+    });
+  
+    await newClone.save();
+    console.log(`Database entry created for clone ${cloneId}`);
+  }
+async function cloneBot(originalBotToken, newBotToken) {
+    const cloneId = uuidv4();
+    const cloneName = `clone-${cloneId}`;
+  
+    // Copy the original bot file
+    exec(`cp bot.js ${cloneName}.js`, (error) => {
+      if (error) {
+        console.error(`Error copying bot file: ${error}`);
+        return;
+      }
+  
+      // Replace the bot token in the new file
+      exec(`sed -i 's/const BOT_TOKEN = .*/const BOT_TOKEN = "${newBotToken}";/' ${cloneName}.js`, (error) => {
+        if (error) {
+          console.error(`Error replacing token: ${error}`);
+          return;
+        }
+  
+        // Start the new bot process with PM2
+        exec(`pm2 start ${cloneName}.js --name ${cloneName}`, (error) => {
+          if (error) {
+            console.error(`Error starting clone: ${error}`);
+            return;
+          }
+          console.log(`Clone ${cloneName} started successfully`);
+        });
+      });
+    });
+  
+    // Create a new database entry for the clone
+    await createCloneDbEntry(cloneId, newBotToken);
+  }
 // Function to deploy bot to Heroku
 async function deployBotToHeroku(botInfo) {
     try {
