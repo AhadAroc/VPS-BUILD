@@ -6,8 +6,18 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const express = require('express');
+const mongoURI = process.env.MONGODB_URI;
+require('dotenv').config();
 //const Heroku = require('heroku-client');
 const mongoose = require('mongoose');
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  ssl: true,
+  tls: true,
+  tlsAllowInvalidCertificates: false
+});
+
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
 // Heroku API key

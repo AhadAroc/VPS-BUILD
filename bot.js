@@ -7,7 +7,7 @@ const { setupMiddlewares } = require('./middlewares');
 const { setupCommands } = require('./commands');
 const mongoose = require('mongoose');
 const BOT_TOKEN = process.env.BOT_TOKEN;
-
+require('./models/clone');
 
 // Use this function to get the bot's data and update statistics
 // Create a new bot instance
