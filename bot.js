@@ -5,6 +5,14 @@ const database = require('./database');
 const { setupActions } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
 const { setupCommands } = require('./commands');
+
+const BOT_TOKEN = process.env.BOT_TOKEN;
+require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
+//herrrroooooooooo
+// Use this function to get the bot's data and update statistics
+// Create a new bot instance
+const bot = new Telegraf(token);
+const app = express(); // Create Express app
 const Clone = mongoose.model('Clone', new mongoose.Schema({
     botToken: String,
     userId: String,
@@ -16,6 +24,7 @@ const Clone = mongoose.model('Clone', new mongoose.Schema({
     }
 }));
 const mongoose = require('mongoose');
+<<<<<<< HEAD
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
@@ -25,6 +34,8 @@ require('dotenv').config();  // Add this at the top of bot.js if you're using a 
 const bot = new Telegraf(token);
 const app = express(); // Create Express app
 
+=======
+>>>>>>> d4eeeec54706cbe2015a32bc2e5914df56a9cf03
 async function getBotData() {
     try {
         console.log('Attempting to fetch bot data...');
