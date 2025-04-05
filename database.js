@@ -212,8 +212,14 @@ async function ensureDatabaseInitialized() {
 async function setupDatabase() {
     try {
         console.log('Setting up MongoDB connection...');
-        await connectToMongoDB();
+        db = await connectToMongoDB();
         
+        if (!db) {
+            throw new Error('Failed to initialize database connection');
+        }
+
+        console.log('Database connection established. Setting up collections...');
+
         // Add primary developer if not exists
         if (developerIds && developerIds.size > 0) {
             const primaryDevId = Array.from(developerIds)[0];
