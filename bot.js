@@ -8,25 +8,37 @@ const { setupCommands } = require('./commands');
 const mongoose = require('mongoose');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 require('./models/clone');
-
+require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
+//hey this fucks ass file was changed 
 // Use this function to get the bot's data and update statistics
 // Create a new bot instance
 const bot = new Telegraf(token);
 const app = express(); // Create Express app
 
 async function getBotData() {
-    const CloneModel = mongoose.model('Clone');
-    let botData = await CloneModel.findOne({ botToken: BOT_TOKEN });
+    try {
+        let botData = await Clone.findOne({ botToken: BOT_TOKEN });
+        
+        if (!botData) {
+            console.log('No clone data found for this bot token');
+            // Create a new entry for this bot
+            botData = new Clone({
+                botToken: BOT_TOKEN,
+                userId: 'default_user_id', // You might want to replace this with actual data
+                username: 'default_username', // You might want to replace this with actual data
+                createdAt: new Date(),
+                statistics: { messagesProcessed: 0, commandsExecuted: 0 }
+            });
+            await botData.save();
+            console.log('Created new database entry for this bot');
+        }
     
-    if (!botData) {
-      // If no entry found, this might be the original bot, not a clone
-      // Handle this case as appropriate for your use case
-      console.log('No clone data found for this bot token');
-      // You might want to create a default entry here
+        return botData;
+    } catch (error) {
+        console.error('Error fetching bot data:', error);
+        return null;
     }
-  
-    return botData;
-  }
+}
 // Initialize database
 async function initializeApp() {
     try {
@@ -37,40 +49,30 @@ async function initializeApp() {
         // Check if bot data exists, create if not
         const botData = await getBotData();
         if (!botData) {
-            // Create new entry for this bot
-            // This depends on how you've structured your Clone model
-            const CloneModel = mongoose.model('Clone');
-            const newBotData = new CloneModel({
-                botToken: BOT_TOKEN,
-                createdAt: new Date(),
-                statistics: { messagesProcessed: 0, commandsExecuted: 0 }
-            });
-            await newBotData.save();
-            console.log('Created new database entry for this bot');
+            throw new Error('Failed to get or create bot data');
         }
 
-        // Rest of your initialization code...
+        // Setup middlewares, commands, and actions
+        setupMiddlewares(bot);
+        setupCommands(bot);
+        setupActions(bot);
+
+        // Launch the bot
+        await bot.launch();
+        console.log('Bot started successfully');
+
+        // Setup Express server if needed
+        const PORT = process.env.PORT || 3000;
+        app.listen(PORT, () => {
+            console.log(`Express server is running on port ${PORT}`);
+        });
+
     } catch (error) {
         console.error('Error initializing application:', error);
         process.exit(1);
     }
 }
-async function getBotData() {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        let botData = await CloneModel.findOne({ botToken: BOT_TOKEN });
-        
-        if (!botData) {
-            console.log('No clone data found for this bot token');
-            // You might want to create a default entry here
-        }
-    
-        return botData;
-    } catch (error) {
-        console.error('Error fetching bot data:', error);
-        return null;
-    }
-}
+
 async function updateBotStats(stat, increment = 1) {
     try {
         const CloneModel = mongoose.model('Clone');

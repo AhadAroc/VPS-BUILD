@@ -40,6 +40,16 @@ if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
 
+
+const cloneSchema = new mongoose.Schema({
+  token: String,
+  ownerId: Number,
+  createdAt: { type: Date, default: Date.now },
+  // add any other fields you use
+});
+
+mongoose.model('Clone', cloneSchema);
+
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 // MongoDB connection

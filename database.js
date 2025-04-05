@@ -219,7 +219,25 @@ async function setupDatabase() {
                 console.log(`Primary developer (${primaryDevId}) added to database`);
             }
         }
-        
+
+        // Ensure indexes for better query performance
+        await db.collection('quiz_questions').createIndex({ category: 1, difficulty: 1 });
+        await db.collection('quiz_scores').createIndex({ userId: 1 });
+        await db.collection('quiz_answers').createIndex({ userId: 1 });
+        await db.collection('replies').createIndex({ trigger_word: 1 }, { unique: true });
+        await db.collection('developers').createIndex({ user_id: 1 }, { unique: true });
+        await db.collection('groups').createIndex({ group_id: 1 }, { unique: true });
+        await db.collection('users').createIndex({ user_id: 1 }, { unique: true });
+
+        // Ensure required collections exist
+        const collections = ['quiz_questions', 'quiz_scores', 'quiz_answers', 'replies', 'developers', 'groups', 'users'];
+        for (const collection of collections) {
+            if (!(await db.listCollections({ name: collection }).hasNext())) {
+                await db.createCollection(collection);
+                console.log(`Created collection: ${collection}`);
+            }
+        }
+
         console.log('Database setup completed');
     } catch (error) {
         console.error('Error setting up database:', error);
