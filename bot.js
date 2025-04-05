@@ -5,6 +5,7 @@ const database = require('./database');
 const { setupActions } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
 const { setupCommands } = require('./commands');
+const Clone = require('./models/Clone'); // Add this line
 const mongoose = require('mongoose');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 require('./models/clone');
