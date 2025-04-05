@@ -53,26 +53,24 @@ async function getBotData() {
 // Initialize database
 async function initializeApp() {
     try {
-        // Setup database first
         await database.setupDatabase();
         console.log('Database initialized successfully');
 
-        // Check if bot data exists, create if not
-        const botData = await getBotData();
-        if (!botData) {
-            throw new Error('Failed to get or create bot data');
+        try {
+            const botData = await getBotData();
+            console.log('Bot data retrieved:', botData);
+        } catch (error) {
+            console.error('Failed to get or create bot data:', error);
+            // Continue execution even if bot data retrieval fails
         }
 
-        // Setup middlewares, commands, and actions
         setupMiddlewares(bot);
         setupCommands(bot);
         setupActions(bot);
 
-        // Launch the bot
         await bot.launch();
         console.log('Bot started successfully');
 
-        // Setup Express server if needed
         const PORT = process.env.PORT || 3000;
         app.listen(PORT, () => {
             console.log(`Express server is running on port ${PORT}`);
