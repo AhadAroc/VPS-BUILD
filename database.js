@@ -1,5 +1,15 @@
 const { MongoClient } = require('mongodb');
 const { mongoUri, dbName, developerIds } = require('./config');
+const mongoose = require('mongoose');
+
+
+const mongooseOptions = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 30000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 30000,
+};
 
 // MongoDB connection
 let db = null;
