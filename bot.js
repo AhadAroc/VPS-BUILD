@@ -17,26 +17,28 @@ const app = express(); // Create Express app
 
 async function getBotData() {
     try {
-        let botData = await Clone.findOne({ botToken: BOT_TOKEN });
+        console.log('Attempting to find bot data...');
+        let botData = await Clone.findOne({ botToken: BOT_TOKEN }).maxTimeMS(20000);
+        console.log('Bot data query completed');
         
         if (!botData) {
-            console.log('No clone data found for this bot token');
-            // Create a new entry for this bot
+            console.log('No clone data found for this bot token. Creating new entry...');
             botData = new Clone({
                 botToken: BOT_TOKEN,
-                userId: 'default_user_id', // You might want to replace this with actual data
-                username: 'default_username', // You might want to replace this with actual data
+                userId: 'default_user_id',
+                username: 'default_username',
                 createdAt: new Date(),
                 statistics: { messagesProcessed: 0, commandsExecuted: 0 }
             });
+            console.log('Saving new bot data...');
             await botData.save();
-            console.log('Created new database entry for this bot');
+            console.log('New database entry created for this bot');
         }
     
         return botData;
     } catch (error) {
-        console.error('Error fetching bot data:', error);
-        return null;
+        console.error('Error in getBotData:', error);
+        throw error;
     }
 }
 // Initialize database
