@@ -107,19 +107,16 @@ async function connectToMongoDB() {
     try {
         console.log('Attempting to connect to MongoDB...');
         
+        // Updated connection options
         const options = {
             useNewUrlParser: true,
             useUnifiedTopology: true,
             serverSelectionTimeoutMS: 30000,
             socketTimeoutMS: 45000,
             connectTimeoutMS: 30000,
-            ssl: true,
-            tls: true,
-            tlsAllowInvalidCertificates: false,
-            retryWrites: true,
-            w: 'majority'
         };
         
+        // Log the connection URI (without password for security)
         const sanitizedUri = mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
         console.log(`Connecting to: ${sanitizedUri} with options:`, options);
         
