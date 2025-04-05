@@ -1,18 +1,32 @@
+require('dotenv').config();
 const { Telegraf, session, Scenes } = require('telegraf');
-const express = require('express'); // Add this import
+const express = require('express');
+const mongoose = require('mongoose');
 const { token } = require('./config');
 const database = require('./database');
 const { setupActions } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
 const { setupCommands } = require('./commands');
-const mongoose = require('mongoose');
-const BOT_TOKEN = process.env.BOT_TOKEN;
-require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
 
-// Use this function to get the bot's data and update statistics
+const BOT_TOKEN = process.env.BOT_TOKEN;
+
 // Create a new bot instance
 const bot = new Telegraf(token);
 const app = express(); // Create Express app
+
+// Define the Clone model
+const CloneSchema = new mongoose.Schema({
+    botToken: String,
+    userId: String,
+    username: String,
+    createdAt: Date,
+    statistics: {
+        messagesProcessed: Number,
+        commandsExecuted: Number
+    }
+});
+
+let Clone;
 
 async function getBotData() {
     try {
