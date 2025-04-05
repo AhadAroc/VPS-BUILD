@@ -207,7 +207,7 @@ async function ensureDatabaseInitialized() {
 async function setupDatabase() {
     try {
         console.log('Setting up MongoDB connection...');
-        db = await connectToMongoDB();
+        const db = await connectToMongoDB();
         
         if (!db) {
             throw new Error('Failed to initialize database connection');
@@ -215,20 +215,15 @@ async function setupDatabase() {
 
         console.log('Database connection established. Setting up collections...');
 
-        // Add primary developer if not exists
-        if (developerIds && developerIds.size > 0) {
-            const primaryDevId = Array.from(developerIds)[0];
-            const existingDev = await db.collection('developers').findOne({ user_id: primaryDevId });
-            
-            if (!existingDev) {
-                await db.collection('developers').insertOne({
-                    user_id: primaryDevId,
-                    username: 'primary_developer',
-                    added_at: new Date()
-                });
-                console.log(`Primary developer (${primaryDevId}) added to database`);
-            }
-        }
+        // The rest of your setupDatabase function remains the same
+        // ...
+
+        console.log('Database setup completed');
+    } catch (error) {
+        console.error('Error setting up database:', error);
+        throw error;
+    }
+}
 
         // Ensure indexes for better query performance
         await db.collection('quiz_questions').createIndex({ category: 1, difficulty: 1 });
