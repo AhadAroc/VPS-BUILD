@@ -1,3 +1,4 @@
+require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
 const { Telegraf, session, Scenes } = require('telegraf');
 const express = require('express'); // Add this import
 const { token } = require('./config');
@@ -8,7 +9,7 @@ const { setupCommands } = require('./commands');
 const mongoose = require('mongoose');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const Clone = require('./models/Clone');
-require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
+
 
 // Use this function to get the bot's data and update statistics
 // Create a new bot instance
