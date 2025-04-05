@@ -29,7 +29,7 @@ const BOTS_DIR = path.join(__dirname, 'active_bots');
 if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
-const mongoose = require('mongoose');
+
 
 const cloneSchema = new mongoose.Schema({
   token: String,
