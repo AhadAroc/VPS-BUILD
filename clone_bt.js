@@ -29,6 +29,16 @@ const BOTS_DIR = path.join(__dirname, 'active_bots');
 if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
+const mongoose = require('mongoose');
+
+const cloneSchema = new mongoose.Schema({
+  token: String,
+  ownerId: Number,
+  createdAt: { type: Date, default: Date.now },
+  // add any other fields you use
+});
+
+mongoose.model('Clone', cloneSchema);
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
