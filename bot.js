@@ -8,7 +8,7 @@ const { setupCommands } = require('./commands');
 const Clone = require('./models/Clone'); // Add this line
 const mongoose = require('mongoose');
 const BOT_TOKEN = process.env.BOT_TOKEN;
-require('./models/clone');
+
 require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
 //hey this fucks ass file was changed 
 // Use this function to get the bot's data and update statistics
