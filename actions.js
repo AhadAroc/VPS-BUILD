@@ -882,7 +882,7 @@ bot.action('show_leaderboard', async (ctx) => {
 });
 
  // Register session middleware
-bot.use(Scenes.session());
+//bot.use(Scenes.session());
  
 
 // Add a button in the quiz menu for adding questions
