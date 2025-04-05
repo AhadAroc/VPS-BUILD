@@ -108,8 +108,6 @@ async function connectToMongoDB() {
         console.log('Attempting to connect to MongoDB...');
         
         const options = {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
             serverSelectionTimeoutMS: 30000,
             socketTimeoutMS: 45000,
             connectTimeoutMS: 30000,
