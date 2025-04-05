@@ -18,7 +18,7 @@ const app = express(); // Create Express app
 async function getBotData() {
     try {
         console.log('Attempting to find bot data...');
-        let botData = await Clone.findOne({ botToken: BOT_TOKEN }).maxTimeMS(20000);
+        let botData = await Clone.findOne({ botToken: BOT_TOKEN }).maxTimeMS(30000);
         console.log('Bot data query completed');
         
         if (!botData) {
@@ -31,7 +31,7 @@ async function getBotData() {
                 statistics: { messagesProcessed: 0, commandsExecuted: 0 }
             });
             console.log('Saving new bot data...');
-            await botData.save();
+            await botData.save({ timeout: 30000 });
             console.log('New database entry created for this bot');
         }
     
