@@ -16,51 +16,51 @@ const app = express(); // Create Express app
 
 async function getBotData() {
     try {
-        let botData = await Clone.findOne({ botToken: BOT_TOKEN });
+        console.log('Attempting to fetch bot data...');
+        let botData = await Clone.findOne({ botToken: BOT_TOKEN }).exec();
         
         if (!botData) {
-            console.log('No clone data found for this bot token');
-            // Create a new entry for this bot
+            console.log('No clone data found for this bot token. Creating new entry...');
             botData = new Clone({
                 botToken: BOT_TOKEN,
-                userId: 'default_user_id', // You might want to replace this with actual data
-                username: 'default_username', // You might want to replace this with actual data
+                userId: 'default_user_id',
+                username: 'default_username',
                 createdAt: new Date(),
                 statistics: { messagesProcessed: 0, commandsExecuted: 0 }
             });
             await botData.save();
             console.log('Created new database entry for this bot');
+        } else {
+            console.log('Bot data found:', botData);
         }
     
         return botData;
     } catch (error) {
         console.error('Error fetching bot data:', error);
-        return null;
+        throw error;
     }
 }
-// Initialize database
+
 async function initializeApp() {
     try {
-        // Setup database first
         await database.setupDatabase();
         console.log('Database initialized successfully');
 
-        // Check if bot data exists, create if not
-        const botData = await getBotData();
-        if (!botData) {
-            throw new Error('Failed to get or create bot data');
+        try {
+            const botData = await getBotData();
+            console.log('Bot data retrieved:', botData);
+        } catch (error) {
+            console.error('Failed to get or create bot data:', error);
+            // Continue execution even if bot data retrieval fails
         }
 
-        // Setup middlewares, commands, and actions
         setupMiddlewares(bot);
         setupCommands(bot);
         setupActions(bot);
 
-        // Launch the bot
         await bot.launch();
         console.log('Bot started successfully');
 
-        // Setup Express server if needed
         const PORT = process.env.PORT || 3000;
         app.listen(PORT, () => {
             console.log(`Express server is running on port ${PORT}`);
@@ -71,7 +71,6 @@ async function initializeApp() {
         process.exit(1);
     }
 }
-
 async function updateBotStats(stat, increment = 1) {
     try {
         const CloneModel = mongoose.model('Clone');
