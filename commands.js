@@ -337,6 +337,7 @@ bot.hears('بدء', async (ctx) => {
                 [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
                 [{ text: 'المطورين', callback_data: 'dev_developers' }],
                 [{ text: 'قريبا', callback_data: 'dev_welcome' }],
+                [{ text: 'رابط القناة', url: 'https://t.me/ctrlsrc' }],
                 [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
             ]
         };
