@@ -235,20 +235,23 @@ bot.hears('بدء', async (ctx) => {
     
     
     async function isSubscribed(ctx, userId) {
-        try {
-            // Check if the user is subscribed to the required channel
-            const channelUsername = 'ctrlsrc'; // Replace with your channel username
-            const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
-            
-            // Consider these statuses as subscribed
-            const subscribedStatuses = ['creator', 'administrator', 'member'];
-            return subscribedStatuses.includes(member.status);
-        } catch (error) {
-            console.error('Error checking subscription:', error);
-            // If there's an error, we'll assume they're not subscribed
-            return false;
-        }
+    try {
+        const channelUsername = 'ctrlsrc'; // Replace with your channel username
+        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
+        const wasSubscribed = ctx.session.isSubscribed || false;
+        const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
+        
+        ctx.session.isSubscribed = isNowSubscribed;
+        
+        return {
+            isSubscribed: isNowSubscribed,
+            statusChanged: wasSubscribed !== isNowSubscribed
+        };
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return { isSubscribed: false, statusChanged: false };
     }
+}}
 
 
     async function updateActiveGroups(ctx) {
