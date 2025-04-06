@@ -309,7 +309,7 @@ function loadExistingBots() {
             
             const botFilePath = path.join(BOTS_DIR, `bot_${botId}.js`);
             if (!fs.existsSync(botFilePath)) {
-                console.error(`Bot file not found for ${config.botUsername}`);
+                console.log(`Bot file not found for ${config.botUsername}. Skipping...`);
                 return;
             }
             
