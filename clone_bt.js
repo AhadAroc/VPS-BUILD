@@ -294,7 +294,17 @@ async function cloneBot(originalBotToken, newBotToken) {
     // Create a new database entry for the clone
     await createCloneDbEntry(cloneId, newBotToken);
   }
-
+async function cleanupDatabase() {
+    const CloneModel = mongoose.model('Clone');
+    const activeBotIds = Object.keys(activeBots);
+    
+    try {
+        const result = await CloneModel.deleteMany({ botId: { $nin: activeBotIds } });
+        console.log(`Cleaned up ${result.deletedCount} inactive bot entries from the database.`);
+    } catch (error) {
+        console.error('Error cleaning up database:', error);
+    }
+}
 // Load existing bots on startup
 function loadExistingBots() {
     if (!fs.existsSync(BOTS_DIR)) return;
