@@ -176,7 +176,24 @@ async function getQuestionsForDifficulty(difficulty) {
     }
 }
 
-
+async function isSubscribed(ctx, userId) {
+    try {
+        const channelUsername = 'ctrlsrc'; // Replace with your channel username
+        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
+        const wasSubscribed = ctx.session.isSubscribed || false;
+        const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
+        
+        ctx.session.isSubscribed = isNowSubscribed;
+        
+        return {
+            isSubscribed: isNowSubscribed,
+            statusChanged: wasSubscribed !== isNowSubscribed
+        };
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return { isSubscribed: false, statusChanged: false };
+    }
+}}
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
    // bot.command('start', (ctx) => {
@@ -240,24 +257,7 @@ bot.hears('بدء', async (ctx) => {
    
     
     
-    async function isSubscribed(ctx, userId) {
-    try {
-        const channelUsername = 'ctrlsrc'; // Replace with your channel username
-        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
-        const wasSubscribed = ctx.session.isSubscribed || false;
-        const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
-        
-        ctx.session.isSubscribed = isNowSubscribed;
-        
-        return {
-            isSubscribed: isNowSubscribed,
-            statusChanged: wasSubscribed !== isNowSubscribed
-        };
-    } catch (error) {
-        console.error('Error checking subscription:', error);
-        return { isSubscribed: false, statusChanged: false };
-    }
-}}
+    
 
 
     async function updateActiveGroups(ctx) {
