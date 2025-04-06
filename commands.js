@@ -1,4 +1,4 @@
-//gayshit 
+//broski?
 
 const { adminOnly } = require('./middlewares');
 const { developerIds } = require('./handlers');
