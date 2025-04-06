@@ -177,9 +177,9 @@ async function getQuestionsForDifficulty(difficulty) {
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
-    bot.command('start', (ctx) => {
-        ctx.reply('مرحبًا بك في البوت! استخدم الأمر /help للحصول على قائمة الأوامر المتاحة.');
-    });
+   // bot.command('start', (ctx) => {
+       // ctx.reply('مرحبًا بك في البوت! استخدم الأمر /help للحصول على قائمة الأوامر المتاحة.');
+   // });
 
       
 // Update the "بدء" command handler
