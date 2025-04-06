@@ -14,7 +14,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
 
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
+
 
 // Create a new bot instance
 const bot = new Telegraf(token);
