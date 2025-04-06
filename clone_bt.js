@@ -86,6 +86,21 @@ bot.action('create_bot', (ctx) => {
 bot.on('text', async (ctx) => {
     const token = ctx.message.text.trim();
     const userId = ctx.from.id;
+    // Inside the token submission handler
+const now = new Date();
+const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+const configContent = `
+module.exports = {
+    token: '${token}',
+    botId: ${botInfo.id},
+    botName: '${botInfo.first_name}',
+    botUsername: '${botInfo.username}',
+    expiryDate: '${expiryDate.toISOString()}',
+    createdAt: '${now.toISOString()}',
+    createdBy: ${ctx.from.id}
+};
+`;
 
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
@@ -124,7 +139,7 @@ module.exports = {
             // Create a custom bot file for this instance
             const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
             const botFileContent = `
-const { Telegraf } = require('telegraf');
+const { Telegraf, Markup } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
 const mongoose = require('mongoose');
@@ -157,13 +172,20 @@ async function initBot() {
             
             const result = await checkAndUpdateActivation(cloneId, userId);
             
+            let message = '';
             if (result.status === 'activated') {
-                ctx.reply('Welcome! Your bot has been activated for 30 days.');
+                message = 'مرحبًا بك في البوت! تم تفعيل البوت لمدة 30 يومًا. ';
             } else if (result.status === 'active') {
-                ctx.reply(\`Welcome back! \${result.message}\`);
+                message = \`مرحبًا بك مجددًا! \${result.message} \\n\\n\`;
             } else {
-                ctx.reply('There was an error activating your bot. Please contact support.');
+                message = 'حدث خطأ أثناء تفعيل البوت. يرجى الاتصال بالدعم. ';
             }
+            
+            message += 'الرجاء إضافة البوت في المجموعة الخاصة لغرض الاستخدام.';
+            
+            ctx.reply(message, Markup.inlineKeyboard([
+                Markup.button.url('أضفني إلى مجموعتك', \`https://t.me/\${ctx.me.username}?startgroup=true\`)
+            ]));
         });
         
         // Launch the bot
@@ -220,16 +242,19 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
                     ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
-- اسم البوت: ${botInfo.first_name}
-- ايدي البوت: ${botInfo.id}
-- معرف البوت: @${botInfo.username}
-- توكن البوت: <code>${token}</code>
-
-~ <b>تاريخ انتهاء الاشتراك</b>: ${EXPIRY_DATE}
-- يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
-                        parse_mode: 'HTML',
-                        disable_web_page_preview: true 
-                    });
+                        - اسم البوت: ${botInfo.first_name}
+                        - ايدي البوت: ${botInfo.id}
+                        - معرف البوت: @${botInfo.username}
+                        - توكن البوت: <code>${token}</code>
+                        
+                        ~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
+                        - يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
+                            parse_mode: 'HTML',
+                            disable_web_page_preview: true 
+                        });
+                        
+                        // Update the createCloneDbEntry call
+                        createCloneDbEntry(botInfo.id, token, expiryDate);
                 });
             });
         } else {
@@ -341,11 +366,12 @@ async function checkAndUpdateActivation(cloneId, userId) {
       return { status: 'active', message: `Bot is active. ${daysLeft} days left.` };
     }
   }
-async function createCloneDbEntry(botId, botToken) {
+  async function createCloneDbEntry(botId, botToken, expiryDate) {
     const CloneModel = mongoose.model('Clone', new mongoose.Schema({
         botId: String,
         botToken: String,
         createdAt: Date,
+        expiresAt: Date,
         statistics: {
             messagesProcessed: { type: Number, default: 0 },
             commandsExecuted: { type: Number, default: 0 },
@@ -356,6 +382,7 @@ async function createCloneDbEntry(botId, botToken) {
         botId,
         botToken,
         createdAt: new Date(),
+        expiresAt: expiryDate,
     });
 
     await newClone.save();
