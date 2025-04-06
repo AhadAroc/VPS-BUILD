@@ -8,7 +8,7 @@ const gifRestrictionStatus = new Map();
 const linkRestrictionStatus = new Map();
 const photoRestrictionStatus = new Map();
 const { MongoClient } = require('mongodb');
-
+const bot = require('./bot');
 // Assuming you have your MongoDB connection string in an environment variable
 const uri = process.env.MONGODB_URI;
 

@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const { Telegraf, session, Scenes } = require('telegraf');
 const express = require('express');
 
@@ -115,3 +116,8 @@ process.once('SIGTERM', () => {
     bot.stop('SIGTERM');
     database.client.close();
 });
+const { Telegraf } = require('telegraf');
+const bot = new Telegraf(process.env.BOT_TOKEN);
+// setup middleware, handlers, etc.
+module.exports = bot;
+s
