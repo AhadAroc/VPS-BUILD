@@ -201,9 +201,7 @@ async function handleStartCommand(ctx) {
     }
 }
 
-// Update the start command handler
-bot.command('start', handleStartCommand);
-bot.action('start', handleStartCommand);
+
 async function getDifficultyLevels() {
     const client = new MongoClient(uri);
     try {
@@ -1406,7 +1404,9 @@ bot.start(async (ctx) => {
 
    
 
-
+// Update the start command handler
+bot.command('start', handleStartCommand);
+bot.action('start', handleStartCommand);
 
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
 bot.command('ترقية_ثانوي', (ctx) => promoteUser(ctx, 'مطور ثانوي'));
