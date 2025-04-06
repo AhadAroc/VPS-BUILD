@@ -6,7 +6,7 @@ const { token } = require('./config');
 const database = require('./database');
 const { setupActions } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
-const { setupCommands } = require('./commands');
+const { setupCommands, isSubscribed } = require('./commands');
 
 const { Clone } = require('./models');
 
