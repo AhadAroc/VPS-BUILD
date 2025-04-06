@@ -1083,7 +1083,7 @@ async function getGroupLink(ctx) {
         console.error('Error in getGroupLink:', error);
         ctx.reply('❌ حدث خطأ أثناء محاولة جلب رابط المجموعة.');
     }
-}
+
 
 
 
@@ -1428,6 +1428,7 @@ bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
 });
 
+}
 
 
 module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty };
