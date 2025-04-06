@@ -96,12 +96,51 @@ function setupMiddlewares(bot) {
     });
 }
 
-function adminOnly(commandFunction) {
+function adminOnly(handler) {
     return async (ctx) => {
-        if (await isAdminOrOwner(ctx, ctx.from.id)) {
-            return commandFunction(ctx);
-        } else {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        try {
+            const userId = ctx.from.id;
+            const chatId = ctx.chat.id;
+
+            // Check if the user is the owner
+            if (ctx.from.username === 'Lorisiv') {
+                return handler(ctx);
+            }
+
+            // Check subscription
+            const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+            if (!isSubscribed) {
+                return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                            [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                        ]
+                    }
+                });
+            }
+
+            if (statusChanged) {
+                // User just subscribed, show the new prompt
+                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                        ]
+                    }
+                });
+            }
+
+            const member = await ctx.telegram.getChatMember(chatId, userId);
+            if (member.status === 'creator' || member.status === 'administrator') {
+                return handler(ctx);
+            } else {
+                ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
+        } catch (error) {
+            console.error('Error in adminOnly wrapper:', error);
+            ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحيات المستخدم.');
         }
     };
 }
