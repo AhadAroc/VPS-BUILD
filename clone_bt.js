@@ -438,29 +438,38 @@ bot.action(/^delete_bot_(\d+)$/, (ctx) => {
     
     const botInfo = activeBots[botId];
     
-    // Kill the bot process
-    if (botInfo.process) {
-        botInfo.process.kill();
-    }
-    
-    // Delete the bot files
-    try {
-        if (fs.existsSync(botInfo.configPath)) {
-            fs.unlinkSync(botInfo.configPath);
+    // Stop the bot process using PM2
+    const pm2 = require('pm2');
+    pm2.delete(`bot_${botId}`, (err) => {
+        if (err) {
+            console.error(`Error stopping bot ${botInfo.username}:`, err);
         }
-        if (fs.existsSync(botInfo.botFilePath)) {
-            fs.unlinkSync(botInfo.botFilePath);
+        
+        // Delete the bot files
+        try {
+            if (fs.existsSync(botInfo.configPath)) {
+                fs.unlinkSync(botInfo.configPath);
+            }
+            if (fs.existsSync(botInfo.botFilePath)) {
+                fs.unlinkSync(botInfo.botFilePath);
+            }
+        } catch (error) {
+            console.error(`Error deleting bot files for ${botInfo.username}:`, error);
         }
-    } catch (error) {
-        console.error(`Error deleting bot files for ${botInfo.username}:`, error);
-    }
     
-    // Remove from active bots
-    delete activeBots[botId];
-    
-    ctx.editMessageText(`✅ تم حذف البوت <b>${botInfo.name}</b> (@${botInfo.username}) بنجاح.`, {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([[Markup.button.callback('🔙 رجوع', 'admin_back')]])
+        // Remove from active bots
+        delete activeBots[botId];
+        
+        // Remove from database
+        const CloneModel = mongoose.model('Clone');
+        CloneModel.deleteOne({ botId: botId }).catch(error => {
+            console.error(`Error removing bot ${botId} from database:`, error);
+        });
+        
+        ctx.editMessageText(`✅ تم حذف البوت <b>${botInfo.name}</b> (@${botInfo.username}) بنجاح.`, {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 رجوع', 'admin_back')]])
+        });
     });
 });
    // Remove user deployment
