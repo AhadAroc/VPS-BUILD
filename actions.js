@@ -2569,9 +2569,22 @@ function adminOnly(handler) {
 async function forceCheckSubscription(ctx) {
     const userId = ctx.from.id;
     try {
-        const isSubbed = await isSubscribed(ctx, userId);
-        if (isSubbed) {
-            await ctx.answerCbQuery('✅ أنت مشترك في القناة.', { show_alert: true });
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        if (isSubscribed) {
+            if (statusChanged) {
+                // User just subscribed, show the new prompt
+                await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
+                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                        ]
+                    }
+                });
+            } else {
+                await ctx.answerCbQuery('✅ أنت مشترك في القناة.', { show_alert: true });
+            }
         } else {
             await ctx.answerCbQuery('❌ أنت غير مشترك في القناة. يرجى الاشتراك للاستمرار.', { show_alert: true });
             await ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
