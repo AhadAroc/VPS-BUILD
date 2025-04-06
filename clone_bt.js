@@ -557,7 +557,14 @@ bot.help((ctx) => {
         disable_web_page_preview: true
     });
 });
-
+// Start Express server for health checks
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+    // Load existing bots after server starts
+    loadExistingBots();
+    // Clean up the database
+    cleanupDatabase();
+});
 // Start Express server for health checks
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
