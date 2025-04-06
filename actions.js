@@ -335,6 +335,7 @@ function setupActions(bot, session, Scenes) {
                 [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
                 [{ text: 'المطورين', callback_data: 'dev_developers' }],
                 [{ text: 'قريبا', callback_data: 'dev_welcome' }],
+                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                 [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
             ]
         };
@@ -370,6 +371,7 @@ function setupActions(bot, session, Scenes) {
                 [{ text: '• مطور البوت الأساسي •', callback_data: 'main_bot_dev' }],
                 [{ text: '• مبرمج السورس •', callback_data: 'source_programmer' }],
                 [{ text: '• قناة السورس •', callback_data: 'source_channel' }],
+                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                 [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
             ]
         };
@@ -2519,6 +2521,7 @@ bot.action('back', async (ctx) => {
                     inline_keyboard: [
                         [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                         [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }]
+                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                     ]
                 }
             }
