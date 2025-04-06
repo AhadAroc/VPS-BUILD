@@ -86,21 +86,6 @@ bot.action('create_bot', (ctx) => {
 bot.on('text', async (ctx) => {
     const token = ctx.message.text.trim();
     const userId = ctx.from.id;
-    // Inside the token submission handler
-const now = new Date();
-const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-
-const configContent = `
-module.exports = {
-    token: '${token}',
-    botId: ${botInfo.id},
-    botName: '${botInfo.first_name}',
-    botUsername: '${botInfo.username}',
-    expiryDate: '${expiryDate.toISOString()}',
-    createdAt: '${now.toISOString()}',
-    createdBy: ${ctx.from.id}
-};
-`;
 
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
@@ -120,6 +105,10 @@ module.exports = {
         if (response.data && response.data.ok) {
             const botInfo = response.data.result;
             
+            // Calculate expiry date
+            const now = new Date();
+            const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
             // Create a config file for this bot instance
             const configPath = path.join(BOTS_DIR, `${botInfo.id}_config.js`);
             const configContent = `
@@ -128,8 +117,8 @@ module.exports = {
     botId: ${botInfo.id},
     botName: '${botInfo.first_name}',
     botUsername: '${botInfo.username}',
-    expiryDate: '${EXPIRY_DATE}',
-    createdAt: '${new Date().toISOString()}',
+    expiryDate: '${expiryDate.toISOString()}',
+    createdAt: '${now.toISOString()}',
     createdBy: ${ctx.from.id}
 };
             `;
@@ -228,7 +217,7 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
                         name: botInfo.first_name,
                         username: botInfo.username,
                         token: token,
-                        expiry: EXPIRY_DATE,
+                        expiry: expiryDate.toISOString(),
                         configPath: configPath,
                         botFilePath: botFilePath,
                         createdBy: ctx.from.id
@@ -238,23 +227,20 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
                     userDeployments.set(userId, botInfo.id);
 
                     // Create database entry
-                    createCloneDbEntry(botInfo.id, token);
+                    createCloneDbEntry(botInfo.id, token, expiryDate);
 
                     ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
-                        - اسم البوت: ${botInfo.first_name}
-                        - ايدي البوت: ${botInfo.id}
-                        - معرف البوت: @${botInfo.username}
-                        - توكن البوت: <code>${token}</code>
-                        
-                        ~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
-                        - يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
-                            parse_mode: 'HTML',
-                            disable_web_page_preview: true 
-                        });
-                        
-                        // Update the createCloneDbEntry call
-                        createCloneDbEntry(botInfo.id, token, expiryDate);
+- اسم البوت: ${botInfo.first_name}
+- ايدي البوت: ${botInfo.id}
+- معرف البوت: @${botInfo.username}
+- توكن البوت: <code>${token}</code>
+
+~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
+- يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
+                        parse_mode: 'HTML',
+                        disable_web_page_preview: true 
+                    });
                 });
             });
         } else {
