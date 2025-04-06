@@ -385,18 +385,7 @@ bot.hears('بدء', async (ctx) => {
     ⌁︙تفعيل متحركة ↫ السماح بإرسال الصور المتحركة`
     
     }
-    async function isDeveloper(ctx, userId) {
-        if (developerIds.has(userId.toString())) {
-            return true;
-        }
-        try {
-            const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, userId);
-            return chatMember.custom_title === 'مطور';
-        } catch (error) {
-            console.error('Error checking developer status:', error);
-            return false;
-        }
-    }
+  
     // Add this function to get the custom bot name for a chat
     async function getCustomBotName(chatId) {
         try {
