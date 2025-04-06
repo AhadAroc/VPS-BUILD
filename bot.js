@@ -8,6 +8,7 @@ const database = require('./database');
 const { setupActions } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
 const { setupCommands } = require('./commands');
+<<<<<<< HEAD
 
 
 const { Clone } = require('./models');
@@ -15,11 +16,13 @@ const mongoose = require('mongoose');
 
 require('dotenv').config();  // Add this at the top of bot.js if you're using a .env file
 
+=======
+>>>>>>> 067bfa15c20595e785070fda1bd44e79c1a67682
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const BOT_TOKEN = process.env.BOT_TOKEN || token;
 
 // Create a new bot instance
-const bot = new Telegraf(token);
+const bot = new Telegraf(BOT_TOKEN);
 const app = express(); // Create Express app
 
 // Define the Clone model
@@ -34,7 +37,11 @@ const CloneSchema = new mongoose.Schema({
     }
 });
 
+<<<<<<< HEAD
 
+=======
+const Clone = mongoose.model('Clone', CloneSchema);
+>>>>>>> 067bfa15c20595e785070fda1bd44e79c1a67682
 
 async function getBotData() {
     try {
@@ -93,10 +100,10 @@ async function initializeApp() {
         process.exit(1);
     }
 }
+
 async function updateBotStats(stat, increment = 1) {
     try {
-        const CloneModel = mongoose.model('Clone');
-        await CloneModel.findOneAndUpdate(
+        await Clone.findOneAndUpdate(
             { botToken: BOT_TOKEN },
             { $inc: { [`statistics.${stat}`]: increment } }
         );
@@ -104,6 +111,7 @@ async function updateBotStats(stat, increment = 1) {
         console.error('Error updating bot statistics:', error);
     }
 }
+
 // Start the application
 initializeApp();
 
@@ -116,8 +124,5 @@ process.once('SIGTERM', () => {
     bot.stop('SIGTERM');
     database.client.close();
 });
-const { Telegraf } = require('telegraf');
-const bot = new Telegraf(process.env.BOT_TOKEN);
-// setup middleware, handlers, etc.
+
 module.exports = bot;
-s
