@@ -183,7 +183,9 @@ function setupCommands(bot) {
        // ctx.reply('مرحبًا بك في البوت! استخدم الأمر /help للحصول على قائمة الأوامر المتاحة.');
    // });
 
-      
+ // Update the start command handler
+bot.command('start', handleStartCommand);
+bot.action('start', handleStartCommand);     
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
