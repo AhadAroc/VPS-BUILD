@@ -349,7 +349,12 @@ function loadExistingBots() {
         }
     });
 }
-
+// Populate userDeployments map
+Object.values(activeBots).forEach(botInfo => {
+    if (botInfo.createdBy) {
+        userDeployments.set(botInfo.createdBy, botInfo.botId);
+    }
+});
 // Add admin commands
 bot.command('admin', (ctx) => {
     if (ctx.from.id !== ADMIN_ID) {
@@ -448,7 +453,11 @@ bot.action(/^delete_bot_(\d+)$/, (ctx) => {
         ...Markup.inlineKeyboard([[Markup.button.callback('🔙 رجوع', 'admin_back')]])
     });
 });
-
+   // Remove user deployment
+const userId = Object.keys(userDeployments).find(key => userDeployments.get(key) === botId);
+if (userId) {
+    userDeployments.delete(parseInt(userId));
+}
 // Restart all bots
 bot.action('admin_restart_all', async (ctx) => {
     if (ctx.from.id !== ADMIN_ID) return;
