@@ -32,7 +32,7 @@ const CloneSchema = new mongoose.Schema({
     }
 });
 
-let Clone;
+
 
 async function getBotData() {
     try {
