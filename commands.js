@@ -178,8 +178,20 @@ async function getQuestionsForDifficulty(difficulty) {
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
     bot.command('start', (ctx) => {
-        ctx.reply('مرحبًا بك في البوت! استخدم الأمر /help للحصول على قائمة الأوامر المتاحة.');
-    });
+    if (ctx.chat.type === 'private') {
+        // This is a DM
+        ctx.reply('مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }]
+                ]
+            }
+        });
+    } else {
+        // This is a group chat, do nothing
+        return;
+    }
+});
 
       
 // Update the "بدء" command handler
