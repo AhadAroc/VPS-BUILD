@@ -1,3 +1,5 @@
+//gayshit 
+
 const { adminOnly } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
