@@ -44,13 +44,16 @@ if (!fs.existsSync(BOTS_DIR)) {
 
 
 const cloneSchema = new mongoose.Schema({
-  token: String,
-  ownerId: Number,
-  createdAt: { type: Date, default: Date.now },
-  // add any other fields you use
-});
-
-mongoose.model('Clone', cloneSchema);
+    token: String,
+    ownerId: Number,
+    createdAt: { type: Date, default: Date.now },
+    activatedAt: Date,
+    expiresAt: Date,
+    isActive: { type: Boolean, default: false },
+    // add any other fields you use
+  });
+  
+  const Clone = mongoose.model('Clone', cloneSchema);
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
@@ -124,6 +127,8 @@ module.exports = {
 const { Telegraf } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
+const mongoose = require('mongoose');
+const { checkAndUpdateActivation } = require('../botUtils');
 
 const bot = new Telegraf(token);
 
@@ -146,7 +151,20 @@ async function initBot() {
         
         // Add your custom protection bot logic here
         
-        bot.start((ctx) => ctx.reply('Welcome to your personalized protection bot!'));
+        bot.command('start', async (ctx) => {
+            const userId = ctx.from.id;
+            const cloneId = token; // Using token as cloneId
+            
+            const result = await checkAndUpdateActivation(cloneId, userId);
+            
+            if (result.status === 'activated') {
+                ctx.reply('Welcome! Your bot has been activated for 30 days.');
+            } else if (result.status === 'active') {
+                ctx.reply(\`Welcome back! \${result.message}\`);
+            } else {
+                ctx.reply('There was an error activating your bot. Please contact support.');
+            }
+        });
         
         // Launch the bot
         await bot.launch();
@@ -300,6 +318,29 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
         ctx.dispatch('show_active_bots');
     });
 });
+
+async function checkAndUpdateActivation(cloneId, userId) {
+    const clone = await Clone.findOne({ token: cloneId });
+    
+    if (!clone) {
+      return { status: 'not_found', message: 'Bot not found.' };
+    }
+  
+    const now = new Date();
+  
+    if (!clone.activatedAt || now > clone.expiresAt) {
+      // Bot needs activation or reactivation
+      clone.activatedAt = now;
+      clone.expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+      clone.isActive = true;
+      await clone.save();
+      return { status: 'activated', message: 'Bot activated for 30 days.' };
+    } else {
+      // Bot is already active
+      const daysLeft = Math.ceil((clone.expiresAt - now) / (24 * 60 * 60 * 1000));
+      return { status: 'active', message: `Bot is active. ${daysLeft} days left.` };
+    }
+  }
 async function createCloneDbEntry(botId, botToken) {
     const CloneModel = mongoose.model('Clone', new mongoose.Schema({
         botId: String,
