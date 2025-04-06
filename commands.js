@@ -1504,3 +1504,4 @@ bot.hears('الاوامر', (ctx) => {
 
 module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSubscribed };
 
+}
