@@ -193,7 +193,8 @@ async function isSubscribed(ctx, userId) {
         console.error('Error checking subscription:', error);
         return { isSubscribed: false, statusChanged: false };
     }
-}}
+}
+
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
    // bot.command('start', (ctx) => {
