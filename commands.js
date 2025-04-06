@@ -135,7 +135,75 @@ async function showQuizMenu(ctx) {
         await ctx.reply(caption, { reply_markup: keyboard });
     }
 }
+async function handleStartCommand(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        const isDM = ctx.chat.type === 'private';
 
+        console.log('DEBUG: /start command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+
+        // Check if the user is the owner
+        if (ctx.from.username === 'Lorsiv') {
+            return showMainMenu(ctx);
+        }
+
+        // Check subscription
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        if (!isSubscribed) {
+            return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+
+        if (statusChanged) {
+            // User just subscribed, show the new prompt
+            await ctx.reply('شكرًا لاشتراكك! يمكنك الآن استخدام البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'انضم إلى مجموعتنا', url: 'https://t.me/${groupUsername}' }],
+                        [{ text: 'قناة المطورين', url: 'https://t.me/ctrlsrc' }]
+                    ]
+                }
+            });
+        }
+
+        if (isDM) {
+            const isDevResult = await isDeveloper(ctx, userId);
+            console.log('DEBUG: isDeveloper result:', isDevResult);
+            
+            if (isDevResult) {
+                console.log('DEBUG: Showing developer panel');
+                return await showDevPanel(ctx);
+            } else {
+                // Show the main menu with photo for regular users in DM
+                return await showMainMenu(ctx);
+            }
+        } else {
+            // For group chats
+            const member = await ctx.telegram.getChatMember(chatId, userId);
+            if (member.status === 'creator' || member.status === 'administrator') {
+                console.log('DEBUG: User is admin/owner in group, showing main menu');
+                return await showMainMenu(ctx);
+            } else {
+                console.log('DEBUG: Regular user in group, showing basic message');
+                return ctx.reply('مرحبًا! يمكنك استخدام الأوامر المتاحة في المجموعة.');
+            }
+        }
+    } catch (error) {
+        console.error('Error in handleStartCommand:', error);
+        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+}
+
+// Update the start command handler
+bot.command('start', handleStartCommand);
+bot.action('start', handleStartCommand);
 async function getDifficultyLevels() {
     const client = new MongoClient(uri);
     try {
