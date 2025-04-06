@@ -7,6 +7,8 @@ const path = require('path');
 const axios = require('axios');
 const express = require('express');
 const mongoURI = process.env.MONGODB_URI;
+// Store user deployments
+const userDeployments = new Map();
 require('dotenv').config();
 //const Heroku = require('heroku-client');
 const mongoose = require('mongoose');
@@ -80,6 +82,12 @@ bot.action('create_bot', (ctx) => {
 // Handle token submission
 bot.on('text', async (ctx) => {
     const token = ctx.message.text.trim();
+    const userId = ctx.from.id;
+
+    // Check if user already has a deployed bot
+    if (userDeployments.has(userId)) {
+        return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
+    }
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
@@ -155,7 +163,7 @@ process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 `;
 
-fs.writeFileSync(botFilePath, botFileContent);
+            fs.writeFileSync(botFilePath, botFileContent);
             
             // Start the bot using PM2
             const pm2 = require('pm2');
@@ -182,8 +190,12 @@ fs.writeFileSync(botFilePath, botFileContent);
                         token: token,
                         expiry: EXPIRY_DATE,
                         configPath: configPath,
-                        botFilePath: botFilePath
+                        botFilePath: botFilePath,
+                        createdBy: ctx.from.id
                     };
+
+                    // Store user deployment
+                    userDeployments.set(userId, botInfo.id);
 
                     // Create database entry
                     createCloneDbEntry(botInfo.id, token);
