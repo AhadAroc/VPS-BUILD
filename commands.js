@@ -1427,7 +1427,7 @@ bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساس
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
 });
-}
+
 
 
 module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty };
