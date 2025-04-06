@@ -1404,9 +1404,7 @@ bot.start(async (ctx) => {
 
    
 
-// Update the start command handler
-bot.command('start', handleStartCommand);
-bot.action('start', handleStartCommand);
+
 
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
 bot.command('ترقية_ثانوي', (ctx) => promoteUser(ctx, 'مطور ثانوي'));
