@@ -52,7 +52,7 @@ function showMainMenu(ctx) {
                 [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                 [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
                 [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
-                [{ text: 'رابط القناة', url: 'https://t.me/ctrlsrc' }]
+                [{ text: '@ctrlsrc', url: 'https://t.me/ctrlsrc' }]
             ]
         }
     });
@@ -337,7 +337,7 @@ bot.hears('بدء', async (ctx) => {
                 [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
                 [{ text: 'المطورين', callback_data: 'dev_developers' }],
                 [{ text: 'قريبا', callback_data: 'dev_welcome' }],
-                [{ text: 'رابط القناة', url: 'https://t.me/ctrlsrc' }],
+                [{ text: '@ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                 [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
             ]
         };
