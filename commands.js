@@ -1196,16 +1196,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     chatStates.delete(ctx.chat.id);
     await showQuizMenu(ctx);
 });
-// Add this callback handler for the quiz_bot button
-bot.action('quiz_bot', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        await showQuizMenu(ctx);
-    } catch (error) {
-        console.error('Error handling quiz_bot action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء فتح قائمة المسابقات.');
-    }
-});
+
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
