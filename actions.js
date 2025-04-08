@@ -834,7 +834,16 @@ createGroupsTable();
     }
 
  
-
+// Add this callback handler for the quiz_bot button
+bot.action('quiz_bot', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await showQuizMenu(ctx);
+    } catch (error) {
+        console.error('Error handling quiz_bot action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء فتح قائمة المسابقات.');
+    }
+});
 
        // Show commands
 bot.action('show_commands', adminOnly((ctx) => {
