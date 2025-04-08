@@ -251,6 +251,42 @@ bot.action('show_stats', async (ctx) => {
         await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض إحصائياتك. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 });     
+
+
+  bot.action('add_custom_questions', async (ctx) => {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+        await ctx.answerCbQuery();
+        await startAddingCustomQuestions(ctx);
+    } catch (error) {
+        console.error('Error handling add_custom_questions action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
+    }
+});
+
+// Add this action handler for the configure_quiz button
+bot.action('configure_quiz', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await configureQuiz(ctx);
+    } catch (error) {
+        console.error('Error handling configure_quiz action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة فتح إعدادات المسابقة.');
+    }
+});
+
+bot.action('add_another_question', async (ctx) => {
+    await ctx.answerCbQuery();
+    await startAddingCustomQuestions(ctx);
+});
+
+bot.action('back_to_quiz_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    chatStates.delete(ctx.chat.id);
+    await showQuizMenu(ctx);
+});
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
@@ -1162,40 +1198,7 @@ async function getGroupLink(ctx) {
 
 
 
-bot.action('add_custom_questions', async (ctx) => {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-        await ctx.answerCbQuery();
-        await startAddingCustomQuestions(ctx);
-    } catch (error) {
-        console.error('Error handling add_custom_questions action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
-    }
-});
 
-// Add this action handler for the configure_quiz button
-bot.action('configure_quiz', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        await configureQuiz(ctx);
-    } catch (error) {
-        console.error('Error handling configure_quiz action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة فتح إعدادات المسابقة.');
-    }
-});
-
-bot.action('add_another_question', async (ctx) => {
-    await ctx.answerCbQuery();
-    await startAddingCustomQuestions(ctx);
-});
-
-bot.action('back_to_quiz_menu', async (ctx) => {
-    await ctx.answerCbQuery();
-    chatStates.delete(ctx.chat.id);
-    await showQuizMenu(ctx);
-});
 
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
