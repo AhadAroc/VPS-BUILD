@@ -832,7 +832,35 @@ createGroupsTable();
     
         ctx.editMessageText(message, { reply_markup: keyboard });
     }
-
+// Add this callback handler for returning to the main menu
+bot.action('back_to_main', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        // Get the original photo URL
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
+        
+        // Edit the message to show the main menu again
+        await ctx.editMessageMedia(
+            {
+                type: 'photo',
+                media: photoUrl,
+                caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:'
+            },
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }]
+                    ]
+                }
+            }
+        );
+    } catch (error) {
+        console.error('Error returning to main menu:', error);
+        await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
+    }
+});
  
 // Add this callback handler for the quiz_bot button
 bot.action('quiz_bot', async (ctx) => {
