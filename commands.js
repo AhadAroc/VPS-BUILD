@@ -193,7 +193,64 @@ function setupCommands(bot) {
     }
 });
 
-      
+ // Add this action handler for the show_stats button
+bot.action('show_stats', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        const userId = ctx.from.id;
+        const stats = await database.getUserStatistics(userId);
+        
+        // Create a visually appealing statistics message
+        let statsMessage = `📊 *إحصائياتك في المسابقات* 📊\n\n`;
+        
+        // Add user info
+        statsMessage += `👤 *المستخدم:* ${ctx.from.first_name}\n`;
+        statsMessage += `🆔 *المعرف:* @${ctx.from.username || 'غير متوفر'}\n\n`;
+        
+        // Add statistics with emojis
+        statsMessage += `🏆 *المركز في قائمة المتصدرين:* ${stats.rank}\n`;
+        statsMessage += `💯 *مجموع النقاط:* ${stats.totalScore} نقطة\n`;
+        statsMessage += `🎮 *عدد المسابقات المشارك بها:* ${stats.quizCount}\n`;
+        statsMessage += `✅ *الإجابات الصحيحة:* ${stats.correctAnswers}\n`;
+        statsMessage += `📝 *إجمالي الإجابات:* ${stats.totalAnswers}\n`;
+        statsMessage += `🎯 *نسبة الدقة:* ${stats.accuracy}%\n\n`;
+        
+        // Add motivational message based on performance
+        if (stats.accuracy >= 80) {
+            statsMessage += `🌟 *رائع!* أداؤك ممتاز في المسابقات. استمر!`;
+        } else if (stats.accuracy >= 50) {
+            statsMessage += `👍 *جيد!* أنت في الطريق الصحيح. واصل التقدم!`;
+        } else if (stats.totalAnswers > 0) {
+            statsMessage += `💪 *لا بأس!* استمر في المحاولة وستتحسن نتائجك.`;
+        } else {
+            statsMessage += `🚀 *ابدأ الآن!* شارك في المسابقات لتظهر إحصائياتك هنا.`;
+        }
+        
+        // Add back button
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: '🔙 العودة لقائمة المسابقات', callback_data: 'back_to_quiz_menu' }]
+            ]
+        };
+        
+        // Send the statistics message
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(statsMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
+        } else {
+            await ctx.editMessageText(statsMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
+        }
+    } catch (error) {
+        console.error('Error showing user statistics:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض الإحصائيات.');
+        await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض إحصائياتك. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+});     
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
@@ -1103,64 +1160,7 @@ async function getGroupLink(ctx) {
 
 
 
-// Add this action handler for the show_stats button
-bot.action('show_stats', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        const userId = ctx.from.id;
-        const stats = await database.getUserStatistics(userId);
-        
-        // Create a visually appealing statistics message
-        let statsMessage = `📊 *إحصائياتك في المسابقات* 📊\n\n`;
-        
-        // Add user info
-        statsMessage += `👤 *المستخدم:* ${ctx.from.first_name}\n`;
-        statsMessage += `🆔 *المعرف:* @${ctx.from.username || 'غير متوفر'}\n\n`;
-        
-        // Add statistics with emojis
-        statsMessage += `🏆 *المركز في قائمة المتصدرين:* ${stats.rank}\n`;
-        statsMessage += `💯 *مجموع النقاط:* ${stats.totalScore} نقطة\n`;
-        statsMessage += `🎮 *عدد المسابقات المشارك بها:* ${stats.quizCount}\n`;
-        statsMessage += `✅ *الإجابات الصحيحة:* ${stats.correctAnswers}\n`;
-        statsMessage += `📝 *إجمالي الإجابات:* ${stats.totalAnswers}\n`;
-        statsMessage += `🎯 *نسبة الدقة:* ${stats.accuracy}%\n\n`;
-        
-        // Add motivational message based on performance
-        if (stats.accuracy >= 80) {
-            statsMessage += `🌟 *رائع!* أداؤك ممتاز في المسابقات. استمر!`;
-        } else if (stats.accuracy >= 50) {
-            statsMessage += `👍 *جيد!* أنت في الطريق الصحيح. واصل التقدم!`;
-        } else if (stats.totalAnswers > 0) {
-            statsMessage += `💪 *لا بأس!* استمر في المحاولة وستتحسن نتائجك.`;
-        } else {
-            statsMessage += `🚀 *ابدأ الآن!* شارك في المسابقات لتظهر إحصائياتك هنا.`;
-        }
-        
-        // Add back button
-        const replyMarkup = {
-            inline_keyboard: [
-                [{ text: '🔙 العودة لقائمة المسابقات', callback_data: 'back_to_quiz_menu' }]
-            ]
-        };
-        
-        // Send the statistics message
-        if (ctx.callbackQuery.message.photo) {
-            await ctx.editMessageCaption(statsMessage, {
-                parse_mode: 'Markdown',
-                reply_markup: replyMarkup
-            });
-        } else {
-            await ctx.editMessageText(statsMessage, {
-                parse_mode: 'Markdown',
-                reply_markup: replyMarkup
-            });
-        }
-    } catch (error) {
-        console.error('Error showing user statistics:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء عرض الإحصائيات.');
-        await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض إحصائياتك. الرجاء المحاولة مرة أخرى لاحقًا.');
-    }
-});
+
 
 bot.action('add_custom_questions', async (ctx) => {
     try {
