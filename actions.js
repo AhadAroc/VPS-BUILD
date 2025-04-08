@@ -2568,8 +2568,8 @@ bot.action('back', async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }]
-                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
                     ]
                 }
             }
