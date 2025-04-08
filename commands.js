@@ -1104,7 +1104,128 @@ async function getGroupLink(ctx) {
 
 
 // Add this action handler for the show_stats button
+bot.action('show_stats', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        const userId = ctx.from.id;
+        const stats = await database.getUserStatistics(userId);
+        
+        // Create a visually appealing statistics message
+        let statsMessage = `📊 *إحصائياتك في المسابقات* 📊\n\n`;
+        
+        // Add user info
+        statsMessage += `👤 *المستخدم:* ${ctx.from.first_name}\n`;
+        statsMessage += `🆔 *المعرف:* @${ctx.from.username || 'غير متوفر'}\n\n`;
+        
+        // Add statistics with emojis
+        statsMessage += `🏆 *المركز في قائمة المتصدرين:* ${stats.rank}\n`;
+        statsMessage += `💯 *مجموع النقاط:* ${stats.totalScore} نقطة\n`;
+        statsMessage += `🎮 *عدد المسابقات المشارك بها:* ${stats.quizCount}\n`;
+        statsMessage += `✅ *الإجابات الصحيحة:* ${stats.correctAnswers}\n`;
+        statsMessage += `📝 *إجمالي الإجابات:* ${stats.totalAnswers}\n`;
+        statsMessage += `🎯 *نسبة الدقة:* ${stats.accuracy}%\n\n`;
+        
+        // Add motivational message based on performance
+        if (stats.accuracy >= 80) {
+            statsMessage += `🌟 *رائع!* أداؤك ممتاز في المسابقات. استمر!`;
+        } else if (stats.accuracy >= 50) {
+            statsMessage += `👍 *جيد!* أنت في الطريق الصحيح. واصل التقدم!`;
+        } else if (stats.totalAnswers > 0) {
+            statsMessage += `💪 *لا بأس!* استمر في المحاولة وستتحسن نتائجك.`;
+        } else {
+            statsMessage += `🚀 *ابدأ الآن!* شارك في المسابقات لتظهر إحصائياتك هنا.`;
+        }
+        
+        // Add back button
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: '🔙 العودة لقائمة المسابقات', callback_data: 'back_to_quiz_menu' }]
+            ]
+        };
+        
+        // Send the statistics message
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(statsMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
+        } else {
+            await ctx.editMessageText(statsMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
+        }
+    } catch (error) {
+        console.error('Error showing user statistics:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض الإحصائيات.');
+        await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض إحصائياتك. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
+bot.action('add_custom_questions', async (ctx) => {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+        await ctx.answerCbQuery();
+        await startAddingCustomQuestions(ctx);
+    } catch (error) {
+        console.error('Error handling add_custom_questions action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
+    }
+});
+
+// Add this action handler for the configure_quiz button
+bot.action('configure_quiz', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await configureQuiz(ctx);
+    } catch (error) {
+        console.error('Error handling configure_quiz action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة فتح إعدادات المسابقة.');
+    }
+});
+
+bot.action('add_another_question', async (ctx) => {
+    await ctx.answerCbQuery();
+    await startAddingCustomQuestions(ctx);
+});
+
+bot.action('back_to_quiz_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    chatStates.delete(ctx.chat.id);
+    await showQuizMenu(ctx);
+});
+
+// Add this callback handler for returning to the main menu
+bot.action('back_to_main', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        // Get the original photo URL
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
+        
+        // Edit the message to show the main menu again
+        await ctx.editMessageMedia(
+            {
+                type: 'photo',
+                media: photoUrl,
+                caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:'
+            },
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }]
+                    ]
+                }
+            }
+        );
+    } catch (error) {
+        console.error('Error returning to main menu:', error);
+        await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
+    }
+});
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
@@ -1315,19 +1436,5 @@ bot.hears('الاوامر', (ctx) => {
 }
 
 
-module.exports = {
-    setupCommands,
-    isAdminOrOwner,
-    showMainMenu,
-    showQuizMenu,
-    getLeaderboard,
-    getDifficultyLevels,
-    getQuestionsForDifficulty,
-    showStats,
-    addCustomQuestions,
-    configureQuiz,
-    addAnotherQuestion,
-    backToQuizMenu,
-    backToMain
-};
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty };
 
