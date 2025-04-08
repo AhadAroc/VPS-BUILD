@@ -851,7 +851,8 @@ bot.action('back_to_main', async (ctx) => {
                     inline_keyboard: [
                         [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                         [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }]
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
                     ]
                 }
             }
