@@ -106,11 +106,26 @@ async function updateBotStats(stat, increment = 1) {
 initializeApp();
 
 // Enable graceful stop
-process.once('SIGINT', () => {
-    bot.stop('SIGINT');
-    database.client.close();
-});
-process.once('SIGTERM', () => {
-    bot.stop('SIGTERM');
-    database.client.close();
-});
+async function gracefulShutdown(signal) {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    try {
+        if (bot && typeof bot.stop === 'function') {
+            await bot.stop(signal);
+            console.log('Bot stopped.');
+        }
+        if (database && database.client && typeof database.client.close === 'function') {
+            await database.client.close();
+            console.log('Database connection closed.');
+        }
+        console.log('Graceful shutdown completed.');
+    } catch (error) {
+        console.error('Error during graceful shutdown:', error);
+    } finally {
+        process.exit(0);
+    }
+}
+
+process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+module.exports = { bot, updateBotStats };
