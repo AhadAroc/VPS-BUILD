@@ -1746,7 +1746,7 @@ bot.on('left_chat_member', (ctx) => {
     // Check for automatic replies
     try {
         const db = await ensureDatabaseInitialized();
-        const reply = await db.collection('replies').findOne({ word: ctx.message.text.trim() });
+        const reply = await db.collection('replies').findOne({ trigger_word: ctx.message.text.trim() });
         
         if (reply) {
             if (reply.type === 'text' && reply.text) {
@@ -1825,7 +1825,7 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     // Handle awaiting reply response
-  if (awaitingReplyResponse) {
+if (awaitingReplyResponse) {
         try {
             let mediaType = 'text';
             let replyText = null;
@@ -1871,7 +1871,7 @@ bot.on('left_chat_member', (ctx) => {
             const db = await ensureDatabaseInitialized();
 
             // Check if the trigger word already exists
-            const existingReply = await db.collection('replies').findOne({ word: tempReplyWord });
+            const existingReply = await db.collection('replies').findOne({ trigger_word: tempReplyWord });
             if (existingReply) {
                 await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
                 awaitingReplyResponse = false;
@@ -1880,7 +1880,7 @@ bot.on('left_chat_member', (ctx) => {
 
             // Insert the new reply
             await db.collection('replies').insertOne({
-                word: tempReplyWord,
+                trigger_word: tempReplyWord, // Changed from 'word' to 'trigger_word'
                 type: mediaType,
                 text: replyText,
                 media_url: mediaUrl,
