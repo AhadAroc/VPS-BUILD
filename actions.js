@@ -1483,197 +1483,198 @@ bot.on('left_chat_member', (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
-        console.log('Received message:', ctx.message.text);
-        
-        const chatId = ctx.chat.id;
-        const userId = ctx.from.id;
-        const userAnswer = ctx.message.text.trim().toLowerCase();
-        if (chatStates.has(ctx.chat.id)) {
-            await handleCustomQuestionInput(ctx);
-            return;
-        }
+    console.log('Received message:', ctx.message.text);
     
-        // Check if there's an active quiz in this chat
-        if (activeQuizzes.has(chatId)) {
-            const quiz = activeQuizzes.get(chatId);
-            console.log('Quiz state:', quiz.state);
-            console.log('Current question index:', quiz.currentQuestionIndex);
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const userAnswer = ctx.message.text.trim().toLowerCase();
+    
+    if (chatStates.has(ctx.chat.id)) {
+        await handleCustomQuestionInput(ctx);
+        return;
+    }
+
+    // Check if there's an active quiz in this chat
+    if (activeQuizzes.has(chatId)) {
+        const quiz = activeQuizzes.get(chatId);
+        console.log('Quiz state:', quiz.state);
+        console.log('Current question index:', quiz.currentQuestionIndex);
+        
+        // Check if the quiz is in the active state
+        if (quiz.state === QUIZ_STATE.ACTIVE) {
+            const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
+            const correctAnswer = currentQuestion.answer.toLowerCase();
             
-            // Check if the quiz is in the active state
-            if (quiz.state === QUIZ_STATE.ACTIVE) {
-                const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-                const correctAnswer = currentQuestion.answer.toLowerCase();
-                
-                // Check if the user has already attempted this question
-                if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
-                    quiz.attempts.set(quiz.currentQuestionIndex, new Set());
-                }
-                
-                const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
-                
-                // If user already attempted, ignore
-                if (questionAttempts.has(userId)) {
-                    return;
-                }
-                
-                // Mark this user as having attempted this question
-                questionAttempts.add(userId);
-                
-                // Check if the answer is correct
-                if (userAnswer === correctAnswer) {
-                    // Update user's score
-                    if (!quiz.scores.has(userId)) {
-                        quiz.scores.set(userId, 0);
-                    }
-                    
-                    // Add points based on difficulty
-                    let points = 1;
-                    if (quiz.difficulty === 'medium') points = 2;
-                    if (quiz.difficulty === 'hard') points = 3;
-                    
-                    quiz.scores.set(userId, quiz.scores.get(userId) + points);
-                    
-                    // Reply to the user
-                    await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
-                        reply_to_message_id: ctx.message.message_id
-                    });
-                    
-                    // Move to the next question after a short delay
-                    setTimeout(async () => {
-                        quiz.currentQuestionIndex++;
-                        
-                        // Check if we've reached the end of the quiz
-                        if (quiz.currentQuestionIndex >= quiz.questions.length) {
-                            await endQuiz(ctx, chatId);
-                        } else {
-                            // Show the next question
-                            await askNextQuestion(chatId, ctx.telegram);
-                        }
-                    }, 2000);
-                } else {
-                    // Wrong answer
-                    await ctx.reply('❌ إجابة خاطئة. حاول مرة أخرى!', {
-                        reply_to_message_id: ctx.message.message_id
-                    });
-                }
-                return; // Exit the handler after processing quiz answer
+            // Initialize attempts tracking for this question if it doesn't exist
+            if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
+                quiz.attempts.set(quiz.currentQuestionIndex, new Set());
             }
-        }
-        
-        // Handle other text messages (non-quiz related)
-        
-        // Check for automatic replies
-        try {
-            const db = await ensureDatabaseInitialized();
-            const reply = await db.collection('replies').findOne({ word: ctx.message.text.trim() });
             
-            if (reply) {
-                if (reply.type === 'text' && reply.text) {
-                    await ctx.reply(reply.text);
-                } else if (reply.media_url) {
-                    switch (reply.type) {
-                        case 'photo':
-                            await ctx.replyWithPhoto(reply.media_url);
-                            break;
-                        case 'video':
-                            await ctx.replyWithVideo(reply.media_url);
-                            break;
-                        case 'animation':
-                            await ctx.replyWithAnimation(reply.media_url);
-                            break;
-                        case 'sticker':
-                            // For stickers from URL, we need to send as photo
-                            await ctx.replyWithPhoto(reply.media_url);
-                            break;
-                        default:
-                            await ctx.reply(reply.text || 'رد غير معروف');
-                    }
-                }
+            const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
+            
+            // Check if the user has already answered correctly
+            if (questionAttempts.has(userId)) {
+                // User already answered correctly, ignore silently
                 return;
             }
-        } catch (error) {
-            console.error('Error checking for automatic replies:', error);
-        }
-        
-        // Handle awaiting reply word
-        if (awaitingReplyWord) {
-            tempReplyWord = ctx.message.text;
-            await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-            awaitingReplyWord = false;
-            awaitingReplyResponse = true;
-            return;
-        }
-        
-        // Handle awaiting delete reply word
-        if (awaitingDeleteReplyWord) {
-            const wordToDelete = ctx.message.text.trim();
-            try {
-                const db = await ensureDatabaseInitialized();
-                const result = await db.collection('replies').deleteOne({ word: wordToDelete });
+            
+            // Check if the answer is correct
+            if (userAnswer === correctAnswer) {
+                // Mark this user as having answered correctly
+                questionAttempts.add(userId);
                 
-                if (result.deletedCount > 0) {
-                    await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
-                } else {
-                    await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+                // Update user's score
+                if (!quiz.scores.has(userId)) {
+                    quiz.scores.set(userId, 0);
                 }
-            } catch (error) {
-                console.error('Error deleting reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
-            }
-            
-            awaitingDeleteReplyWord = false;
-            return;
-        }
-        
-        // Handle awaiting bot name
-        if (awaitingBotName) {
-            const newBotName = ctx.message.text.trim();
-            try {
-                const db = await ensureDatabaseInitialized();
-                await db.collection('bot_custom_names').updateOne(
-                    { bot_id: bot.botInfo.id },
-                    { $set: { name: newBotName } },
-                    { upsert: true }
-                );
                 
-                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
-            } catch (error) {
-                console.error('Error updating bot name:', error);
-                await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
-            }
-            
-            awaitingBotName = false;
-            return;
-        }
-        
-        // Handle awaiting reply response
-        if (awaitingReplyResponse) {
-            try {
-                const db = await ensureDatabaseInitialized();
-                await db.collection('replies').insertOne({
-                    word: tempReplyWord,
-                    text: ctx.message.text,
-                    created_at: new Date(),
-                    created_by: userId
+                // Add points based on difficulty
+                let points = 1;
+                if (quiz.difficulty === 'medium') points = 2;
+                if (quiz.difficulty === 'hard') points = 3;
+                
+                quiz.scores.set(userId, quiz.scores.get(userId) + points);
+                
+                // Reply to the user
+                await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
+                    reply_to_message_id: ctx.message.message_id
                 });
                 
-                await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-                
-                // Reset state
-                tempReplyWord = '';
-                awaitingReplyResponse = false;
-            } catch (error) {
-                console.error('Error adding reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء إضافة الرد.');
-                awaitingReplyResponse = false;
+                // Move to the next question after a short delay
+                setTimeout(async () => {
+                    quiz.currentQuestionIndex++;
+                    
+                    // Check if we've reached the end of the quiz
+                    if (quiz.currentQuestionIndex >= quiz.questions.length) {
+                        await endQuiz(ctx, chatId);
+                    } else {
+                        // Show the next question
+                        await askNextQuestion(chatId, ctx.telegram);
+                    }
+                }, 2000);
+            } else {
+                // Wrong answer - allow the user to try again
+                await ctx.reply('❌ إجابة خاطئة. حاول مرة أخرى!', {
+                    reply_to_message_id: ctx.message.message_id
+                });
+            }
+            return; // Exit the handler after processing quiz answer
+        }
+    }
+    
+    // Handle other text messages (non-quiz related)
+    
+    // Check for automatic replies
+    try {
+        const db = await ensureDatabaseInitialized();
+        const reply = await db.collection('replies').findOne({ word: ctx.message.text.trim() });
+        
+        if (reply) {
+            if (reply.type === 'text' && reply.text) {
+                await ctx.reply(reply.text);
+            } else if (reply.media_url) {
+                switch (reply.type) {
+                    case 'photo':
+                        await ctx.replyWithPhoto(reply.media_url);
+                        break;
+                    case 'video':
+                        await ctx.replyWithVideo(reply.media_url);
+                        break;
+                    case 'animation':
+                        await ctx.replyWithAnimation(reply.media_url);
+                        break;
+                    case 'sticker':
+                        // For stickers from URL, we need to send as photo
+                        await ctx.replyWithPhoto(reply.media_url);
+                        break;
+                    default:
+                        await ctx.reply(reply.text || 'رد غير معروف');
+                }
             }
             return;
         }
-        
-        // Handle other commands or messages here
-        // ...
+    } catch (error) {
+        console.error('Error checking for automatic replies:', error);
+    }
     
-    });
+    // Handle awaiting reply word
+    if (awaitingReplyWord) {
+        tempReplyWord = ctx.message.text;
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
+        return;
+    }
+    
+    // Handle awaiting delete reply word
+    if (awaitingDeleteReplyWord) {
+        const wordToDelete = ctx.message.text.trim();
+        try {
+            const db = await ensureDatabaseInitialized();
+            const result = await db.collection('replies').deleteOne({ word: wordToDelete });
+            
+            if (result.deletedCount > 0) {
+                await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
+            } else {
+                await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+            }
+        } catch (error) {
+            console.error('Error deleting reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
+        }
+        
+        awaitingDeleteReplyWord = false;
+        return;
+    }
+    
+    // Handle awaiting bot name
+    if (awaitingBotName) {
+        const newBotName = ctx.message.text.trim();
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('bot_custom_names').updateOne(
+                { bot_id: bot.botInfo.id },
+                { $set: { name: newBotName } },
+                { upsert: true }
+            );
+            
+            await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
+        } catch (error) {
+            console.error('Error updating bot name:', error);
+            await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
+        }
+        
+        awaitingBotName = false;
+        return;
+    }
+    
+    // Handle awaiting reply response
+    if (awaitingReplyResponse) {
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                word: tempReplyWord,
+                text: ctx.message.text,
+                created_at: new Date(),
+                created_by: userId
+            });
+            
+            await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+            
+            // Reset state
+            tempReplyWord = '';
+            awaitingReplyResponse = false;
+        } catch (error) {
+            console.error('Error adding reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء إضافة الرد.');
+            awaitingReplyResponse = false;
+        }
+        return;
+    }
+    
+    // Handle other commands or messages here
+    // ...
+});
 
 
 
