@@ -1825,16 +1825,58 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     // Handle awaiting reply response
-    if (awaitingReplyResponse) {
+   if (awaitingReplyResponse) {
         try {
+            let mediaType = 'text';
+            let replyText = null;
+            let mediaUrl = null;
+
+            if (ctx.message.text) {
+                mediaType = 'text';
+                replyText = ctx.message.text.trim();
+            } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
+                let fileId, fileName;
+
+                if (ctx.message.photo) {
+                    mediaType = 'photo';
+                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                    fileName = `photo_${Date.now()}.jpg`;
+                } else if (ctx.message.sticker) {
+                    mediaType = 'sticker';
+                    fileId = ctx.message.sticker.file_id;
+                    fileName = `sticker_${Date.now()}.webp`;
+                } else if (ctx.message.video) {
+                    mediaType = 'video';
+                    fileId = ctx.message.video.file_id;
+                    fileName = `video_${Date.now()}.mp4`;
+                } else if (ctx.message.animation) {
+                    mediaType = 'animation';
+                    fileId = ctx.message.animation.file_id;
+                    fileName = `animation_${Date.now()}.mp4`;
+                }
+
+                if (fileId) {
+                    const fileLink = await ctx.telegram.getFileLink(fileId);
+                    mediaUrl = fileLink.href;
+                }
+            }
+
+            if (!tempReplyWord || tempReplyWord.trim() === '') {
+                await ctx.reply('❌ الكلمة المفتاحية لا يمكن أن تكون فارغة. يرجى إدخال كلمة صالحة.');
+                awaitingReplyResponse = false;
+                return;
+            }
+
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
                 word: tempReplyWord,
-                text: ctx.message.text,
+                type: mediaType,
+                text: replyText,
+                media_url: mediaUrl,
                 created_at: new Date(),
-                created_by: userId
+                created_by: ctx.from.id
             });
-            
+
             await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
             
             // Reset state
