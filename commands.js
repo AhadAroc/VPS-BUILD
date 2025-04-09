@@ -10,8 +10,7 @@ const gifRestrictionStatus = new Map();
 const linkRestrictionStatus = new Map();
 const photoRestrictionStatus = new Map();
 const { MongoClient } = require('mongodb');
-// Add this to your global variables
-const quizSettings = new Map();
+
 // Assuming you have your MongoDB connection string in an environment variable
 const uri = process.env.MONGODB_URI;
 
@@ -177,7 +176,7 @@ async function getQuestionsForDifficulty(difficulty) {
 
 
 function setupCommands(bot) {
-    const { setupActions, activeQuizzes, endQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
+    const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
     bot.command('start', (ctx) => {
     if (ctx.chat.type === 'private') {
         // This is a DM
@@ -191,35 +190,6 @@ function setupCommands(bot) {
     } else {
         // This is a group chat, do nothing
         return;
-    }
-});
-
-
-  // Add these action handlers
-bot.action(/^quiz_timer_(\d+)$/, async (ctx) => {
-    try {
-        const chatId = ctx.chat.id;
-        const newTimer = parseInt(ctx.match[1]);
-        
-        // Update the quiz settings for this chat
-        quizSettings.set(chatId, { ...quizSettings.get(chatId), timer: newTimer });
-        
-        await ctx.answerCbQuery(`تم تحديث وقت السؤال إلى ${newTimer} ثانية`);
-        await ctx.editMessageText(`تم تحديث إعدادات المسابقة.\nوقت السؤال الجديد: ${newTimer} ثانية`);
-    } catch (error) {
-        console.error('Error updating quiz timer:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
-    }
-});
-
-bot.action('show_current_timer', async (ctx) => {
-    try {
-        const chatId = ctx.chat.id;
-        const currentTimer = quizSettings.get(chatId)?.timer || 30; // Default to 30 seconds if not set
-        await ctx.answerCbQuery(`الوقت الحالي للسؤال: ${currentTimer} ثانية`);
-    } catch (error) {
-        console.error('Error showing current timer:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء عرض الوقت الحالي.');
     }
 });
 // Add this near your other command handlers
@@ -305,7 +275,16 @@ bot.action('show_stats', async (ctx) => {
     }
 });
 
-
+// Add this action handler for the configure_quiz button
+bot.action('configure_quiz', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await configureQuiz(ctx);
+    } catch (error) {
+        console.error('Error handling configure_quiz action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة فتح إعدادات المسابقة.');
+    }
+});
 
 bot.action('add_another_question', async (ctx) => {
     await ctx.answerCbQuery();
