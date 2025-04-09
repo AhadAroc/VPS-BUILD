@@ -192,7 +192,16 @@ function setupCommands(bot) {
         return;
     }
 });
-
+// Add this near your other command handlers
+bot.command('stop', async (ctx) => {
+    const chatId = ctx.chat.id;
+    if (activeQuizzes.has(chatId)) {
+        await endQuiz(ctx, chatId);
+        await ctx.reply('تم إيقاف المسابقة.');
+    } else {
+        await ctx.reply('لا توجد مسابقة نشطة حالياً.');
+    }
+});
  // Add this action handler for the show_stats button
 bot.action('show_stats', async (ctx) => {
     try {
@@ -1273,16 +1282,7 @@ bot.command('ترقية ثانوي', async (ctx) => {
     }
 });
 
-// Add this near your other command handlers
-bot.command('stop', async (ctx) => {
-    const chatId = ctx.chat.id;
-    if (activeQuizzes.has(chatId)) {
-        await endQuiz(ctx, chatId);
-        await ctx.reply('تم إيقاف المسابقة.');
-    } else {
-        await ctx.reply('لا توجد مسابقة نشطة حالياً.');
-    }
-});
+
 
 // Command handler for "ترقية_ثانوي"
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
