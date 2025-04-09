@@ -1825,7 +1825,7 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     // Handle awaiting reply response
-   if (awaitingReplyResponse) {
+  if (awaitingReplyResponse) {
         try {
             let mediaType = 'text';
             let replyText = null;
@@ -1861,6 +1861,7 @@ bot.on('left_chat_member', (ctx) => {
                 }
             }
 
+            // Validate trigger word
             if (!tempReplyWord || tempReplyWord.trim() === '') {
                 await ctx.reply('❌ الكلمة المفتاحية لا يمكن أن تكون فارغة. يرجى إدخال كلمة صالحة.');
                 awaitingReplyResponse = false;
@@ -1868,6 +1869,16 @@ bot.on('left_chat_member', (ctx) => {
             }
 
             const db = await ensureDatabaseInitialized();
+
+            // Check if the trigger word already exists
+            const existingReply = await db.collection('replies').findOne({ word: tempReplyWord });
+            if (existingReply) {
+                await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
+                awaitingReplyResponse = false;
+                return;
+            }
+
+            // Insert the new reply
             await db.collection('replies').insertOne({
                 word: tempReplyWord,
                 type: mediaType,
