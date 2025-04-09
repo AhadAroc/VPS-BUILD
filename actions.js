@@ -1830,10 +1830,11 @@ if (awaitingReplyResponse) {
             let replyText = null;
             let mediaUrl = null;
 
-            // Validate trigger word first
-            if (!tempReplyWord || tempReplyWord.trim() === '') {
+            // Stronger null check for tempReplyWord
+            if (typeof tempReplyWord !== 'string' || !tempReplyWord.trim()) {
                 await ctx.reply('❌ الكلمة المفتاحية لا يمكن أن تكون فارغة. يرجى إدخال كلمة صالحة أولاً.');
                 awaitingReplyResponse = false;
+                tempReplyWord = ''; // clear it just in case
                 return;
             }
 
@@ -1863,22 +1864,25 @@ if (awaitingReplyResponse) {
                 } else {
                     await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
                     awaitingReplyResponse = false;
+                    tempReplyWord = '';
                     return;
                 }
             } else {
                 await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
                 awaitingReplyResponse = false;
+                tempReplyWord = '';
                 return;
             }
 
             try {
                 const db = await ensureDatabaseInitialized();
-                
-                // Check if the trigger word already exists
+
+                // Check if trigger word already exists
                 const existingReply = await db.collection('replies').findOne({ trigger_word: tempReplyWord });
                 if (existingReply) {
                     await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
                     awaitingReplyResponse = false;
+                    tempReplyWord = '';
                     return;
                 }
 
@@ -1893,7 +1897,7 @@ if (awaitingReplyResponse) {
                 });
 
                 await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-                
+
                 // Reset state
                 tempReplyWord = '';
                 awaitingReplyResponse = false;
@@ -1901,9 +1905,11 @@ if (awaitingReplyResponse) {
                 console.error('Error adding reply:', error);
                 await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
                 awaitingReplyResponse = false;
+                tempReplyWord = '';
             }
             return;
         }
+
     
     // Handle other commands or messages here
     // ...
