@@ -259,7 +259,52 @@ async function ensureDatabaseInitialized() {
 }
 
 
+async function configureQuiz(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        const chatId = ctx.chat.id;
+        const settings = quizSettings.get(chatId) || { timer: 30 };
+
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: 'اختر وقت السؤال للمسابقة:', callback_data: 'dummy' }],
+                [
+                    { text: '10 ثوان', callback_data: 'set_timer_10' },
+                    { text: '20 ثانية', callback_data: 'set_timer_20' },
+                    { text: '30 ثانية', callback_data: 'set_timer_30' }
+                ],
+                [
+                    { text: '40 ثانية', callback_data: 'set_timer_40' },
+                    { text: '50 ثانية', callback_data: 'set_timer_50' }
+                ],
+                [{ text: `عرض الوقت الحالي: ${settings.timer} ثانية`, callback_data: 'show_current_timer' }],
+                [{ text: '🔙 العودة', callback_data: 'back_to_quiz_menu' }]
+            ]
+        };
+
+        const message = `اختر وقت السؤال للمسابقة:\n\nالوقت الحالي: ${settings.timer} ثانية`;
+
+        if (ctx.callbackQuery) {
+            // Check if the message has a photo
+            if (ctx.callbackQuery.message.photo) {
+                // Edit the caption of the photo message
+                await ctx.editMessageCaption(message, { reply_markup: keyboard });
+            } else {
+                // Edit the text message
+                await ctx.editMessageText(message, { reply_markup: keyboard });
+            }
+        } else {
+            // Send a new message if it's a direct command
+            await ctx.reply(message, { reply_markup: keyboard });
+        }
+    } catch (error) {
+        console.error('Error in configureQuiz:', error);
+        ctx.answerCbQuery('❌ حدث خطأ أثناء تكوين المسابقة.');
+    }
+}
 
 // ... (rest of the existing imports and variables)
 function setupActions(bot, session, Scenes) {
@@ -317,9 +362,6 @@ function setupActions(bot, session, Scenes) {
     
         await ctx.editMessageText(message, { reply_markup: keyboard });
     }
-
-
-  
     async function showSourceMenu(ctx) {
         const message = 'قائمة السورس - اختر الإجراء المطلوب:';
         const keyboard = {
@@ -1187,7 +1229,33 @@ bot.action('back_to_quiz_menu', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة لقائمة المسابقات.');
     }
 });
+// Add these action handlers
+bot.action(/^quiz_timer_(\d+)$/, async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const newTimer = parseInt(ctx.match[1]);
+        
+        // Update the quiz settings for this chat
+        quizSettings.set(chatId, { ...quizSettings.get(chatId), timer: newTimer });
+        
+        await ctx.answerCbQuery(`تم تحديث وقت السؤال إلى ${newTimer} ثانية`);
+        await ctx.editMessageText(`تم تحديث إعدادات المسابقة.\nوقت السؤال الجديد: ${newTimer} ثانية`);
+    } catch (error) {
+        console.error('Error updating quiz timer:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
+    }
+});
 
+bot.action('show_current_timer', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const currentTimer = quizSettings.get(chatId)?.timer || 30; // Default to 30 seconds if not set
+        await ctx.answerCbQuery(`الوقت الحالي للسؤال: ${currentTimer} ثانية`);
+    } catch (error) {
+        console.error('Error showing current timer:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض الوقت الحالي.');
+    }
+});
 // Handle difficulty selection
 bot.action(/^difficulty_(.+)$/, async (ctx) => {
     try {
@@ -2661,4 +2729,4 @@ bot.action('check_subscription', forceCheckSubscription);
 }
 
 module.exports = { setupActions,
-    activeQuizzes,endQuiz , ensureDatabaseInitialized,startAddingCustomQuestions,chatStates };
+    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates };
