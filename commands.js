@@ -10,7 +10,8 @@ const gifRestrictionStatus = new Map();
 const linkRestrictionStatus = new Map();
 const photoRestrictionStatus = new Map();
 const { MongoClient } = require('mongodb');
-
+// Add this to your global variables
+const quizSettings = new Map();
 // Assuming you have your MongoDB connection string in an environment variable
 const uri = process.env.MONGODB_URI;
 
