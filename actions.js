@@ -751,9 +751,6 @@ async function askNextQuestion(chatId, telegram) {
     // Get the timer setting for this chat, default to 30 seconds if not set
     const timer = quizSettings.get(chatId)?.timer || 30;
     
-    // Reset attempts for the new question - we'll use this to track who has answered correctly
-    quiz.attempts.set(quiz.currentQuestionIndex, new Set());
-    
     await telegram.sendMessage(
         chatId,
         `السؤال ${questionNumber}/${totalQuestions}:\n\n${currentQuestion.question}\n\n⏱️ لديك ${timer} ثانية للإجابة!`
@@ -1485,81 +1482,83 @@ bot.on('left_chat_member', (ctx) => {
 
 // Register the text handler
     // For the text handler that's causing errors, update it to:
-    // For the text handler that processes quiz answers
-bot.on('text', async (ctx) => {
-    console.log('Received message:', ctx.message.text);
-    
-    const chatId = ctx.chat.id;
-    const userId = ctx.from.id;
-    const userAnswer = ctx.message.text.trim().toLowerCase();
-
-    // Check if there's an active quiz in this chat
-    if (activeQuizzes.has(chatId)) {
-        const quiz = activeQuizzes.get(chatId);
+    bot.on('text', async (ctx) => {
+        console.log('Received message:', ctx.message.text);
         
-        // Check if the quiz is in the active state
-        if (quiz.state === QUIZ_STATE.ACTIVE) {
-            const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-            const correctAnswer = currentQuestion.answer.toLowerCase();
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        const userAnswer = ctx.message.text.trim().toLowerCase();
+        if (chatStates.has(ctx.chat.id)) {
+            await handleCustomQuestionInput(ctx);
+            return;
+        }
+    
+        // Check if there's an active quiz in this chat
+        if (activeQuizzes.has(chatId)) {
+            const quiz = activeQuizzes.get(chatId);
+            console.log('Quiz state:', quiz.state);
+            console.log('Current question index:', quiz.currentQuestionIndex);
             
-            // Initialize attempts tracking for this question if it doesn't exist
-            if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
-                quiz.attempts.set(quiz.currentQuestionIndex, new Set());
-            }
-            
-            const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
-            
-            // Check if the user has already answered correctly
-            if (questionAttempts.has(userId)) {
-                // User already answered correctly, ignore silently
-                return;
-            }
-            
-            // Check if the answer is correct
-            if (userAnswer === correctAnswer) {
-                // Mark this user as having answered correctly
-                questionAttempts.add(userId);
+            // Check if the quiz is in the active state
+            if (quiz.state === QUIZ_STATE.ACTIVE) {
+                const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
+                const correctAnswer = currentQuestion.answer.toLowerCase();
                 
-                // Update user's score
-                if (!quiz.scores.has(userId)) {
-                    quiz.scores.set(userId, 0);
+                // Check if the user has already attempted this question
+                if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
+                    quiz.attempts.set(quiz.currentQuestionIndex, new Set());
                 }
                 
-                // Add points based on difficulty
-                let points = 1;
-                if (quiz.difficulty === 'medium') points = 2;
-                if (quiz.difficulty === 'hard') points = 3;
+                const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
                 
-                quiz.scores.set(userId, quiz.scores.get(userId) + points);
+                // If user already attempted, ignore
+                if (questionAttempts.has(userId)) {
+                    return;
+                }
                 
-                // Reply to the user
-                await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
-                    reply_to_message_id: ctx.message.message_id
-                });
+                // Mark this user as having attempted this question
+                questionAttempts.add(userId);
                 
-                // Move to the next question after a short delay
-                setTimeout(async () => {
-                    quiz.currentQuestionIndex++;
-                    
-                    // Check if we've reached the end of the quiz
-                    if (quiz.currentQuestionIndex >= quiz.questions.length) {
-                        await endQuiz(ctx, chatId);
-                    } else {
-                        // Show the next question
-                        await askNextQuestion(chatId, ctx.telegram);
+                // Check if the answer is correct
+                if (userAnswer === correctAnswer) {
+                    // Update user's score
+                    if (!quiz.scores.has(userId)) {
+                        quiz.scores.set(userId, 0);
                     }
-                }, 2000);
-            } else {
-                // Wrong answer - allow the user to try again
-                await ctx.reply('❌ إجابة خاطئة. حاول مرة أخرى!', {
-                    reply_to_message_id: ctx.message.message_id
-                });
+                    
+                    // Add points based on difficulty
+                    let points = 1;
+                    if (quiz.difficulty === 'medium') points = 2;
+                    if (quiz.difficulty === 'hard') points = 3;
+                    
+                    quiz.scores.set(userId, quiz.scores.get(userId) + points);
+                    
+                    // Reply to the user
+                    await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
+                        reply_to_message_id: ctx.message.message_id
+                    });
+                    
+                    // Move to the next question after a short delay
+                    setTimeout(async () => {
+                        quiz.currentQuestionIndex++;
+                        
+                        // Check if we've reached the end of the quiz
+                        if (quiz.currentQuestionIndex >= quiz.questions.length) {
+                            await endQuiz(ctx, chatId);
+                        } else {
+                            // Show the next question
+                            await askNextQuestion(chatId, ctx.telegram);
+                        }
+                    }, 2000);
+                } else {
+                    // Wrong answer
+                    await ctx.reply('❌ إجابة خاطئة. حاول مرة أخرى!', {
+                        reply_to_message_id: ctx.message.message_id
+                    });
+                }
+                return; // Exit the handler after processing quiz answer
             }
-            return; // Exit the handler after processing quiz answer
         }
-    }
-        
-        
         
         // Handle other text messages (non-quiz related)
         
