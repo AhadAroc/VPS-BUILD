@@ -2706,4 +2706,4 @@ bot.action('check_subscription', forceCheckSubscription);
 }
 
 module.exports = { setupActions,
-    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates };
+    activeQuizzes,endQuiz , ensureDatabaseInitialized,startAddingCustomQuestions,chatStates };
