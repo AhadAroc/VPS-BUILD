@@ -40,7 +40,52 @@ const QUIZ_STATE = {
 
 const {isAdminOrOwner} = require('./commands');    
     
+async function configureQuiz(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        const chatId = ctx.chat.id;
+        const settings = quizSettings.get(chatId) || { timer: 30 };
+
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: 'اختر وقت السؤال للمسابقة:', callback_data: 'dummy' }],
+                [
+                    { text: '10 ثوان', callback_data: 'set_timer_10' },
+                    { text: '20 ثانية', callback_data: 'set_timer_20' },
+                    { text: '30 ثانية', callback_data: 'set_timer_30' }
+                ],
+                [
+                    { text: '40 ثانية', callback_data: 'set_timer_40' },
+                    { text: '50 ثانية', callback_data: 'set_timer_50' }
+                ],
+                [{ text: `عرض الوقت الحالي: ${settings.timer} ثانية`, callback_data: 'show_current_timer' }],
+                [{ text: '🔙 العودة', callback_data: 'back_to_quiz_menu' }]
+            ]
+        };
+
+        const message = `اختر وقت السؤال للمسابقة:\n\nالوقت الحالي: ${settings.timer} ثانية`;
+
+        if (ctx.callbackQuery) {
+            // Check if the message has a photo
+            if (ctx.callbackQuery.message.photo) {
+                // Edit the caption of the photo message
+                await ctx.editMessageCaption(message, { reply_markup: keyboard });
+            } else {
+                // Edit the text message
+                await ctx.editMessageText(message, { reply_markup: keyboard });
+            }
+        } else {
+            // Send a new message if it's a direct command
+            await ctx.reply(message, { reply_markup: keyboard });
+        }
+    } catch (error) {
+        console.error('Error in configureQuiz:', error);
+        ctx.answerCbQuery('❌ حدث خطأ أثناء تكوين المسابقة.');
+    }
+}
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleQuizAnswer(ctx) {
@@ -319,52 +364,7 @@ function setupActions(bot, session, Scenes) {
     }
 
 
-  async function configureQuiz(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-
-        const chatId = ctx.chat.id;
-        const settings = quizSettings.get(chatId) || { timer: 30 };
-
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: 'اختر وقت السؤال للمسابقة:', callback_data: 'dummy' }],
-                [
-                    { text: '10 ثوان', callback_data: 'set_timer_10' },
-                    { text: '20 ثانية', callback_data: 'set_timer_20' },
-                    { text: '30 ثانية', callback_data: 'set_timer_30' }
-                ],
-                [
-                    { text: '40 ثانية', callback_data: 'set_timer_40' },
-                    { text: '50 ثانية', callback_data: 'set_timer_50' }
-                ],
-                [{ text: `عرض الوقت الحالي: ${settings.timer} ثانية`, callback_data: 'show_current_timer' }],
-                [{ text: '🔙 العودة', callback_data: 'back_to_quiz_menu' }]
-            ]
-        };
-
-        const message = `اختر وقت السؤال للمسابقة:\n\nالوقت الحالي: ${settings.timer} ثانية`;
-
-        if (ctx.callbackQuery) {
-            // Check if the message has a photo
-            if (ctx.callbackQuery.message.photo) {
-                // Edit the caption of the photo message
-                await ctx.editMessageCaption(message, { reply_markup: keyboard });
-            } else {
-                // Edit the text message
-                await ctx.editMessageText(message, { reply_markup: keyboard });
-            }
-        } else {
-            // Send a new message if it's a direct command
-            await ctx.reply(message, { reply_markup: keyboard });
-        }
-    } catch (error) {
-        console.error('Error in configureQuiz:', error);
-        ctx.answerCbQuery('❌ حدث خطأ أثناء تكوين المسابقة.');
-    }
-}
+  
     async function showSourceMenu(ctx) {
         const message = 'قائمة السورس - اختر الإجراء المطلوب:';
         const keyboard = {
