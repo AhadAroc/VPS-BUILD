@@ -288,14 +288,8 @@ async function configureQuiz(ctx) {
         const message = `اختر وقت السؤال للمسابقة:\n\nالوقت الحالي: ${settings.timer} ثانية`;
 
         if (ctx.callbackQuery) {
-            // Check if the message has a photo
-            if (ctx.callbackQuery.message.photo) {
-                // Edit the caption of the photo message
-                await ctx.editMessageCaption(message, { reply_markup: keyboard });
-            } else {
-                // Edit the text message
-                await ctx.editMessageText(message, { reply_markup: keyboard });
-            }
+            // Edit the existing message
+            await ctx.editMessageText(message, { reply_markup: keyboard });
         } else {
             // Send a new message if it's a direct command
             await ctx.reply(message, { reply_markup: keyboard });
@@ -305,6 +299,38 @@ async function configureQuiz(ctx) {
         ctx.answerCbQuery('❌ حدث خطأ أثناء تكوين المسابقة.');
     }
 }
+
+// Add these action handlers for timer settings
+bot.action(/^set_timer_(\d+)$/, async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const newTimer = parseInt(ctx.match[1]);
+        
+        // Update the quiz settings for this chat
+        const settings = quizSettings.get(chatId) || {};
+        settings.timer = newTimer;
+        quizSettings.set(chatId, settings);
+        
+        await ctx.answerCbQuery(`تم تحديث وقت السؤال إلى ${newTimer} ثانية`);
+        
+        // Refresh the configuration menu
+        await configureQuiz(ctx);
+    } catch (error) {
+        console.error('Error updating quiz timer:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
+    }
+});
+
+bot.action('show_current_timer', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const currentTimer = quizSettings.get(chatId)?.timer || 30; // Default to 30 seconds if not set
+        await ctx.answerCbQuery(`الوقت الحالي للسؤال: ${currentTimer} ثانية`, { show_alert: true });
+    } catch (error) {
+        console.error('Error showing current timer:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض الوقت الحالي.');
+    }
+});
 
 // ... (rest of the existing imports and variables)
 function setupActions(bot, session, Scenes) {
