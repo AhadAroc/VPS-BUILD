@@ -300,6 +300,14 @@ async function configureQuiz(ctx) {
     }
 }
 
+
+
+// ... (rest of the existing imports and variables)
+function setupActions(bot, session, Scenes) {
+    // Add this function to handle quiz configuration
+
+    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
+
 // Add these action handlers for timer settings
 bot.action(/^set_timer_(\d+)$/, async (ctx) => {
     try {
@@ -331,13 +339,7 @@ bot.action('show_current_timer', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء عرض الوقت الحالي.');
     }
 });
-
-// ... (rest of the existing imports and variables)
-function setupActions(bot, session, Scenes) {
-    // Add this function to handle quiz configuration
-
-    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
-    
+  
     async function showDevPanel(ctx) {
         // Check if the message is from a private chat (DM)
         if (ctx.chat.type !== 'private') {
