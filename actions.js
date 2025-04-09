@@ -751,6 +751,11 @@ async function askNextQuestion(chatId, telegram) {
     // Get the timer setting for this chat, default to 30 seconds if not set
     const timer = quizSettings.get(chatId)?.timer || 30;
     
+    // Initialize attempts tracking for this question if it doesn't exist
+    if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
+        quiz.attempts.set(quiz.currentQuestionIndex, new Set());
+    }
+    
     await telegram.sendMessage(
         chatId,
         `السؤال ${questionNumber}/${totalQuestions}:\n\n${currentQuestion.question}\n\n⏱️ لديك ${timer} ثانية للإجابة!`
@@ -1488,31 +1493,26 @@ bot.on('left_chat_member', (ctx) => {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         const userAnswer = ctx.message.text.trim().toLowerCase();
-        if (chatStates.has(ctx.chat.id)) {
-            await handleCustomQuestionInput(ctx);
-            return;
-        }
     
         // Check if there's an active quiz in this chat
         if (activeQuizzes.has(chatId)) {
             const quiz = activeQuizzes.get(chatId);
-            console.log('Quiz state:', quiz.state);
-            console.log('Current question index:', quiz.currentQuestionIndex);
             
             // Check if the quiz is in the active state
             if (quiz.state === QUIZ_STATE.ACTIVE) {
                 const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
                 const correctAnswer = currentQuestion.answer.toLowerCase();
                 
-                // Check if the user has already attempted this question
+                // Initialize attempts tracking for this question if it doesn't exist
                 if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
                     quiz.attempts.set(quiz.currentQuestionIndex, new Set());
                 }
                 
                 const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
                 
-                // If user already attempted, ignore
+                // Check if the user has already attempted this question
                 if (questionAttempts.has(userId)) {
+                    // User already attempted, ignore silently
                     return;
                 }
                 
@@ -1555,10 +1555,13 @@ bot.on('left_chat_member', (ctx) => {
                     await ctx.reply('❌ إجابة خاطئة. حاول مرة أخرى!', {
                         reply_to_message_id: ctx.message.message_id
                     });
+                    // Don't move to the next question, allow more attempts from other users
                 }
                 return; // Exit the handler after processing quiz answer
             }
         }
+        
+        
         
         // Handle other text messages (non-quiz related)
         
