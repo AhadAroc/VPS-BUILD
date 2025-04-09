@@ -39,7 +39,31 @@ const QUIZ_STATE = {
 
 
 const {isAdminOrOwner} = require('./commands');    
-    
+const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');    
+
+
+
+// Function to download and save file
+async function saveFile(fileLink, fileName) {
+    const filePath = path.join('/var/www/bot_media', fileName);
+    const writer = fs.createWriteStream(filePath);
+
+    const response = await axios({
+        method: 'GET',
+        url: fileLink,
+        responseType: 'stream'
+    });
+
+    response.data.pipe(writer);
+
+    return new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+    });
+}
+
 
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
@@ -1730,6 +1754,7 @@ bot.on('left_chat_member', (ctx) => {
             } else if (reply.media_url) {
                 switch (reply.type) {
                     case 'photo':
+                    case 'sticker':
                         await ctx.replyWithPhoto(reply.media_url);
                         break;
                     case 'video':
@@ -1737,10 +1762,6 @@ bot.on('left_chat_member', (ctx) => {
                         break;
                     case 'animation':
                         await ctx.replyWithAnimation(reply.media_url);
-                        break;
-                    case 'sticker':
-                        // For stickers from URL, we need to send as photo
-                        await ctx.replyWithPhoto(reply.media_url);
                         break;
                     default:
                         await ctx.reply(reply.text || 'رد غير معروف');
@@ -1875,23 +1896,62 @@ bot.on('left_chat_member', (ctx) => {
                 }
                 
                 // Handle awaiting delete reply word
-                if (awaitingDeleteReplyWord) {
-                    const wordToDelete = message.text.trim();
+                if (awaitingReplyResponse) {
                     try {
-                        const db = await ensureDatabaseInitialized();
-                        const result = await db.collection('replies').deleteOne({ word: wordToDelete });
-                        
-                        if (result.deletedCount > 0) {
-                            await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
-                        } else {
-                            await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+                        let mediaType = 'text';
+                        let replyText = null;
+                        let mediaUrl = null;
+            
+                        if (ctx.message.text) {
+                            mediaType = 'text';
+                            replyText = ctx.message.text.trim();
+                        } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
+                            let fileId, fileName;
+            
+                            if (ctx.message.photo) {
+                                mediaType = 'photo';
+                                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                                fileName = `photo_${Date.now()}.jpg`;
+                            } else if (ctx.message.sticker) {
+                                mediaType = 'sticker';
+                                fileId = ctx.message.sticker.file_id;
+                                fileName = `sticker_${Date.now()}.webp`;
+                            } else if (ctx.message.video) {
+                                mediaType = 'video';
+                                fileId = ctx.message.video.file_id;
+                                fileName = `video_${Date.now()}.mp4`;
+                            } else if (ctx.message.animation) {
+                                mediaType = 'animation';
+                                fileId = ctx.message.animation.file_id;
+                                fileName = `animation_${Date.now()}.mp4`;
+                            }
+            
+                            const fileLink = await ctx.telegram.getFileLink(fileId);
+                            await saveFile(fileLink.href, fileName);
+            
+                            mediaUrl = `http://69.62.114.242/bot_media/${fileName}`;
                         }
+            
+                        const db = await ensureDatabaseInitialized();
+                        await db.collection('replies').insertOne({
+                            word: tempReplyWord,
+                            type: mediaType,
+                            text: replyText,
+                            media_url: mediaUrl,
+                            created_at: new Date(),
+                            created_by: ctx.from.id
+                        });
+            
+                        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+                        
+                        // Reset state
+                        tempReplyWord = '';
+                        awaitingReplyResponse = false;
                     } catch (error) {
-                        console.error('Error deleting reply:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
+                        console.error('Error adding reply:', error);
+                        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد.');
+                        awaitingReplyResponse = false;
                     }
-                    
-                    awaitingDeleteReplyWord = false;
                     return;
                 }
                 
