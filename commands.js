@@ -177,7 +177,7 @@ async function getQuestionsForDifficulty(difficulty) {
 
 
 function setupCommands(bot) {
-    const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
+    const { setupActions, activeQuizzes, endQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
     bot.command('start', (ctx) => {
     if (ctx.chat.type === 'private') {
         // This is a DM
