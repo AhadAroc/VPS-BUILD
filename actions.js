@@ -1950,63 +1950,76 @@ if (awaitingReplyResponse) {
                 
                 // Handle awaiting delete reply word
                 if (awaitingReplyResponse) {
-                    try {
-                        let mediaType = 'text';
-                        let replyText = null;
-                        let mediaUrl = null;
-            
-                        if (ctx.message.text) {
-                            mediaType = 'text';
-                            replyText = ctx.message.text.trim();
-                        } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
-                            let fileId, fileName;
-            
-                            if (ctx.message.photo) {
-                                mediaType = 'photo';
-                                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                                fileName = `photo_${Date.now()}.jpg`;
-                            } else if (ctx.message.sticker) {
-                                mediaType = 'sticker';
-                                fileId = ctx.message.sticker.file_id;
-                                fileName = `sticker_${Date.now()}.webp`;
-                            } else if (ctx.message.video) {
-                                mediaType = 'video';
-                                fileId = ctx.message.video.file_id;
-                                fileName = `video_${Date.now()}.mp4`;
-                            } else if (ctx.message.animation) {
-                                mediaType = 'animation';
-                                fileId = ctx.message.animation.file_id;
-                                fileName = `animation_${Date.now()}.mp4`;
-                            }
-            
-                            const fileLink = await ctx.telegram.getFileLink(fileId);
-                            await saveFile(fileLink.href, fileName);
-            
-                            mediaUrl = `http://69.62.114.242/bot_media/${fileName}`;
-                        }
-            
-                        const db = await ensureDatabaseInitialized();
-                        await db.collection('replies').insertOne({
-                            word: tempReplyWord,
-                            type: mediaType,
-                            text: replyText,
-                            media_url: mediaUrl,
-                            created_at: new Date(),
-                            created_by: ctx.from.id
-                        });
-            
-                        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-                        
-                        // Reset state
-                        tempReplyWord = '';
-                        awaitingReplyResponse = false;
-                    } catch (error) {
-                        console.error('Error adding reply:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد.');
-                        awaitingReplyResponse = false;
-                    }
+            let mediaType = 'text';
+            let replyText = null;
+            let mediaUrl = null;
+
+            if (ctx.message.text) {
+                mediaType = 'text';
+                replyText = ctx.message.text.trim();
+            } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
+                let fileId;
+
+                if (ctx.message.photo) {
+                    mediaType = 'photo';
+                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                } else if (ctx.message.sticker) {
+                    mediaType = 'sticker';
+                    fileId = ctx.message.sticker.file_id;
+                } else if (ctx.message.video) {
+                    mediaType = 'video';
+                    fileId = ctx.message.video.file_id;
+                } else if (ctx.message.animation) {
+                    mediaType = 'animation';
+                    fileId = ctx.message.animation.file_id;
+                }
+
+                if (fileId) {
+                    const fileLink = await ctx.telegram.getFileLink(fileId);
+                    mediaUrl = fileLink.href;
+                }
+            }
+
+            // Validate trigger word
+            if (!tempReplyWord || tempReplyWord.trim() === '') {
+                await ctx.reply('❌ الكلمة المفتاحية لا يمكن أن تكون فارغة. يرجى إدخال كلمة صالحة.');
+                awaitingReplyResponse = false;
+                return;
+            }
+
+            try {
+                const db = await ensureDatabaseInitialized();
+                
+                // Check if the trigger word already exists
+                const existingReply = await db.collection('replies').findOne({ trigger_word: tempReplyWord });
+                if (existingReply) {
+                    await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
+                    awaitingReplyResponse = false;
                     return;
                 }
+
+                // Insert the new reply
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: mediaType,
+                    text: replyText,
+                    media_url: mediaUrl,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+
+                await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+                
+                // Reset state
+                tempReplyWord = '';
+                awaitingReplyResponse = false;
+            } catch (error) {
+                console.error('Error adding reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
+                awaitingReplyResponse = false;
+            }
+            return;
+        }
                 
                 // Handle awaiting bot name
                 if (awaitingBotName) {
