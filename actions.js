@@ -22,7 +22,8 @@ cloudinary.config({
   api_key: '248273337268518',
   api_secret: 'SihooJWz6cMi5bNDAU26Tmf-tIw' // Replace with your actual API secret
 });
-
+// Add this to your global variables
+const quizSettings = new Map();
 const { isDeveloper } = require('./middlewares');
 const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
