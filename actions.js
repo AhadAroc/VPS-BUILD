@@ -288,8 +288,17 @@ async function configureQuiz(ctx) {
         const message = `اختر وقت السؤال للمسابقة:\n\nالوقت الحالي: ${settings.timer} ثانية`;
 
         if (ctx.callbackQuery) {
-            // Edit the existing message
-            await ctx.editMessageText(message, { reply_markup: keyboard });
+            const msg = ctx.callbackQuery.message;
+            if (msg.photo) {
+                // If the message has a photo, edit the caption
+                await ctx.editMessageCaption(message, { reply_markup: keyboard });
+            } else if (msg.text) {
+                // If it's a text message, edit the text
+                await ctx.editMessageText(message, { reply_markup: keyboard });
+            } else {
+                // If it's neither photo nor text, send a new message
+                await ctx.reply(message, { reply_markup: keyboard });
+            }
         } else {
             // Send a new message if it's a direct command
             await ctx.reply(message, { reply_markup: keyboard });
@@ -299,7 +308,6 @@ async function configureQuiz(ctx) {
         ctx.answerCbQuery('❌ حدث خطأ أثناء تكوين المسابقة.');
     }
 }
-
 
 
 // ... (rest of the existing imports and variables)
