@@ -192,6 +192,35 @@ function setupCommands(bot) {
         return;
     }
 });
+
+
+  // Add these action handlers
+bot.action(/^quiz_timer_(\d+)$/, async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const newTimer = parseInt(ctx.match[1]);
+        
+        // Update the quiz settings for this chat
+        quizSettings.set(chatId, { ...quizSettings.get(chatId), timer: newTimer });
+        
+        await ctx.answerCbQuery(`تم تحديث وقت السؤال إلى ${newTimer} ثانية`);
+        await ctx.editMessageText(`تم تحديث إعدادات المسابقة.\nوقت السؤال الجديد: ${newTimer} ثانية`);
+    } catch (error) {
+        console.error('Error updating quiz timer:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
+    }
+});
+
+bot.action('show_current_timer', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const currentTimer = quizSettings.get(chatId)?.timer || 30; // Default to 30 seconds if not set
+        await ctx.answerCbQuery(`الوقت الحالي للسؤال: ${currentTimer} ثانية`);
+    } catch (error) {
+        console.error('Error showing current timer:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض الوقت الحالي.');
+    }
+});
 // Add this near your other command handlers
 bot.command('stop', async (ctx) => {
     const chatId = ctx.chat.id;
