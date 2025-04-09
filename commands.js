@@ -305,16 +305,7 @@ bot.action('show_stats', async (ctx) => {
     }
 });
 
-// Add this action handler for the configure_quiz button
-bot.action('configure_quiz', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        await configureQuiz(ctx);
-    } catch (error) {
-        console.error('Error handling configure_quiz action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة فتح إعدادات المسابقة.');
-    }
-});
+
 
 bot.action('add_another_question', async (ctx) => {
     await ctx.answerCbQuery();
