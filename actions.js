@@ -2067,6 +2067,7 @@ if (awaitingDeleteReplyWord) {
     
    // Handle awaiting reply response
 // Handle awaiting reply response
+// Handle awaiting reply response
 if (awaitingReplyResponse) {
     let mediaType = 'text';
     let replyText = null;
@@ -2139,25 +2140,22 @@ if (awaitingReplyResponse) {
             return;
         }
 
-        // After adding the reply
-await db.collection('replies').insertOne({
-    trigger_word: tempReplyWord,
-    word: tempReplyWord,
-    type: mediaType,
-    text: replyText,
-    media_url: mediaUrl,
-    created_at: new Date(),
-    created_by: ctx.from.id
-});
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            word: tempReplyWord,
+            type: mediaType,
+            text: replyText,
+            media_url: mediaUrl,
+            created_at: new Date(),
+            created_by: ctx.from.id
+        });
 
-await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
-// Reset state
-tempReplyWord = '';
-awaitingReplyResponse = false;
-
+        // Reset state
         tempReplyWord = '';
         awaitingReplyResponse = false;
+
     } catch (error) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
