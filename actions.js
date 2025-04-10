@@ -2222,10 +2222,29 @@ if (awaitingReplyResponse) {
         }
 
         // Handle photos
-        if (ctx.message.photo) {
+                // Handle photos
+        if (ctx.message.photo && awaitingReplyResponse) {
             const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-            await ctx.reply(`📸 Received a photo with file_id: ${fileId}`);
-            // Save it or respond however you like
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'photo',
+                    file_id: fileId,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+                await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving photo reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        } else if (ctx.message.photo) {
+            // If a photo is received but we're not awaiting a reply, ignore it
             return;
         }
 
