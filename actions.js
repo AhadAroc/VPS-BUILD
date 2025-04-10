@@ -2069,10 +2069,12 @@ if (awaitingDeleteReplyWord) {
 // Handle awaiting reply response
 // Handle awaiting reply response
 // Handle awaiting reply response
+// Handle awaiting reply response
 if (awaitingReplyResponse) {
     let mediaType = 'text';
     let replyText = null;
     let mediaUrl = null;
+    let fileId = null;
 
     if (!tempReplyWord || tempReplyWord.trim() === '') {
         await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
@@ -2084,8 +2086,6 @@ if (awaitingReplyResponse) {
         mediaType = 'text';
         replyText = ctx.message.text.trim();
     } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
-        let fileId;
-
         if (ctx.message.photo) {
             mediaType = 'photo';
             fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
@@ -2148,11 +2148,26 @@ if (awaitingReplyResponse) {
             type: mediaType,
             text: replyText,
             media_url: mediaUrl,
+            file_id: fileId,
             created_at: new Date(),
             created_by: ctx.from.id
         });
 
-        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+        // Confirm the save and send the media back
+        await ctx.reply(`✅ تم حفظ ${mediaType} للكلمة "${tempReplyWord}" بنجاح.`);
+        
+        // Send the media back as confirmation
+        if (mediaType === 'text') {
+            await ctx.reply(`الرد المحفوظ للكلمة "${tempReplyWord}":\n${replyText}`);
+        } else if (mediaType === 'photo') {
+            await ctx.replyWithPhoto(fileId, { caption: `الرد المحفوظ للكلمة "${tempReplyWord}"` });
+        } else if (mediaType === 'sticker') {
+            await ctx.replyWithSticker(fileId);
+        } else if (mediaType === 'video') {
+            await ctx.replyWithVideo(fileId, { caption: `الرد المحفوظ للكلمة "${tempReplyWord}"` });
+        } else if (mediaType === 'animation') {
+            await ctx.replyWithAnimation(fileId, { caption: `الرد المحفوظ للكلمة "${tempReplyWord}"` });
+        }
 
         // Reset state
         tempReplyWord = '';
