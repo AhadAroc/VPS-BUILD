@@ -1795,30 +1795,31 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     // Handle awaiting delete reply word
-    if (awaitingDeleteReplyWord) {
-        const wordToDelete = ctx.message.text.trim();
-        try {
-            const db = await ensureDatabaseInitialized();
-            const result = await db.collection('replies').deleteOne({
-                $or: [
-                    { trigger_word: wordToDelete },
-                    { word: wordToDelete }
-                ]
-            });
-            
-            if (result.deletedCount > 0) {
-                await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
-            } else {
-                await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
-            }
-        } catch (error) {
-            console.error('Error deleting reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
-        }
+    // Handle awaiting delete reply word
+if (awaitingDeleteReplyWord) {
+    const wordToDelete = ctx.message.text.trim();
+    try {
+        const db = await ensureDatabaseInitialized();
+        const result = await db.collection('replies').deleteOne({
+            $or: [
+                { trigger_word: wordToDelete },
+                { word: wordToDelete }
+            ]
+        });
         
-        awaitingDeleteReplyWord = false;
-        return;
+        if (result.deletedCount > 0) {
+            await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
+        } else {
+            await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+        }
+    } catch (error) {
+        console.error('Error deleting reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
     }
+    
+    awaitingDeleteReplyWord = false;
+    return;
+}
     
     // Handle awaiting bot name
     if (awaitingBotName) {
@@ -1841,91 +1842,105 @@ bot.on('left_chat_member', (ctx) => {
         return;
     }
     
-    // Handle awaiting reply response
+   // Handle awaiting reply response
 if (awaitingReplyResponse) {
-            let mediaType = 'text';
-            let replyText = null;
-            let mediaUrl = null;
+    let mediaType = 'text';
+    let replyText = null;
+    let mediaUrl = null;
 
-            // Stronger null check for tempReplyWord
-            if (typeof tempReplyWord !== 'string' || !tempReplyWord.trim()) {
-                await ctx.reply('❌ الكلمة المفتاحية لا يمكن أن تكون فارغة. يرجى إدخال كلمة صالحة أولاً.');
-                awaitingReplyResponse = false;
-                tempReplyWord = ''; // clear it just in case
-                return;
-            }
+    // Validate that tempReplyWord is not empty or null
+    if (!tempReplyWord || tempReplyWord.trim() === '') {
+        await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
+        awaitingReplyResponse = false;
+        return;
+    }
 
-            if (ctx.message.text) {
-                mediaType = 'text';
-                replyText = ctx.message.text.trim();
-            } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
-                let fileId;
+    if (ctx.message.text) {
+        mediaType = 'text';
+        replyText = ctx.message.text.trim();
+    } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
+        let fileId;
 
-                if (ctx.message.photo) {
-                    mediaType = 'photo';
-                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                } else if (ctx.message.sticker) {
-                    mediaType = 'sticker';
-                    fileId = ctx.message.sticker.file_id;
-                } else if (ctx.message.video) {
-                    mediaType = 'video';
-                    fileId = ctx.message.video.file_id;
-                } else if (ctx.message.animation) {
-                    mediaType = 'animation';
-                    fileId = ctx.message.animation.file_id;
-                }
+        if (ctx.message.photo) {
+            mediaType = 'photo';
+            fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        } else if (ctx.message.sticker) {
+            mediaType = 'sticker';
+            fileId = ctx.message.sticker.file_id;
+        } else if (ctx.message.video) {
+            mediaType = 'video';
+            fileId = ctx.message.video.file_id;
+        } else if (ctx.message.animation) {
+            mediaType = 'animation';
+            fileId = ctx.message.animation.file_id;
+        }
 
-                if (fileId) {
-                    const fileLink = await ctx.telegram.getFileLink(fileId);
-                    mediaUrl = fileLink.href;
-                } else {
-                    await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
-                    awaitingReplyResponse = false;
-                    tempReplyWord = '';
-                    return;
-                }
-            } else {
-                await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-                return;
-            }
-            
+        if (fileId) {
             try {
-                const db = await ensureDatabaseInitialized();
-
-                // Check if trigger word already exists
-                const existingReply = await db.collection('replies').findOne({ trigger_word: tempReplyWord });
-                if (existingReply) {
-                    await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
-                    awaitingReplyResponse = false;
-                    tempReplyWord = '';
-                    return;
-                }
-
-                // Insert the new reply
-                await db.collection('replies').insertOne({
-                    trigger_word: tempReplyWord,
-                    type: mediaType,
-                    text: replyText,
-                    media_url: mediaUrl,
-                    created_at: new Date(),
-                    created_by: ctx.from.id
-                });
-
-                await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-
-                // Reset state
-                tempReplyWord = '';
-                awaitingReplyResponse = false;
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaUrl = fileLink.href;
             } catch (error) {
-                console.error('Error adding reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
+                console.error('Error getting file link:', error);
+                await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
                 awaitingReplyResponse = false;
                 tempReplyWord = '';
+                return;
             }
+        } else {
+            await ctx.reply('❌ لم يتم العثور على ملف صالح. يرجى المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
             return;
         }
+    } else {
+        await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        return;
+    }
+    
+    try {
+        const db = await ensureDatabaseInitialized();
+
+        // Check if trigger word already exists
+        const existingReply = await db.collection('replies').findOne({ 
+            $or: [
+                { trigger_word: tempReplyWord },
+                { word: tempReplyWord }
+            ]
+        });
+        
+        if (existingReply) {
+            await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            return;
+        }
+
+        // Insert the new reply with both field names for compatibility
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            word: tempReplyWord, // For backward compatibility
+            type: mediaType,
+            text: replyText,
+            media_url: mediaUrl,
+            created_at: new Date(),
+            created_by: ctx.from.id
+        });
+
+        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+
+        // Reset state
+        tempReplyWord = '';
+        awaitingReplyResponse = false;
+    } catch (error) {
+        console.error('Error adding reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+    }
+    return;
+}
 
     
     // Handle other commands or messages here
