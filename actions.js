@@ -2063,12 +2063,12 @@ if (awaitingDeleteReplyWord) {
     }
     
    // Handle awaiting reply response
+// Handle awaiting reply response
 if (awaitingReplyResponse) {
     let mediaType = 'text';
     let replyText = null;
     let mediaUrl = null;
 
-    // Validate that tempReplyWord is not empty or null
     if (!tempReplyWord || tempReplyWord.trim() === '') {
         await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
         awaitingReplyResponse = false;
@@ -2122,7 +2122,6 @@ if (awaitingReplyResponse) {
     try {
         const db = await ensureDatabaseInitialized();
 
-        // Check if trigger word already exists
         const existingReply = await db.collection('replies').findOne({ 
             $or: [
                 { trigger_word: tempReplyWord },
@@ -2137,10 +2136,9 @@ if (awaitingReplyResponse) {
             return;
         }
 
-        // Insert the new reply with both field names for compatibility
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
-            word: tempReplyWord, // For backward compatibility
+            word: tempReplyWord,
             type: mediaType,
             text: replyText,
             media_url: mediaUrl,
@@ -2150,7 +2148,6 @@ if (awaitingReplyResponse) {
 
         await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
-        // Reset state
         tempReplyWord = '';
         awaitingReplyResponse = false;
     } catch (error) {
