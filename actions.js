@@ -1886,18 +1886,29 @@ bot.on('left_chat_member', (ctx) => {
   const reply = await db.collection('replies').findOne({ trigger_word: text });
 
   if (reply) {
-    if (reply.type === "text") {
+  switch (reply.type) {
+    case "text":
       await ctx.reply(reply.text);
-    } else if (reply.type === "photo") {
+      break;
+    case "photo":
       await ctx.replyWithPhoto(reply.file_id);
-    } else if (reply.type === "animation") {
+      break;
+    case "animation":
       await ctx.replyWithAnimation(reply.file_id);
-    } else if (reply.type === "video") {
+      break;
+    case "video":
       await ctx.replyWithVideo(reply.file_id);
-    } else {
+      break;
+    case "sticker":
+      await ctx.replyWithSticker(reply.file_id);
+      break;
+    case "document":
+      await ctx.replyWithDocument(reply.file_id);
+      break;
+    default:
       await ctx.reply("⚠️ نوع الرد غير مدعوم.");
-    }
   }
+}
 
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
