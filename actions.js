@@ -40,8 +40,13 @@ const QUIZ_STATE = {
 
 const {isAdminOrOwner} = require('./commands');    
 const axios = require('axios');
-const fs = require('fs-extra');
+const fs = require('fs');
 const path = require('path');    
+// Ensure the directory for saving media exists
+const mediaDir = path.join(__dirname, 'media');
+if (!fs.existsSync(mediaDir)) {
+    fs.mkdirSync(mediaDir);
+}
 
 
 
@@ -2169,124 +2174,40 @@ if (awaitingReplyResponse) {
                 updateActiveGroups(ctx.chat.id, ctx.chat.title);
             }
     
-            // Only process text messages for quiz answers and commands
-            if (message.text) {
-                // First check if this is a quiz answer
-                const isQuizAnswer = await handleQuizAnswer(ctx);
-                if (isQuizAnswer) return; // If it was a quiz answer, stop processing
-                
-                // Handle /start command
-                if (message.text.toLowerCase() === '/start' || message.text === 'بدء') {
-                    // Handle start command logic here
-                    await ctx.reply('مرحباً بك! البوت جاهز للاستخدام.');
-                    return;
+            // Handle media messages
+            if (message.photo || message.sticker || message.video || message.animation) {
+                let fileId;
+                let mediaType;
+    
+                if (message.photo) {
+                    mediaType = 'photo';
+                    fileId = message.photo[message.photo.length - 1].file_id;
+                } else if (message.sticker) {
+                    mediaType = 'sticker';
+                    fileId = message.sticker.file_id;
+                } else if (message.video) {
+                    mediaType = 'video';
+                    fileId = message.video.file_id;
+                } else if (message.animation) {
+                    mediaType = 'animation';
+                    fileId = message.animation.file_id;
                 }
     
-                // Handle awaiting reply word
-                if (awaitingReplyWord) {
-                    tempReplyWord = message.text;
-                    ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-                    awaitingReplyWord = false;
-                    awaitingReplyResponse = true;
-                    return;
-                }
-                
-                // Handle awaiting delete reply word
-                if (awaitingDeleteReplyWord) {
-                    const wordToDelete = message.text.trim();
+                if (fileId) {
                     try {
-                        const db = await ensureDatabaseInitialized();
-                        const result = await db.collection('replies').deleteOne({
-                            $or: [
-                                { trigger_word: wordToDelete },
-                                { word: wordToDelete }
-                            ]
-                        });
+                        const fileLink = await ctx.telegram.getFileLink(fileId);
+                        const filePath = path.join(mediaDir, `${fileId}.${mediaType}`);
                         
-                        if (result.deletedCount > 0) {
-                            await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
-                        } else {
-                            await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
-                        }
-                    } catch (error) {
-                        console.error('Error deleting reply:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
-                    }
-                    
-                    awaitingDeleteReplyWord = false;
-                    return;
-                }
-                
-                // Handle awaiting bot name
-                if (awaitingBotName) {
-                    const newBotName = message.text.trim();
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        await db.collection('bot_custom_names').updateOne(
-                            { bot_id: bot.botInfo.id },
-                            { $set: { name: newBotName } },
-                            { upsert: true }
-                        );
-                        
-                        await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
-                    } catch (error) {
-                        console.error('Error updating bot name:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
-                    }
-                    
-                    awaitingBotName = false;
-                    return;
-                }
-                
-                // Handle awaiting reply response
-                if (awaitingReplyResponse) {
-                    // ... existing code for handling reply response ...
-                    return;
-                }
+                        // Download and save the file
+                        const response = await fetch(fileLink.href);
+                        const buffer = await response.buffer();
+                        fs.writeFileSync(filePath, buffer);
     
-                // Check for automatic replies
-                try {
-                    const db = await ensureDatabaseInitialized();
-                    // Check both trigger_word and word fields for backward compatibility
-                    const reply = await db.collection('replies').findOne({
-                        $or: [
-                            { trigger_word: ctx.message.text.trim() },
-                            { word: ctx.message.text.trim() }
-                        ]
-                    });
-                    
-                    if (reply) {
-                        if (reply.type === 'text' && reply.text) {
-                            await ctx.reply(reply.text);
-                        } else if (reply.media_url) {
-                            switch (reply.type) {
-                                case 'photo':
-                                    await ctx.replyWithPhoto(reply.media_url);
-                                    break;
-                                case 'video':
-                                    await ctx.replyWithVideo(reply.media_url);
-                                    break;
-                                case 'animation':
-                                    await ctx.replyWithAnimation(reply.media_url);
-                                    break;
-                                case 'sticker':
-                                    // For stickers from URL, we need to send as photo
-                                    await ctx.replyWithPhoto(reply.media_url);
-                                    break;
-                                default:
-                                    await ctx.reply(reply.text || 'رد غير معروف');
-                            }
-                        }
-                        return;
+                        await ctx.reply(`✅ تم حفظ ${mediaType} بنجاح.`);
+                    } catch (error) {
+                        console.error('Error downloading file:', error);
+                        await ctx.reply('❌ حدث خطأ أثناء تنزيل الملف. يرجى المحاولة مرة أخرى.');
                     }
-                } catch (error) {
-                    console.error('Error checking for automatic replies:', error);
-                }
-            } else if (message.photo || message.sticker || message.video || message.animation) {
-                // Handle media messages for awaiting reply response
-                if (awaitingReplyResponse) {
-                    // ... existing code for handling media reply response ...
-                    return;
                 }
             }
     
