@@ -662,7 +662,39 @@ function shuffleArray(array) {
     // Call this function when your bot starts
     createSecondaryDevelopersTable();
 
-
+// This function should be called when you want to send a reply
+async function sendReply(ctx, reply) {
+    try {
+        switch (reply.type) {
+            case 'text':
+                await ctx.reply(reply.text);
+                break;
+            case 'photo':
+                await ctx.replyWithPhoto(reply.file_id);
+                break;
+            case 'animation':
+                await ctx.replyWithAnimation(reply.file_id);
+                break;
+            case 'video':
+                await ctx.replyWithVideo(reply.file_id);
+                break;
+            case 'document':
+                await ctx.replyWithDocument(reply.file_id, { 
+                    filename: reply.file_name,
+                    mime_type: reply.mime_type 
+                });
+                break;
+            case 'sticker':
+                await ctx.replyWithSticker(reply.file_id);
+                break;
+            default:
+                await ctx.reply('⚠️ نوع الرد غير مدعوم.');
+        }
+    } catch (error) {
+        console.error('Error sending reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إرسال الرد. يرجى المحاولة مرة أخرى.');
+    }
+}
 
     async function createBotCustomNamesTable() {
         try {
@@ -1882,10 +1914,12 @@ bot.on('left_chat_member', (ctx) => {
   const text = ctx.message.text.trim().toLowerCase();
 
   // Check if this matches a saved trigger word
-  const db = await ensureDatabaseInitialized();
-  const reply = await db.collection('replies').findOne({ trigger_word: text });
+  const text = ctx.message.text.trim().toLowerCase();
+    const db = await ensureDatabaseInitialized();
+    const reply = await db.collection('replies').findOne({ trigger_word: text });
 
-  if (reply) {
+    if (reply) {
+        await sendReply(ctx, reply);
     if (reply.type === "text") {
       await ctx.reply(reply.text);
     } else if (reply.type === "photo") {
