@@ -1021,7 +1021,6 @@ async function handleAwaitingReplyResponse(ctx) {
     if (!awaitingReplyResponse) return false;
 
     try {
-        // Validate that tempReplyWord is not empty or null
         if (!tempReplyWord || tempReplyWord.trim() === '') {
             await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
             awaitingReplyResponse = false;
@@ -1038,8 +1037,7 @@ async function handleAwaitingReplyResponse(ctx) {
             fileId = ctx.message.animation.file_id;
         } else if (ctx.message.photo) {
             mediaType = 'photo';
-            const photoArray = ctx.message.photo;
-            fileId = photoArray[photoArray.length - 1].file_id;
+            fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
         } else if (ctx.message.sticker) {
             mediaType = 'sticker';
             fileId = ctx.message.sticker.file_id;
@@ -1071,11 +1069,10 @@ async function handleAwaitingReplyResponse(ctx) {
 
         const db = await ensureDatabaseInitialized();
 
-        // Check if trigger word already exists
-        const existingReply = await db.collection('replies').findOne({ 
-            trigger_word: tempReplyWord 
+        const existingReply = await db.collection('replies').findOne({
+            trigger_word: tempReplyWord
         });
-        
+
         if (existingReply) {
             await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
             awaitingReplyResponse = false;
@@ -1083,7 +1080,6 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
-        // Add the reply to the database
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             type: mediaType,
@@ -1094,20 +1090,21 @@ async function handleAwaitingReplyResponse(ctx) {
             created_by: ctx.from.id
         });
 
-        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+        await ctx.reply(`✅ تم حفظ الرد للكلمة "${tempReplyWord}" بنجاح 🎉`);
 
-        // Reset state
-        tempReplyWord = '';
+        // 🔒 Stop listening for next messages
         awaitingReplyResponse = false;
+        tempReplyWord = '';
         return true;
     } catch (error) {
-        console.error('Error adding reply:', error);
-        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
+        console.error('Error saving reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
         awaitingReplyResponse = false;
         tempReplyWord = '';
         return true;
     }
 }
+
 // Add these action handlers
 bot.action('add_another_question', async (ctx) => {
     await ctx.answerCbQuery();
