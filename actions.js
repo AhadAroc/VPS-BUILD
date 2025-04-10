@@ -2249,10 +2249,29 @@ if (awaitingReplyResponse) {
         }
 
         // Handle animations (GIFs)
-        if (ctx.message.animation) {
+                // Handle animations (GIFs)
+        if (ctx.message.animation && awaitingReplyResponse) {
             const fileId = ctx.message.animation.file_id;
-            await ctx.reply(`🎞️ Received a GIF with file_id: ${fileId}`);
-            // Save or respond as needed
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'animation',
+                    file_id: fileId,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+                await ctx.reply(`✅ تم حفظ الـ GIF كرد للكلمة "${tempReplyWord}" بنجاح.`);
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving GIF reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الـ GIF كرد. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        } else if (ctx.message.animation) {
+            // If a GIF is received but we're not awaiting a reply, ignore it
             return;
         }
 
