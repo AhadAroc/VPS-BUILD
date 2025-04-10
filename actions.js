@@ -55,18 +55,23 @@ async function saveFile(fileLink, fileName) {
     const filePath = path.join('/var/www/bot_media', fileName);
     const writer = fs.createWriteStream(filePath);
 
-    const response = await axios({
-        method: 'GET',
-        url: fileLink,
-        responseType: 'stream'
-    });
+    try {
+        const response = await axios({
+            method: 'GET',
+            url: fileLink,
+            responseType: 'stream'
+        });
 
-    response.data.pipe(writer);
+        response.data.pipe(writer);
 
-    return new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-    });
+        return new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+    } catch (error) {
+        console.error('Error downloading file:', error);
+        throw error;
+    }
 }
 
 
