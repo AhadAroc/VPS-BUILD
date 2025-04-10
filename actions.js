@@ -1235,22 +1235,34 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
         }
     });
     bot.action('list_general_replies', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('عرض الردود العامة');
-            const replies = await fetchRepliesFromDatabase();
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('عرض الردود العامة');
+        try {
+            const db = await ensureDatabaseInitialized();
+            const replies = await db.collection('replies').find({}).toArray();
+            
             let replyList = 'الردود العامة:\n\n';
             if (replies.length > 0) {
                 replies.forEach((reply, index) => {
-                    replyList += `${index + 1}. الكلمة: ${reply.trigger_word}\nالرد: ${reply.reply_text}\n\n`;
+                    const triggerWord = reply.trigger_word || reply.word || 'غير معروف';
+                    const replyContent = reply.type === 'text' ? 
+                        (reply.text || 'نص غير متوفر') : 
+                        `${reply.type} (${reply.media_url ? 'متوفر' : 'غير متوفر'})`;
+                    
+                    replyList += `${index + 1}. الكلمة: ${triggerWord}\nالرد: ${replyContent}\n\n`;
                 });
             } else {
                 replyList += 'لا توجد ردود عامة حالياً.';
             }
             ctx.reply(replyList);
-        } else {
-            ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+        } catch (error) {
+            console.error('Error fetching replies:', error);
+            ctx.reply('❌ حدث خطأ أثناء جلب الردود العامة.');
         }
-    });
+    } else {
+        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
     
     // Add this callback handler for the start_quiz button
     bot.action('start_quiz', async (ctx) => {
@@ -1744,34 +1756,44 @@ bot.on('left_chat_member', (ctx) => {
     // Handle other text messages (non-quiz related)
     
     // Check for automatic replies
-    try {
-        const db = await ensureDatabaseInitialized();
-        const reply = await db.collection('replies').findOne({ trigger_word: ctx.message.text.trim() });
-        
-        if (reply) {
-            if (reply.type === 'text' && reply.text) {
-                await ctx.reply(reply.text);
-            } else if (reply.media_url) {
-                switch (reply.type) {
-                    case 'photo':
-                    case 'sticker':
-                        await ctx.replyWithPhoto(reply.media_url);
-                        break;
-                    case 'video':
-                        await ctx.replyWithVideo(reply.media_url);
-                        break;
-                    case 'animation':
-                        await ctx.replyWithAnimation(reply.media_url);
-                        break;
-                    default:
-                        await ctx.reply(reply.text || 'رد غير معروف');
-                }
+    // Check for automatic replies
+try {
+    const db = await ensureDatabaseInitialized();
+    // Check both trigger_word and word fields for backward compatibility
+    const reply = await db.collection('replies').findOne({
+        $or: [
+            { trigger_word: ctx.message.text.trim() },
+            { word: ctx.message.text.trim() }
+        ]
+    });
+    
+    if (reply) {
+        if (reply.type === 'text' && reply.text) {
+            await ctx.reply(reply.text);
+        } else if (reply.media_url) {
+            switch (reply.type) {
+                case 'photo':
+                    await ctx.replyWithPhoto(reply.media_url);
+                    break;
+                case 'video':
+                    await ctx.replyWithVideo(reply.media_url);
+                    break;
+                case 'animation':
+                    await ctx.replyWithAnimation(reply.media_url);
+                    break;
+                case 'sticker':
+                    // For stickers from URL, we need to send as photo
+                    await ctx.replyWithPhoto(reply.media_url);
+                    break;
+                default:
+                    await ctx.reply(reply.text || 'رد غير معروف');
             }
-            return;
         }
-    } catch (error) {
-        console.error('Error checking for automatic replies:', error);
+        return;
     }
+} catch (error) {
+    console.error('Error checking for automatic replies:', error);
+}
     
     // Handle awaiting reply word
     if (awaitingReplyWord) {
@@ -1782,26 +1804,32 @@ bot.on('left_chat_member', (ctx) => {
         return;
     }
     
+   
     // Handle awaiting delete reply word
-    if (awaitingDeleteReplyWord) {
-        const wordToDelete = ctx.message.text.trim();
-        try {
-            const db = await ensureDatabaseInitialized();
-            const result = await db.collection('replies').deleteOne({ word: wordToDelete });
-            
-            if (result.deletedCount > 0) {
-                await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
-            } else {
-                await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
-            }
-        } catch (error) {
-            console.error('Error deleting reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
-        }
+if (awaitingDeleteReplyWord) {
+    const wordToDelete = ctx.message.text.trim();
+    try {
+        const db = await ensureDatabaseInitialized();
+        const result = await db.collection('replies').deleteOne({
+            $or: [
+                { trigger_word: wordToDelete },
+                { word: wordToDelete }
+            ]
+        });
         
-        awaitingDeleteReplyWord = false;
-        return;
+        if (result.deletedCount > 0) {
+            await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
+        } else {
+            await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+        }
+    } catch (error) {
+        console.error('Error deleting reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
     }
+    
+    awaitingDeleteReplyWord = false;
+    return;
+}
     
     // Handle awaiting bot name
     if (awaitingBotName) {
@@ -1962,14 +1990,15 @@ if (awaitingReplyResponse) {
                 return;
             }
 
-            try {
+             try {
                 const db = await ensureDatabaseInitialized();
-                
-                // Check if the trigger word already exists
+
+                // Check if trigger word already exists
                 const existingReply = await db.collection('replies').findOne({ trigger_word: tempReplyWord });
                 if (existingReply) {
                     await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
                     awaitingReplyResponse = false;
+                    tempReplyWord = '';
                     return;
                 }
 
@@ -1984,7 +2013,7 @@ if (awaitingReplyResponse) {
                 });
 
                 await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-                
+
                 // Reset state
                 tempReplyWord = '';
                 awaitingReplyResponse = false;
@@ -1992,9 +2021,8 @@ if (awaitingReplyResponse) {
                 console.error('Error adding reply:', error);
                 await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
                 awaitingReplyResponse = false;
+                tempReplyWord = '';
             }
-            return;
-        }
                 
                 // Handle awaiting bot name
                 if (awaitingBotName) {
