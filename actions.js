@@ -1828,6 +1828,8 @@ bot.on('left_chat_member', (ctx) => {
 // ... existing code
 
 // Handle media messages for awaiting reply response
+// ... existing code
+
 if (awaitingReplyResponse) {
     try {
         let mediaType = '';
@@ -1841,9 +1843,9 @@ if (awaitingReplyResponse) {
             return;
         }
 
-        if (message.photo) {
+        if (ctx.message.photo) {
             mediaType = 'photo';
-            const fileId = message.photo[message.photo.length - 1].file_id;
+            const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
             const fileLink = await ctx.telegram.getFileLink(fileId);
             
             const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
@@ -1851,9 +1853,9 @@ if (awaitingReplyResponse) {
             });
             
             cloudinaryUrl = uploadResult.secure_url;
-        } else if (message.sticker) {
+        } else if (ctx.message.sticker) {
             mediaType = 'sticker';
-            const fileId = message.sticker.file_id;
+            const fileId = ctx.message.sticker.file_id;
             const fileLink = await ctx.telegram.getFileLink(fileId);
             
             const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
@@ -1861,9 +1863,9 @@ if (awaitingReplyResponse) {
             });
             
             cloudinaryUrl = uploadResult.secure_url;
-        } else if (message.video) {
+        } else if (ctx.message.video) {
             mediaType = 'video';
-            const fileId = message.video.file_id;
+            const fileId = ctx.message.video.file_id;
             const fileLink = await ctx.telegram.getFileLink(fileId);
             
             const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
@@ -1871,9 +1873,9 @@ if (awaitingReplyResponse) {
             });
             
             cloudinaryUrl = uploadResult.secure_url;
-        } else if (message.animation) {
+        } else if (ctx.message.animation) {
             mediaType = 'animation';
-            const fileId = message.animation.file_id;
+            const fileId = ctx.message.animation.file_id;
             const fileLink = await ctx.telegram.getFileLink(fileId);
             
             const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
@@ -1900,7 +1902,7 @@ if (awaitingReplyResponse) {
             text: null,
             media_url: cloudinaryUrl,
             created_at: new Date(),
-            created_by: userId
+            created_by: ctx.from.id
         });
 
         await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
@@ -1916,6 +1918,7 @@ if (awaitingReplyResponse) {
     return;
 }
 
+// ... existing code
 // ... existing code
 
     
