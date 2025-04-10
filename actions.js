@@ -1,4 +1,4 @@
-//freaky version want to be rebilous freaky deak 
+//glock chigga 
 let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
