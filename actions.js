@@ -75,6 +75,7 @@ async function saveFile(fileLink, fileName) {
 }
 
 
+
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleQuizAnswer(ctx) {
@@ -2205,8 +2206,10 @@ if (awaitingReplyResponse) {
                         
                         // Download and save the file
                         const response = await fetch(fileLink.href);
-                        const buffer = await response.buffer();
-                        fs.writeFileSync(filePath, buffer);
+const arrayBuffer = await response.arrayBuffer();
+const buffer = Buffer.from(arrayBuffer);
+fs.writeFileSync(filePath, buffer);
+
     
                         await ctx.reply(`✅ تم حفظ ${mediaType} بنجاح.`);
                     } catch (error) {
