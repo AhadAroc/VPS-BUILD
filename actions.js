@@ -1885,28 +1885,28 @@ bot.on('left_chat_member', (ctx) => {
   const db = await ensureDatabaseInitialized();
   const reply = await db.collection('replies').findOne({ trigger_word: text });
 
-  if (reply) {
+ if (reply) {
   switch (reply.type) {
     case "text":
-      await ctx.reply(reply.text);
+      await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
       break;
     case "photo":
-      await ctx.replyWithPhoto(reply.file_id);
+      await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
       break;
     case "animation":
-      await ctx.replyWithAnimation(reply.file_id);
+      await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
       break;
     case "video":
-      await ctx.replyWithVideo(reply.file_id);
+      await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
       break;
     case "sticker":
-      await ctx.replyWithSticker(reply.file_id);
+      await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
       break;
     case "document":
-      await ctx.replyWithDocument(reply.file_id);
+      await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
       break;
     default:
-      await ctx.reply("⚠️ نوع الرد غير مدعوم.");
+      await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
   }
 }
 
