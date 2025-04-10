@@ -2276,26 +2276,88 @@ if (awaitingReplyResponse) {
         }
 
         // Handle documents (like MP4 or other media)
-        if (ctx.message.document) {
+                // Handle documents (like MP4 or other media)
+        if (ctx.message.document && awaitingReplyResponse) {
             const fileId = ctx.message.document.file_id;
-            await ctx.reply(`📎 Received a document with file_id: ${fileId}`);
-            // Process the document as needed
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'document',
+                    file_id: fileId,
+                    file_name: ctx.message.document.file_name,
+                    mime_type: ctx.message.document.mime_type,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+                await ctx.reply(`✅ تم حفظ المستند كرد للكلمة "${tempReplyWord}" بنجاح.`);
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving document reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ المستند كرد. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        } else if (ctx.message.document) {
+            // If a document is received but we're not awaiting a reply, ignore it
             return;
         }
 
         // Handle stickers
-        if (ctx.message.sticker) {
+                // Handle stickers
+        if (ctx.message.sticker && awaitingReplyResponse) {
             const fileId = ctx.message.sticker.file_id;
-            await ctx.reply(`🌟 Received a sticker with file_id: ${fileId}`);
-            // Process the sticker as needed
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'sticker',
+                    file_id: fileId,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+                await ctx.reply(`✅ تم حفظ الملصق كرد للكلمة "${tempReplyWord}" بنجاح.`);
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving sticker reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الملصق كرد. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        } else if (ctx.message.sticker) {
+            // If a sticker is received but we're not awaiting a reply, ignore it
             return;
         }
 
-        // Handle videos
-        if (ctx.message.video) {
+               // Handle videos
+        if (ctx.message.video && awaitingReplyResponse) {
             const fileId = ctx.message.video.file_id;
-            await ctx.reply(`🎥 Received a video with file_id: ${fileId}`);
-            // Process the video as needed
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'video',
+                    file_id: fileId,
+                    duration: ctx.message.video.duration,
+                    width: ctx.message.video.width,
+                    height: ctx.message.video.height,
+                    mime_type: ctx.message.video.mime_type,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+                await ctx.reply(`✅ تم حفظ الفيديو كرد للكلمة "${tempReplyWord}" بنجاح.`);
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving video reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الفيديو كرد. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        } else if (ctx.message.video) {
+            // If a video is received but we're not awaiting a reply, ignore it
             return;
         }
 
