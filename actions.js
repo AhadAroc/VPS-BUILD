@@ -1977,26 +1977,27 @@ bot.on('left_chat_member', (ctx) => {
                 { word: ctx.message.text.trim() }
             ]
         });
-        console.log('Reply found:', reply);
-        if (reply.type === 'text' && reply.text) {
-            await ctx.reply(reply.text);
-        } else if (reply.media_url) {
-            switch (reply.type) {
-                case 'photo':
-                    await ctx.replyWithPhoto(reply.media_url);
-                    break;
-                case 'sticker':
-                    await ctx.replyWithSticker(reply.media_url);
-                    break;
-                case 'video':
-                    await ctx.replyWithVideo(reply.media_url);
-                    break;
-                case 'animation':
-                    await ctx.replyWithAnimation(reply.media_url);
-                    break;
-                default:
-                    await ctx.reply('رد غير معروف');
-            
+        
+        if (reply) {
+            if (reply.type === 'text' && reply.text) {
+                await ctx.reply(reply.text);
+            } else if (reply.media_url) {
+                switch (reply.type) {
+                    case 'photo':
+                        await ctx.replyWithPhoto(reply.media_url);
+                        break;
+                    case 'sticker':
+                        await ctx.replyWithSticker(reply.media_url);
+                        break;
+                    case 'video':
+                        await ctx.replyWithVideo(reply.media_url);
+                        break;
+                    case 'animation':
+                        await ctx.replyWithAnimation(reply.media_url);
+                        break;
+                    default:
+                        await ctx.reply('رد غير معروف');
+                }
             }
             return;
         }
