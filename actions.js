@@ -2068,6 +2068,7 @@ if (awaitingDeleteReplyWord) {
    // Handle awaiting reply response
 // Handle awaiting reply response
 // Handle awaiting reply response
+// Handle awaiting reply response
 if (awaitingReplyResponse) {
     let mediaType = 'text';
     let replyText = null;
@@ -2140,6 +2141,7 @@ if (awaitingReplyResponse) {
             return;
         }
 
+        // Add the reply to the database
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             word: tempReplyWord,
@@ -2155,7 +2157,6 @@ if (awaitingReplyResponse) {
         // Reset state
         tempReplyWord = '';
         awaitingReplyResponse = false;
-
     } catch (error) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
