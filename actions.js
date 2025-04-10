@@ -1831,75 +1831,46 @@ bot.on('left_chat_member', (ctx) => {
 // ... existing code
 
 if (awaitingReplyResponse) {
-                    try {
-                        let mediaType = '';
-                        let cloudinaryUrl = null;
-    
-                        if (message.photo) {
-                            mediaType = 'photo';
-                            const fileId = message.photo[message.photo.length - 1].file_id;
-                            const fileLink = await ctx.telegram.getFileLink(fileId);
-                            
-                            const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
-                                resource_type: 'image'
-                            });
-                            
-                            cloudinaryUrl = uploadResult.secure_url;
-                        } else if (message.sticker) {
-                            mediaType = 'sticker';
-                            const fileId = message.sticker.file_id;
-                            const fileLink = await ctx.telegram.getFileLink(fileId);
-                            
-                            const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
-                                resource_type: 'image'
-                            });
-                            
-                            cloudinaryUrl = uploadResult.secure_url;
-                        } else if (message.video) {
-                            mediaType = 'video';
-                            const fileId = message.video.file_id;
-                            const fileLink = await ctx.telegram.getFileLink(fileId);
-                            
-                            const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
-                                resource_type: 'video'
-                            });
-                            
-                            cloudinaryUrl = uploadResult.secure_url;
-                        } else if (message.animation) {
-                            mediaType = 'animation';
-                            const fileId = message.animation.file_id;
-                            const fileLink = await ctx.telegram.getFileLink(fileId);
-                            
-                            const uploadResult = await cloudinary.uploader.upload(fileLink.href, {
-                                resource_type: 'auto'
-                            });
-                            
-                            cloudinaryUrl = uploadResult.secure_url;
-                        }
-    
-                        const db = await ensureDatabaseInitialized();
-                        await db.collection('replies').insertOne({
-                            word: tempReplyWord,
-                            type: mediaType,
-                            text: null,
-                            media_url: cloudinaryUrl,
-                            created_at: new Date(),
-                            created_by: userId
-                        });
-    
-                        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-                        
-                        // Reset state
-                        tempReplyWord = '';
-                        awaitingReplyResponse = false;
-                    } catch (error) {
-                        console.error('Error adding media reply:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد.');
-                        awaitingReplyResponse = false;
-                    }
-                    return;
-                }
-            }
+    try {
+        let mediaType = '';
+        let fileId = null;
+
+        if (message.photo) {
+            mediaType = 'photo';
+            fileId = message.photo[message.photo.length - 1].file_id;
+        } else if (message.sticker) {
+            mediaType = 'sticker';
+            fileId = message.sticker.file_id;
+        } else if (message.video) {
+            mediaType = 'video';
+            fileId = message.video.file_id;
+        } else if (message.animation) {
+            mediaType = 'animation';
+            fileId = message.animation.file_id;
+        }
+
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').insertOne({
+            word: tempReplyWord,
+            type: mediaType,
+            file_id: fileId,
+            text: null,
+            created_at: new Date(),
+            created_by: userId
+        });
+
+        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+        
+        // Reset state
+        tempReplyWord = '';
+        awaitingReplyResponse = false;
+    } catch (error) {
+        console.error('Error adding media reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد.');
+        awaitingReplyResponse = false;
+    }
+    return;
+}
 
 // ... existing code
 // ... existing code
