@@ -2203,20 +2203,24 @@ if (awaitingReplyResponse) {
                     try {
                         const fileLink = await ctx.telegram.getFileLink(fileId);
                         const filePath = path.join(mediaDir, `${fileId}.${mediaType}`);
-                        
-                        // Download and save the file
-                        const response = await fetch(fileLink.href);
-const arrayBuffer = await response.arrayBuffer();
-const buffer = Buffer.from(arrayBuffer);
-fs.writeFileSync(filePath, buffer);
-
-    
+                
+                        // Download and save the file using axios
+                        const response = await axios({
+                            method: 'GET',
+                            url: fileLink.href,
+                            responseType: 'arraybuffer'
+                        });
+                
+                        const buffer = Buffer.from(response.data);
+                        fs.writeFileSync(filePath, buffer);
+                
                         await ctx.reply(`✅ تم حفظ ${mediaType} بنجاح.`);
                     } catch (error) {
                         console.error('Error downloading file:', error);
                         await ctx.reply('❌ حدث خطأ أثناء تنزيل الملف. يرجى المحاولة مرة أخرى.');
                     }
                 }
+                
             }
     
             // Continue to next middleware
