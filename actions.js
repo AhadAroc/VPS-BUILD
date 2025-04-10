@@ -1970,26 +1970,33 @@ bot.on('left_chat_member', (ctx) => {
     // Check for automatic replies
     try {
         const db = await ensureDatabaseInitialized();
-        const reply = await db.collection('replies').findOne({ trigger_word: ctx.message.text.trim() });
-        
-        if (reply) {
-            if (reply.type === 'text' && reply.text) {
-                await ctx.reply(reply.text);
-            } else if (reply.media_url) {
-                switch (reply.type) {
-                    case 'photo':
-                    case 'sticker':
-                        await ctx.replyWithPhoto(reply.media_url);
-                        break;
-                    case 'video':
-                        await ctx.replyWithVideo(reply.media_url);
-                        break;
-                    case 'animation':
-                        await ctx.replyWithAnimation(reply.media_url);
-                        break;
-                    default:
-                        await ctx.reply(reply.text || 'رد غير معروف');
-                }
+        console.log('Searching for reply with keyword:', ctx.message.text.trim());
+        const reply = await db.collection('replies').findOne({
+            $or: [
+                { trigger_word: ctx.message.text.trim() },
+                { word: ctx.message.text.trim() }
+            ]
+        });
+        console.log('Reply found:', reply);
+        if (reply.type === 'text' && reply.text) {
+            await ctx.reply(reply.text);
+        } else if (reply.media_url) {
+            switch (reply.type) {
+                case 'photo':
+                    await ctx.replyWithPhoto(reply.media_url);
+                    break;
+                case 'sticker':
+                    await ctx.replyWithSticker(reply.media_url);
+                    break;
+                case 'video':
+                    await ctx.replyWithVideo(reply.media_url);
+                    break;
+                case 'animation':
+                    await ctx.replyWithAnimation(reply.media_url);
+                    break;
+                default:
+                    await ctx.reply('رد غير معروف');
+            
             }
             return;
         }
