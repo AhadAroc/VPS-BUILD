@@ -192,6 +192,97 @@ function setupCommands(bot) {
         return;
     }
 });
+
+bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
+bot.command('ترقية_ثانوي', (ctx) => promoteUser(ctx, 'مطور ثانوي'));
+bot.hears(/^ترقية ثانوي/, (ctx) => promoteUser(ctx, 'مطور ثانوي'));
+
+bot.command('promote', (ctx) => promoteUser(ctx, 'مطور'));
+bot.command('promote', (ctx) => promoteUser(ctx, 'developer'));
+
+bot.command('تنزيل مطور', async (ctx) => {
+    await demoteUser(ctx, 'developer');
+});
+
+bot.hears(/^تنزيل مطور/, async (ctx) => {
+    await demoteUser(ctx, 'developer');
+});
+bot.hears('كتم', adminOnly((ctx) => muteUser(ctx, true)));
+bot.hears('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
+bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
+bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
+bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
+bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
+// Add these lines to your existing command handlers
+bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, (ctx) => {
+    const role = ctx.match[1];
+    promoteUser(ctx, role);
+});
+
+bot.hears('تنزيل', (ctx) => demoteUser(ctx));
+
+// Handle "نكتة" text command
+bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
+bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
+bot.command('ازالة الروابط', adminOnly((ctx) => removeLinks(ctx)));
+bot.hears('ازالة الروابط', (ctx) => removeLinks(ctx));
+bot.command('معرفي', (ctx) => showUserId(ctx));
+bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
+bot.hears('معرفي', (ctx) => showUserId(ctx));
+bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
+bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
+bot.hears('فتح روابط', adminOnly((ctx) => toggleLinkSharing(ctx)));
+bot.hears('غلق روابط', adminOnly((ctx) => toggleLinkSharing(ctx)));
+bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
+bot.hears('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
+bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
+bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
+bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
+bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
+
+// Handle "نكتة" text command
+bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
+bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
+bot.command('ازالة_الروابط', adminOnly((ctx) => removeLinks(ctx)));
+
+bot.command('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
+
+bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
+
+bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
+bot.hears('سماح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
+
+
+bot.command('معرفي', (ctx) => showUserId(ctx));
+
+bot.hears('معرفي', (ctx) => showUserId(ctx));
+bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
+bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
+
+bot.command('كتم', adminOnly((ctx) => muteUser(ctx, true)));
+bot.command('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
+
+bot.command('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
+bot.command('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
+
+// Also add handlers for text commands without the slash
+bot.hears('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
+bot.hears('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
+bot.command('منع_متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
+bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
+
+// Also add handlers for text commands without the underscore
+bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
+bot.hears('تفعيل متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
+bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
+bot.hears(/^ترقية مطور/, (ctx) => promoteUser(ctx, 'مطور'));
+bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
+bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
+
+bot.hears('الاوامر', (ctx) => {
+    ctx.reply(getCommandList());
+});
+
 // Add this near your other command handlers
 bot.command('stop', async (ctx) => {
     const chatId = ctx.chat.id;
@@ -1347,95 +1438,7 @@ bot.start(async (ctx) => {
 
 
 
-bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
-bot.command('ترقية_ثانوي', (ctx) => promoteUser(ctx, 'مطور ثانوي'));
-bot.hears(/^ترقية ثانوي/, (ctx) => promoteUser(ctx, 'مطور ثانوي'));
 
-bot.command('promote', (ctx) => promoteUser(ctx, 'مطور'));
-bot.command('promote', (ctx) => promoteUser(ctx, 'developer'));
-
-bot.command('تنزيل مطور', async (ctx) => {
-    await demoteUser(ctx, 'developer');
-});
-
-bot.hears(/^تنزيل مطور/, async (ctx) => {
-    await demoteUser(ctx, 'developer');
-});
-bot.hears('كتم', adminOnly((ctx) => muteUser(ctx, true)));
-bot.hears('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
-bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
-bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
-bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
-// Add these lines to your existing command handlers
-bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, (ctx) => {
-    const role = ctx.match[1];
-    promoteUser(ctx, role);
-});
-
-bot.hears('تنزيل', (ctx) => demoteUser(ctx));
-
-// Handle "نكتة" text command
-bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
-bot.command('ازالة الروابط', adminOnly((ctx) => removeLinks(ctx)));
-bot.hears('ازالة الروابط', (ctx) => removeLinks(ctx));
-bot.command('معرفي', (ctx) => showUserId(ctx));
-bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
-bot.hears('معرفي', (ctx) => showUserId(ctx));
-bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-bot.hears('فتح روابط', adminOnly((ctx) => toggleLinkSharing(ctx)));
-bot.hears('غلق روابط', adminOnly((ctx) => toggleLinkSharing(ctx)));
-bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
-bot.hears('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
-bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
-bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
-bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
-
-// Handle "نكتة" text command
-bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
-bot.command('ازالة_الروابط', adminOnly((ctx) => removeLinks(ctx)));
-
-bot.command('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
-
-bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
-
-bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
-bot.hears('سماح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
-
-
-bot.command('معرفي', (ctx) => showUserId(ctx));
-
-bot.hears('معرفي', (ctx) => showUserId(ctx));
-bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-
-bot.command('كتم', adminOnly((ctx) => muteUser(ctx, true)));
-bot.command('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
-
-bot.command('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
-bot.command('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
-
-// Also add handlers for text commands without the slash
-bot.hears('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
-bot.hears('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
-bot.command('منع_متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
-bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
-
-// Also add handlers for text commands without the underscore
-bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
-bot.hears('تفعيل متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
-bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
-bot.hears(/^ترقية مطور/, (ctx) => promoteUser(ctx, 'مطور'));
-bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
-bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
-
-bot.hears('الاوامر', (ctx) => {
-    ctx.reply(getCommandList());
-});
 
 }
 
