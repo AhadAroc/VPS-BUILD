@@ -1033,50 +1033,42 @@ async function handleAwaitingReplyResponse(ctx) {
         let mediaUrl = null;
         let fileId = null;
 
-        if (ctx.message.text) {
+        if (ctx.message.animation) {
+            mediaType = 'animation';
+            fileId = ctx.message.animation.file_id;
+        } else if (ctx.message.photo) {
+            mediaType = 'photo';
+            const photoArray = ctx.message.photo;
+            fileId = photoArray[photoArray.length - 1].file_id;
+        } else if (ctx.message.sticker) {
+            mediaType = 'sticker';
+            fileId = ctx.message.sticker.file_id;
+        } else if (ctx.message.video) {
+            mediaType = 'video';
+            fileId = ctx.message.video.file_id;
+        } else if (ctx.message.text) {
             mediaType = 'text';
             replyText = ctx.message.text.trim();
-        } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
-            if (ctx.message.photo) {
-                const photoArray = ctx.message.photo;
-                const largestPhoto = photoArray[photoArray.length - 1];
-                const fileId = largestPhoto.file_id;
-                await ctx.reply(`📷 Received a photo. File ID: ${fileId}`);
-            } else if (ctx.message.sticker) {
-                mediaType = 'sticker';
-                fileId = ctx.message.sticker.file_id;
-            } else if (ctx.message.video) {
-                const fileId = ctx.message.video.file_id;
-                await ctx.reply(`🎥 Received a video. File ID: ${fileId}`);
-            } else if (ctx.message.animation) {
-                const fileId = ctx.message.animation.file_id;
-                await ctx.reply(`🎞️ Received a GIF. File ID: ${fileId}`)
-            }
-
-            if (fileId) {
-                try {
-                    const fileLink = await ctx.telegram.getFileLink(fileId);
-                    mediaUrl = fileLink.href;
-                } catch (error) {
-                    console.error('Error getting file link:', error);
-                    await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
-                    awaitingReplyResponse = false;
-                    tempReplyWord = '';
-                    return true;
-                }
-            } else {
-                await ctx.reply('❌ لم يتم العثور على ملف صالح. يرجى المحاولة مرة أخرى.');
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-                return true;
-            }
         } else {
             await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
             awaitingReplyResponse = false;
             tempReplyWord = '';
             return true;
         }
-        
+
+        if (fileId) {
+            try {
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaUrl = fileLink.href;
+            } catch (error) {
+                console.error('Error getting file link:', error);
+                await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+                return true;
+            }
+        }
+
         const db = await ensureDatabaseInitialized();
 
         // Check if trigger word already exists
@@ -1091,25 +1083,18 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
-        // Generate a unique ID for the media if it's not text
-        const uniqueId = mediaType !== 'text' ? `${tempReplyWord}_${Date.now()}` : null;
+        // Add the reply to the database
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            type: mediaType,
+            text: replyText,
+            media_url: mediaUrl,
+            file_id: fileId,
+            created_at: new Date(),
+            created_by: ctx.from.id
+        });
 
-        // After adding the reply
-await db.collection('replies').insertOne({
-    trigger_word: tempReplyWord,
-    word: tempReplyWord,
-    type: mediaType,
-    text: replyText,
-    media_url: mediaUrl,
-    created_at: new Date(),
-    created_by: ctx.from.id
-});
-
-await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
-
-// Reset state
-tempReplyWord = '';
-awaitingReplyResponse = false;
+        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
         // Reset state
         tempReplyWord = '';
