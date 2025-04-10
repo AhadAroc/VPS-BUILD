@@ -2191,72 +2191,160 @@ if (awaitingReplyResponse) {
     //this fucks how the bot starts
      // Replace the problematic message handler with this one
      
-     bot.on('message', async (ctx, next) => {
-        try {
-            console.log('Received message:', ctx.message);
-    
-            const userId = ctx.from.id;
-            const username = ctx.from.username;
-            const message = ctx.message;
-    
-            // Update last interaction for the user
-            updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
-            
-            // If in a group, update the group's active status
-            if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-                updateActiveGroups(ctx.chat.id, ctx.chat.title);
-            }
-    
-            // Handle media messages
-            if (message.photo || message.sticker || message.video || message.animation) {
-                let fileId;
-                let mediaType;
-    
-                if (message.photo) {
-                    mediaType = 'photo';
-                    fileId = message.photo[message.photo.length - 1].file_id;
-                } else if (message.sticker) {
-                    mediaType = 'sticker';
-                    fileId = message.sticker.file_id;
-                } else if (message.video) {
-                    mediaType = 'video';
-                    fileId = message.video.file_id;
-                } else if (message.animation) {
-                    mediaType = 'animation';
-                    fileId = message.animation.file_id;
-                }
-    
-                if (fileId) {
-                    try {
-                        const fileLink = await ctx.telegram.getFileLink(fileId);
-                        const filePath = path.join(mediaDir, `${fileId}.${mediaType}`);
-                
-                        // Download and save the file using axios
-                        const response = await axios({
-                            method: 'GET',
-                            url: fileLink.href,
-                            responseType: 'arraybuffer'
-                        });
-                
-                        const buffer = Buffer.from(response.data);
-                        fs.writeFileSync(filePath, buffer);
-                
-                        await ctx.reply(`✅ تم حفظ ${mediaType} بنجاح.`);
-                    } catch (error) {
-                        console.error('Error downloading file:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء تنزيل الملف. يرجى المحاولة مرة أخرى.');
-                    }
-                }
-                
-            }
-    
-            // Continue to next middleware
-            await next();
-        } catch (error) {
-            console.error('Error in message handler:', error);
-            // Don't send error messages to users to avoid spamming
+    bot.on('message', async (ctx, next) => {
+    try {
+        console.log('Received message:', ctx.message);
+
+        const userId = ctx.from.id;
+        const username = ctx.from.username;
+        const message = ctx.message;
+        const chatId = ctx.chat.id;
+
+        // Update last interaction for the user
+        updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
+        
+        // If in a group, update the group's active status
+        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+            updateActiveGroups(ctx.chat.id, ctx.chat.title);
         }
-    });
+
+        // Handle custom question input for quizzes
+        if (chatStates.has(chatId)) {
+            await handleCustomQuestionInput(ctx);
+            return;
+        }
+
+        // Handle media messages
+        if (message.photo || message.sticker || message.video || message.animation) {
+            await handleMediaMessage(ctx);
+            return;
+        }
+
+        // Handle text messages
+        if (message.text) {
+            await handleTextMessage(ctx);
+            return;
+        }
+
+        // If we reach here, it's an unsupported message type
+        await ctx.reply('عذرًا، هذا النوع من الرسائل غير مدعوم.');
+
+    } catch (error) {
+        console.error('Error in message handler:', error);
+        await ctx.reply('حدث خطأ أثناء معالجة رسالتك. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+
+    await next();
+});
+
+async function handleMediaMessage(ctx) {
+    const message = ctx.message;
+    let fileId, mediaType;
+
+    if (message.photo) {
+        mediaType = 'photo';
+        fileId = message.photo[message.photo.length - 1].file_id;
+    } else if (message.sticker) {
+        mediaType = 'sticker';
+        fileId = message.sticker.file_id;
+    } else if (message.video) {
+        mediaType = 'video';
+        fileId = message.video.file_id;
+    } else if (message.animation) {
+        mediaType = 'animation';
+        fileId = message.animation.file_id;
+    }
+
+    if (fileId) {
+        try {
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            const filePath = path.join(mediaDir, `${fileId}.${mediaType}`);
+    
+            // Download and save the file using axios
+            const response = await axios({
+                method: 'GET',
+                url: fileLink.href,
+                responseType: 'arraybuffer'
+            });
+    
+            const buffer = Buffer.from(response.data);
+            fs.writeFileSync(filePath, buffer);
+    
+            await ctx.reply(`✅ تم حفظ ${mediaType} بنجاح.`);
+        } catch (error) {
+            console.error('Error downloading file:', error);
+            await ctx.reply('❌ حدث خطأ أثناء تنزيل الملف. يرجى المحاولة مرة أخرى.');
+        }
+    }
+}
+
+async function handleTextMessage(ctx) {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const userAnswer = ctx.message.text.trim().toLowerCase();
+
+    // Check for active quiz
+    if (activeQuizzes.has(chatId)) {
+        await handleQuizAnswer(ctx, chatId, userId, userAnswer);
+        return;
+    }
+
+    // Check for automatic replies
+    const reply = await checkForAutomaticReply(ctx);
+    if (reply) {
+        await sendReply(ctx, reply);
+        return;
+    }
+
+    // Handle awaiting reply word
+    if (awaitingReplyWord) {
+        await handleAwaitingReplyWord(ctx);
+        return;
+    }
+
+    // Handle awaiting delete reply word
+    if (awaitingDeleteReplyWord) {
+        await handleAwaitingDeleteReplyWord(ctx);
+        return;
+    }
+
+    // Handle awaiting bot name
+    if (awaitingBotName) {
+        await handleAwaitingBotName(ctx);
+        return;
+    }
+
+    // Handle awaiting reply response
+    if (awaitingReplyResponse) {
+        await handleAwaitingReplyResponse(ctx);
+        return;
+    }
+
+    // If we reach here, it's an unhandled text message
+    await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
+}
+
+// Implement the helper functions (handleQuizAnswer, checkForAutomaticReply, sendReply, etc.) 
+// based on your existing code and requirements.
+
+// Example of one helper function:
+async function checkForAutomaticReply(ctx) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        console.log('Searching for reply with keyword:', ctx.message.text.trim());
+        return await db.collection('replies').findOne({
+            $or: [
+                { trigger_word: ctx.message.text.trim() },
+                { word: ctx.message.text.trim() }
+            ]
+        });
+    } catch (error) {
+        console.error('Error checking for automatic replies:', error);
+        return null;
+    }
+}
+
+// Implement other helper functions similarly...
  
     bot.action('add_general_reply', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
