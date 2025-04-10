@@ -1092,19 +1092,22 @@ async function handleAwaitingReplyResponse(ctx) {
         // Generate a unique ID for the media if it's not text
         const uniqueId = mediaType !== 'text' ? `${tempReplyWord}_${Date.now()}` : null;
 
-        // Insert the new reply
-        await db.collection('replies').insertOne({
-            trigger_word: tempReplyWord,
-            type: mediaType,
-            text: replyText,
-            media_url: mediaUrl,
-            file_id: fileId,
-            unique_id: uniqueId,
-            created_at: new Date(),
-            created_by: ctx.from.id
-        });
+        // After adding the reply
+await db.collection('replies').insertOne({
+    trigger_word: tempReplyWord,
+    word: tempReplyWord,
+    type: mediaType,
+    text: replyText,
+    media_url: mediaUrl,
+    created_at: new Date(),
+    created_by: ctx.from.id
+});
 
-        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+
+// Reset state
+tempReplyWord = '';
+awaitingReplyResponse = false;
 
         // Reset state
         tempReplyWord = '';
@@ -2136,17 +2139,22 @@ if (awaitingReplyResponse) {
             return;
         }
 
-        await db.collection('replies').insertOne({
-            trigger_word: tempReplyWord,
-            word: tempReplyWord,
-            type: mediaType,
-            text: replyText,
-            media_url: mediaUrl,
-            created_at: new Date(),
-            created_by: ctx.from.id
-        });
+        // After adding the reply
+await db.collection('replies').insertOne({
+    trigger_word: tempReplyWord,
+    word: tempReplyWord,
+    type: mediaType,
+    text: replyText,
+    media_url: mediaUrl,
+    created_at: new Date(),
+    created_by: ctx.from.id
+});
 
-        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+
+// Reset state
+tempReplyWord = '';
+awaitingReplyResponse = false;
 
         tempReplyWord = '';
         awaitingReplyResponse = false;
