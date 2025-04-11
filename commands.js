@@ -567,26 +567,38 @@ bot.hears('بدء', async (ctx) => {
             ctx.reply('❌ حدث خطأ أثناء محاولة حذف الروابط.');
         }
     }
-    function showDevPanel(ctx) {
-        const message = 'مرحبا عزيزي المطور الاساسي\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '• الردود •', callback_data: 'dev_replies' }],
-                [{ text: '• الإذاعة •', callback_data: 'dev_broadcast' }],
-                [{ text: 'السورس', callback_data: 'dev_source' }],
-                [{ text: '• اسم البوت •', callback_data: 'dev_bot_name' }],
-                [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
-                [{ text: 'المطورين', callback_data: 'dev_developers' }],
-                [{ text: 'قريبا', callback_data: 'dev_welcome' }],
-                [{ text: '@ctrlsrc', url: 'https://t.me/ctrlsrc' }],
-                [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
-            ]
-        };
+    async function showDevPanel(ctx) {
+        try {
+            const userId = ctx.from.id;
+            
+            // Check if the user is a primary developer
+            if (!(await isPrimaryDeveloper(ctx, userId))) {
+                return ctx.reply('❌ هذا القسم مخصص للمطور الرئيسي فقط.');
+            }
     
-        if (ctx.callbackQuery) {
-            ctx.editMessageText(message, { reply_markup: keyboard });
-        } else {
-            ctx.reply(message, { reply_markup: keyboard });
+            const message = 'مرحبا عزيزي المطور الرئيسي\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '• الردود •', callback_data: 'dev_replies' }],
+                    [{ text: '• الإذاعة •', callback_data: 'dev_broadcast' }],
+                    [{ text: 'السورس', callback_data: 'dev_source' }],
+                    [{ text: '• اسم البوت •', callback_data: 'dev_bot_name' }],
+                    [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
+                    [{ text: 'المطورين', callback_data: 'dev_developers' }],
+                    [{ text: 'قريبا', callback_data: 'dev_welcome' }],
+                    [{ text: '@ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
+                ]
+            };
+        
+            if (ctx.callbackQuery) {
+                await ctx.editMessageText(message, { reply_markup: keyboard });
+            } else {
+                await ctx.reply(message, { reply_markup: keyboard });
+            }
+        } catch (error) {
+            console.error('Error in showDevPanel:', error);
+            await ctx.reply('❌ حدث خطأ أثناء عرض لوحة التحكم للمطور.');
         }
     }
     function getCommandList() {
