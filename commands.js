@@ -382,7 +382,11 @@ bot.action('show_stats', async (ctx) => {
         await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض إحصائياتك. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 });     
-
+// Add this callback query handler
+bot.action('list_secondary_devs', async (ctx) => {
+    await ctx.answerCbQuery();
+    await listSecondaryDevelopers(ctx);
+});
 
   bot.action('add_custom_questions', async (ctx) => {
     try {
@@ -1470,16 +1474,17 @@ async function promoteToSecondaryDeveloper(ctx) {
             return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
         }
 
-        let userId, userMention;
+        let userId, userMention, username;
         if (ctx.message.reply_to_message) {
             userId = ctx.message.reply_to_message.from.id;
             userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            username = ctx.message.reply_to_message.from.username;
         } else {
             const args = ctx.message.text.split(' ').slice(1);
             if (args.length === 0) {
                 return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
             }
-            const username = args[0].replace('@', '');
+            username = args[0].replace('@', '');
             try {
                 const user = await ctx.telegram.getChat(username);
                 userId = user.id;
@@ -1500,7 +1505,7 @@ async function promoteToSecondaryDeveloper(ctx) {
         // Add the user to the secondary_developers collection
         await db.collection('secondary_developers').insertOne({
             user_id: userId,
-            username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : username,
+            username: username,
             promoted_at: new Date(),
             promoted_by: ctx.from.id
         });
