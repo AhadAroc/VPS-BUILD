@@ -225,8 +225,7 @@ function setupCommands(bot) {
 });
 
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
-bot.command('ترقية_ثانوي', (ctx) => promoteUser(ctx, 'مطور ثانوي'));
-bot.hears(/^ترقية ثانوي/, (ctx) => promoteUser(ctx, 'مطور ثانوي'));
+
 
 bot.command('promote', (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('promote', (ctx) => promoteUser(ctx, 'developer'));
