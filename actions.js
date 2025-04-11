@@ -1040,24 +1040,26 @@ async function handleAwaitingReplyResponse(ctx) {
     if (!awaitingReplyResponse) return false;
 
     try {
-        // Validate that tempReplyWord is not empty or null
-        if (!tempReplyWord || tempReplyWord.trim() === '') {
-            await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
-            awaitingReplyResponse = false;
+        // Check if it's a group chat
+        if (ctx.chat.type !== 'private') {
+            await ctx.reply('❌ لا يمكن إضافة الردود إلا من خلال الرسائل الخاصة (الـ DM).');
             return true;
         }
 
+        // Continue with the reply saving process for private chats
         let mediaType = 'text';
         let replyText = null;
         let mediaUrl = null;
         let fileId = null;
-// 🚫 Block group usage
-if (ctx.chat.type !== 'private') {
-    await ctx.reply('❌ لا يمكن إضافة الردود إلا من خلال الرسائل الخاصة (الـ DM).');
-    awaitingReplyResponse = false;
-    tempReplyWord = '';
-    return true;
-}
+
+        // Validate that tempReplyWord is not empty or null
+        if (!tempReplyWord || tempReplyWord.trim() === '') {
+            await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            return true;
+        }
+
         if (ctx.message.animation) {
             mediaType = 'animation';
             fileId = ctx.message.animation.file_id;
