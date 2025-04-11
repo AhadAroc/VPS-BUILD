@@ -1919,7 +1919,7 @@ bot.on('left_chat_member', (ctx) => {
             return;
         }
         
-        // ONLY process automatic replies in private chats
+        // Only process reply management in private chats
         if (ctx.chat.type === 'private') {
             // Handle awaiting states first
             if (awaitingReplyWord) {
@@ -1979,47 +1979,47 @@ bot.on('left_chat_member', (ctx) => {
                 await handleAwaitingReplyResponse(ctx);
                 return;
             }
-            
-            // Check for automatic replies - ONLY in private chats
-            try {
-                const db = await ensureDatabaseInitialized();
-                const reply = await db.collection('replies').findOne({
-                    $or: [
-                        { trigger_word: userAnswer },
-                        { word: userAnswer }
-                    ]
-                });
-                
-                if (reply) {
-                    switch (reply.type) {
-                        case "text":
-                            await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        case "photo":
-                            await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        case "animation":
-                            await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        case "video":
-                            await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        case "sticker":
-                            await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        case "document":
-                            await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        default:
-                            await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
-                    }
-                    return;
-                }
-            } catch (error) {
-                console.error('Error checking for automatic replies:', error);
-            }
         }
-    });
+        
+        // Check for automatic replies - in both private chats AND groups
+        try {
+            const db = await ensureDatabaseInitialized();
+            const reply = await db.collection('replies').findOne({
+                $or: [
+                    { trigger_word: userAnswer },
+                    { word: userAnswer }
+                ]
+            });
+            
+            if (reply) {
+                switch (reply.type) {
+                    case "text":
+                        await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "photo":
+                        await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "animation":
+                        await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "video":
+                        await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "sticker":
+                        await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "document":
+                        await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    default:
+                        await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
+                }
+                return;
+            }
+        } catch (error) {
+            console.error('Error checking for automatic replies:', error);
+        }
+    });;
 
 
 
@@ -2217,32 +2217,38 @@ async function handleTextMessage(ctx) {
         return;
     }
 
-    // Check for automatic replies
-    // Restrict auto-replies to DMs only
-if (ctx.chat.type === 'private') {
+    // Check for automatic replies - in both private chats AND groups
     const reply = await checkForAutomaticReply(ctx);
     if (reply) {
         await sendReply(ctx, reply);
         return;
     }
-}
+    
+    // Only process reply management in private chats
+    if (ctx.chat.type === 'private') {
+        // Handle awaiting reply word
+        if (awaitingReplyWord) {
+            await handleAwaitingReplyWord(ctx);
+            return;
+        }
 
-    // Handle awaiting reply word
-    if (awaitingReplyWord) {
-        await handleAwaitingReplyWord(ctx);
-        return;
-    }
+        // Handle awaiting delete reply word
+        if (awaitingDeleteReplyWord) {
+            await handleAwaitingDeleteReplyWord(ctx);
+            return;
+        }
 
-    // Handle awaiting delete reply word
-    if (awaitingDeleteReplyWord) {
-        await handleAwaitingDeleteReplyWord(ctx);
-        return;
-    }
+        // Handle awaiting bot name
+        if (awaitingBotName) {
+            await handleAwaitingBotName(ctx);
+            return;
+        }
 
-    // Handle awaiting bot name
-    if (awaitingBotName) {
-        await handleAwaitingBotName(ctx);
-        return;
+        // Handle awaiting reply response
+        if (awaitingReplyResponse) {
+            await handleAwaitingReplyResponse(ctx);
+            return;
+        }
     }
 
     // Handle awaiting reply response
