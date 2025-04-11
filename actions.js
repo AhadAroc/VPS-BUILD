@@ -2428,11 +2428,14 @@ async function handleTextMessage(ctx) {
     }
 
     // Check for automatic replies
+    // Restrict auto-replies to DMs only
+if (ctx.chat.type === 'private') {
     const reply = await checkForAutomaticReply(ctx);
     if (reply) {
         await sendReply(ctx, reply);
         return;
     }
+}
 
     // Handle awaiting reply word
     if (awaitingReplyWord) {
