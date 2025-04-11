@@ -112,7 +112,7 @@ async function connectToMongoDB() {
             useUnifiedTopology: true,
             serverSelectionTimeoutMS: 30000,
             socketTimeoutMS: 45000,
-            connectTimeoutMS: 30000,loadActiveGroupsFromDatabase 
+            connectTimeoutMS: 30000
         };
         
         const sanitizedUri = mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
