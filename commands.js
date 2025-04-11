@@ -818,31 +818,40 @@ async function toggleLinkSharing(ctx, allow) {
     
             const db = await ensureDatabaseInitialized();
             let collection, successMessage;
-
-        switch (role) {
-            case 'مطور':
-            case 'developer':
-                collection = 'developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
-                break;
-            case 'مطور ثانوي':
-            case 'secondary_developer':
-                collection = 'secondary_developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
-                break;
-            case 'مطور أساسي':
-            case 'primary_developer':
-                collection = 'primary_developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور أساسي.`;
-                break;
-            case 'ادمن':
-            case 'admin':
-                collection = 'admins';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
-                break;
-            default:
-                throw new Error('Invalid role specified: ' + role);
-        }
+    
+            switch (role) {
+                case 'مطور':
+                case 'developer':
+                    collection = 'developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
+                    break;
+                case 'مطور ثانوي':
+                case 'secondary_developer':
+                    collection = 'secondary_developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
+                    break;
+                case 'مطور أساسي':
+                case 'primary_developer':
+                    collection = 'primary_developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور أساسي.`;
+                    break;
+                case 'ادمن':
+                case 'admin':
+                    collection = 'admins';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
+                    // Actually promote the user in the Telegram group
+                    await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                        can_change_info: true,
+                        can_delete_messages: true,
+                        can_invite_users: true,
+                        can_restrict_members: true,
+                        can_pin_messages: true,
+                        can_promote_members: false
+                    });
+                    break;
+                default:
+                    throw new Error('Invalid role specified: ' + role);
+            }
     
             await db.collection(collection).updateOne(
                 { user_id: userId },
