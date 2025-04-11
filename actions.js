@@ -1050,7 +1050,12 @@ async function saveCustomQuestion(chatId, question, answer) {
 // Add this function to handle awaiting reply response
 async function handleAwaitingReplyResponse(ctx) {
     if (!awaitingReplyResponse) return false;
-
+    if (ctx.chat.type !== 'private') {
+        // Silent exit — don't send anything to the group
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        return true;
+    }
     try {
         // Validate that tempReplyWord is not empty or null
         if (!tempReplyWord || tempReplyWord.trim() === '') {
