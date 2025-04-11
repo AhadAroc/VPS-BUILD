@@ -11,7 +11,7 @@ let awaitingBotName = false;
 // Add these variables at the top of your file
 let awaitingDeleteReplyWord = false;
 const cloudinary = require('cloudinary').v2;
-//const { getLeaderboard,getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty  } = require('./commands');
+const { getLeaderboard,getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty  } = require('./commands');
 const chatStates = new Map();
 // Add these global variables at the top of your file
 const activeQuizzes = new Map(); // Map to store active quizzes by chat ID
@@ -521,7 +521,7 @@ bot.action('show_current_timer', async (ctx) => {
     }
 });
   
-async function showDevPanel(ctx) {
+//async function showDevPanel(ctx) {
     try {
         // Check if the message is from a private chat (DM)
         if (ctx.chat.type !== 'private') {
