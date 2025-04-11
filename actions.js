@@ -3211,40 +3211,7 @@ bot.action('back', async (ctx) => {
     }
 });
 
-function adminOnly(handler) {
-    return async (ctx) => {
-        try {
-            const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
 
-            // Check if the user is the owner
-            if (ctx.from.username === 'Lorisiv') {
-                return handler(ctx);
-            }
-
-            // Check subscription
-            if (!await isSubscribed(ctx, userId)) {
-                return ctx.reply('يرجى الاشتراك بخاص القناة للاستخدام', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }]
-                        ]
-                    }
-                });
-            }
-
-            const member = await ctx.telegram.getChatMember(chatId, userId);
-            if (member.status === 'creator' || member.status === 'administrator') {
-                return handler(ctx);
-            } else {
-                ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-            }
-        } catch (error) {
-            console.error('Error in adminOnly wrapper:', error);
-            ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحيات المستخدم.');
-        }
-    };
-}
 async function forceCheckSubscription(ctx) {
     const userId = ctx.from.id;
     try {
