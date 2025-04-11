@@ -521,7 +521,7 @@ bot.action('show_current_timer', async (ctx) => {
     }
 });
   
-//async function showDevPanel(ctx) {
+async function showDevPanel(ctx) {
     try {
         // Check if the message is from a private chat (DM)
         if (ctx.chat.type !== 'private') {
