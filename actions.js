@@ -605,6 +605,31 @@ async function showDevPanel(ctx) {
             return [];
         }
     }
+
+    async function listSecondaryDevelopers(ctx) {
+        try {
+            if (!(await isPrimaryDeveloper(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
+            }
+    
+            const db = await ensureDatabaseInitialized();
+            const secondaryDevs = await db.collection('secondary_developers').find().toArray();
+    
+            if (secondaryDevs.length === 0) {
+                return ctx.reply('لا يوجد مطورين ثانويين حاليًا.');
+            }
+    
+            let message = '📋 قائمة المطورين الثانويين:\n\n';
+            for (const dev of secondaryDevs) {
+                message += `• ${dev.username ? '@' + dev.username : 'مستخدم'} (ID: ${dev.user_id})\n`;
+            }
+    
+            ctx.reply(message);
+        } catch (error) {
+            console.error('Error listing secondary developers:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المطورين الثانويين.');
+        }
+    }
 // Function to shuffle array (for randomizing questions)
 function shuffleArray(array) {
     const newArray = [...array];
