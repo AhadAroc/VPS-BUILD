@@ -1042,7 +1042,7 @@ async function handleAwaitingReplyResponse(ctx) {
     try {
         // Check if it's a group chat
         if (ctx.chat.type !== 'private') {
-            await ctx.reply('❌ لا يمكن إضافة الردود إلا من خلال الرسائل الخاصة (الـ DM).');
+            await ctx.reply('شلونكم ؟ 🌝');
             return true;
         }
 
