@@ -3038,9 +3038,8 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('عرض قائمة المطورين الثانويين');
             try {
-                const connection = await pool.getConnection();
-                const [secondaryDevs] = await connection.query('SELECT user_id, username FROM secondary_developers');
-                connection.release();
+                const db = await ensureDatabaseInitialized();
+                const secondaryDevs = await db.collection('secondary_developers').find({}).toArray();
     
                 if (secondaryDevs.length > 0) {
                     const devsList = await Promise.all(secondaryDevs.map(async (dev, index) => {
@@ -3060,6 +3059,15 @@ bot.action('remove_custom_chat_name', async (ctx) => {
             } catch (error) {
                 console.error('Error fetching secondary developers:', error);
                 await ctx.reply('❌ حدث خطأ أثناء جلب قائمة المطورين الثانويين. الرجاء المحاولة مرة أخرى لاحقًا.');
+                
+                // Additional error logging
+                console.error('Error details:', error.message);
+                console.error('Error stack:', error.stack);
+                
+                // Check if it's a database connection error
+                if (error.name === 'MongoNetworkError') {
+                    console.error('Database connection error. Please check your MongoDB connection.');
+                }
             }
         } else {
             ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
