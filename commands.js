@@ -1194,7 +1194,9 @@ async function enableGifSharing(ctx) {
 
 async function promoteToSecondaryDeveloper(ctx) {
     try {
+        console.log('DEBUG: Attempting to promote to secondary developer');
         if (!(await isPrimaryDeveloper(ctx, ctx.from.id))) {
+            console.log('DEBUG: User is not a primary developer');
             return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
         }
 
@@ -1206,6 +1208,7 @@ async function promoteToSecondaryDeveloper(ctx) {
         } else {
             const args = ctx.message.text.split(' ').slice(1);
             if (args.length === 0) {
+                console.log('DEBUG: No username provided');
                 return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
             }
             username = args[0].replace('@', '');
@@ -1214,19 +1217,22 @@ async function promoteToSecondaryDeveloper(ctx) {
                 userId = user.id;
                 userMention = `[${user.first_name}](tg://user?id=${userId})`;
             } catch (error) {
+                console.log('DEBUG: User not found', error);
                 return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
             }
         }
 
+        console.log('DEBUG: Attempting to connect to database');
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is already a secondary developer
+        console.log('DEBUG: Checking if user is already a secondary developer');
         const existingDev = await db.collection('secondary_developers').findOne({ user_id: userId });
         if (existingDev) {
+            console.log('DEBUG: User is already a secondary developer');
             return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
         }
 
-        // Add the user to the secondary_developers collection
+        console.log('DEBUG: Adding user to secondary_developers collection');
         await db.collection('secondary_developers').insertOne({
             user_id: userId,
             username: username,
@@ -1234,6 +1240,7 @@ async function promoteToSecondaryDeveloper(ctx) {
             promoted_by: ctx.from.id
         });
 
+        console.log('DEBUG: User successfully promoted to secondary developer');
         ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
     } catch (error) {
         console.error('Error promoting user to secondary developer:', error);
@@ -1435,8 +1442,12 @@ bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
 
 // Command handler for "ترقية_ثانوي"
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
+
 // Text handler for "ترقية ثانوي" (without underscore)
 bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
+
+// Additional handler for flexibility
+bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
 
 
 
