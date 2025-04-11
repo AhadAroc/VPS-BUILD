@@ -750,7 +750,7 @@ async function toggleLinkSharing(ctx, allow) {
         }
     }
     // ✅ Demote user
-    // ✅ Demote user
+    // ✅ Demote user u check this
     async function demoteUser(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
