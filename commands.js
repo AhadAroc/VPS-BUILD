@@ -958,7 +958,7 @@ async function toggleLinkSharing(ctx, allow) {
             ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
         }
     }
-    async function demoteUser(ctx, role) {
+    async function demoteUser(ctx, role = 'admin') {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
                 return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
@@ -1005,6 +1005,7 @@ async function toggleLinkSharing(ctx, allow) {
                     successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الأساسيين.`;
                     break;
                 case 'admin':
+                default:
                     collection = db.collection('admins');
                     successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة الادمن.`;
                     // Demote the user in the Telegram group
@@ -1017,8 +1018,6 @@ async function toggleLinkSharing(ctx, allow) {
                         can_promote_members: false
                     });
                     break;
-                default:
-                    throw new Error('Invalid role specified');
             }
     
             await collection.deleteOne({ user_id: userId });
