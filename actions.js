@@ -1255,6 +1255,15 @@ createGroupsTable();
 bot.action('back_to_main', async (ctx) => {
     try {
         await ctx.answerCbQuery();
+
+        // Check if the user is an admin, owner, or secondary developer
+        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
+
+        if (!isAdmin && !isSecDev) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        }
+
         // Get the original photo URL
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
         
@@ -3238,9 +3247,18 @@ bot.action('remove_custom_chat_name', async (ctx) => {
 
     // ✅ Back to the main menu in the same message
   // ✅ Back to the main menu in the same message
-bot.action('back', async (ctx) => {
+  bot.action('back', async (ctx) => {
     try {
         await ctx.answerCbQuery(); // Clear the loading state
+
+        // Check if the user is an admin, owner, or secondary developer
+        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
+
+        if (!isAdmin && !isSecDev) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        }
+
         await ctx.editMessageCaption(
             '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
             {
