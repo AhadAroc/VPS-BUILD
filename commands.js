@@ -42,7 +42,17 @@ let mongoClient = null;
 }
 
 // ✅ Display main menu
-function showMainMenu(ctx) {
+async function showMainMenu(ctx) {
+    // Check if the chat is a group or supergroup
+    if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
+        return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات.');
+    }
+
+    // Check if the user is an admin or owner
+    if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+        return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+    }
+
     const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
     const caption = '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:';
     const keyboard = {
