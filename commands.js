@@ -1474,6 +1474,7 @@ bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
 bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
+bot.hears( "ترقية ثانوي", promoteToSecondaryDeveloper);
 bot.command('تنزيل مطور', async (ctx) => {
     if (!(await isOwner(ctx, ctx.from.id))) {
         return ctx.reply('❌ هذا الأمر مخصص للمالك فقط.');
