@@ -305,7 +305,7 @@ bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx))
 bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
 bot.hears('تفعيل متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
 bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
-bot.hears(/^ترقية مطور/, (ctx) => promoteUser(ctx, 'مطور'));
+bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
 bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
 
