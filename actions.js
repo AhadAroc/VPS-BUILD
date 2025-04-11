@@ -1051,7 +1051,13 @@ async function handleAwaitingReplyResponse(ctx) {
         let replyText = null;
         let mediaUrl = null;
         let fileId = null;
-
+// 🚫 Block group usage
+if (ctx.chat.type !== 'private') {
+    await ctx.reply('❌ لا يمكن إضافة الردود إلا من خلال الرسائل الخاصة (الـ DM).');
+    awaitingReplyResponse = false;
+    tempReplyWord = '';
+    return true;
+}
         if (ctx.message.animation) {
             mediaType = 'animation';
             fileId = ctx.message.animation.file_id;
@@ -2102,12 +2108,15 @@ bot.on('left_chat_member', (ctx) => {
             awaitingBotName = false;
             return;
         }
-    
+
+        
+        if (ctx.chat.type === 'private') 
         if (awaitingReplyResponse) {
             await handleAwaitingReplyResponse(ctx);
             return;
         }
     }
+    
     
     
     // Handle awaiting delete reply word
@@ -2475,11 +2484,15 @@ async function handleTextMessage(ctx) {
     }
 
     // Check for automatic replies
+    // ✅ Only scan replies in private chats
+if (ctx.chat.type === 'private') {
     const reply = await checkForAutomaticReply(ctx);
     if (reply) {
         await sendReply(ctx, reply);
         return;
     }
+}
+
 
     // Handle awaiting reply word
     if (awaitingReplyWord) {
