@@ -2488,16 +2488,20 @@ async function checkForAutomaticReply(ctx) {
 
 // Implement other helper functions similarly...
  
-    bot.action('add_general_reply', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('إضافة رد عام');
-            ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-            awaitingReplyWord = true;
-        } else {
-            ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-        }
-    });
-    
+bot.action('add_general_reply', async (ctx) => {
+    if (!(await isDeveloper(ctx, ctx.from.id))) {
+        return ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+
+    if (ctx.chat.type !== 'private') {
+        return; // Do not run in groups
+    }
+
+    await ctx.answerCbQuery('إضافة رد عام');
+    await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
+    awaitingReplyWord = true;
+});
+
     function showDevelopersMenu(ctx) {
         const message = ' يرجى استخدام الاوامر لرفع مطور اساسي او مطور ثاني , قائمة المطورين - اختر الإجراء المطلوب:';
         const keyboard = {
