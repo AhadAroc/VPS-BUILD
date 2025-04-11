@@ -2008,12 +2008,8 @@ bot.on('left_chat_member', (ctx) => {
                         await askNextQuestion(chatId, ctx.telegram);
                     }
                 }, 2000);
-            } else {
-                // Wrong answer - allow the user to try again
-                await ctx.reply('❌ إجابة خاطئة. حاول مرة أخرى!', {
-                    reply_to_message_id: ctx.message.message_id
-                });
             }
+            // Incorrect answers are now ignored silently
             return; // Exit the handler after processing quiz answer
         }
     }
