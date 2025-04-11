@@ -43,51 +43,45 @@ let mongoClient = null;
 
 // ✅ Display main menu
 async function showMainMenu(ctx) {
-    // Check if the chat is a group or supergroup
-    if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
-        return ctx.reply('❌ هذا الأمر متاح فقط في المجموعات.');
-    }
+    try {
+        // Check if the user is an admin, owner, or secondary developer
+        if (!(await isAdminOrOwner(ctx, ctx.from.id)) && !(await isSecondaryDeveloper(ctx, ctx.from.id))) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        }
 
-    // Check if the user is an admin or owner
-    if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-        return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-    }
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
+        const caption = '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:';
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+            ]
+        };
 
-    const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
-    const caption = '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:';
-    const keyboard = {
-        inline_keyboard: [
-            [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-            [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-            [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-            [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-        ]
-    };
-
-    if (ctx.callbackQuery) {
-        // If it's a callback query, edit the existing message
-        ctx.editMessageMedia(
-            {
-                type: 'photo',
-                media: photoUrl,
-                caption: caption
-            },
-            {
+        if (ctx.callbackQuery) {
+            // If it's a callback query, edit the existing message
+            await ctx.editMessageMedia(
+                {
+                    type: 'photo',
+                    media: photoUrl,
+                    caption: caption
+                },
+                {
+                    reply_markup: keyboard
+                }
+            );
+        } else {
+            // If it's a new command, send a new message
+            await ctx.replyWithPhoto(photoUrl, {
+                caption: caption,
                 reply_markup: keyboard
-            }
-        ).catch(error => {
-            console.error('Error editing message:', error);
-            ctx.reply('❌ حدث خطأ أثناء تحديث القائمة الرئيسية.');
-        });
-    } else {
-        // If it's a new command, send a new message
-        ctx.replyWithPhoto(photoUrl, {
-            caption: caption,
-            reply_markup: keyboard
-        }).catch(error => {
-            console.error('Error sending photo:', error);
-            ctx.reply('❌ حدث خطأ أثناء إرسال القائمة الرئيسية.');
-        });
+            });
+        }
+    } catch (error) {
+        console.error('Error in showMainMenu:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 }
 async function getLeaderboard() {
@@ -1536,5 +1530,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper };
 
