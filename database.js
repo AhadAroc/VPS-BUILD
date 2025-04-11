@@ -108,9 +108,11 @@ async function connectToMongoDB() {
         console.log('Attempting to connect to MongoDB...');
         
         const options = {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
             serverSelectionTimeoutMS: 30000,
             socketTimeoutMS: 45000,
-            connectTimeoutMS: 30000,
+            connectTimeoutMS: 30000,loadActiveGroupsFromDatabase 
         };
         
         const sanitizedUri = mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
@@ -195,6 +197,18 @@ async function getUserStatistics(userId) {
         };
     }
 }
+
+async function loadActiveGroupsFromDatabase() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const activeGroups = await db.collection('active_groups').find({}).toArray();
+        return activeGroups;
+    } catch (error) {
+        console.error('Error loading active groups from database:', error);
+        return [];
+    }
+}
+
 async function ensureDatabaseInitialized() {
     if (!db) {
         await connectToMongoDB();
@@ -513,6 +527,7 @@ module.exports = {
     addQuizQuestion,
     getQuizQuestions,
     getQuizCategories,
+    loadActiveGroupsFromDatabase,
     // Quiz functions
     saveQuizScore,
     getUserStatistics,
