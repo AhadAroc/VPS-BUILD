@@ -606,30 +606,7 @@ async function showDevPanel(ctx) {
         }
     }
 
-    async function listSecondaryDevelopers(ctx) {
-        try {
-            if (!(await isPrimaryDeveloper(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
-            }
     
-            const db = await ensureDatabaseInitialized();
-            const secondaryDevs = await db.collection('secondary_developers').find().toArray();
-    
-            if (secondaryDevs.length === 0) {
-                return ctx.reply('لا يوجد مطورين ثانويين حاليًا.');
-            }
-    
-            let message = '📋 قائمة المطورين الثانويين:\n\n';
-            for (const dev of secondaryDevs) {
-                message += `• ${dev.username ? '@' + dev.username : 'مستخدم'} (ID: ${dev.user_id})\n`;
-            }
-    
-            ctx.reply(message);
-        } catch (error) {
-            console.error('Error listing secondary developers:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المطورين الثانويين.');
-        }
-    }
 // Function to shuffle array (for randomizing questions)
 function shuffleArray(array) {
     const newArray = [...array];
@@ -3064,7 +3041,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
             await ctx.answerCbQuery('عرض قائمة المطورين الثانويين');
             try {
                 const db = await ensureDatabaseInitialized();
-                const secondaryDevs = await db.collection('secondary_developers').find({}).toArray();
+                const secondaryDevs = await db.collection('secondary_developers').find().toArray();
     
                 if (secondaryDevs.length > 0) {
                     const devsList = await Promise.all(secondaryDevs.map(async (dev, index) => {
@@ -3088,11 +3065,6 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 // Additional error logging
                 console.error('Error details:', error.message);
                 console.error('Error stack:', error.stack);
-                
-                // Check if it's a database connection error
-                if (error.name === 'MongoNetworkError') {
-                    console.error('Database connection error. Please check your MongoDB connection.');
-                }
             }
         } else {
             ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
@@ -3103,9 +3075,8 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('حذف المطورين الثانويين');
             try {
-                const connection = await pool.getConnection();
-                const [secondaryDevs] = await connection.query('SELECT user_id, username FROM secondary_developers');
-                connection.release();
+                const db = await ensureDatabaseInitialized();
+                const secondaryDevs = await db.collection('secondary_developers').find().toArray();
     
                 if (secondaryDevs.length > 0) {
                     const keyboard = await Promise.all(secondaryDevs.map(async (dev, index) => {
