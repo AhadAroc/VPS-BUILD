@@ -529,14 +529,14 @@ async function showDevPanel(ctx) {
             return;
         }
     
-        // Check if the user is the main developer
-        const isMainDev = await isMainDeveloper(ctx, ctx.from.id);
-        if (!isMainDev) {
-            await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطور الرئيسي فقط.');
+        // Check if the user is a developer (including main developer and promoted developers)
+        const isDev = await isDeveloper(ctx, ctx.from.id);
+        if (!isDev) {
+            await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطورين فقط.');
             return;
         }
     
-        const message = 'مرحبا عزيزي المطور الرئيسي\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
+        const message = 'مرحبا عزيزي المطور\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
         const keyboard = {
             inline_keyboard: [
                 [{ text: '• الردود •', callback_data: 'dev_replies' }],
