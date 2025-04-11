@@ -964,7 +964,7 @@ async function toggleLinkSharing(ctx, allow) {
             switch (role) {
                 case 'developer':
                     collection = db.collection('developers');
-                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`;
+                    successMessage = `✅ يرجى التوجه لخاص البوت لغرض الامان   ${userMention} لتنزيل هذا المستخدم  .`;
                     break;
                 case 'secondary_developer':
                     collection = db.collection('secondary_developers');
