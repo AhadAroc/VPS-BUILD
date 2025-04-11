@@ -243,12 +243,15 @@ bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
-// Add these lines to your existing command handlers
-bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|  )/, (ctx) => {
-    const role = ctx.match[1];
-    promoteUser(ctx, role);
-});
 
+// Command handler for "ترقية_ثانوي"
+bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
+
+// Text handler for "ترقية ثانوي" (without underscore)
+bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
+
+// Additional handler for flexibility
+bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 
 // Handle "نكتة" text command
