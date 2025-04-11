@@ -1,7 +1,9 @@
 //glock chigga 
-let awaitingReplyWord = false;
-let awaitingReplyResponse = false;  // Add this line
-let tempReplyWord = '';
+//let awaitingReplyWord = false;
+//let awaitingReplyResponse = false;  // Add this line
+//let tempReplyWord = '';
+const replyStates = new Map(); // key: user ID, value: { state, word }
+
 // Add this at the top of your file with other imports
 const { Scenes } = require('telegraf');
 // Make sure this is at the top of your file
@@ -2060,13 +2062,20 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     // Handle awaiting reply word
-    if (awaitingReplyWord) {
-        tempReplyWord = ctx.message.text;
-        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-        awaitingReplyWord = false;
-        awaitingReplyResponse = true;
-        return;
+    if (ctx.chat.type !== 'private') return; {  // Prevent reply handling in groups ]
+
+const userId = ctx.from.id;
+const userState = replyStates.get(userId);
     }
+if (userState && userState.state === 'awaiting_word') {
+    replyStates.set(userId, {
+        state: 'awaiting_response',
+        word: ctx.message.text.trim()
+    });
+    ctx.reply(`تم استلام الكلمة: "${ctx.message.text.trim()}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+    return;
+}
+
     
     // Handle awaiting delete reply word
     // Handle awaiting delete reply word
@@ -2489,18 +2498,17 @@ async function checkForAutomaticReply(ctx) {
 // Implement other helper functions similarly...
  
 bot.action('add_general_reply', async (ctx) => {
-    if (!(await isDeveloper(ctx, ctx.from.id))) {
-        return ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
+    if (ctx.chat.type !== 'private') return;
 
-    if (ctx.chat.type !== 'private') {
-        return; // Do not run in groups
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('إضافة رد عام');
+        ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
+        replyStates.set(ctx.from.id, { state: 'awaiting_word' });
+    } else {
+        ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
-
-    await ctx.answerCbQuery('إضافة رد عام');
-    await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-    awaitingReplyWord = true;
 });
+
 
     function showDevelopersMenu(ctx) {
         const message = ' يرجى استخدام الاوامر لرفع مطور اساسي او مطور ثاني , قائمة المطورين - اختر الإجراء المطلوب:';
