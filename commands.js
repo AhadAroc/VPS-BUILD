@@ -1198,9 +1198,9 @@ async function enableGifSharing(ctx) {
 async function promoteToSecondaryDeveloper(ctx) {
     try {
         console.log('DEBUG: Attempting to promote to secondary developer');
-        if (!(await isPrimaryDeveloper(ctx, ctx.from.id))) {
-            console.log('DEBUG: User is not a primary developer');
-            return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            console.log('DEBUG: User is not an admin or owner');
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين ومالك المجموعة فقط.');
         }
 
         let userId, userMention, username;
