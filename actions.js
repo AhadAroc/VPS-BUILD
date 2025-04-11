@@ -1914,39 +1914,49 @@ bot.on('left_chat_member', (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
-    console.log('Received message:', ctx.message.text);
-    if (await handleAwaitingReplyResponse(ctx)) return;
-
-  const text = ctx.message.text.trim().toLowerCase();
-
-  // Check if this matches a saved trigger word
-  const db = await ensureDatabaseInitialized();
-  const reply = await db.collection('replies').findOne({ trigger_word: text });
-
- if (reply) {
-  switch (reply.type) {
-    case "text":
-      await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "photo":
-      await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "animation":
-      await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "video":
-      await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "sticker":
-      await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "document":
-      await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    default:
-      await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
-  }
-}
+        console.log('Received message:', ctx.message.text);
+        if (await handleAwaitingReplyResponse(ctx)) return;
+    
+        const text = ctx.message.text.trim().toLowerCase();
+        const chatType = ctx.chat.type;
+    
+        // Only scan for new replies in DMs
+        if (chatType === 'private' && awaitingReplyWord) {
+            tempReplyWord = ctx.message.text;
+            await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+            awaitingReplyWord = false;
+            awaitingReplyResponse = true;
+            return;
+        }
+    
+        // Check if this matches a saved trigger word
+        const db = await ensureDatabaseInitialized();
+        const reply = await db.collection('replies').findOne({ trigger_word: text });
+    
+        if (reply) {
+            switch (reply.type) {
+                case "text":
+                    await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case "photo":
+                    await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case "animation":
+                    await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case "video":
+                    await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case "sticker":
+                    await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case "document":
+                    await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                default:
+                    await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
+            }
+        }
 
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
@@ -2062,20 +2072,13 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     // Handle awaiting reply word
-    if (ctx.chat.type !== 'private') return; {  // Prevent reply handling in groups ]
-
-const userId = ctx.from.id;
-const userState = replyStates.get(userId);
+    if (awaitingReplyWord) {
+        tempReplyWord = ctx.message.text;
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
+        return;
     }
-if (userState && userState.state === 'awaiting_word') {
-    replyStates.set(userId, {
-        state: 'awaiting_response',
-        word: ctx.message.text.trim()
-    });
-    ctx.reply(`تم استلام الكلمة: "${ctx.message.text.trim()}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-    return;
-}
-
     
     // Handle awaiting delete reply word
     // Handle awaiting delete reply word
