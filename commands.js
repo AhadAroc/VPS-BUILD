@@ -955,9 +955,9 @@ async function toggleLinkSharing(ctx, allow) {
             } else {
                 const username = args[0].replace('@', '');
                 try {
-                    const user = await ctx.telegram.getChat(username);
-                    userId = user.id;
-                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                    userId = user.user.id;
+                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
                 } catch (error) {
                     return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
                 }
@@ -973,7 +973,7 @@ async function toggleLinkSharing(ctx, allow) {
             switch (role) {
                 case 'developer':
                     collection = db.collection('developers');
-                    successMessage = `✅ يرجى التوجه لخاص البوت لغرض الامان   ${userMention} لتنزيل هذا المستخدم  .`;
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`;
                     break;
                 case 'secondary_developer':
                     collection = db.collection('secondary_developers');
@@ -986,6 +986,15 @@ async function toggleLinkSharing(ctx, allow) {
                 case 'admin':
                     collection = db.collection('admins');
                     successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة الادمن.`;
+                    // Demote the user in the Telegram group
+                    await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                        can_change_info: false,
+                        can_delete_messages: false,
+                        can_invite_users: false,
+                        can_restrict_members: false,
+                        can_pin_messages: false,
+                        can_promote_members: false
+                    });
                     break;
                 default:
                     throw new Error('Invalid role specified');
