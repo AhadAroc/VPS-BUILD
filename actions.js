@@ -85,54 +85,42 @@ async function handleTextMessage(ctx) {
 
     // Check for active quiz
     if (activeQuizzes.has(chatId)) {
-        const quiz = activeQuizzes.get(chatId);
-        if (quiz.state === QUIZ_STATE.ACTIVE) {
-            const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-            const correctAnswer = currentQuestion.answer.toLowerCase();
+        await handleQuizAnswer(ctx, chatId, userId, userAnswer);
+        return;
+    }
 
-            // Only process if the answer is correct
-            if (userAnswer === correctAnswer) {
-                await handleCorrectQuizAnswer(ctx, chatId, userId);
-            }
-            // Ignore incorrect answers silently
+    // ✅ Only check auto-replies in DMs
+    if (ctx.chat.type === 'private') {
+        const reply = await checkForAutomaticReply(ctx);
+        if (reply) {
+            await sendReply(ctx, reply);
             return;
         }
-    }
 
-    // Check for automatic replies
-    const reply = await checkForAutomaticReply(ctx);
-    if (reply) {
-        await sendReply(ctx, reply);
-        return;
-    }
+        // Handle reply setup states
+        if (awaitingReplyWord) {
+            await handleAwaitingReplyWord(ctx);
+            return;
+        }
 
-    // Handle awaiting reply word
-    if (awaitingReplyWord) {
-        await handleAwaitingReplyWord(ctx);
-        return;
-    }
+        if (awaitingDeleteReplyWord) {
+            await handleAwaitingDeleteReplyWord(ctx);
+            return;
+        }
 
-    // Handle awaiting delete reply word
-    if (awaitingDeleteReplyWord) {
-        await handleAwaitingDeleteReplyWord(ctx);
-        return;
-    }
+        if (awaitingBotName) {
+            await handleAwaitingBotName(ctx);
+            return;
+        }
 
-    // Handle awaiting bot name
-    if (awaitingBotName) {
-        await handleAwaitingBotName(ctx);
-        return;
-    }
+        if (awaitingReplyResponse) {
+            await handleAwaitingReplyResponse(ctx);
+            return;
+        }
 
-    // Handle awaiting reply response
-    if (awaitingReplyResponse) {
-        await handleAwaitingReplyResponse(ctx);
-        return;
+        // Fallback for unrecognized messages in DMs only
+        await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
-
-    // If we reach here, it's an unhandled text message
-    // You might want to add a default response or just ignore it
-    // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
 }
 
 async function handleCorrectQuizAnswer(ctx, chatId, userId) {
