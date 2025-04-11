@@ -25,21 +25,18 @@ let mongoClient = null;
   // ✅ Function to check if the user is admin or owner
   async function isAdminOrOwner(ctx, userId) {
     try {
-        console.log('DEBUG: Checking if user is admin or owner:', userId);
-        // First check if it's a DM
-        if (ctx.chat.type === 'private') {
-            console.log('DEBUG: Chat is private, checking if developer');
-            return await isDeveloper(ctx, userId);
+        if (!ctx.chat) {
+            console.error('Chat context is missing');
+            return false;
         }
-        
-        // For groups, check admin status
-        const member = await ctx.telegram.getChatMember(ctx.chat.id, userId);
-        console.log('DEBUG: Chat member status:', member.status);
-        const result = ['creator', 'administrator'].includes(member.status);
-        console.log('DEBUG: isAdminOrOwner result:', result);
-        return result;
+
+        const chatId = ctx.chat.id;
+        const chatMember = await ctx.telegram.getChatMember(chatId, userId);
+
+        return ['creator', 'administrator'].includes(chatMember.status);
     } catch (error) {
-        console.error('Error in isAdminOrOwner:', error);
+        console.error('Error checking admin status:', error);
+        // In case of an error, we'll assume the user is not an admin
         return false;
     }
 }
