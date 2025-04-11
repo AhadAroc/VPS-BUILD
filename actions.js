@@ -37,7 +37,7 @@ const QUIZ_STATE = {
     ACTIVE: 3
 };
 
-
+const usersAddingReply = new Map();
 const {isAdminOrOwner} = require('./commands');    
 const axios = require('axios');
 const fs = require('fs');
@@ -1049,13 +1049,18 @@ async function saveCustomQuestion(chatId, question, answer) {
 }
 // Add this function to handle awaiting reply response
 async function handleAwaitingReplyResponse(ctx) {
-    if (!awaitingReplyResponse) return false;
+    const userId = ctx.from.id;
+    
+    // Check if the message is from a private chat and the user is adding a reply
+    if (ctx.chat.type !== 'private' || !usersAddingReply.has(userId)) {
+        return false;
+    }
 
     try {
         // Validate that tempReplyWord is not empty or null
         if (!tempReplyWord || tempReplyWord.trim() === '') {
             await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
-            awaitingReplyResponse = false;
+            usersAddingReply.delete(userId);
             return true;
         }
 
@@ -1082,8 +1087,7 @@ async function handleAwaitingReplyResponse(ctx) {
             replyText = ctx.message.text.trim();
         } else {
             await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+            usersAddingReply.delete(userId);
             return true;
         }
 
@@ -1094,8 +1098,7 @@ async function handleAwaitingReplyResponse(ctx) {
             } catch (error) {
                 console.error('Error getting file link:', error);
                 await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
+                usersAddingReply.delete(userId);
                 return true;
             }
         }
@@ -1109,8 +1112,7 @@ async function handleAwaitingReplyResponse(ctx) {
         
         if (existingReply) {
             await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+            usersAddingReply.delete(userId);
             return true;
         }
 
@@ -1129,13 +1131,12 @@ async function handleAwaitingReplyResponse(ctx) {
 
         // Reset state
         tempReplyWord = '';
-        awaitingReplyResponse = false;
+        usersAddingReply.delete(userId);
         return true;
     } catch (error) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
-        awaitingReplyResponse = false;
-        tempReplyWord = '';
+        usersAddingReply.delete(userId);
         return true;
     }
 }
@@ -1907,14 +1908,26 @@ bot.on('left_chat_member', (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
-    console.log('Received message:', ctx.message.text);
-    if (await handleAwaitingReplyResponse(ctx)) return;
-
-  const text = ctx.message.text.trim().toLowerCase();
-
-  // Check if this matches a saved trigger word
-  const db = await ensureDatabaseInitialized();
-  const reply = await db.collection('replies').findOne({ trigger_word: text });
+        console.log('Received message:', ctx.message.text);
+    
+        // Handle awaiting reply response for all chat types
+        if (await handleAwaitingReplyResponse(ctx)) return;
+    
+        // Handle private chat messages
+        if (ctx.chat.type === 'private') {
+            // Add your private chat handling logic here
+            // For example:
+            await handlePrivateChat(ctx);
+            return; // Exit the handler after processing private chat
+        }
+    
+        const text = ctx.message.text.trim().toLowerCase();
+    
+        // Check if this matches a saved trigger word
+        const db = await ensureDatabaseInitialized();
+        const reply = await db.collection('replies').findOne({ trigger_word: text });
+    
+        // ... rest of your existing code ...
 
  if (reply) {
   switch (reply.type) {
