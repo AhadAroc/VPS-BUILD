@@ -244,7 +244,7 @@ bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
 // Add these lines to your existing command handlers
-bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور| )/, (ctx) => {
+bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور| ثانوي )/, (ctx) => {
     const role = ctx.match[1];
     promoteUser(ctx, role);
 });
