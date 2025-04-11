@@ -85,30 +85,19 @@ async function handleTextMessage(ctx) {
 
     // Check for active quiz
     if (activeQuizzes.has(chatId)) {
-        const quiz = activeQuizzes.get(chatId);
-        if (quiz.state === QUIZ_STATE.ACTIVE) {
-            const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-            const correctAnswer = currentQuestion.answer.toLowerCase();
-
-            // Only process if the answer is correct
-            if (userAnswer === correctAnswer) {
-                await handleCorrectQuizAnswer(ctx, chatId, userId);
-            }
-            // Ignore incorrect answers silently
-            return;
-        }
+        await handleQuizAnswer(ctx, chatId, userId, userAnswer);
+        return;
     }
 
     // Check for automatic replies
     // Restrict auto-replies to DMs only
-if (ctx.chat.type === 'private') {
-    const reply = await checkForAutomaticReply(ctx);
-    if (reply) {
-        await sendReply(ctx, reply);
-        return;
+    if (ctx.chat.type === 'private') {
+        const reply = await checkForAutomaticReply(ctx);
+        if (reply) {
+            await sendReply(ctx, reply);
+            return;
+        }
     }
-}
-
 
     // Handle awaiting reply word
     if (awaitingReplyWord) {
