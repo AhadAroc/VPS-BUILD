@@ -3159,7 +3159,13 @@ bot.action('remove_custom_chat_name', async (ctx) => {
     
     bot.action('cancel_delete_secondary_developers', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.editMessageText('تم إلغاء عملية حذف المطورين الثانويين.');
+            await ctx.editMessageText('تم إلغاء عملية حذف المطورين الثانويين.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
+                    ]
+                }
+            });
         } else {
             ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
         }
