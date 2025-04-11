@@ -1908,26 +1908,16 @@ bot.on('left_chat_member', (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
-        console.log('Received message:', ctx.message.text);
-    
-        // Handle awaiting reply response for all chat types
-        if (await handleAwaitingReplyResponse(ctx)) return;
-    
-        // Handle private chat messages
-        if (ctx.chat.type === 'private') {
-            // Add your private chat handling logic here
-            // For example:
-            await handlePrivateChat(ctx);
-            return; // Exit the handler after processing private chat
-        }
-    
-        const text = ctx.message.text.trim().toLowerCase();
-    
-        // Check if this matches a saved trigger word
-        const db = await ensureDatabaseInitialized();
-        const reply = await db.collection('replies').findOne({ trigger_word: text });
-    
-        // ... rest of your existing code ...
+    console.log('Received message:', ctx.message.text);
+    if (await handleAwaitingReplyResponse(ctx)) return;
+   // Handle private chat messages
+   if (ctx.chat.type === 'private') {
+    if (await handleAwaitingReplyResponse(ctx)) return; }
+  const text = ctx.message.text.trim().toLowerCase();
+
+  // Check if this matches a saved trigger word
+  const db = await ensureDatabaseInitialized();
+  const reply = await db.collection('replies').findOne({ trigger_word: text });
 
  if (reply) {
   switch (reply.type) {
