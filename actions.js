@@ -3147,13 +3147,31 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 const result = await db.collection('secondary_developers').deleteOne({ user_id: parseInt(devIdToDelete) });
                 
                 if (result.deletedCount > 0) {
-                    await ctx.editMessageText('تم حذف المطور الثانوي بنجاح.');
+                    await ctx.editMessageText('تم حذف المطور الثانوي بنجاح.', {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
+                            ]
+                        }
+                    });
                 } else {
-                    await ctx.editMessageText('لم يتم العثور على المطور الثانوي للحذف.');
+                    await ctx.editMessageText('لم يتم العثور على المطور الثانوي للحذف.', {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
+                            ]
+                        }
+                    });
                 }
             } catch (error) {
                 console.error('Error deleting secondary developer:', error);
-                await ctx.editMessageText('❌ حدث خطأ أثناء حذف المطور الثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
+                await ctx.editMessageText('❌ حدث خطأ أثناء حذف المطور الثانوي. الرجاء المحاولة مرة أخرى لاحقًا.', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
+                        ]
+                    }
+                });
             }
         } else {
             ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
