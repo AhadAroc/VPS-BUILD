@@ -569,14 +569,20 @@ bot.hears('بدء', async (ctx) => {
     }
     async function showDevPanel(ctx) {
         try {
-            const userId = ctx.from.id;
-            
-            // Check if the user is a primary developer
-            if (!(await isPrimaryDeveloper(ctx, userId))) {
-                return ctx.reply('❌ هذا القسم مخصص للمطور الرئيسي فقط.');
+            // Check if the message is from a private chat (DM)
+            if (ctx.chat.type !== 'private') {
+                await ctx.reply('⚠️ يمكن استخدام لوحة التحكم في الرسائل الخاصة فقط.');
+                return;
             }
-    
-            const message = 'مرحبا عزيزي المطور الرئيسي\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
+        
+            // Check if the user is a developer (including main developer and promoted developers)
+            const isDev = await isDeveloper(ctx, ctx.from.id);
+            if (!isDev) {
+                await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطورين فقط.');
+                return;
+            }
+        
+            const message = 'مرحبا عزيزي المطور\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
             const keyboard = {
                 inline_keyboard: [
                     [{ text: '• الردود •', callback_data: 'dev_replies' }],
@@ -586,11 +592,13 @@ bot.hears('بدء', async (ctx) => {
                     [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
                     [{ text: 'المطورين', callback_data: 'dev_developers' }],
                     [{ text: 'قريبا', callback_data: 'dev_welcome' }],
-                    [{ text: '@ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                     [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
                 ]
             };
-        
+    
+            await loadActiveGroupsFromDatabase();
+            
             if (ctx.callbackQuery) {
                 await ctx.editMessageText(message, { reply_markup: keyboard });
             } else {
@@ -598,7 +606,7 @@ bot.hears('بدء', async (ctx) => {
             }
         } catch (error) {
             console.error('Error in showDevPanel:', error);
-            await ctx.reply('❌ حدث خطأ أثناء عرض لوحة التحكم للمطور.');
+            await ctx.reply('❌ حدث خطأ أثناء محاولة عرض لوحة التحكم للمطور.');
         }
     }
     function getCommandList() {
