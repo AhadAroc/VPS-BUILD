@@ -1911,6 +1911,14 @@ bot.on('left_chat_member', (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
+        if (ctx.chat.type === 'private') {
+            // Only scan for replies in DMs
+            const reply = await checkForAutomaticReply(ctx);
+            if (reply) {
+              await sendReply(ctx, reply);
+              return;
+            }
+          }
     console.log('Received message:', ctx.message.text);
     if (await handleAwaitingReplyResponse(ctx)) return;
 
