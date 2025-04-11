@@ -476,7 +476,26 @@ bot.hears('بدء', async (ctx) => {
     }
  
    
+    async function listSecondaryDevelopers(ctx) {
+        try {
+            const db = await ensureDatabaseInitialized();
+            const secondaryDevs = await db.collection('secondary_developers').find().toArray();
     
+            if (secondaryDevs.length === 0) {
+                return ctx.reply('لا يوجد مطورين ثانويين حاليًا.');
+            }
+    
+            let message = '📋 قائمة المطورين الثانويين:\n\n';
+            for (const dev of secondaryDevs) {
+                message += `• ${dev.username || 'مستخدم'} (ID: ${dev.user_id})\n`;
+            }
+    
+            await ctx.reply(message);
+        } catch (error) {
+            console.error('Error listing secondary developers:', error);
+            await ctx.reply('❌ حدث خطأ أثناء جلب قائمة المطورين الثانويين. الرجاء المحاولة مرة أخرى لاحقًا.');
+        }
+    }
     
     async function isSubscribed(ctx, userId) {
     try {
