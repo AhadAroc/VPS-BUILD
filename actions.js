@@ -521,20 +521,22 @@ bot.action('show_current_timer', async (ctx) => {
     }
 });
   
-    async function showDevPanel(ctx) {
+async function showDevPanel(ctx) {
+    try {
         // Check if the message is from a private chat (DM)
         if (ctx.chat.type !== 'private') {
             await ctx.reply('⚠️ يمكن استخدام لوحة التحكم في الرسائل الخاصة فقط.');
             return;
         }
     
-        // Check if the user is a developer
-        if (!(await isDeveloper(ctx, ctx.from.id))) {
-            await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطورين فقط.');
+        // Check if the user is the main developer
+        const isMainDev = await isMainDeveloper(ctx, ctx.from.id);
+        if (!isMainDev) {
+            await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطور الرئيسي فقط.');
             return;
         }
     
-        const message = 'مرحبا عزيزي المطور الاساسي\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
+        const message = 'مرحبا عزيزي المطور الرئيسي\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
         const keyboard = {
             inline_keyboard: [
                 [{ text: '• الردود •', callback_data: 'dev_replies' }],
@@ -548,13 +550,19 @@ bot.action('show_current_timer', async (ctx) => {
                 [{ text: 'إلغاء', callback_data: 'dev_cancel' }]
             ]
         };
-        loadActiveGroupsFromDatabase();
+
+        await loadActiveGroupsFromDatabase();
+        
         if (ctx.callbackQuery) {
             await ctx.editMessageText(message, { reply_markup: keyboard });
         } else {
             await ctx.reply(message, { reply_markup: keyboard });
         }
+    } catch (error) {
+        console.error('Error in showDevPanel:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض لوحة التحكم للمطور.');
     }
+}
     async function showStatisticsMenu(ctx) {
         const message = 'قائمة الإحصائيات - اختر الإجراء المطلوب:';
         const keyboard = {
