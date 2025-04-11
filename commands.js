@@ -42,19 +42,43 @@ let mongoClient = null;
 }
 
 // ✅ Display main menu
-// ✅ Display main menu
 function showMainMenu(ctx) {
-    ctx.replyWithPhoto('https://i.postimg.cc/R0jjs1YY/bot.jpg', {
-        caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
-                [{ text: '@ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-            ]
-        }
-    });
+    const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
+    const caption = '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:';
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+            [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+            [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+            [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+        ]
+    };
+
+    if (ctx.callbackQuery) {
+        // If it's a callback query, edit the existing message
+        ctx.editMessageMedia(
+            {
+                type: 'photo',
+                media: photoUrl,
+                caption: caption
+            },
+            {
+                reply_markup: keyboard
+            }
+        ).catch(error => {
+            console.error('Error editing message:', error);
+            ctx.reply('❌ حدث خطأ أثناء تحديث القائمة الرئيسية.');
+        });
+    } else {
+        // If it's a new command, send a new message
+        ctx.replyWithPhoto(photoUrl, {
+            caption: caption,
+            reply_markup: keyboard
+        }).catch(error => {
+            console.error('Error sending photo:', error);
+            ctx.reply('❌ حدث خطأ أثناء إرسال القائمة الرئيسية.');
+        });
+    }
 }
 async function getLeaderboard() {
     try {
