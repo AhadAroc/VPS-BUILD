@@ -3114,11 +3114,11 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const connection = await pool.getConnection();
-                const [developer] = await connection.query('SELECT username FROM secondary_developers WHERE user_id = ?', [devIdToDelete]);
+                const db = await ensureDatabaseInitialized();
+                const developer = await db.collection('secondary_developers').findOne({ user_id: parseInt(devIdToDelete) });
                 
-                if (developer.length > 0) {
-                    const devUsername = developer[0].username ? `@${developer[0].username}` : `User ID: ${devIdToDelete}`;
+                if (developer) {
+                    const devUsername = developer.username ? `@${developer.username}` : `User ID: ${devIdToDelete}`;
                     await ctx.editMessageText(`هل أنت متأكد من حذف المطور الثانوي: ${devUsername}؟`, {
                         reply_markup: {
                             inline_keyboard: [
@@ -3130,7 +3130,6 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 } else {
                     await ctx.answerCbQuery('لم يتم العثور على المطور الثانوي', { show_alert: true });
                 }
-                connection.release();
             } catch (error) {
                 console.error('Error confirming secondary developer deletion:', error);
                 await ctx.answerCbQuery('حدث خطأ أثناء تأكيد الحذف', { show_alert: true });
@@ -3144,10 +3143,14 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const connection = await pool.getConnection();
-                await connection.query('DELETE FROM secondary_developers WHERE user_id = ?', [devIdToDelete]);
-                connection.release();
-                await ctx.editMessageText('تم حذف المطور الثانوي بنجاح.');
+                const db = await ensureDatabaseInitialized();
+                const result = await db.collection('secondary_developers').deleteOne({ user_id: parseInt(devIdToDelete) });
+                
+                if (result.deletedCount > 0) {
+                    await ctx.editMessageText('تم حذف المطور الثانوي بنجاح.');
+                } else {
+                    await ctx.editMessageText('لم يتم العثور على المطور الثانوي للحذف.');
+                }
             } catch (error) {
                 console.error('Error deleting secondary developer:', error);
                 await ctx.editMessageText('❌ حدث خطأ أثناء حذف المطور الثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
