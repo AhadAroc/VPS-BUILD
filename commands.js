@@ -948,44 +948,46 @@ async function toggleLinkSharing(ctx, allow) {
     }
     
     // Function to handle secondary developer promotion
-    async function promoteToSecondaryDeveloper(ctx) {
-        try {
-            // Check if the user is an admin or owner
-            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-            }
-    
-            const args = ctx.message.text.split(' ').slice(1);
-            if (args.length === 0 && !ctx.message.reply_to_message) {
-                return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
-            }
-    
-            let userId, userMention;
-            if (ctx.message.reply_to_message) {
-                userId = ctx.message.reply_to_message.from.id;
-                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-            } else {
-                const username = args[0].replace('@', '');
-                try {
-                    const user = await ctx.telegram.getChat(username);
-                    userId = user.id;
-                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
-                } catch (error) {
-                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+    async function promoteToSecondaryDeveloper(ctx, userId) {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            try {
+                const db = await ensureDatabaseInitialized();
+                
+                // Check if the user is already a secondary developer
+                const existingDev = await db.collection('secondary_developers').findOne({ user_id: userId });
+                if (existingDev) {
+                    await ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
+                    return;
                 }
+    
+                // Get user information
+                let username, first_name;
+                try {
+                    const user = await ctx.telegram.getChat(userId);
+                    username = user.username;
+                    first_name = user.first_name;
+                } catch (error) {
+                    console.error('Error fetching user info:', error);
+                    username = 'Unknown';
+                    first_name = 'Unknown';
+                }
+    
+                // Add the user to the secondary_developers collection
+                await db.collection('secondary_developers').insertOne({
+                    user_id: userId,
+                    username: username,
+                    first_name: first_name,
+                    promoted_at: new Date(),
+                    promoted_by: ctx.from.id
+                });
+    
+                await ctx.reply(`تمت ترقية المستخدم ${username || userId} إلى مطور ثانوي بنجاح.`);
+            } catch (error) {
+                console.error('Error promoting to secondary developer:', error);
+                await ctx.reply('❌ حدث خطأ أثناء ترقية المستخدم إلى مطور ثانوي. يرجى المحاولة مرة أخرى لاحقًا.');
             }
-    
-            const connection = await pool.getConnection();
-            await connection.query(
-                'INSERT INTO secondary_developers (user_id, username) VALUES (?, ?) ON DUPLICATE KEY UPDATE username = ?',
-                [userId, args[0] || ctx.message.reply_to_message.from.username, args[0] || ctx.message.reply_to_message.from.username]
-            );
-            connection.release();
-    
-            ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
-        } catch (error) {
-            console.error('Error promoting user to secondary developer:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
+        } else {
+            await ctx.reply('عذرًا، هذا الأمر للمطورين الرئيسيين فقط.');
         }
     }
     async function demoteUser(ctx, role = 'admin') {
