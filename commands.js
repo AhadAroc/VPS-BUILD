@@ -935,7 +935,7 @@ async function toggleLinkSharing(ctx, allow) {
             }
     
             const args = ctx.message.text.split(' ').slice(1);
-            if (args.length === 0) {
+            if (args.length === 0 && !ctx.message.reply_to_message) {
                 return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لتنزيله.');
             }
     
@@ -954,32 +954,37 @@ async function toggleLinkSharing(ctx, allow) {
                 }
             }
     
-            const connection = await pool.getConnection();
-        let query, successMessage;
-
-        switch (role) {
-            case 'developer':
-                query = 'DELETE FROM developers WHERE user_id = ?';
-                successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`;
-                break;
-            case 'secondary_developer':
-                query = 'DELETE FROM secondary_developers WHERE user_id = ?';
-                successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الثانويين.`;
-                break;
-            case 'primary_developer':
-                query = 'DELETE FROM primary_developers WHERE user_id = ?';
-                successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الأساسيين.`;
-                break;
-            case 'admin':
-                query = 'DELETE FROM admins WHERE user_id = ?';
-                successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة الادمن.`;
-                break;
-            default:
-                throw new Error('Invalid role specified');
-        }
+            const uri = process.env.MONGODB_URI;
+            const client = new MongoClient(uri);
     
-            await connection.query(query, [userId]);
-            connection.release();
+            await client.connect();
+            const db = client.db("your_database_name"); // Replace with your actual database name
+            let collection, successMessage;
+    
+            switch (role) {
+                case 'developer':
+                    collection = db.collection('developers');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`;
+                    break;
+                case 'secondary_developer':
+                    collection = db.collection('secondary_developers');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الثانويين.`;
+                    break;
+                case 'primary_developer':
+                    collection = db.collection('primary_developers');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الأساسيين.`;
+                    break;
+                case 'admin':
+                    collection = db.collection('admins');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة الادمن.`;
+                    break;
+                default:
+                    throw new Error('Invalid role specified');
+            }
+    
+            await collection.deleteOne({ user_id: userId });
+            await client.close();
+    
             ctx.replyWithMarkdown(successMessage);
         } catch (error) {
             console.error(`Error demoting user from ${role}:`, error);
