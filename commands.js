@@ -948,46 +948,51 @@ async function toggleLinkSharing(ctx, allow) {
     }
     
     // Function to handle secondary developer promotion
-    async function promoteToSecondaryDeveloper(ctx, userId) {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            try {
-                const db = await ensureDatabaseInitialized();
-                
-                // Check if the user is already a secondary developer
-                const existingDev = await db.collection('secondary_developers').findOne({ user_id: userId });
-                if (existingDev) {
-                    await ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
-                    return;
-                }
-    
-                // Get user information
-                let username, first_name;
-                try {
-                    const user = await ctx.telegram.getChat(userId);
-                    username = user.username;
-                    first_name = user.first_name;
-                } catch (error) {
-                    console.error('Error fetching user info:', error);
-                    username = 'Unknown';
-                    first_name = 'Unknown';
-                }
-    
-                // Add the user to the secondary_developers collection
-                await db.collection('secondary_developers').insertOne({
-                    user_id: userId,
-                    username: username,
-                    first_name: first_name,
-                    promoted_at: new Date(),
-                    promoted_by: ctx.from.id
-                });
-    
-                await ctx.reply(`تمت ترقية المستخدم ${username || userId} إلى مطور ثانوي بنجاح.`);
-            } catch (error) {
-                console.error('Error promoting to secondary developer:', error);
-                await ctx.reply('❌ حدث خطأ أثناء ترقية المستخدم إلى مطور ثانوي. يرجى المحاولة مرة أخرى لاحقًا.');
+    async function promoteToSecondaryDeveloper(ctx) {
+        try {
+            if (!(await isPrimaryDeveloper(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
             }
-        } else {
-            await ctx.reply('عذرًا، هذا الأمر للمطورين الرئيسيين فقط.');
+    
+            let userId, userMention;
+            if (ctx.message.reply_to_message) {
+                userId = ctx.message.reply_to_message.from.id;
+                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            } else {
+                const args = ctx.message.text.split(' ').slice(1);
+                if (args.length === 0) {
+                    return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
+                }
+                const username = args[0].replace('@', '');
+                try {
+                    const user = await ctx.telegram.getChat(username);
+                    userId = user.id;
+                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                } catch (error) {
+                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                }
+            }
+    
+            const db = await ensureDatabaseInitialized();
+            
+            // Check if the user is already a secondary developer
+            const existingDev = await db.collection('secondary_developers').findOne({ user_id: userId });
+            if (existingDev) {
+                return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
+            }
+    
+            // Add the user to the secondary_developers collection
+            await db.collection('secondary_developers').insertOne({
+                user_id: userId,
+                username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : username,
+                promoted_at: new Date(),
+                promoted_by: ctx.from.id
+            });
+    
+            ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
+        } catch (error) {
+            console.error('Error promoting user to secondary developer:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
         }
     }
     async function demoteUser(ctx, role = 'admin') {
@@ -1459,14 +1464,59 @@ bot.command('ترقية ثانوي', async (ctx) => {
 
 
 
+async function promoteToSecondaryDeveloper(ctx) {
+    try {
+        if (!(await isPrimaryDeveloper(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمطورين الأساسيين فقط.');
+        }
+
+        let userId, userMention;
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else {
+            const args = ctx.message.text.split(' ').slice(1);
+            if (args.length === 0) {
+                return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
+            }
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChat(username);
+                userId = user.id;
+                userMention = `[${user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
+        }
+
+        const db = await ensureDatabaseInitialized();
+        
+        // Check if the user is already a secondary developer
+        const existingDev = await db.collection('secondary_developers').findOne({ user_id: userId });
+        if (existingDev) {
+            return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
+        }
+
+        // Add the user to the secondary_developers collection
+        await db.collection('secondary_developers').insertOne({
+            user_id: userId,
+            username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : username,
+            promoted_at: new Date(),
+            promoted_by: ctx.from.id
+        });
+
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
+    } catch (error) {
+        console.error('Error promoting user to secondary developer:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+}
+
 // Command handler for "ترقية_ثانوي"
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^ترقية ثانوي/, async (ctx) => {
-    // Call the same function as the command handler
-    await promoteToSecondaryDeveloper(ctx);
-});
+bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
 bot.command('تنزيل مطور', async (ctx) => {
     if (!(await isOwner(ctx, ctx.from.id))) {
         return ctx.reply('❌ هذا الأمر مخصص للمالك فقط.');
