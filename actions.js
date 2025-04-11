@@ -1912,46 +1912,46 @@ bot.on('left_chat_member', (ctx) => {
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
         if (ctx.chat.type === 'private') {
-            // Only scan for replies in DMs
-            const reply = await checkForAutomaticReply(ctx);
-            if (reply) {
-              await sendReply(ctx, reply);
-              return;
-            }
+          // Only scan for replies in DMs
+          const reply = await checkForAutomaticReply(ctx);
+          if (reply) {
+            await sendReply(ctx, reply);
+            return;
           }
-    console.log('Received message:', ctx.message.text);
-    if (await handleAwaitingReplyResponse(ctx)) return;
-
-  const text = ctx.message.text.trim().toLowerCase();
-
-  // Check if this matches a saved trigger word
-  const db = await ensureDatabaseInitialized();
-  const reply = await db.collection('replies').findOne({ trigger_word: text });
-
- if (reply) {
-  switch (reply.type) {
-    case "text":
-      await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "photo":
-      await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "animation":
-      await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "video":
-      await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "sticker":
-      await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    case "document":
-      await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-      break;
-    default:
-      await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
-  }
-}
+        }
+        console.log('Received message:', ctx.message.text);
+        if (await handleAwaitingReplyResponse(ctx)) return;
+      
+        const text = ctx.message.text.trim().toLowerCase();
+      
+        // Check if this matches a saved trigger word
+        const db = await ensureDatabaseInitialized();
+        const reply = await db.collection('replies').findOne({ trigger_word: text });
+      
+        if (reply) {
+          switch (reply.type) {
+            case "text":
+              await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
+              break;
+            case "photo":
+              await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+              break;
+            case "animation":
+              await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+              break;
+            case "video":
+              await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+              break;
+            case "sticker":
+              await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+              break;
+            case "document":
+              await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+              break;
+            default:
+              await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
+          }
+        }
 
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
