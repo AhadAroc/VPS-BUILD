@@ -246,7 +246,11 @@ bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
-
+// Add these command handlers
+bot.command('لستة_مميز', listVIPUsers);
+bot.hears('لستة مميز', listVIPUsers);
+bot.command('قائمة_المميزين', listVIPUsers);
+bot.hears('قائمة المميزين', listVIPUsers);
 // Command handler for "ترقية_ثانوي"
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 
@@ -473,7 +477,34 @@ bot.hears('بدء', async (ctx) => {
     }
 });
 
+// Add this function to list VIP users
+async function listVIPUsers(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        const db = await ensureDatabaseInitialized();
+        const vipUsers = await db.collection('vip_users').find().toArray();
+
+        if (vipUsers.length === 0) {
+            return ctx.reply('لا يوجد مستخدمين مميزين (VIP) حاليًا.');
+        }
+
+        let message = '📋 قائمة المستخدمين المميزين (VIP):\n\n';
+        for (const user of vipUsers) {
+            const userMention = user.username ? 
+                `@${user.username}` : 
+                `[المستخدم](tg://user?id=${user.user_id})`;
+            message += `• ${userMention} (ID: ${user.user_id})\n`;
+        }
+
+        await ctx.replyWithMarkdown(message);
+    } catch (error) {
+        console.error('Error listing VIP users:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
+    }
+}
     async function deleteLatestMessage(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
