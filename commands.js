@@ -318,7 +318,7 @@ bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx))
 bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
 bot.hears('تفعيل متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
 bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
-bot.hears(/^ترقية مطور/, (ctx) => promoteUser(ctx, 'مطور'));
+bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
 bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
 
@@ -435,6 +435,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 // Update the "بدء" command handler
+// Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
@@ -457,8 +458,11 @@ bot.hears('بدء', async (ctx) => {
         } 
         
         // For group chats
-        if (await isAdminOrOwner(ctx, userId)) {
-            console.log('DEBUG: User is admin/owner in group, showing main menu');
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        
+        if (isAdmin || isVIPUser) {
+            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
             return showMainMenu(ctx);
         } else {
             console.log('DEBUG: Regular user in group, showing basic message');
