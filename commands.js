@@ -1115,56 +1115,47 @@ async function listVIPUsers(ctx) {
     
             let userId, userMention;
             const args = ctx.message.text.split(' ').slice(1);
-    
+            
+            // Check if replying to a message
             if (ctx.message.reply_to_message) {
-                // If replying to a message, kick that user
                 const target = ctx.message.reply_to_message.from;
                 userId = target.id;
                 userMention = `[${target.first_name}](tg://user?id=${userId})`;
-            } else if (args.length > 0) {
-                // If a username is provided as an argument
-                const username = args[0].replace('@', '');
+            } 
+            // Check if there's a username mention in the command
+            else if (ctx.message.entities && ctx.message.entities.some(e => e.type === 'mention')) {
+                const mentionEntity = ctx.message.entities.find(e => e.type === 'mention');
+                const username = ctx.message.text.substring(
+                    mentionEntity.offset + 1, 
+                    mentionEntity.offset + mentionEntity.length
+                );
+                
+                console.log(`Attempting to kick user by mention: @${username}`);
                 
                 try {
-                    // Try to get user information directly from Telegram
-                    const user = await ctx.telegram.getChat(username);
-                    userId = user.id;
-                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                    // Try to get chat member by username
+                    const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
+                    userId = chatMember.user.id;
+                    userMention = `[${chatMember.user.first_name}](tg://user?id=${userId})`;
                 } catch (error) {
-                    console.error('Error getting user by username:', error);
-                    
-                    // Fallback to knownUsers if available
-                    if (knownUsers && knownUsers.has(username.toLowerCase())) {
-                        const userData = knownUsers.get(username.toLowerCase());
-                        userId = userData.id;
-                        userMention = `[${userData.first_name}](tg://user?id=${userId})`;
-                    } else {
-                        return ctx.reply('❌ لم أتمكن من العثور على هذا المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-                    }
+                    console.error('Error getting user by mention:', error);
+                    return ctx.reply(`❌ لم أتمكن من العثور على المستخدم @${username}. تأكد من المعرف أو قم بالرد على رسالة المستخدم.`);
                 }
-            } else if (ctx.message.entities) {
-                // If there's a mention in the message
-                const mentionEntity = ctx.message.entities.find(e => e.type === "mention");
-                if (mentionEntity) {
-                    const username = ctx.message.text.slice(mentionEntity.offset + 1, mentionEntity.offset + mentionEntity.length).toLowerCase();
-                    
-                    try {
-                        // Try to get user information directly from Telegram
-                        const user = await ctx.telegram.getChat(username);
-                        userId = user.id;
-                        userMention = `[${user.first_name}](tg://user?id=${userId})`;
-                    } catch (error) {
-                        console.error('Error getting user by mention:', error);
-                        
-                        // Fallback to knownUsers if available
-                        if (knownUsers && knownUsers.has(username)) {
-                            const userData = knownUsers.get(username);
-                            userId = userData.id;
-                            userMention = `[${userData.first_name}](tg://user?id=${userId})`;
-                        } else {
-                            return ctx.reply('❌ لم أتمكن من العثور على هذا المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-                        }
-                    }
+            }
+            // Check if there's a username as an argument
+            else if (args.length > 0) {
+                const usernameArg = args[0].startsWith('@') ? args[0].substring(1) : args[0];
+                
+                console.log(`Attempting to kick user by argument: @${usernameArg}`);
+                
+                try {
+                    // Try to get chat member by username
+                    const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${usernameArg}`);
+                    userId = chatMember.user.id;
+                    userMention = `[${chatMember.user.first_name}](tg://user?id=${userId})`;
+                } catch (error) {
+                    console.error('Error getting user by argument:', error);
+                    return ctx.reply(`❌ لم أتمكن من العثور على المستخدم @${usernameArg}. تأكد من المعرف أو قم بالرد على رسالة المستخدم.`);
                 }
             } else {
                 return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لطرده.');
@@ -1185,8 +1176,10 @@ async function listVIPUsers(ctx) {
                 // Continue with kick attempt even if we can't check admin status
             }
     
+            console.log(`Attempting to kick user ID: ${userId}`);
+            
             // Kick the user
-            await ctx.telegram.kickChatMember(ctx.chat.id, userId);
+            await ctx.telegram.banChatMember(ctx.chat.id, userId);
             
             // Unban to allow rejoining (this is what makes it a "kick" rather than a "ban")
             await ctx.telegram.unbanChatMember(ctx.chat.id, userId, {
@@ -1199,7 +1192,6 @@ async function listVIPUsers(ctx) {
             ctx.reply('❌ حدث خطأ أثناء محاولة طرد المستخدم. تأكد من أن البوت لديه صلاحيات كافية.');
         }
     }
-    
     
     
     async function enableVideoSharing(ctx) {
