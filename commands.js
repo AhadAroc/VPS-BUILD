@@ -50,12 +50,13 @@ async function showMainMenu(ctx) {
     try {
         const userId = ctx.from.id;
         
-        // Check if the user is an admin, owner, or secondary developer
+        // Check if the user is an admin, owner, secondary developer, or VIP
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
 
-        if (!isAdmin && !isSecDev) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.');
+        if (!isAdmin && !isSecDev && !isVIPUser) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والأعضاء المميزين فقط.');
         }
 
         // Get the original photo URL
@@ -69,8 +70,6 @@ async function showMainMenu(ctx) {
                 [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
             ]
         };
-
-        
 
         await ctx.replyWithPhoto(photoUrl, {
             caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
