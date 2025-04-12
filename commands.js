@@ -101,7 +101,24 @@ async function linkRestrictionMiddleware(ctx, next) {
     }
     return next();
 }
-
+async function videoRestrictionMiddleware(ctx, next) {
+    if (ctx.message && (ctx.message.video || (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('video/')))) {
+        const chatId = ctx.chat.id;
+        if (videoRestrictionStatus.get(chatId)) {
+            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+            if (!isAdmin) {
+                try {
+                    await ctx.deleteMessage();
+                    await ctx.reply('❌ عذرًا، تم تعطيل إرسال الفيديوهات للأعضاء العاديين في هذه المجموعة.');
+                } catch (error) {
+                    console.error('Error in videoRestrictionMiddleware:', error);
+                }
+                return;
+            }
+        }
+    }
+    return next();
+}
 
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
@@ -400,7 +417,7 @@ bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساس
 // Make sure to use this middleware
 bot.use(photoRestrictionMiddleware);
 bot.use(linkRestrictionMiddleware);
-
+bot.use(videoRestrictionMiddleware);
 
 
 bot.hears('الاوامر', (ctx) => {
@@ -729,7 +746,35 @@ async function listVIPUsers(ctx) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الصور.');
         }
     }
+    async function enableVideoSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
     
+            const chatId = ctx.chat.id;
+            videoRestrictionStatus.set(chatId, false);
+            ctx.reply('✅ تم تفعيل مشاركة الفيديوهات للجميع.');
+        } catch (error) {
+            console.error('Error in enableVideoSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الفيديوهات.');
+        }
+    }
+    async function disableVideoSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
+    
+            const chatId = ctx.chat.id;
+            videoRestrictionStatus.set(chatId, true);
+            ctx.reply('✅ تم تعطيل مشاركة الفيديوهات للأعضاء العاديين. فقط المشرفين يمكنهم إرسال الفيديوهات الآن.');
+        } catch (error) {
+            console.error('Error in disableVideoSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الفيديوهات.');
+        }
+    }
+
     async function enablePhotoSharing(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
