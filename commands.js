@@ -75,6 +75,28 @@ async function photoRestrictionMiddleware(ctx, next) {
     return next();
 }
 
+async function linkRestrictionMiddleware(ctx, next) {
+    if (ctx.message && ctx.message.text) {
+        const chatId = ctx.chat.id;
+        if (linkRestrictionStatus.get(chatId)) {
+            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+            if (!isAdmin) {
+                // Simple regex to detect URLs
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                if (urlRegex.test(ctx.message.text)) {
+                    try {
+                        await ctx.deleteMessage();
+                        await ctx.reply('❌ تم حذف الرسالة لأنها تحتوي على رابط. مشاركة الروابط غير مسموحة حاليًا.');
+                    } catch (error) {
+                        console.error('Error deleting message with link:', error);
+                    }
+                    return; // Stop further processing
+                }
+            }
+        }
+    }
+    return next();
+}
 
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
@@ -372,6 +394,10 @@ bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أسا�
 bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
 // Make sure to use this middleware
 bot.use(photoRestrictionMiddleware);
+bot.use(linkRestrictionMiddleware);
+
+
+
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
 });
@@ -845,7 +871,7 @@ async function listVIPUsers(ctx) {
             const chatId = ctx.chat.id;
             linkRestrictionStatus.set(chatId, true);
     
-            await ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة.');
+            await ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة. سيتم حذف أي روابط يتم إرسالها.');
         } catch (error) {
             console.error('Error in disableLinkSharing:', error);
             ctx.reply('❌ حدث خطأ أثناء محاولة منع مشاركة الروابط.');
