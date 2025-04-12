@@ -22,6 +22,17 @@ const { isDeveloper } = require('./middlewares');
 const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
 // MongoDB connection for storing scores
 let mongoClient = null;
+const knownUsers = new Map();
+
+bot.on('message', (ctx) => {
+    const user = ctx.from;
+    if (user.username) {
+        knownUsers.set(user.username.toLowerCase(), {
+            id: user.id,
+            first_name: user.first_name
+        });
+    }
+});
 
   // ✅ Function to check if the user is admin or owner
   async function isAdminOrOwner(ctx, userId) {
@@ -1105,19 +1116,20 @@ async function listVIPUsers(ctx) {
             let userId, userMention;
     
             if (ctx.message.reply_to_message) {
-                userId = ctx.message.reply_to_message.from.id;
-                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+                const target = ctx.message.reply_to_message.from;
+                userId = target.id;
+                userMention = `[${target.first_name}](tg://user?id=${userId})`;
             } else if (ctx.message.entities) {
                 const mentionEntity = ctx.message.entities.find(e => e.type === "mention");
                 if (mentionEntity) {
-                    const username = ctx.message.text.slice(mentionEntity.offset + 1, mentionEntity.offset + mentionEntity.length);
-                    try {
-                        const user = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
-                        userId = user.user.id;
-                        userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
-                    } catch (error) {
-                        console.error('❌ فشل في الحصول على معلومات المستخدم:', error);
-                        return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من صحة المعرف.');
+                    const username = ctx.message.text.slice(mentionEntity.offset + 1, mentionEntity.offset + mentionEntity.length).toLowerCase();
+                    const userData = knownUsers.get(username);
+    
+                    if (userData) {
+                        userId = userData.id;
+                        userMention = `[${userData.first_name}](tg://user?id=${userId})`;
+                    } else {
+                        return ctx.reply('❌ لا أستطيع طرد هذا المستخدم. يجب أن يرسل رسالة في المجموعة أولًا أو قم بالرد على رسالته.');
                     }
                 }
             }
@@ -1135,6 +1147,7 @@ async function listVIPUsers(ctx) {
             ctx.reply('❌ حدث خطأ أثناء محاولة طرد المستخدم.');
         }
     }
+    
     
     
     async function enableVideoSharing(ctx) {
