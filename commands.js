@@ -342,6 +342,39 @@ function setupCommands(bot) {
         return;
     }
 });
+// Add this callback handler for returning to the main menu
+bot.action('back_to_main', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        // Get the original photo URL
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
+        
+        // Edit the message to show the main menu again
+        await ctx.editMessageMedia(
+            {
+                type: 'photo',
+                media: photoUrl,
+                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:'
+            },
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+                    ]
+                }
+            }
+        );
+    } catch (error) {
+        console.error('Error returning to main menu:', error);
+        await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
+    }
+});
+
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
@@ -1732,38 +1765,6 @@ async function getGroupLink(ctx) {
 
 
 
-// Add this callback handler for returning to the main menu
-bot.action('back_to_main', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        
-        // Get the original photo URL
-        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
-        
-        // Edit the message to show the main menu again
-        await ctx.editMessageMedia(
-            {
-                type: 'photo',
-                media: photoUrl,
-                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:'
-            },
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-                    ]
-                }
-            }
-        );
-    } catch (error) {
-        console.error('Error returning to main menu:', error);
-        await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
-    }
-});
 
 
 
