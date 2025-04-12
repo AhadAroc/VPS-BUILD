@@ -2565,7 +2565,7 @@ if (awaitingReplyResponse) {
         }
 
         // If we reach here, it's an unsupported message type
-        await ctx.reply('عذرًا، هذا النوع من الرسائل غير مدعوم.');
+        await ctx.reply('عاشوا 👍');
 
     } catch (error) {
         console.error('Error in message handler:', error);
