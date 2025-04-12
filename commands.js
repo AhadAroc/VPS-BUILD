@@ -309,8 +309,8 @@ bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
 bot.hears('معرفي', (ctx) => showUserId(ctx));
 bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
 bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-bot.hears('فتح روابط', adminOnly((ctx) => toggleLinkSharing(ctx)));
-bot.hears('غلق روابط', adminOnly((ctx) => toggleLinkSharing(ctx)));
+bot.hears('فتح روابط', adminOnly((ctx) => enableLinkSharing(ctx)));
+bot.hears('غلق روابط', adminOnly((ctx) => disableLinkSharing(ctx)));
 bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.hears('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
@@ -820,27 +820,37 @@ async function listVIPUsers(ctx) {
         }
     }
     // Add this function to handle link sharing toggling
-async function toggleLinkSharing(ctx, allow) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-
-        const chatId = ctx.chat.id;
-        linkRestrictionStatus.set(chatId, !allow);
-
-        if (allow) {
-            await ctx.reply('✅ تم السماح بمشاركة الروابط للجميع في المجموعة.');
-        } else {
-            await ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة.');
-        }
-    } catch (error) {
-        console.error('Error in toggleLinkSharing:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تغيير إعدادات مشاركة الروابط.');
-    }
-}
-
+    async function enableLinkSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
     
+            const chatId = ctx.chat.id;
+            linkRestrictionStatus.set(chatId, false);
+    
+            await ctx.reply('✅ تم السماح بمشاركة الروابط للجميع في المجموعة.');
+        } catch (error) {
+            console.error('Error in enableLinkSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة السماح بمشاركة الروابط.');
+        }
+    }
+    
+    async function disableLinkSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
+    
+            const chatId = ctx.chat.id;
+            linkRestrictionStatus.set(chatId, true);
+    
+            await ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة.');
+        } catch (error) {
+            console.error('Error in disableLinkSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة منع مشاركة الروابط.');
+        }
+    }
  
 
 
