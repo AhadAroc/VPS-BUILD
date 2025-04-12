@@ -554,6 +554,56 @@ bot.command('تفعيل_مستندات', adminOnly((ctx) => enableDocumentSharin
 // Also add handlers for text commands without the underscore
 bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
 bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
+// Command handler for "ترقية_ثانوي"
+bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
+
+// Text handler for "ترقية ثانوي" (without underscore)
+bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
+
+// Additional handler for flexibility
+bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
+
+
+
+
+
+
+bot.command('تنزيل مطور', async (ctx) => {
+    if (!(await isOwner(ctx, ctx.from.id))) {
+        return ctx.reply('❌ هذا الأمر مخصص للمالك فقط.');
+    }
+
+    const args = ctx.message.text.split(' ').slice(1);
+    if (args.length === 0) {
+        return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لتنزيله من المطورين.');
+    }
+
+    let userId, userMention;
+    if (ctx.message.reply_to_message) {
+        userId = ctx.message.reply_to_message.from.id;
+        userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+    } else {
+        const username = args[0].replace('@', '');
+        try {
+            const user = await ctx.telegram.getChat(username);
+            userId = user.id;
+            userMention = `[${user.first_name}](tg://user?id=${userId})`;
+        } catch (error) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+        }
+    }
+
+    try {
+        const connection = await pool.getConnection();
+        await connection.query('DELETE FROM developers WHERE user_id = ?', [userId]);
+        connection.release();
+        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`);
+    } catch (error) {
+        console.error('Error demoting developer:', error);
+        ctx.reply('❌ حدث خطأ أثناء تنزيل المطور. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
 
 // Make sure to use this middleware
 bot.use(photoRestrictionMiddleware);
@@ -1856,56 +1906,6 @@ async function getGroupLink(ctx) {
 
 
 
-
-// Command handler for "ترقية_ثانوي"
-bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
-
-// Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
-
-// Additional handler for flexibility
-bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
-
-
-
-
-
-
-bot.command('تنزيل مطور', async (ctx) => {
-    if (!(await isOwner(ctx, ctx.from.id))) {
-        return ctx.reply('❌ هذا الأمر مخصص للمالك فقط.');
-    }
-
-    const args = ctx.message.text.split(' ').slice(1);
-    if (args.length === 0) {
-        return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لتنزيله من المطورين.');
-    }
-
-    let userId, userMention;
-    if (ctx.message.reply_to_message) {
-        userId = ctx.message.reply_to_message.from.id;
-        userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-    } else {
-        const username = args[0].replace('@', '');
-        try {
-            const user = await ctx.telegram.getChat(username);
-            userId = user.id;
-            userMention = `[${user.first_name}](tg://user?id=${userId})`;
-        } catch (error) {
-            return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-        }
-    }
-
-    try {
-        const connection = await pool.getConnection();
-        await connection.query('DELETE FROM developers WHERE user_id = ?', [userId]);
-        connection.release();
-        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`);
-    } catch (error) {
-        console.error('Error demoting developer:', error);
-        ctx.reply('❌ حدث خطأ أثناء تنزيل المطور. الرجاء المحاولة مرة أخرى لاحقًا.');
-    }
-});
 
 
 
