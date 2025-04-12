@@ -70,10 +70,7 @@ async function showMainMenu(ctx) {
             ]
         };
 
-        // If it's a developer, add the developer panel option
-        if (await isDeveloper(ctx, userId)) {
-            keyboard.inline_keyboard.unshift([{ text: '🛠️ لوحة المطور', callback_data: 'dev_panel' }]);
-        }
+        
 
         await ctx.replyWithPhoto(photoUrl, {
             caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
