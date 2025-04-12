@@ -60,8 +60,15 @@ async function photoRestrictionMiddleware(ctx, next) {
         if (photoRestrictionStatus.get(chatId)) {
             const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
             if (!isAdmin) {
-                await ctx.reply('❌ عذرًا، تم تعطيل إرسال الصور للأعضاء العاديين في هذه المجموعة.');
-                return;
+                try {
+                    // Delete the message
+                    await ctx.deleteMessage();
+                    // Send a warning message
+                    await ctx.reply('❌ عذرًا، تم تعطيل إرسال الصور للأعضاء العاديين في هذه المجموعة.');
+                } catch (error) {
+                    console.error('Error in photoRestrictionMiddleware:', error);
+                }
+                return; // Stop further processing
             }
         }
     }
