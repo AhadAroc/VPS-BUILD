@@ -349,7 +349,20 @@ bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساس
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
 });
+bot.on(['photo', 'document', 'sticker'], (ctx) => {
+    const chatId = ctx.chat.id;
+    const messageId = ctx.message.message_id;
+    const timestamp = Date.now();
 
+    if (ctx.message.photo || 
+        (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('image/')) ||
+        (ctx.message.sticker && !ctx.message.sticker.is_animated)) {
+        
+        let photos = photoMessages.get(chatId) || [];
+        photos.push({ messageId, timestamp });
+        photoMessages.set(chatId, photos);
+    }
+});
 // Add this near your other command handlers
 bot.command('stop', async (ctx) => {
     const chatId = ctx.chat.id;
@@ -1204,34 +1217,37 @@ async function deleteLatestPhotos(ctx) {
         const chatId = ctx.chat.id;
         let deletedCount = 0;
 
-        if (ctx.message.reply_to_message && ctx.message.reply_to_message.photo) {
-            // If replying to a photo, delete that specific photo
-            try {
-                await ctx.telegram.deleteMessage(chatId, ctx.message.reply_to_message.message_id);
-                deletedCount = 1;
-            } catch (error) {
-                console.error(`Failed to delete replied photo:`, error);
-                return ctx.reply('❌ فشل في حذف الصورة المحددة.');
+        if (ctx.message.reply_to_message) {
+            // If replying to a message, check if it contains any type of image
+            if (ctx.message.reply_to_message.photo || 
+                ctx.message.reply_to_message.document?.mime_type?.startsWith('image/') ||
+                ctx.message.reply_to_message.sticker?.is_animated === false) {
+                try {
+                    await ctx.telegram.deleteMessage(chatId, ctx.message.reply_to_message.message_id);
+                    deletedCount = 1;
+                } catch (error) {
+                    console.error(`Failed to delete replied image:`, error);
+                    return ctx.reply('❌ فشل في حذف الصورة المحددة.');
+                }
+            } else {
+                return ctx.reply('❌ الرسالة التي تم الرد عليها لا تحتوي على صورة.');
             }
         } else {
-            // If not replying, delete the latest photo
-            const photos = photoMessages.get(chatId) || [];
-            
-            if (photos.length > 0) {
-                // Get the most recent photo
-                const latestPhoto = photos[photos.length - 1];
-                try {
-                    await ctx.telegram.deleteMessage(chatId, latestPhoto.messageId);
-                    deletedCount = 1;
-                    // Remove the deleted photo from the array
-                    photos.pop();
-                } catch (error) {
-                    console.error(`Failed to delete latest photo:`, error);
+            // If not replying, delete the latest image
+            const messages = await ctx.telegram.getChatHistory(chatId, { limit: 100 });
+            for (const message of messages) {
+                if (message.photo || 
+                    message.document?.mime_type?.startsWith('image/') ||
+                    message.sticker?.is_animated === false) {
+                    try {
+                        await ctx.telegram.deleteMessage(chatId, message.message_id);
+                        deletedCount = 1;
+                        break;
+                    } catch (error) {
+                        console.error(`Failed to delete latest image:`, error);
+                    }
                 }
             }
-
-            // Update the photos array
-            photoMessages.set(chatId, photos);
         }
 
         if (deletedCount > 0) {
