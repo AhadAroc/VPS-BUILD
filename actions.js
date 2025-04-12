@@ -1314,7 +1314,7 @@ bot.action('back_to_main', async (ctx) => {
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }]
+                        [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
                         [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                         [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
@@ -3342,6 +3342,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
             {
                 reply_markup: {
                     inline_keyboard: [
+                        [{ text: 'text handle', url: 'https://t.me/ctrlsrc' }],
                         [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                         [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
                         [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
