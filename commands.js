@@ -1102,13 +1102,24 @@ async function listVIPUsers(ctx) {
                 return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
             }
     
-            const replyMessage = ctx.message.reply_to_message;
-            if (!replyMessage) {
-                return ctx.reply('❌ يجب الرد على رسالة المستخدم الذي تريد طرده.');
-            }
+            let userId, userMention;
+            const args = ctx.message.text.split(' ').slice(1);
     
-            const userId = replyMessage.from.id;
-            const userMention = `[${replyMessage.from.first_name}](tg://user?id=${userId})`;
+            if (ctx.message.reply_to_message) {
+                userId = ctx.message.reply_to_message.from.id;
+                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            } else if (args.length > 0) {
+                const username = args[0].replace('@', '');
+                try {
+                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                    userId = user.user.id;
+                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+                } catch (error) {
+                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                }
+            } else {
+                return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لطرده.');
+            }
     
             await ctx.telegram.kickChatMember(ctx.chat.id, userId);
             await ctx.telegram.unbanChatMember(ctx.chat.id, userId); // Unban to allow rejoining
@@ -1168,24 +1179,23 @@ async function listVIPUsers(ctx) {
                 return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
             }
     
-            const args = ctx.message.text.split(' ').slice(1);
-            if (args.length === 0 && !ctx.message.reply_to_message) {
-                return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته.');
-            }
-    
             let userId, userMention;
+            const args = ctx.message.text.split(' ').slice(1);
+    
             if (ctx.message.reply_to_message) {
                 userId = ctx.message.reply_to_message.from.id;
                 userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-            } else {
+            } else if (args.length > 0) {
                 const username = args[0].replace('@', '');
                 try {
-                    const user = await ctx.telegram.getChat(username);
-                    userId = user.id;
-                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                    userId = user.user.id;
+                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
                 } catch (error) {
                     return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
                 }
+            } else {
+                return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
             }
     
             const db = await ensureDatabaseInitialized();
@@ -1688,30 +1698,37 @@ async function muteUser(ctx, mute = true) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
         }
 
-        const replyMessage = ctx.message.reply_to_message;
-        if (!replyMessage) {
-            return ctx.reply('❌ يجب الرد على رسالة المستخدم الذي تريد كتمه/إلغاء كتمه.');
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
+        } else {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لكتمه/إلغاء كتمه.');
         }
 
-        const userId = replyMessage.from.id;
-        const userMention = `[${replyMessage.from.first_name}](tg://user?id=${userId})`;
-
         if (mute) {
-            // Mute the user
             await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
                 can_send_messages: false,
                 can_send_media_messages: false,
-                can_send_polls: false,
                 can_send_other_messages: false,
                 can_add_web_page_previews: false
             });
             ctx.replyWithMarkdown(`✅ تم كتم المستخدم ${userMention}.`);
         } else {
-            // Unmute the user
             await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
                 can_send_messages: true,
                 can_send_media_messages: true,
-                can_send_polls: true,
                 can_send_other_messages: true,
                 can_add_web_page_previews: true
             });
@@ -1719,7 +1736,7 @@ async function muteUser(ctx, mute = true) {
         }
     } catch (error) {
         console.error('Error in muteUser:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة الكتم/إلغاء الكتم.');
+        ctx.reply('❌ حدث خطأ أثناء محاولة كتم/إلغاء كتم المستخدم.');
     }
 }
 
