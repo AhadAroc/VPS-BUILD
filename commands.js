@@ -236,7 +236,9 @@ function setupCommands(bot) {
         return;
     }
 });
-
+// Add this to your existing command handlers
+bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
+bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
 // Add these to your command setup function
 bot.command('ترقية_ادمن', (ctx) => promoteUser(ctx, 'ادمن'));
@@ -1458,9 +1460,7 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
-// Add this to your existing command handlers
-bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
-bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
+
 
 
 
