@@ -1203,27 +1203,45 @@ async function deleteLatestPhotos(ctx) {
 
         const chatId = ctx.chat.id;
         let deletedCount = 0;
-        const photos = photoMessages.get(chatId) || [];
 
-        // Sort photos by timestamp, most recent first
-        photos.sort((a, b) => b.timestamp - a.timestamp);
-
-        for (const photo of photos) {
+        if (ctx.message.reply_to_message && ctx.message.reply_to_message.photo) {
+            // If replying to a photo, delete that specific photo
             try {
-                await ctx.telegram.deleteMessage(chatId, photo.messageId);
-                deletedCount++;
+                await ctx.telegram.deleteMessage(chatId, ctx.message.reply_to_message.message_id);
+                deletedCount = 1;
             } catch (error) {
-                console.error(`Failed to delete message ${photo.messageId}:`, error);
+                console.error(`Failed to delete replied photo:`, error);
+                return ctx.reply('❌ فشل في حذف الصورة المحددة.');
             }
+        } else {
+            // If not replying, delete the latest photo
+            const photos = photoMessages.get(chatId) || [];
+            
+            if (photos.length > 0) {
+                // Get the most recent photo
+                const latestPhoto = photos[photos.length - 1];
+                try {
+                    await ctx.telegram.deleteMessage(chatId, latestPhoto.messageId);
+                    deletedCount = 1;
+                    // Remove the deleted photo from the array
+                    photos.pop();
+                } catch (error) {
+                    console.error(`Failed to delete latest photo:`, error);
+                }
+            }
+
+            // Update the photos array
+            photoMessages.set(chatId, photos);
         }
 
-        // Clear the array after deletion
-        photoMessages.set(chatId, []);
-
-        ctx.reply(`✅ تم حذف ${deletedCount} صورة.`);
+        if (deletedCount > 0) {
+            ctx.reply(`✅ تم حذف الصورة بنجاح.`);
+        } else {
+            ctx.reply('❌ لم يتم العثور على صور لحذفها.');
+        }
     } catch (error) {
         console.error('Error in deleteLatestPhotos:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة حذف الصور.');
+        ctx.reply('❌ حدث خطأ أثناء محاولة حذف الصورة.');
     }
 }
 async function enableGifSharing(ctx) {
