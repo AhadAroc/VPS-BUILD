@@ -293,7 +293,13 @@ bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
+// Add these command handlers
+bot.command('كتم', (ctx) => muteUser(ctx, true));
+bot.command('الغاء_كتم', (ctx) => muteUser(ctx, false));
 
+// Add these hears handlers
+bot.hears('كتم', (ctx) => muteUser(ctx, true));
+bot.hears('الغاء كتم', (ctx) => muteUser(ctx, false));
 // Handle "نكتة" text command
 bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
@@ -1321,15 +1327,27 @@ async function muteUser(ctx, mute = true) {
         const userId = replyMessage.from.id;
         const userMention = `[${replyMessage.from.first_name}](tg://user?id=${userId})`;
 
-        await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
-            can_send_messages: !mute,
-            can_send_media_messages: !mute,
-            can_send_polls: !mute,
-            can_send_other_messages: !mute,
-            can_add_web_page_previews: !mute
-        });
-
-        ctx.replyWithMarkdown(mute ? `✅ تم كتم المستخدم ${userMention}.` : `✅ تم إلغاء كتم المستخدم ${userMention}.`);
+        if (mute) {
+            // Mute the user
+            await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
+                can_send_messages: false,
+                can_send_media_messages: false,
+                can_send_polls: false,
+                can_send_other_messages: false,
+                can_add_web_page_previews: false
+            });
+            ctx.replyWithMarkdown(`✅ تم كتم المستخدم ${userMention}.`);
+        } else {
+            // Unmute the user
+            await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
+                can_send_messages: true,
+                can_send_media_messages: true,
+                can_send_polls: true,
+                can_send_other_messages: true,
+                can_add_web_page_previews: true
+            });
+            ctx.replyWithMarkdown(`✅ تم إلغاء كتم المستخدم ${userMention}.`);
+        }
     } catch (error) {
         console.error('Error in muteUser:', error);
         ctx.reply('❌ حدث خطأ أثناء محاولة الكتم/إلغاء الكتم.');
