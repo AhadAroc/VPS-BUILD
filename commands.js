@@ -70,7 +70,10 @@ async function showMainMenu(ctx) {
             ]
         };
 
-        
+        // If it's a developer, add the developer panel option
+        if (await isDeveloper(ctx, userId)) {
+            keyboard.inline_keyboard.unshift([{ text: '🛠️ لوحة المطور', callback_data: 'dev_panel' }]);
+        }
 
         await ctx.replyWithPhoto(photoUrl, {
             caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
@@ -157,18 +160,7 @@ async function showQuizMenu(ctx) {
         await ctx.reply(caption, { reply_markup: keyboard });
     }
 }
-// Add this function to check if a user is a VIP
-async function isVIP(ctx, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const user = await db.collection('vip_users').findOne({ user_id: userId });
-        console.log('User data for VIP check:', user);
-        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
-    } catch (error) {
-        console.error('Error checking VIP status:', error);
-        return false;
-    }
-}
+
 async function getDifficultyLevels() {
     const client = new MongoClient(uri);
     try {
@@ -286,13 +278,7 @@ bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx))
 
 bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
 bot.hears('سماح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
-// Add command handlers for promoting and demoting VIP users
-bot.command('ترقية_مميز', (ctx) => promoteUser(ctx, 'مميز'));
-bot.command('تنزيل_مميز', demoteUser);
 
-// Add hears handlers for promoting and demoting VIP users
-bot.hears(/^ترقية مميز/, (ctx) => promoteUser(ctx, 'مميز'));
-bot.hears(/^تنزيل مميز/, demoteUser);
 
 bot.command('معرفي', (ctx) => showUserId(ctx));
 
@@ -812,135 +798,12 @@ async function toggleLinkSharing(ctx, allow) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الصور المتحركة.');
         }
     }
-   async function promoteUser(ctx, role) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-        }
-
-        const args = ctx.message.text.split(' ').slice(1);
-        if (args.length === 0 && !ctx.message.reply_to_message) {
-            return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته.');
-        }
-
-        let userId, userMention;
-        if (ctx.message.reply_to_message) {
-            userId = ctx.message.reply_to_message.from.id;
-            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-        } else {
-            const username = args[0].replace('@', '');
-            try {
-                const user = await ctx.telegram.getChat(username);
-                userId = user.id;
-                userMention = `[${user.first_name}](tg://user?id=${userId})`;
-            } catch (error) {
-                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-            }
-        }
-
-        const db = await ensureDatabaseInitialized();
-        let collection, successMessage;
-
-        switch (role.toLowerCase()) {
-            case 'مميز':
-            case 'vip':
-                collection = 'vip_users';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مميز (VIP).`;
-                break;
-            case 'ادمن':
-            case 'admin':
-                collection = 'admins';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
-                break;
-            case 'مدير':
-            case 'manager':
-                collection = 'managers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
-                break;
-            case 'منشئ':
-            case 'creator':
-                collection = 'creators';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
-                break;
-            case 'منشئ اساسي':
-            case 'primary creator':
-                collection = 'primary_creators';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
-                break;
-            case 'مطور':
-            case 'developer':
-                collection = 'developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
-                break;
-            case 'مطور ثانوي':
-            case 'secondary developer':
-                collection = 'secondary_developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
-                break;
-            default:
-                throw new Error('Invalid role specified: ' + role);
-        }
-
-        await db.collection(collection).updateOne(
-            { user_id: userId },
-            { 
-                $set: { 
-                    user_id: userId, 
-                    username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
-                    promoted_at: new Date(),
-                    promoted_by: ctx.from.id
-                }
-            },
-            { upsert: true }
-        );
-        
-        ctx.replyWithMarkdown(successMessage);
-
-        // Update user permissions in the group based on the role
-        if (role.toLowerCase() === 'ادمن' || role.toLowerCase() === 'admin') {
-            await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                can_change_info: true,
-                can_delete_messages: true,
-                can_invite_users: true,
-                can_restrict_members: true,
-                can_pin_messages: true,
-                can_promote_members: false
-            });
-        } else if (role.toLowerCase() === 'مدير' || role.toLowerCase() === 'manager') {
-            await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                can_change_info: true,
-                can_delete_messages: true,
-                can_invite_users: true,
-                can_restrict_members: true,
-                can_pin_messages: true,
-                can_promote_members: true
-            });
-        } else if (role.toLowerCase() === 'مميز' || role.toLowerCase() === 'vip') {
-            await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
-                can_send_messages: true,
-                can_send_media_messages: true,
-                can_send_polls: true,
-                can_send_other_messages: true,
-                can_add_web_page_previews: true,
-                can_change_info: false,
-                can_invite_users: false,
-                can_pin_messages: false
-            });
-        }
-
-        console.log(`User ${userId} promoted to ${role}`);
-
-    } catch (error) {
-        console.error(`Error promoting user to ${role}:`, error);
-        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
-    }
-}
     // ✅ Demote user
     // ✅ Demote user u check this
     async function demoteUser(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
             }
     
             let userId, userMention;
@@ -964,41 +827,197 @@ async function toggleLinkSharing(ctx, allow) {
                 }
             }
     
-            const db = await ensureDatabaseInitialized();
-            let collection, successMessage;
+            const botInfo = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+            if (!botInfo || botInfo.status !== "administrator" || !botInfo.can_promote_members) {
+                return ctx.reply('❌ البوت ليس لديه إذن "إدارة المستخدمين". يرجى تعديل صلاحيات البوت.');
+            }
     
-            // Check all possible roles
-            const roles = ['developers', 'secondary_developers', 'primary_developers', 'admins', 'vip_users'];
-            let userRole = null;
+            const targetUserInfo = await ctx.telegram.getChatMember(ctx.chat.id, userId);
+            if (targetUserInfo.status === 'creator') {
+                return ctx.reply('❌ لا يمكن إزالة رتبة مالك المجموعة.');
+            }
     
-            for (const role of roles) {
-                const user = await db.collection(role).findOne({ user_id: userId });
-                if (user) {
-                    userRole = role;
-                    break;
+            if (targetUserInfo.status !== 'administrator') {
+                return ctx.reply('❌ هذا المستخدم ليس مشرفًا بالفعل.');
+            }
+    
+            await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                can_change_info: false,
+                can_post_messages: false,
+                can_edit_messages: false,
+                can_delete_messages: false,
+                can_invite_users: false,
+                can_restrict_members: false,
+                can_pin_messages: false,
+                can_promote_members: false
+            });
+    
+            ctx.replyWithMarkdown(`✅ تم إزالة رتبة المستخدم ${userMention} بنجاح.`);
+        } catch (error) {
+            console.error('Error in demoteUser:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة إزالة رتبة المستخدم.');
+        }
+    }
+    // ✅ Promote user to the specified role
+    // ✅ Promote user to the specified role
+    async function promoteUser(ctx, role) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+            }
+    
+            const args = ctx.message.text.split(' ').slice(1);
+            if (args.length === 0 && !ctx.message.reply_to_message) {
+                return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته.');
+            }
+    
+            let userId, userMention;
+            if (ctx.message.reply_to_message) {
+                userId = ctx.message.reply_to_message.from.id;
+                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            } else {
+                const username = args[0].replace('@', '');
+                try {
+                    const user = await ctx.telegram.getChat(username);
+                    userId = user.id;
+                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                } catch (error) {
+                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
                 }
             }
     
-            if (!userRole) {
-                return ctx.reply('❌ هذا المستخدم ليس لديه أي رتبة خاصة للإزالة.');
+            const db = await ensureDatabaseInitialized();
+            let collection, successMessage;
+    
+            switch (role) {
+                case 'مطور':
+                case 'developer':
+                    collection = 'developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
+                    break;
+                case 'مطور ثانوي':
+                case 'secondary_developer':
+                    collection = 'secondary_developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
+                    break;
+                case 'مطور أساسي':
+                case 'primary_developer':
+                    collection = 'primary_developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور أساسي.`;
+                    break;
+                case 'ادمن':
+                case 'admin':
+                    collection = 'admins';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
+                    // Actually promote the user in the Telegram group
+                    await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                        can_change_info: true,
+                        can_delete_messages: true,
+                        can_invite_users: true,
+                        can_restrict_members: true,
+                        can_pin_messages: true,
+                        can_promote_members: false
+                    });
+                    break;
+                default:
+                    throw new Error('Invalid role specified: ' + role);
             }
     
-            // Remove the user from the corresponding collection
-            await db.collection(userRole).deleteOne({ user_id: userId });
+            await db.collection(collection).updateOne(
+                { user_id: userId },
+                { $set: { user_id: userId, username: args[0] || ctx.message.reply_to_message.from.username } },
+                { upsert: true }
+            );
+            
+            ctx.replyWithMarkdown(successMessage);
+        } catch (error) {
+            console.error(`Error promoting user to ${role}:`, error);
+            ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
+        }
+    }
+
+    async function disablePhotoSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
     
-            switch (userRole) {
-                case 'developers':
-                    successMessage = `✅ تم إزالة رتبة المطور من المستخدم ${userMention}.`;
+            const chatId = ctx.chat.id;
+            photoRestrictionStatus.set(chatId, true);
+            ctx.reply('✅ تم تعطيل مشاركة الصور للأعضاء العاديين. فقط المشرفين يمكنهم إرسال الصور الآن.');
+        } catch (error) {
+            console.error('Error in disablePhotoSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الصور.');
+        }
+    }
+    
+    async function enablePhotoSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
+    
+            const chatId = ctx.chat.id;
+            photoRestrictionStatus.set(chatId, false);
+            ctx.reply('✅ تم تفعيل مشاركة الصور للجميع.');
+        } catch (error) {
+            console.error('Error in enablePhotoSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور.');
+        }
+    }
+    
+    
+    async function demoteUser(ctx, role = 'admin') {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+            }
+    
+            const args = ctx.message.text.split(' ').slice(1);
+            if (args.length === 0 && !ctx.message.reply_to_message) {
+                return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لتنزيله.');
+            }
+    
+            let userId, userMention;
+            if (ctx.message.reply_to_message) {
+                userId = ctx.message.reply_to_message.from.id;
+                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            } else {
+                const username = args[0].replace('@', '');
+                try {
+                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                    userId = user.user.id;
+                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+                } catch (error) {
+                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                }
+            }
+    
+            const uri = process.env.MONGODB_URI;
+            const client = new MongoClient(uri);
+    
+            await client.connect();
+            const db = client.db("your_database_name"); // Replace with your actual database name
+            let collection, successMessage;
+    
+            switch (role) {
+                case 'developer':
+                    collection = db.collection('developers');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين.`;
                     break;
-                case 'secondary_developers':
-                    successMessage = `✅ تم إزالة رتبة المطور الثانوي من المستخدم ${userMention}.`;
+                case 'secondary_developer':
+                    collection = db.collection('secondary_developers');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الثانويين.`;
                     break;
-                case 'primary_developers':
-                    successMessage = `✅ تم إزالة رتبة المطور الأساسي من المستخدم ${userMention}.`;
+                case 'primary_developer':
+                    collection = db.collection('primary_developers');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة المطورين الأساسيين.`;
                     break;
-                case 'admins':
-                    successMessage = `✅ تم إزالة رتبة الادمن من المستخدم ${userMention}.`;
-                    // Remove admin privileges in the Telegram group
+                case 'admin':
+                default:
+                    collection = db.collection('admins');
+                    successMessage = `✅ تم تنزيل المستخدم ${userMention} من قائمة الادمن.`;
+                    // Demote the user in the Telegram group
                     await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
                         can_change_info: false,
                         can_delete_messages: false,
@@ -1008,27 +1027,15 @@ async function toggleLinkSharing(ctx, allow) {
                         can_promote_members: false
                     });
                     break;
-                case 'vip_users':
-                    successMessage = `✅ تم إزالة رتبة المميز (VIP) من المستخدم ${userMention}.`;
-                    // Reset user permissions to default
-                    await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
-                        can_send_messages: true,
-                        can_send_media_messages: true,
-                        can_send_polls: true,
-                        can_send_other_messages: true,
-                        can_add_web_page_previews: true,
-                        can_change_info: false,
-                        can_invite_users: false,
-                        can_pin_messages: false
-                    });
-                    break;
             }
     
-            ctx.replyWithMarkdown(successMessage);
+            await collection.deleteOne({ user_id: userId });
+            await client.close();
     
+            ctx.replyWithMarkdown(successMessage);
         } catch (error) {
-            console.error('Error in demoteUser:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة إزالة رتبة المستخدم.');
+            console.error(`Error demoting user from ${role}:`, error);
+            ctx.reply(`❌ حدث خطأ أثناء تنزيل المستخدم من ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
         }
     }
     //call command
