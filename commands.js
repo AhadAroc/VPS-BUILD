@@ -465,7 +465,7 @@ bot.hears('بدء', async (ctx) => {
             return showMainMenu(ctx);
         } else {
             console.log('DEBUG: Regular user in group, showing basic message');
-            return ctx.reply('مرحبًا! يمكنك استخدام الأوامر المتاحة في المجموعة.');
+            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
         }
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
