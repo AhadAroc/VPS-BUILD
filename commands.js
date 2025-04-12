@@ -10,7 +10,8 @@ const gifRestrictionStatus = new Map();
 const linkRestrictionStatus = new Map();
 const photoRestrictionStatus = new Map();
 const { MongoClient } = require('mongodb');
-
+// Add this near the top of your file, with other global variables
+const documentRestrictionStatus = new Map();
 // Assuming you have your MongoDB connection string in an environment variable
 const uri = process.env.MONGODB_URI;
 const { pool } = require('./database'); // Adjust the path as necessary
@@ -137,6 +138,26 @@ async function gifRestrictionMiddleware(ctx, next) {
     }
     return next();
 }
+
+async function documentRestrictionMiddleware(ctx, next) {
+    if (ctx.message && ctx.message.document) {
+        const chatId = ctx.chat.id;
+        if (documentRestrictionStatus.get(chatId)) {
+            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+            if (!isAdmin) {
+                try {
+                    await ctx.deleteMessage();
+                    await ctx.reply('❌ عذرًا، تم تعطيل إرسال المستندات للأعضاء العاديين في هذه المجموعة.');
+                } catch (error) {
+                    console.error('Error in documentRestrictionMiddleware:', error);
+                }
+                return;
+            }
+        }
+    }
+    return next();
+}
+
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
@@ -431,11 +452,20 @@ bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
 bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
 bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
+
+bot.command('منع_مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
+bot.command('تفعيل_مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
+
+// Also add handlers for text commands without the underscore
+bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
+bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
+
 // Make sure to use this middleware
 bot.use(photoRestrictionMiddleware);
 bot.use(linkRestrictionMiddleware);
 bot.use(videoRestrictionMiddleware);
 bot.use(gifRestrictionMiddleware);
+bot.use(documentRestrictionMiddleware);
 
 
 bot.hears('الاوامر', (ctx) => {
@@ -1451,7 +1481,35 @@ async function enableGifSharing(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
     }
 }
+async function disableDocumentSharing(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        const chatId = ctx.chat.id;
+        documentRestrictionStatus.set(chatId, true);
+        ctx.reply('✅ تم تعطيل مشاركة المستندات للأعضاء العاديين. فقط المشرفين يمكنهم إرسال المستندات الآن.');
+    } catch (error) {
+        console.error('Error in disableDocumentSharing:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة المستندات.');
+    }
+}
+
+async function enableDocumentSharing(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const chatId = ctx.chat.id;
+        documentRestrictionStatus.set(chatId, false);
+        ctx.reply('✅ تم تفعيل مشاركة المستندات للجميع.');
+    } catch (error) {
+        console.error('Error in enableDocumentSharing:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة المستندات.');
+    }
+}
 async function promoteToSecondaryDeveloper(ctx) {
     try {
         console.log('DEBUG: Attempting to promote to secondary developer');
