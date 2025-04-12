@@ -525,19 +525,7 @@ async function listVIPUsers(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
     }
 }
-    async function deleteLatestMessage(ctx) {
-        try {
-            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-            }
     
-            await ctx.deleteMessage();
-            ctx.reply('✅ تم حذف آخر رسالة.');
-        } catch (error) {
-            console.error(error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة حذف الرسالة.');
-        }
-    }
  
    
     async function listSecondaryDevelopers(ctx) {
