@@ -1159,17 +1159,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-async function isVIP(ctx, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const user = await db.collection('vip_users').findOne({ user_id: userId });
-        console.log('User data for VIP check:', user);
-        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
-    } catch (error) {
-        console.error('Error checking VIP status:', error);
-        return false;
-    }
-}
+
 async function setUserAsVIP(userId) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -2564,7 +2554,17 @@ if (awaitingReplyResponse) {
 
     await next();
 });
-
+async function isVIP(ctx, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const user = await db.collection('vip_users').findOne({ user_id: userId });
+        console.log('User data for VIP check:', user);
+        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
+    } catch (error) {
+        console.error('Error checking VIP status:', error);
+        return false;
+    }
+}
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
