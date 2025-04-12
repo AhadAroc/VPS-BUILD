@@ -227,7 +227,9 @@ function setupCommands(bot) {
 });
 
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
-
+// Add these to your command setup function
+bot.command('ترقية_ادمن', (ctx) => promoteUser(ctx, 'ادمن'));
+bot.hears(/^ترقية ادمن/, (ctx) => promoteUser(ctx, 'ادمن'));
 
 bot.command('promote', (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('promote', (ctx) => promoteUser(ctx, 'developer'));
@@ -851,6 +853,15 @@ async function toggleLinkSharing(ctx, allow) {
                 case 'admin':
                     collection = 'admins';
                     successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
+                    // Promote the user to admin in the Telegram group
+                    await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                        can_change_info: true,
+                        can_delete_messages: true,
+                        can_invite_users: true,
+                        can_restrict_members: true,
+                        can_pin_messages: true,
+                        can_promote_members: false
+                    });
                     break;
                 case 'مدير':
                 case 'manager':
