@@ -1312,8 +1312,8 @@ bot.action('back_to_main', async (ctx) => {
 // Update the quiz-related commands to check for VIP status
 bot.action('quiz_bot', async (ctx) => {
     try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id) && !await isVIP(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والمميزين فقط.', { show_alert: true });
+        if (!(await hasRequiredPermissions(ctx, ctx.from.id)) && !(await isVIP(ctx, ctx.from.id))) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين والمميزين فقط.', { show_alert: true });
         }
 
         await ctx.answerCbQuery();
