@@ -11,7 +11,7 @@ let awaitingBotName = false;
 // Add these variables at the top of your file
 let awaitingDeleteReplyWord = false;
 const cloudinary = require('cloudinary').v2;
-const { getLeaderboard,getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper  } = require('./commands');
+const { getLeaderboard,getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty  } = require('./commands');
 const chatStates = new Map();
 // Add these global variables at the top of your file
 const activeQuizzes = new Map(); // Map to store active quizzes by chat ID
@@ -1222,11 +1222,6 @@ createGroupsTable();
             console.error('Error updating active group:', error);
         }
     }
-    async function hasRequiredPermissions(ctx, userId) {
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        return isAdmin || isSecDev;
-    }
     async function loadActiveGroupsFromDatabase() {
         try {
             const db = await ensureDatabaseInitialized();
@@ -1260,15 +1255,6 @@ createGroupsTable();
 bot.action('back_to_main', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-
-        // Check if the user is an admin, owner, or secondary developer
-        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
-
-        if (!isAdmin && !isSecDev) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-        }
-
         // Get the original photo URL
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
         
@@ -1299,10 +1285,6 @@ bot.action('back_to_main', async (ctx) => {
 // Add this callback handler for the quiz_bot button
 bot.action('quiz_bot', async (ctx) => {
     try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-        }
-
         await ctx.answerCbQuery();
         await showQuizMenu(ctx);
     } catch (error) {
@@ -1313,8 +1295,9 @@ bot.action('quiz_bot', async (ctx) => {
 
 bot.action('show_commands', async (ctx) => {
     try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+        if (!isAdmin) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.', { show_alert: true });
         }
 
         ctx.editMessageCaption(
@@ -1334,7 +1317,19 @@ bot.action('show_commands', async (ctx) => {
             '⌁︙/كتم ↫ كتم مستخدم\n' +
             '⌁︙/الغاء كتم ↫ إلغاء كتم مستخدم\n' +
             '⌁︙/مسح ↫ حذف آخر رسالة\n' +
-            '⌁︙/تثبيت ↫ تثبيت رسالة\n',
+            '⌁︙/تثبيت ↫ تثبيت رسالة\n' +
+            '⌁︙/نكتة ↫ إرسال نكتة\n' +
+            '⌁︙/طرد ↫ طرد مستخدم\n' +
+            '⌁︙/مسح الصور ↫ حذف آخر الصور المرسلة\n' +
+            '⌁︙/منع_الصور ↫ منع إرسال الصور\n' +
+            '⌁︙/سماح_الصور ↫ السماح بإرسال الصور\n' +
+            '⌁︙/ازالة_الروابط ↫ حذف الروابط في المجموعة\n' +
+            '⌁︙/فتح روابط ↫ السماح بمشاركة الروابط\n' +
+            '⌁︙/غلق روابط ↫ منع مشاركة الروابط\n' +
+            '⌁︙/منع فيديو ↫ منع إرسال الفيديوهات\n' +
+            '⌁︙/تفعيل فيديو ↫ السماح بإرسال الفيديوهات\n' +
+            '⌁︙/منع متحركة ↫ منع إرسال الصور المتحركة\n' +
+            '⌁︙/تفعيل متحركة ↫ السماح بإرسال الصور المتحركة\n',
             {
                 reply_markup: {
                     inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back' }]]
@@ -3119,11 +3114,11 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const db = await ensureDatabaseInitialized();
-                const developer = await db.collection('secondary_developers').findOne({ user_id: parseInt(devIdToDelete) });
+                const connection = await pool.getConnection();
+                const [developer] = await connection.query('SELECT username FROM secondary_developers WHERE user_id = ?', [devIdToDelete]);
                 
-                if (developer) {
-                    const devUsername = developer.username ? `@${developer.username}` : `User ID: ${devIdToDelete}`;
+                if (developer.length > 0) {
+                    const devUsername = developer[0].username ? `@${developer[0].username}` : `User ID: ${devIdToDelete}`;
                     await ctx.editMessageText(`هل أنت متأكد من حذف المطور الثانوي: ${devUsername}؟`, {
                         reply_markup: {
                             inline_keyboard: [
@@ -3135,6 +3130,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 } else {
                     await ctx.answerCbQuery('لم يتم العثور على المطور الثانوي', { show_alert: true });
                 }
+                connection.release();
             } catch (error) {
                 console.error('Error confirming secondary developer deletion:', error);
                 await ctx.answerCbQuery('حدث خطأ أثناء تأكيد الحذف', { show_alert: true });
@@ -3148,35 +3144,13 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const db = await ensureDatabaseInitialized();
-                const result = await db.collection('secondary_developers').deleteOne({ user_id: parseInt(devIdToDelete) });
-                
-                if (result.deletedCount > 0) {
-                    await ctx.editMessageText('تم حذف المطور الثانوي بنجاح.', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
-                            ]
-                        }
-                    });
-                } else {
-                    await ctx.editMessageText('لم يتم العثور على المطور الثانوي للحذف.', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
-                            ]
-                        }
-                    });
-                }
+                const connection = await pool.getConnection();
+                await connection.query('DELETE FROM secondary_developers WHERE user_id = ?', [devIdToDelete]);
+                connection.release();
+                await ctx.editMessageText('تم حذف المطور الثانوي بنجاح.');
             } catch (error) {
                 console.error('Error deleting secondary developer:', error);
-                await ctx.editMessageText('❌ حدث خطأ أثناء حذف المطور الثانوي. الرجاء المحاولة مرة أخرى لاحقًا.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
-                        ]
-                    }
-                });
+                await ctx.editMessageText('❌ حدث خطأ أثناء حذف المطور الثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
             }
         } else {
             ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
@@ -3221,19 +3195,11 @@ bot.action('remove_custom_chat_name', async (ctx) => {
  
     
     
+    // Update the show_active_groups action handler
     bot.action('show_active_groups', async (ctx) => {
         try {
-            if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-                return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-            }
-    
-            // Fetch active groups
             const activeGroupsList = await getActiveGroups(ctx);
-    
-            // Clear the loading state
-            await ctx.answerCbQuery();
-    
-            // Edit the message with the list of active groups
+            await ctx.answerCbQuery(); // Clear the loading state
             await ctx.editMessageCaption(activeGroupsList, {
                 parse_mode: 'Markdown',
                 disable_web_page_preview: true,
@@ -3251,18 +3217,9 @@ bot.action('remove_custom_chat_name', async (ctx) => {
 
     // ✅ Back to the main menu in the same message
   // ✅ Back to the main menu in the same message
-  bot.action('back', async (ctx) => {
+bot.action('back', async (ctx) => {
     try {
         await ctx.answerCbQuery(); // Clear the loading state
-
-        // Check if the user is an admin, owner, or secondary developer
-        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
-
-        if (!isAdmin && !isSecDev) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-        }
-
         await ctx.editMessageCaption(
             '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
             {
