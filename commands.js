@@ -109,21 +109,31 @@ async function getLeaderboard() {
     }
 }
 async function showQuizMenu(ctx) {
-    const keyboard = {
-        inline_keyboard: [
-            [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
-            [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
-            [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
-            [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
-            [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
-            [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
-        ]
-    };
-
-    const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
-    const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
-    
     try {
+        const userId = ctx.from.id;
+        
+        // Check if the user is an admin, owner, or VIP
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+
+        if (!isAdmin && !isVIPUser) {
+            return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
+        }
+
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
+                [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
+                [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
+                [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
+                [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
+                [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+            ]
+        };
+
+        const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
+        const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
+        
         if (ctx.callbackQuery) {
             // If it's a callback query, we need to edit the existing message
             if (ctx.callbackQuery.message.photo) {
@@ -153,7 +163,7 @@ async function showQuizMenu(ctx) {
     } catch (error) {
         console.error('Error in showQuizMenu:', error);
         // If editing fails, send a new message
-        await ctx.reply(caption, { reply_markup: keyboard });
+        await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المسابقات. الرجاء المحاولة مرة أخرى.');
     }
 }
 // Add this function to check if a user is a VIP
