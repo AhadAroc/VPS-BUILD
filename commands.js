@@ -1103,33 +1103,39 @@ async function listVIPUsers(ctx) {
             }
     
             let userId, userMention;
-            const args = ctx.message.text.split(' ').slice(1);
     
             if (ctx.message.reply_to_message) {
                 userId = ctx.message.reply_to_message.from.id;
                 userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-            } else if (args.length > 0) {
-                const username = args[0].replace('@', '');
-                try {
-                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
-                    userId = user.user.id;
-                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
-                } catch (error) {
-                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            } else if (ctx.message.entities) {
+                const mentionEntity = ctx.message.entities.find(e => e.type === "mention");
+                if (mentionEntity) {
+                    const username = ctx.message.text.slice(mentionEntity.offset + 1, mentionEntity.offset + mentionEntity.length);
+                    try {
+                        const user = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
+                        userId = user.user.id;
+                        userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+                    } catch (error) {
+                        console.error('❌ فشل في الحصول على معلومات المستخدم:', error);
+                        return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من صحة المعرف.');
+                    }
                 }
-            } else {
+            }
+    
+            if (!userId) {
                 return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لطرده.');
             }
     
             await ctx.telegram.kickChatMember(ctx.chat.id, userId);
             await ctx.telegram.unbanChatMember(ctx.chat.id, userId); // Unban to allow rejoining
     
-            ctx.replyWithMarkdown(`✅ تم طرد المستخدم ${userMention} من المجموعة.`);
+            await ctx.replyWithMarkdown(`✅ تم طرد المستخدم ${userMention} من المجموعة.`);
         } catch (error) {
-            console.error(error);
+            console.error('❌ حدث خطأ أثناء محاولة طرد المستخدم:', error);
             ctx.reply('❌ حدث خطأ أثناء محاولة طرد المستخدم.');
         }
     }
+    
     
     async function enableVideoSharing(ctx) {
         try {
