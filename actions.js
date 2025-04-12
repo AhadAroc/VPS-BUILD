@@ -1577,9 +1577,11 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
             // Check if the user is an admin, developer, or VIP
             const isAdmin = await isAdminOrOwner(ctx, userId);
             const isDev = await isDeveloper(ctx, userId);
-            const isVIP = await isVIP(ctx, userId);
+            const vipStatus = await isVIP(ctx, userId);
+
     
-            if (!isAdmin && !isDev && !isVIP) {
+            if (!isAdmin && !isDev && !vipStatus) {
+
                 return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين والمميزين (VIP).');
             }
     
