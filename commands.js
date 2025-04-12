@@ -1216,6 +1216,7 @@ async function deleteLatestPhotos(ctx) {
 
         const chatId = ctx.chat.id;
         let deletedCount = 0;
+        const maxDeletions = 8;
 
         if (ctx.message.reply_to_message) {
             // If replying to a message, check if it contains any type of image
@@ -1233,28 +1234,28 @@ async function deleteLatestPhotos(ctx) {
                 return ctx.reply('❌ الرسالة التي تم الرد عليها لا تحتوي على صورة.');
             }
         } else {
-            // If not replying, delete the latest image from the tracked photos
+            // If not replying, delete the latest images from the tracked photos
             const photos = photoMessages.get(chatId) || [];
-            if (photos.length > 0) {
+            while (photos.length > 0 && deletedCount < maxDeletions) {
                 const latestPhoto = photos.pop();
                 try {
                     await ctx.telegram.deleteMessage(chatId, latestPhoto.messageId);
-                    deletedCount = 1;
-                    photoMessages.set(chatId, photos);
+                    deletedCount++;
                 } catch (error) {
-                    console.error(`Failed to delete latest image:`, error);
+                    console.error(`Failed to delete image:`, error);
                 }
             }
+            photoMessages.set(chatId, photos);
         }
 
         if (deletedCount > 0) {
-            ctx.reply(`✅ تم حذف الصورة بنجاح.`);
+            ctx.reply(`✅ تم حذف ${deletedCount} صورة بنجاح.`);
         } else {
             ctx.reply('❌ لم يتم العثور على صور لحذفها.');
         }
     } catch (error) {
         console.error('Error in deleteLatestPhotos:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة حذف الصورة.');
+        ctx.reply('❌ حدث خطأ أثناء محاولة حذف الصور.');
     }
 }
 async function enableGifSharing(ctx) {
