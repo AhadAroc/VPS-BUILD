@@ -1222,6 +1222,11 @@ createGroupsTable();
             console.error('Error updating active group:', error);
         }
     }
+    async function hasRequiredPermissions(ctx, userId) {
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        return isAdmin || isSecDev;
+    }
     async function loadActiveGroupsFromDatabase() {
         try {
             const db = await ensureDatabaseInitialized();
@@ -1294,6 +1299,10 @@ bot.action('back_to_main', async (ctx) => {
 // Add this callback handler for the quiz_bot button
 bot.action('quiz_bot', async (ctx) => {
     try {
+        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.', { show_alert: true });
+        }
+
         await ctx.answerCbQuery();
         await showQuizMenu(ctx);
     } catch (error) {
@@ -3228,8 +3237,21 @@ bot.action('remove_custom_chat_name', async (ctx) => {
     // Update the show_active_groups action handler
     bot.action('show_active_groups', async (ctx) => {
         try {
+            // Check if the user is an admin, owner, or secondary developer
+            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+            const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
+    
+            if (!isAdmin && !isSecDev) {
+                return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+            }
+    
+            // Fetch active groups
             const activeGroupsList = await getActiveGroups(ctx);
-            await ctx.answerCbQuery(); // Clear the loading state
+    
+            // Clear the loading state
+            await ctx.answerCbQuery();
+    
+            // Edit the message with the list of active groups
             await ctx.editMessageCaption(activeGroupsList, {
                 parse_mode: 'Markdown',
                 disable_web_page_preview: true,
