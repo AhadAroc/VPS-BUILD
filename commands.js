@@ -76,27 +76,32 @@ async function photoRestrictionMiddleware(ctx, next) {
 }
 
 async function linkRestrictionMiddleware(ctx, next) {
-    if (ctx.message && ctx.message.text) {
+    if (ctx.message && ctx.message.text && !ctx.from?.is_bot) {
         const chatId = ctx.chat.id;
+
         if (linkRestrictionStatus.get(chatId)) {
             const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+
             if (!isAdmin) {
-                // Simple regex to detect URLs
-                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                const urlRegex = /(https?:\/\/)?[^\s]+\.[a-z]{2,}/i;
+
                 if (urlRegex.test(ctx.message.text)) {
                     try {
                         await ctx.deleteMessage();
-                        await ctx.reply('❌ تم حذف الرسالة لأنها تحتوي على رابط. مشاركة الروابط غير مسموحة حاليًا.');
+                        await ctx.reply('❌ تم حذف الرسالة لأنها تحتوي على رابط.', {
+                            reply_to_message_id: ctx.message.message_id
+                        });
                     } catch (error) {
                         console.error('Error deleting message with link:', error);
                     }
-                    return; // Stop further processing
+                    return;
                 }
             }
         }
     }
     return next();
 }
+
 
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
@@ -864,6 +869,10 @@ async function listVIPUsers(ctx) {
     
     async function disableLinkSharing(ctx) {
         try {
+            if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
+                return ctx.reply('❌ هذا الأمر يعمل فقط داخل المجموعات.');
+            }
+    
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
                 return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
             }
@@ -871,12 +880,14 @@ async function listVIPUsers(ctx) {
             const chatId = ctx.chat.id;
             linkRestrictionStatus.set(chatId, true);
     
-            await ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة. سيتم حذف أي روابط يتم إرسالها.');
+            console.log(`✅ روابط مُنعَت في ${chatId} بواسطة ${ctx.from.id}`);
+            return ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة. سيتم حذف أي روابط يتم إرسالها.');
         } catch (error) {
             console.error('Error in disableLinkSharing:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة منع مشاركة الروابط.');
+            return ctx.reply('❌ حدث خطأ أثناء محاولة منع مشاركة الروابط.');
         }
     }
+    
  
 
 
