@@ -52,6 +52,23 @@ async function isVIP(ctx, userId) {
         return false;
     }
 }
+
+// Add this middleware function
+async function photoRestrictionMiddleware(ctx, next) {
+    if (ctx.message && (ctx.message.photo || (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('image/')))) {
+        const chatId = ctx.chat.id;
+        if (photoRestrictionStatus.get(chatId)) {
+            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+            if (!isAdmin) {
+                await ctx.reply('❌ عذرًا، تم تعطيل إرسال الصور للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+    }
+    return next();
+}
+
+
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
@@ -346,7 +363,8 @@ bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
 bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
 bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
-
+// Make sure to use this middleware
+bot.use(photoRestrictionMiddleware);
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
 });
@@ -674,7 +692,6 @@ async function listVIPUsers(ctx) {
         }
     }
     
-    // Add this function to enable photo sharing
     async function enablePhotoSharing(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
