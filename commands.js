@@ -293,6 +293,7 @@ bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
+bot.hears('طرد', adminOnly((ctx) => kickUser(ctx)));
 // Add these command handlers
 bot.command('كتم', (ctx) => muteUser(ctx, true));
 bot.command('الغاء_كتم', (ctx) => muteUser(ctx, false));
