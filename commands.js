@@ -847,9 +847,38 @@ async function toggleLinkSharing(ctx, allow) {
                     collection = 'vip_users';
                     successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مميز (VIP).`;
                     break;
-                // ... (other cases remain the same)
+                case 'ادمن':
+                case 'admin':
+                    collection = 'admins';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
+                    break;
+                case 'مدير':
+                case 'manager':
+                    collection = 'managers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
+                    break;
+                case 'منشئ':
+                case 'creator':
+                    collection = 'creators';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
+                    break;
+                case 'منشئ اساسي':
+                case 'primary creator':
+                    collection = 'primary_creators';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
+                    break;
+                case 'مطور':
+                case 'developer':
+                    collection = 'developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
+                    break;
+                case 'مطور ثانوي':
+                case 'secondary developer':
+                    collection = 'secondary_developers';
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
+                    break;
                 default:
-                    throw new Error('Invalid role specified: ' + role);
+                    return ctx.reply('❌ نوع الترقية غير صالح.');
             }
     
             await db.collection(collection).updateOne(
@@ -866,20 +895,6 @@ async function toggleLinkSharing(ctx, allow) {
             );
             
             ctx.replyWithMarkdown(successMessage);
-    
-            // If the role is VIP, update the user's permissions in the group
-            if (role.toLowerCase() === 'مميز' || role.toLowerCase() === 'vip') {
-                await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
-                    can_send_messages: true,
-                    can_send_media_messages: true,
-                    can_send_polls: true,
-                    can_send_other_messages: true,
-                    can_add_web_page_previews: true,
-                    can_change_info: false,
-                    can_invite_users: false,
-                    can_pin_messages: false
-                });
-            }
     
             console.log(`User ${userId} promoted to ${role}`);
     
