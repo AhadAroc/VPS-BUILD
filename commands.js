@@ -48,16 +48,19 @@ async function hasRequiredPermissions(ctx, userId) {
 // ✅ Display main menu
 async function showMainMenu(ctx) {
     try {
+        const userId = ctx.from.id;
+        
         // Check if the user is an admin, owner, or secondary developer
-        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
 
         if (!isAdmin && !isSecDev) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.');
         }
 
+        // Get the original photo URL
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
-        const caption = '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:';
+        
         const keyboard = {
             inline_keyboard: [
                 [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
@@ -67,28 +70,18 @@ async function showMainMenu(ctx) {
             ]
         };
 
-        if (ctx.callbackQuery) {
-            // If it's a callback query, edit the existing message
-            await ctx.editMessageMedia(
-                {
-                    type: 'photo',
-                    media: photoUrl,
-                    caption: caption
-                },
-                {
-                    reply_markup: keyboard
-                }
-            );
-        } else {
-            // If it's a new command, send a new message
-            await ctx.replyWithPhoto(photoUrl, {
-                caption: caption,
-                reply_markup: keyboard
-            });
+        // If it's a developer, add the developer panel option
+        if (await isDeveloper(ctx, userId)) {
+            keyboard.inline_keyboard.unshift([{ text: '🛠️ لوحة المطور', callback_data: 'dev_panel' }]);
         }
+
+        await ctx.replyWithPhoto(photoUrl, {
+            caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:',
+            reply_markup: keyboard
+        });
     } catch (error) {
         console.error('Error in showMainMenu:', error);
-        await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية. الرجاء المحاولة مرة أخرى لاحقًا.');
+        await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية.');
     }
 }
 async function getLeaderboard() {
@@ -1149,22 +1142,12 @@ async function isPrimaryDeveloper(ctx, userId) {
 // Add a function to check if user is secondary developer
 async function isSecondaryDeveloper(ctx, userId) {
     try {
-        console.log('DEBUG: Checking if user is secondary developer:', userId);
-        const { MongoClient } = require('mongodb');
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri);
-        
-        await client.connect();
-        const db = client.db("protectionBot");
+        const db = await ensureDatabaseInitialized();
         const secondaryDev = await db.collection('secondary_developers').findOne({ user_id: userId });
-        const result = !!secondaryDev;
-        console.log('DEBUG: isSecondaryDeveloper result:', result);
-        
-        await client.close();
-        return result;
+        return !!secondaryDev; // Returns true if the user is found in the secondary_developers collection, false otherwise
     } catch (error) {
-        console.error('Error in isSecondaryDeveloper:', error);
-        return false;
+        console.error('Error checking secondary developer status:', error);
+        return false; // Return false in case of any error
     }
 }
 
@@ -1214,19 +1197,10 @@ async function enableGifSharing(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
     }
 }
-const secondaryDevPermissions = {
-    can_change_info: true,
-    can_delete_messages: true,
-    can_invite_users: true,
-    can_restrict_members: true,
-    can_pin_messages: true,
-    can_promote_members: false  // Keep this false for security
-};
+
 async function promoteToSecondaryDeveloper(ctx) {
     try {
         console.log('DEBUG: Attempting to promote to secondary developer');
-        
-        // Check if the user is an admin or owner
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
             console.log('DEBUG: User is not an admin or owner');
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين ومالك المجموعة فقط.');
@@ -1249,23 +1223,22 @@ async function promoteToSecondaryDeveloper(ctx) {
                 userId = user.id;
                 userMention = `[${user.first_name}](tg://user?id=${userId})`;
             } catch (error) {
-                console.error('Error fetching user info:', error);
+                console.log('DEBUG: User not found', error);
                 return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
             }
         }
 
-        console.log(`DEBUG: Promoting user ${userId} (${username}) to secondary developer`);
-
+        console.log('DEBUG: Attempting to connect to database');
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is already a secondary developer
+        console.log('DEBUG: Checking if user is already a secondary developer');
         const existingDev = await db.collection('secondary_developers').findOne({ user_id: userId });
         if (existingDev) {
-            console.log(`DEBUG: User ${userId} is already a secondary developer`);
+            console.log('DEBUG: User is already a secondary developer');
             return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
         }
 
-        // Add to database
+        console.log('DEBUG: Adding user to secondary_developers collection');
         await db.collection('secondary_developers').insertOne({
             user_id: userId,
             username: username,
@@ -1273,57 +1246,14 @@ async function promoteToSecondaryDeveloper(ctx) {
             promoted_by: ctx.from.id
         });
 
-        console.log(`DEBUG: Added user ${userId} to secondary_developers collection`);
-
-        // Set permissions in Telegram
-        try {
-            await ctx.telegram.promoteChatMember(ctx.chat.id, userId, secondaryDevPermissions);
-            console.log(`DEBUG: Set secondary developer permissions for user ${userId}`);
-        } catch (error) {
-            console.error('Error setting permissions:', error);
-            // If setting permissions fails, remove the user from the database
-            await db.collection('secondary_developers').deleteOne({ user_id: userId });
-            throw new Error('فشل في تعيين الصلاحيات. تم إلغاء الترقية.');
-        }
-
-        // Send success message
-        await ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
-        console.log(`DEBUG: Successfully promoted user ${userId} to secondary developer`);
-
+        console.log('DEBUG: User successfully promoted to secondary developer');
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
     } catch (error) {
         console.error('Error promoting user to secondary developer:', error);
-        await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي: ${error.message}`);
-    }
-}
-async function resetSecondaryDevPermissions(ctx, userId) {
-    try {
-        await ctx.telegram.promoteChatMember(ctx.chat.id, userId, secondaryDevPermissions);
-        console.log(`Reset permissions for secondary developer ${userId}`);
-    } catch (error) {
-        console.error(`Error resetting permissions for ${userId}:`, error);
-    }
-}
-async function verifySecondaryDevPermissions() {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const secondaryDevs = await db.collection('secondary_developers').find().toArray();
-
-        for (const dev of secondaryDevs) {
-            // You'll need to implement a way to get the chat ID for each relevant chat
-            // This is just an example assuming you store chat IDs somewhere
-            for (const chatId of relevantChatIds) {
-                await bot.telegram.promoteChatMember(chatId, dev.user_id, secondaryDevPermissions);
-            }
-        }
-
-        console.log('Verified and reset permissions for all secondary developers');
-    } catch (error) {
-        console.error('Error verifying secondary developer permissions:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 }
 
-// Run this function periodically, e.g., every hour
-setInterval(verifySecondaryDevPermissions, 3600000);
 async function disableVideoSharing(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
