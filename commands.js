@@ -1233,19 +1233,16 @@ async function deleteLatestPhotos(ctx) {
                 return ctx.reply('❌ الرسالة التي تم الرد عليها لا تحتوي على صورة.');
             }
         } else {
-            // If not replying, delete the latest image
-            const messages = await ctx.telegram.getChatHistory(chatId, { limit: 100 });
-            for (const message of messages) {
-                if (message.photo || 
-                    message.document?.mime_type?.startsWith('image/') ||
-                    message.sticker?.is_animated === false) {
-                    try {
-                        await ctx.telegram.deleteMessage(chatId, message.message_id);
-                        deletedCount = 1;
-                        break;
-                    } catch (error) {
-                        console.error(`Failed to delete latest image:`, error);
-                    }
+            // If not replying, delete the latest image from the tracked photos
+            const photos = photoMessages.get(chatId) || [];
+            if (photos.length > 0) {
+                const latestPhoto = photos.pop();
+                try {
+                    await ctx.telegram.deleteMessage(chatId, latestPhoto.messageId);
+                    deletedCount = 1;
+                    photoMessages.set(chatId, photos);
+                } catch (error) {
+                    console.error(`Failed to delete latest image:`, error);
                 }
             }
         }
