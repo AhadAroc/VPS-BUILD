@@ -1291,9 +1291,14 @@ bot.action('back_to_main', async (ctx) => {
         // Check if the user is an admin, owner, or secondary developer
         const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
         const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
+        const isVIPUser = await isVIP(ctx, ctx.from.id);
 
-        if (!isAdmin && !isSecDev) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        // New check for secondary developer in the database
+        const db = await ensureDatabaseInitialized();
+        const secDevInDb = await db.collection('secondary_developers').findOne({ user_id: ctx.from.id });
+
+        if (!isAdmin && !isSecDev && !isVIPUser && !secDevInDb) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والمستخدمين المميزين فقط.', { show_alert: true });
         }
 
         // Get the original photo URL
