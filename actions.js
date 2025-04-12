@@ -1300,7 +1300,7 @@ bot.action('back_to_main', async (ctx) => {
 bot.action('quiz_bot', async (ctx) => {
     try {
         if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.', { show_alert: true });
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
         await ctx.answerCbQuery();
@@ -3234,14 +3234,9 @@ bot.action('remove_custom_chat_name', async (ctx) => {
  
     
     
-    // Update the show_active_groups action handler
     bot.action('show_active_groups', async (ctx) => {
         try {
-            // Check if the user is an admin, owner, or secondary developer
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
-    
-            if (!isAdmin && !isSecDev) {
+            if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
                 return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
             }
     
