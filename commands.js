@@ -24,15 +24,7 @@ const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the pa
 let mongoClient = null;
 const knownUsers = new Map();
 
-bot.on('message', (ctx) => {
-    const user = ctx.from;
-    if (user.username) {
-        knownUsers.set(user.username.toLowerCase(), {
-            id: user.id,
-            first_name: user.first_name
-        });
-    }
-});
+
 
   // ✅ Function to check if the user is admin or owner
   async function isAdminOrOwner(ctx, userId) {
@@ -85,6 +77,14 @@ async function photoRestrictionMiddleware(ctx, next) {
         }
     }
     return next();
+}
+function trackUser(ctx) {
+    if (ctx.from?.username) {
+        knownUsers.set(ctx.from.username.toLowerCase(), {
+            id: ctx.from.id,
+            first_name: ctx.from.first_name
+        });
+    }
 }
 
 async function linkRestrictionMiddleware(ctx, next) {
