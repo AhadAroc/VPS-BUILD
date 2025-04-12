@@ -1164,9 +1164,25 @@ async function isVIP(ctx, userId) {
     try {
         const db = await ensureDatabaseInitialized();
         const user = await db.collection('users').findOne({ user_id: userId });
-        return user && user.role === 'vip';
+        console.log('User data for VIP check:', user); // Add this log
+        return user && (user.role === 'vip' || user.is_vip === true);
     } catch (error) {
         console.error('Error checking VIP status:', error);
+        return false;
+    }
+}
+async function setUserAsVIP(userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const result = await db.collection('users').updateOne(
+            { user_id: userId },
+            { $set: { role: 'vip', is_vip: true } },
+            { upsert: true }
+        );
+        console.log(`Set user ${userId} as VIP. Result:`, result);
+        return result.modifiedCount > 0 || result.upsertedCount > 0;
+    } catch (error) {
+        console.error('Error setting user as VIP:', error);
         return false;
     }
 }
@@ -1312,7 +1328,14 @@ bot.action('back_to_main', async (ctx) => {
 // Update the quiz-related commands to check for VIP status
 bot.action('quiz_bot', async (ctx) => {
     try {
-        if (!(await hasRequiredPermissions(ctx, ctx.from.id)) && !(await isVIP(ctx, ctx.from.id))) {
+        const userId = ctx.from.id;
+        const hasPermissions = await hasRequiredPermissions(ctx, userId);
+        const isUserVIP = await isVIP(ctx, userId);
+        
+        console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP });
+
+        if (!hasPermissions && !isUserVIP) {
+            console.log(`User ${userId} denied access to quiz_bot`);
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين والمميزين فقط.', { show_alert: true });
         }
 
