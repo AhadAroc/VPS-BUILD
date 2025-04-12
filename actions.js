@@ -1159,13 +1159,12 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-// Add this function to check if a user is a VIP
 async function isVIP(ctx, userId) {
     try {
         const db = await ensureDatabaseInitialized();
-        const user = await db.collection('users').findOne({ user_id: userId });
-        console.log('User data for VIP check:', user); // Add this log
-        return user && (user.role === 'vip' || user.is_vip === true);
+        const user = await db.collection('vip_users').findOne({ user_id: userId });
+        console.log('User data for VIP check:', user);
+        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
     } catch (error) {
         console.error('Error checking VIP status:', error);
         return false;
