@@ -303,6 +303,7 @@ bot.hears('كتم', (ctx) => muteUser(ctx, true));
 bot.hears('الغاء كتم', (ctx) => muteUser(ctx, false));
 // Handle "نكتة" text command
 bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
+
 bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
 bot.command('ازالة_الروابط', adminOnly((ctx) => removeLinks(ctx)));
 
@@ -656,6 +657,36 @@ async function listVIPUsers(ctx) {
         } catch (error) {
             console.error('Error in removeLinks:', error);
             ctx.reply('❌ حدث خطأ أثناء محاولة حذف الروابط.');
+        }
+    }
+    async function disablePhotoSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
+    
+            const chatId = ctx.chat.id;
+            photoRestrictionStatus.set(chatId, true);
+            ctx.reply('✅ تم تعطيل مشاركة الصور للأعضاء العاديين. فقط المشرفين يمكنهم إرسال الصور الآن.');
+        } catch (error) {
+            console.error('Error in disablePhotoSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الصور.');
+        }
+    }
+    
+    // Add this function to enable photo sharing
+    async function enablePhotoSharing(ctx) {
+        try {
+            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+            }
+    
+            const chatId = ctx.chat.id;
+            photoRestrictionStatus.set(chatId, false);
+            ctx.reply('✅ تم تفعيل مشاركة الصور للجميع.');
+        } catch (error) {
+            console.error('Error in enablePhotoSharing:', error);
+            ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور.');
         }
     }
     async function showDevPanel(ctx) {
