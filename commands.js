@@ -40,12 +40,19 @@ let mongoClient = null;
         return false;
     }
 }
-
+async function hasRequiredPermissions(ctx, userId) {
+    const isAdmin = await isAdminOrOwner(ctx, userId);
+    const isSecDev = await isSecondaryDeveloper(ctx, userId);
+    return isAdmin || isSecDev;
+}
 // ✅ Display main menu
 async function showMainMenu(ctx) {
     try {
         // Check if the user is an admin, owner, or secondary developer
-        if (!(await isAdminOrOwner(ctx, ctx.from.id)) && !(await isSecondaryDeveloper(ctx, ctx.from.id))) {
+        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
+        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
+
+        if (!isAdmin && !isSecDev) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
