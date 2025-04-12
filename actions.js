@@ -1158,33 +1158,6 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     chatStates.delete(ctx.chat.id);
     await showQuizMenu(ctx);
 });
-
-async function isVIP(ctx, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const user = await db.collection('vip_users').findOne({ user_id: userId });
-        console.log('User data for VIP check:', user);
-        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
-    } catch (error) {
-        console.error('Error checking VIP status:', error);
-        return false;
-    }
-}
-async function setUserAsVIP(userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const result = await db.collection('users').updateOne(
-            { user_id: userId },
-            { $set: { role: 'vip', is_vip: true } },
-            { upsert: true }
-        );
-        console.log(`Set user ${userId} as VIP. Result:`, result);
-        return result.modifiedCount > 0 || result.upsertedCount > 0;
-    } catch (error) {
-        console.error('Error setting user as VIP:', error);
-        return false;
-    }
-}
 // Add this function to ask the next question
 async function askNextQuestion(chatId, telegram) {
     const quiz = activeQuizzes.get(chatId);
@@ -1324,18 +1297,10 @@ bot.action('back_to_main', async (ctx) => {
 });
  
 // Add this callback handler for the quiz_bot button
-// Update the quiz-related commands to check for VIP status
 bot.action('quiz_bot', async (ctx) => {
     try {
-        const userId = ctx.from.id;
-        const hasPermissions = await hasRequiredPermissions(ctx, userId);
-        const isUserVIP = await isVIP(ctx, userId);
-        
-        console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP });
-
-        if (!hasPermissions && !isUserVIP) {
-            console.log(`User ${userId} denied access to quiz_bot`);
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين والمميزين فقط.', { show_alert: true });
+        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
         await ctx.answerCbQuery();
@@ -1558,17 +1523,7 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
         try {
             await ctx.answerCbQuery();
             const chatId = ctx.chat.id;
-            const userId = ctx.from.id;
-    
-            // Check if the user is an admin, developer, or VIP
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            const isDev = await isDeveloper(ctx, userId);
-            const isVIP = await isVIP(ctx, userId);
-    
-            if (!isAdmin && !isDev && !isVIP) {
-                return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين والمميزين (VIP).');
-            }
-    
+            
             // Initialize a new quiz for this chat
             activeQuizzes.set(chatId, {
                 state: QUIZ_STATE.SELECTING_DIFFICULTY,
@@ -1579,7 +1534,7 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
                 attempts: new Map(),
                 timeouts: []
             });
-    
+            
             const difficultyKeyboard = {
                 inline_keyboard: [
                     [{ text: '😊 سهل', callback_data: 'difficulty_easy' }],
@@ -1590,6 +1545,9 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
                 ]
             };
     
+            const newText = 'اختر مستوى صعوبة المسابقة:';
+    
+            // Add question count options to the keyboard
             const questionCountKeyboard = {
                 inline_keyboard: [
                     [
@@ -1613,7 +1571,7 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
                 ]
             };
     
-            const combinedText = `اختر مستوى صعوبة المسابقة:\n\n🔢 اختر عدد الأسئلة للمسابقة:`;
+            const combinedText = `${newText}\n\n🔢 اختر عدد الأسئلة للمسابقة:`;
     
             if (ctx.callbackQuery.message.photo) {
                 // If the current message is a photo, edit the caption
@@ -1622,16 +1580,6 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
                 // If it's a text message, edit the text
                 await ctx.editMessageText(combinedText, { reply_markup: combinedKeyboard });
             }
-    
-            // Add a custom field to track who started the quiz
-            activeQuizzes.get(chatId).startedBy = {
-                id: userId,
-                name: ctx.from.first_name,
-                isAdmin: isAdmin,
-                isDev: isDev,
-                isVIP: isVIP
-            };
-    
         } catch (error) {
             console.error('Error handling start_quiz action:', error);
             await ctx.reply('❌ حدث خطأ أثناء بدء المسابقة الجديدة.');
