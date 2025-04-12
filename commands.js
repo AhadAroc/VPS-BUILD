@@ -1429,38 +1429,28 @@ async function getGroupLink(ctx) {
 bot.action('back_to_main', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        const userId = ctx.from.id;
         
-        // Check if the user is an admin, owner, or VIP
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
+        // Get the original photo URL
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
         
-        if (isAdmin || isVIPUser) {
-            // Get the original photo URL
-            const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
-            
-            // Edit the message to show the main menu again
-            await ctx.editMessageMedia(
-                {
-                    type: 'photo',
-                    media: photoUrl,
-                    caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:'
-                },
-                {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                            [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                            [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                            [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-                        ]
-                    }
+        // Edit the message to show the main menu again
+        await ctx.editMessageMedia(
+            {
+                type: 'photo',
+                media: photoUrl,
+                caption: '🤖 مرحبًا! أنا بوت الحماية. اختر خيارًا:'
+            },
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+                    ]
                 }
-            );
-        } else {
-            // For non-admin and non-VIP users, show a message
-            await ctx.answerCbQuery('عذرًا، هذه الميزة متاحة فقط للمشرفين والمستخدمين المميزين.', { show_alert: true });
-        }
+            }
+        );
     } catch (error) {
         console.error('Error returning to main menu:', error);
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
