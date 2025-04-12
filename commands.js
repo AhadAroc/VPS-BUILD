@@ -40,6 +40,18 @@ let mongoClient = null;
         return false;
     }
 }
+// Add this function to check if a user is a VIP
+async function isVIP(ctx, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const user = await db.collection('vip_users').findOne({ user_id: userId });
+        console.log('User data for VIP check:', user);
+        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
+    } catch (error) {
+        console.error('Error checking VIP status:', error);
+        return false;
+    }
+}
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
@@ -166,18 +178,7 @@ async function showQuizMenu(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المسابقات. الرجاء المحاولة مرة أخرى.');
     }
 }
-// Add this function to check if a user is a VIP
-async function isVIP(ctx, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const user = await db.collection('vip_users').findOne({ user_id: userId });
-        console.log('User data for VIP check:', user);
-        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
-    } catch (error) {
-        console.error('Error checking VIP status:', error);
-        return false;
-    }
-}
+
 async function getDifficultyLevels() {
     const client = new MongoClient(uri);
     try {
