@@ -1214,7 +1214,14 @@ async function enableGifSharing(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
     }
 }
-
+const secondaryDevPermissions = {
+    can_change_info: true,
+    can_delete_messages: true,
+    can_invite_users: true,
+    can_restrict_members: true,
+    can_pin_messages: true,
+    can_promote_members: false  // Keep this false for security
+};
 async function promoteToSecondaryDeveloper(ctx) {
     try {
         console.log('DEBUG: Attempting to promote to secondary developer');
