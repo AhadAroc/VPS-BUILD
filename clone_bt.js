@@ -404,7 +404,97 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
         ]));
     });
 });
+// Populate userDeployments map - Fixed version
+function populateUserDeployments() {
+    Object.entries(activeBots).forEach(([botId, botInfo]) => {
+        if (botInfo.createdBy) {
+            userDeployments.set(botInfo.createdBy, botId);
+        }
+    });
+    console.log(`Populated userDeployments map with ${userDeployments.size} entries`);
+}
 
+// Load existing bots on startup - Updated version
+function loadExistingBots() {
+    if (!fs.existsSync(BOTS_DIR)) return;
+    
+    const configFiles = fs.readdirSync(BOTS_DIR).filter(file => file.endsWith('_config.js'));
+    
+    const pm2 = require('pm2');
+    
+    pm2.connect((connectErr) => {
+        if (connectErr) {
+            console.error('Error connecting to PM2:', connectErr);
+            return;
+        }
+
+        configFiles.forEach(file => {
+            try {
+                const configPath = path.join(BOTS_DIR, file);
+                const config = require(configPath);
+                const botId = config.botId;
+                
+                const botFilePath = path.join(BOTS_DIR, `bot_${botId}.js`);
+                if (!fs.existsSync(botFilePath)) {
+                    console.log(`Bot file not found for ${config.botUsername}. Skipping...`);
+                    return;
+                }
+                
+                // Check if the bot is already running
+                pm2.describe(`bot_${botId}`, (describeErr, processDescription) => {
+                    if (describeErr) {
+                        console.error(`Error checking PM2 process for bot ${config.botUsername}:`, describeErr);
+                        return;
+                    }
+
+                    if (processDescription && processDescription.length > 0) {
+                        console.log(`Bot ${config.botUsername} is already running. Skipping start...`);
+                        // Store bot details for running bot
+                        activeBots[botId] = {
+                            name: config.botName,
+                            username: config.botUsername,
+                            token: config.token,
+                            expiry: config.expiryDate,
+                            configPath: configPath,
+                            botFilePath: botFilePath,
+                            createdBy: config.createdBy // Make sure to include createdBy
+                        };
+                    } else {
+                        // Start the bot using PM2
+                        pm2.start({
+                            script: botFilePath,
+                            name: `bot_${botId}`,
+                            autorestart: true,
+                        }, (startErr) => {
+                            if (startErr) {
+                                console.error(`Failed to start bot ${config.botUsername}:`, startErr);
+                                return;
+                            }
+
+                            // Store bot details
+                            activeBots[botId] = {
+                                name: config.botName,
+                                username: config.botUsername,
+                                token: config.token,
+                                expiry: config.expiryDate,
+                                configPath: configPath,
+                                botFilePath: botFilePath,
+                                createdBy: config.createdBy // Make sure to include createdBy
+                            };
+                            
+                            console.log(`Loaded and started existing bot: @${config.botUsername}`);
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error(`Error loading bot from config file ${file}:`, error);
+            }
+        });
+        
+        // Call populateUserDeployments after all bots are loaded
+        setTimeout(populateUserDeployments, 5000);
+    });
+}
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
@@ -569,12 +659,7 @@ function loadExistingBots() {
         });
     });
 }
-// Populate userDeployments map
-Object.values(activeBots).forEach(botInfo => {
-    if (botInfo.createdBy) {
-        userDeployments.set(botInfo.createdBy, botInfo.botId);
-    }
-});
+
 // Add admin commands
 bot.command('admin', (ctx) => {
     if (ctx.from.id !== ADMIN_ID) {
