@@ -143,14 +143,30 @@ const { setupMiddlewares } = require('../middlewares');
 const { setupActions } = require('../actions');
 const database = require('../database');
 
+
 // Channel subscription check function
 async function isSubscribedToChannel(ctx, userId, channelUsername) {
     try {
+        // First try to get chat member directly
         const chatMember = await ctx.telegram.getChatMember('@' + channelUsername, userId);
         return ['creator', 'administrator', 'member'].includes(chatMember.status);
     } catch (error) {
         console.error('Error checking channel subscription:', error);
-        return false;
+        
+        // If we get "member list is inaccessible" error, use alternative method
+        if (error.description && error.description.includes('member list is inaccessible')) {
+            try {
+                // Alternative method: Send a message to the user with a button that links to the channel
+                // This doesn't check subscription but provides a way for users to subscribe
+                return false; // Return false to prompt subscription
+            } catch (innerError) {
+                console.error('Error in alternative subscription check:', innerError);
+                return true; // Allow access on error to prevent blocking legitimate users
+            }
+        }
+        
+        // For other errors, allow access to prevent blocking legitimate users
+        return true;
     }
 }
 
@@ -168,44 +184,57 @@ async function initBot() {
         // Add your custom protection bot logic here
         
         // Add middleware to check channel subscription for all commands
-        bot.use(async (ctx, next) => {
-            // Skip subscription check for specific commands or in private chats
-            if (ctx.chat?.type === 'private' || !ctx.from) {
-                return next();
-            }
-            
-            // Define your source channel username
-            const sourceChannel = 'Lorisiv'; // Change to your channel username without @
-            
-            // Check if user is subscribed
-            const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
-            
-            if (!isSubscribed) {
-                return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
-                            [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                        ]
-                    }
-                });
-            }
-            
-            return next();
-        });
+        // Add middleware to check channel subscription for all commands
+bot.use(async (ctx, next) => {
+    // Skip subscription check for specific commands or in private chats
+    if (!ctx.from || ctx.chat?.type === 'private') {
+        return next();
+    }
+    
+    // Define your source channel username
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        // Check if user is subscribed
+        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+        
+        if (!isSubscribed) {
+            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error in subscription check middleware:', error);
+        // On error, allow the user to proceed to avoid blocking legitimate users
+    }
+    
+    return next();
+});
         
         // Handle subscription check callback
-        bot.action('check_subscription', async (ctx) => {
-            const sourceChannel = 'Lorisiv'; // Change to your channel username without @
-            const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
-            
-            if (isSubscribed) {
-                await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.');
-                await ctx.deleteMessage();
-            } else {
-                await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد.', { show_alert: true });
-            }
-        });
+        // Handle subscription check callback
+bot.action('check_subscription', async (ctx) => {
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+        
+        if (isSubscribed) {
+            await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.');
+            await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
+        } else {
+            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد.', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error checking subscription in callback:', error);
+        await ctx.answerCbQuery('⚠️ حدث خطأ أثناء التحقق من الاشتراك. يمكنك المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
         
         bot.command('start', async (ctx) => {
             const userId = ctx.from.id;
@@ -888,22 +917,90 @@ bot.launch().then(() => {
 });
 
 // Enable graceful stop
+// Enable graceful stop
 process.once('SIGINT', () => {
-    // Stop all bot processes
-    Object.values(activeBots).forEach(bot => {
-        if (bot.process) {
-            bot.process.kill();
+    // Stop all bot processes using PM2
+    const pm2 = require('pm2');
+    pm2.connect((err) => {
+        if (err) {
+            console.error('Error connecting to PM2:', err);
+            bot.stop('SIGINT');
+            process.exit(0);
+            return;
         }
+        
+        // Get all running processes
+        pm2.list((err, list) => {
+            if (err) {
+                console.error('Error getting PM2 process list:', err);
+                bot.stop('SIGINT');
+                process.exit(0);
+                return;
+            }
+            
+            // Filter bot processes
+            const botProcesses = list.filter(proc => proc.name.startsWith('bot_'));
+            
+            if (botProcesses.length === 0) {
+                bot.stop('SIGINT');
+                process.exit(0);
+                return;
+            }
+            
+            // Stop each bot process
+            let stoppedCount = 0;
+            botProcesses.forEach(proc => {
+                pm2.delete(proc.name, () => {
+                    stoppedCount++;
+                    if (stoppedCount === botProcesses.length) {
+                        bot.stop('SIGINT');
+                        process.exit(0);
+                    }
+                });
+            });
+        });
     });
-    bot.stop('SIGINT');
 });
-
 process.once('SIGTERM', () => {
-    // Stop all bot processes
-    Object.values(activeBots).forEach(bot => {
-        if (bot.process) {
-            bot.process.kill();
+    // Stop all bot processes using PM2
+    const pm2 = require('pm2');
+    pm2.connect((err) => {
+        if (err) {
+            console.error('Error connecting to PM2:', err);
+            bot.stop('SIGTERM');
+            process.exit(0);
+            return;
         }
+        
+        // Get all running processes
+        pm2.list((err, list) => {
+            if (err) {
+                console.error('Error getting PM2 process list:', err);
+                bot.stop('SIGTERM');
+                process.exit(0);
+                return;
+            }
+            
+            // Filter bot processes
+            const botProcesses = list.filter(proc => proc.name.startsWith('bot_'));
+            
+            if (botProcesses.length === 0) {
+                bot.stop('SIGTERM');
+                process.exit(0);
+                return;
+            }
+            
+            // Stop each bot process
+            let stoppedCount = 0;
+            botProcesses.forEach(proc => {
+                pm2.delete(proc.name, () => {
+                    stoppedCount++;
+                    if (stoppedCount === botProcesses.length) {
+                        bot.stop('SIGTERM');
+                        process.exit(0);
+                    }
+                });
+            });
+        });
     });
-    bot.stop('SIGTERM');
 });
