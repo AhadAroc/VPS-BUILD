@@ -193,13 +193,18 @@ async function initBot() {
         // Add middleware to check channel subscription for all commands
 // Add middleware to check channel subscription for all commands
 bot.use(async (ctx, next) => {
-    // Skip subscription check for specific commands or in private chats
+    // Skip subscription check if no user information is available
     if (!ctx.from) {
         return next();
     }
     
     // Skip subscription check for the check_subscription callback
     if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+        return next();
+    }
+    
+    // Skip subscription check in groups and supergroups
+    if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
         return next();
     }
     
