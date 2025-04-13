@@ -122,25 +122,43 @@ async function handleTextMessage(ctx) {
         await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
 }
+
+// Add this function to check subscription status directly
+async function checkSubscriptionStatus(ctx, userId) {
+    try {
+        const channelUsername = 'ctrlsrc'; // Your channel username without @
+        
+        // Try to get the user's status in the channel
+        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
+        
+        // Check if the user is a member of the channel
+        const status = member.status;
+        if (status === 'member' || status === 'administrator' || status === 'creator') {
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error checking subscription status:', error);
+        return false;
+    }
+}
+
+// Replace your forceCheckSubscription function with this
 async function forceCheckSubscription(ctx) {
     const userId = ctx.from.id;
     try {
-        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
-        if (isSubscribed) {
-            if (statusChanged) {
-                // User just subscribed, show the new prompt
-                await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
-                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
-                        ]
-                    }
-                });
-            } else {
-                await ctx.answerCbQuery('✅ أنت مشترك في القناة.', { show_alert: true });
-            }
+        const isUserSubscribed = await checkSubscriptionStatus(ctx, userId);
+        
+        if (isUserSubscribed) {
+            await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
+            await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.botInfo.username + '?startgroup=true' }],
+                        [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                    ]
+                }
+            });
         } else {
             await ctx.answerCbQuery('❌ أنت غير مشترك في القناة. يرجى الاشتراك للاستمرار.', { show_alert: true });
             await ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
