@@ -122,7 +122,41 @@ async function handleTextMessage(ctx) {
         await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
 }
-
+async function forceCheckSubscription(ctx) {
+    const userId = ctx.from.id;
+    try {
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        if (isSubscribed) {
+            if (statusChanged) {
+                // User just subscribed, show the new prompt
+                await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
+                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                        ]
+                    }
+                });
+            } else {
+                await ctx.answerCbQuery('✅ أنت مشترك في القناة.', { show_alert: true });
+            }
+        } else {
+            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة. يرجى الاشتراك للاستمرار.', { show_alert: true });
+            await ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error in forceCheckSubscription:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+}
 async function handleCorrectQuizAnswer(ctx, chatId, userId) {
     const quiz = activeQuizzes.get(chatId);
     const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
@@ -3360,41 +3394,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
 });
 
 
-async function forceCheckSubscription(ctx) {
-    const userId = ctx.from.id;
-    try {
-        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
-        if (isSubscribed) {
-            if (statusChanged) {
-                // User just subscribed, show the new prompt
-                await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
-                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
-                        ]
-                    }
-                });
-            } else {
-                await ctx.answerCbQuery('✅ أنت مشترك في القناة.', { show_alert: true });
-            }
-        } else {
-            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة. يرجى الاشتراك للاستمرار.', { show_alert: true });
-            await ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in forceCheckSubscription:', error);
-        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
-    }
-}
+
 // ✅ Show list of active groups
 function getActiveGroups() {
     if (activeGroups.size === 0) return '❌ لا توجد مجموعات نشطة.';
