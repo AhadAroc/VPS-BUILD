@@ -193,18 +193,13 @@ async function initBot() {
         // Add middleware to check channel subscription for all commands
 // Add middleware to check channel subscription for all commands
 bot.use(async (ctx, next) => {
-    // Skip subscription check if no user information is available
+    // Skip subscription check for specific commands or in private chats
     if (!ctx.from) {
         return next();
     }
     
     // Skip subscription check for the check_subscription callback
     if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
-        return next();
-    }
-    
-    // Skip subscription check in groups and supergroups
-    if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
         return next();
     }
     
@@ -233,7 +228,24 @@ bot.use(async (ctx, next) => {
     
     return next();
 });
-        
+
+// Add this error handler to handle group migration errors
+bot.catch((err, ctx) => {
+    console.error('Bot error:', err);
+    // Check if this is a group migration error
+    if (err.description && err.description.includes('group chat was upgraded to a supergroup chat')) {
+        const newChatId = err.parameters.migrate_to_chat_id;
+        const oldChatId = ctx.chat.id;
+// Try to send a message to the new supergroup
+        ctx.telegram.sendMessage(newChatId, 'Group upgraded to supergroup. Bot will continue working here.')
+            .catch(e => console.error('Error sending message to new supergroup:', e));
+    }
+});
+
+
+
+
+
         // Handle subscription check callback
         // Handle subscription check callback
 // Handle subscription check callback
