@@ -62,10 +62,32 @@ async function isDeveloper(ctx, userId) {
 async function isSubscribed(ctx, userId) {
     try {
         const chatMember = await ctx.telegram.getChatMember('@ctrlsrc', userId);
-        return ['member', 'administrator', 'creator'].includes(chatMember.status);
+        return {
+            isSubscribed: ['member', 'administrator', 'creator'].includes(chatMember.status),
+            statusChanged: false
+        };
     } catch (error) {
         console.error('خطأ في التحقق من الاشتراك:', error);
-        return false;
+        
+        // Check if the error is about member list being inaccessible
+        if (error.description && (
+            error.description.includes('member list is inaccessible') || 
+            error.description.includes('Bad Request')
+        )) {
+            // Since we can't check directly, we'll assume the user is subscribed
+            // to prevent blocking legitimate users
+            console.log(`Cannot verify subscription for user ${userId}, assuming subscribed`);
+            return {
+                isSubscribed: true,
+                statusChanged: false
+            };
+        }
+        
+        // For other errors, also assume subscribed to avoid blocking users
+        return {
+            isSubscribed: true,
+            statusChanged: false
+        };
     }
 }
 
