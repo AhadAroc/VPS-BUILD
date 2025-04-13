@@ -191,7 +191,7 @@ async function initBot() {
         
         // Add middleware to check channel subscription for all commands
         // Add middleware to check channel subscription for all commands
-// Add middleware to check channel subscription for all commands
+// Replace the existing middleware with this updated version
 bot.use(async (ctx, next) => {
     // Skip subscription check for specific commands or in private chats
     if (!ctx.from) {
@@ -200,6 +200,11 @@ bot.use(async (ctx, next) => {
     
     // Skip subscription check for the check_subscription callback
     if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+        return next();
+    }
+    
+    // Skip subscription check in group chats
+    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
         return next();
     }
     
@@ -236,12 +241,72 @@ bot.catch((err, ctx) => {
     if (err.description && err.description.includes('group chat was upgraded to a supergroup chat')) {
         const newChatId = err.parameters.migrate_to_chat_id;
         const oldChatId = ctx.chat.id;
-// Try to send a message to the new supergroup
+        
+        // Try to send a message to the new supergroup
         ctx.telegram.sendMessage(newChatId, 'Group upgraded to supergroup. Bot will continue working here.')
             .catch(e => console.error('Error sending message to new supergroup:', e));
     }
 });
 
+// Add a new command for activating the bot in groups
+bot.command('تفعيل', async (ctx) => {
+    // Only process in group chats
+    if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
+        return ctx.reply('هذا الأمر يعمل فقط في المجموعات.');
+    }
+    
+    const userId = ctx.from.id;
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        // Check if user is subscribed
+        const isSubscribed = await isSubscribedToChannel(ctx, userId, sourceChannel);
+        
+        if (!isSubscribed) {
+            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً لتفعيل البوت في المجموعة.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'activate_group' }]
+                    ]
+                }
+            });
+        }
+        
+        // User is subscribed, activate the bot in the group
+        await ctx.reply('✅ تم تفعيل البوت في المجموعة بنجاح! يمكنك الآن استخدام جميع الميزات.');
+        
+    } catch (error) {
+        console.error('Error in group activation:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل البوت. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+// Add a callback handler for group activation
+bot.action('activate_group', async (ctx) => {
+    const userId = ctx.from.id;
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        await ctx.answerCbQuery('⏳ جاري التحقق من الاشتراك...');
+        
+        const isSubscribed = await isSubscribedToChannel(ctx, userId, sourceChannel);
+        
+        if (isSubscribed) {
+            await ctx.answerCbQuery('✅ شكراً للاشتراك!', { show_alert: true });
+            // Try to delete the subscription message
+            await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
+            
+            // Send activation confirmation
+            await ctx.reply('✅ تم تفعيل البوت في المجموعة بنجاح! يمكنك الآن استخدام جميع الميزات.');
+        } else {
+            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد. يرجى الاشتراك ثم المحاولة مرة أخرى.', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error checking subscription for group activation:', error);
+        await ctx.answerCbQuery('⚠️ حدث خطأ أثناء التحقق من الاشتراك. يمكنك المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
 
 
 
