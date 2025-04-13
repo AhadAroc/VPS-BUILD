@@ -60,90 +60,35 @@ async function isDeveloper(ctx, userId) {
 }
 
 async function isSubscribed(ctx, userId) {
-    // Check if we have a cached status for this user
-    const cacheKey = `subscription_${userId}`;
-    const cachedStatus = global.subscriptionCache ? global.subscriptionCache.get(cacheKey) : null;
-    
     try {
-        // Try to get the user's membership status
-        const chatMember = await ctx.telegram.getChatMember('@ctrlsrc', userId);
-        const currentStatus = ['member', 'administrator', 'creator'].includes(chatMember.status);
-        
-        // Determine if status has changed
-        const statusChanged = cachedStatus !== undefined && cachedStatus !== currentStatus;
-        
-        // Update cache
-        if (!global.subscriptionCache) {
-            global.subscriptionCache = new Map();
-        }
-        global.subscriptionCache.set(cacheKey, currentStatus);
-        
-        return {
-            isSubscribed: currentStatus,
-            statusChanged: statusChanged
-        };
-    } catch (error) {
-        console.error('خطأ في التحقق من الاشتراك:', error);
-        
-        // Handle the "member list is inaccessible" error
-        if (error.description && (
-            error.description.includes('member list is inaccessible') || 
-            error.description.includes('Bad Request')
-        )) {
-            // Try an alternative approach - send a message to the channel
-            try {
-                // Use the bot's getChat method to check if the channel exists and is accessible
-                const channelInfo = await ctx.telegram.getChat('@ctrlsrc');
-                console.log(`Channel exists: ${channelInfo.title}`);
-                
-                // Since we can't check membership directly, we'll use a workaround
-                // We'll assume the user is subscribed if they've been previously verified
-                // or if they're a developer
-                const isDev = await isDeveloper(ctx, userId);
-                
-                if (isDev) {
-                    return {
-                        isSubscribed: true,
-                        statusChanged: false
-                    };
-                }
-                
-                // If we have a cached status, use it
-                if (cachedStatus !== undefined) {
-                    return {
-                        isSubscribed: cachedStatus,
-                        statusChanged: false
-                    };
-                }
-                
-                // For new users without a cached status, we'll prompt them to verify
-                return {
-                    isSubscribed: false,
-                    statusChanged: false,
-                    needsVerification: true
-                };
-            } catch (channelError) {
-                console.error('Error checking channel:', channelError);
-                // If we can't even access the channel, assume the user is subscribed
-                // to prevent blocking legitimate users
-                return {
-                    isSubscribed: true,
-                    statusChanged: false
-                };
-            }
-        }
-        
-        // For other errors, check if we have a cached status
-        if (cachedStatus !== undefined) {
+        // First check if the user is a developer - developers are always "subscribed"
+        if (await isDeveloper(ctx, userId)) {
             return {
-                isSubscribed: cachedStatus,
+                isSubscribed: true,
                 statusChanged: false
             };
         }
         
-        // If all else fails, allow access to prevent blocking legitimate users
+        try {
+            // Try to check membership, but wrap in another try/catch to handle API errors
+            const chatMember = await ctx.telegram.getChatMember('@ctrlsrc', userId);
+            return {
+                isSubscribed: ['member', 'administrator', 'creator'].includes(chatMember.status),
+                statusChanged: false
+            };
+        } catch (memberError) {
+            // If we can't check membership, assume the user is subscribed
+            console.log(`Cannot verify subscription for user ${userId}, assuming subscribed:`, memberError.description);
+            return {
+                isSubscribed: true,
+                statusChanged: false
+            };
+        }
+    } catch (error) {
+        // This is a fallback for any other errors
+        console.error('خطأ في التحقق من الاشتراك:', error);
         return {
-            isSubscribed: true,
+            isSubscribed: true, // Always assume subscribed on error to avoid blocking users
             statusChanged: false
         };
     }
@@ -152,12 +97,29 @@ async function isSubscribed(ctx, userId) {
 function setupMiddlewares(bot) {
     bot.use(async (ctx, next) => {
         try {
-            console.log('Received message:', ctx.message);
-
-            if (ctx.message && ctx.message.text && ctx.message.text.startsWith('/')) {
-                const userId = ctx.from.id;
-                const isSubbed = await isSubscribed(ctx, userId);
-                if (!isSubbed && !await isDeveloper(ctx, userId)) {
+            // Skip subscription check for non-command messages
+            if (!ctx.message || !ctx.message.text || !ctx.message.text.startsWith('/')) {
+                return next();
+            }
+            
+            // Skip subscription check for groups and channels
+            if (ctx.chat && ctx.chat.type !== 'private') {
+                return next();
+            }
+            
+            const userId = ctx.from.id;
+            
+            // Check if user is a developer
+            if (await isDeveloper(ctx, userId)) {
+                return next();
+            }
+            
+            // For private chats with commands, check subscription
+            try {
+                const { isSubscribed } = await isSubscribed(ctx, userId);
+                if (isSubscribed) {
+                    return next();
+                } else {
                     return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
                         reply_markup: {
                             inline_keyboard: [
@@ -167,11 +129,14 @@ function setupMiddlewares(bot) {
                         }
                     });
                 }
+            } catch (subError) {
+                // If subscription check fails, allow the user to proceed
+                console.error('Error checking subscription:', subError);
+                return next();
             }
-
-            await next();
         } catch (error) {
             console.error('Error in middleware:', error);
+            return next(); // Always proceed on error
         }
     });
 }
@@ -180,43 +145,33 @@ function adminOnly(handler) {
     return async (ctx) => {
         try {
             const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
-
-            // Check if the user is the owner
+            
+            // Check if the user is the owner by username
             if (ctx.from.username === 'Lorisiv') {
                 return handler(ctx);
             }
-
-            // Check subscription
-            const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
-            if (!isSubscribed) {
-                return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                            [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                        ]
-                    }
-                });
-            }
-
-            if (statusChanged) {
-                // User just subscribed, show the new prompt
-                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
-                        ]
-                    }
-                });
-            }
-
-            const member = await ctx.telegram.getChatMember(chatId, userId);
-            if (member.status === 'creator' || member.status === 'administrator') {
+            
+            // Check if user is a developer
+            if (await isDeveloper(ctx, userId)) {
                 return handler(ctx);
+            }
+            
+            // For group chats, check admin status
+            if (ctx.chat.type !== 'private') {
+                try {
+                    const member = await ctx.telegram.getChatMember(ctx.chat.id, userId);
+                    if (member.status === 'creator' || member.status === 'administrator') {
+                        return handler(ctx);
+                    } else {
+                        return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+                    }
+                } catch (adminError) {
+                    console.error('Error checking admin status:', adminError);
+                    return ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحيات المستخدم.');
+                }
             } else {
-                ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+                // In private chats, only developers and the owner can use admin commands
+                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
             }
         } catch (error) {
             console.error('Error in adminOnly wrapper:', error);
