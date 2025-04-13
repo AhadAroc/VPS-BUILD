@@ -70,8 +70,9 @@ app.get('/', (req, res) => {
 });
 
 // Your existing bot code
+// Update the bot.start handler
 bot.start((ctx) => {
-    ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
+    ctx.reply('🤖 أهلا بك! \nلصنع بوت يرجى الضغط على الخيار الاول وارسال التوكن المخصص من بوت فاذر.\nمهم : للتفعيل يرجى رفع البوت ادمن مع كامل الصلاحيات .\nملاحظة : لديك بوت واحد فقط في النسخة المجانية لعمل نسخة اخرى يرجى حذف النسخة الحالية وصنع اخرى.', Markup.inlineKeyboard([
         [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
         [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
     ]));
@@ -242,8 +243,9 @@ bot.catch((err, ctx) => {
         const newChatId = err.parameters.migrate_to_chat_id;
         const oldChatId = ctx.chat.id;
         
-        // Try to send a message to the new supergroup
-        ctx.telegram.sendMessage(newChatId, 'Group upgraded to supergroup. Bot will continue working here.')
+      
+                // Try to send a message to the new supergroup
+        ctx.telegram.sendMessage(newChatId, 'تم تفعيل البوت بنجاح يرجى ارسال * بدء * لعرض القائمة الرئيسية وارسال * مساعدة * لفهم الاوامر والصلاحيات خاص البوت يبدئ ب * /start * لمن لديه الصلاحية وتحياتنا 🙌.')
             .catch(e => console.error('Error sending message to new supergroup:', e));
     }
 });
