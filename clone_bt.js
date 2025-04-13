@@ -244,6 +244,16 @@ bot.action('check_subscription', async (ctx) => {
             await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.', { show_alert: true });
             // Try to delete the subscription message
             await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
+            
+            // Send a welcome message with the "Add to Group" button
+            await ctx.reply('مرحباً بك في البوت! يمكنك الآن استخدام جميع الميزات.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.me.username + '?startgroup=true' }],
+                        [{ text: 'قناة المطور', url: 'https://t.me/Lorisiv' }]
+                    ]
+                }
+            });
         } else {
             await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد. يرجى الاشتراك ثم المحاولة مرة أخرى.', { show_alert: true });
         }
