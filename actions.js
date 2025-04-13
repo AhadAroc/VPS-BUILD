@@ -24,7 +24,7 @@ cloudinary.config({
 });
 // Add this to your global variables
 const quizSettings = new Map();
-const { isDeveloper } = require('./middlewares');
+const { isDeveloper,isSubscribed } = require('./middlewares');
 const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
@@ -487,7 +487,7 @@ async function configureQuiz(ctx) {
 function setupActions(bot, session, Scenes) {
     // Add this function to handle quiz configuration
 
-    const { setupCommands, showMainMenu, showQuizMenu,isSubscribed } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 
 // Add these action handlers for timer settings
 bot.action(/^set_timer_(\d+)$/, async (ctx) => {
