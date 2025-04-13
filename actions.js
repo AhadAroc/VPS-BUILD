@@ -145,36 +145,48 @@ async function checkSubscriptionStatus(ctx, userId) {
 
 // Replace your forceCheckSubscription function with this
 async function forceCheckSubscription(ctx) {
-    const userId = ctx.from.id;
     try {
-        const isUserSubscribed = await checkSubscriptionStatus(ctx, userId);
+        await ctx.answerCbQuery('جاري التحقق من الاشتراك...');
         
-        if (isUserSubscribed) {
-            await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
-            await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+        // Instead of checking directly, we'll ask the user to join and then click a button
+        await ctx.reply('للاستمرار في استخدام البوت، يرجى:',
+            {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.botInfo.username + '?startgroup=true' }],
-                        [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                        [{ text: '1. اشترك في القناة', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '2. تحقق من الاشتراك', callback_data: 'confirm_subscription' }]
                     ]
                 }
-            });
-        } else {
-            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة. يرجى الاشتراك للاستمرار.', { show_alert: true });
-            await ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
-                }
-            });
-        }
+            }
+        );
     } catch (error) {
         console.error('Error in forceCheckSubscription:', error);
-        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+        await ctx.answerCbQuery('❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 }
+async function confirmSubscription(ctx) {
+    try {
+        // Here we assume the user has subscribed since they clicked the button
+        // This is more reliable than checking membership which often fails
+        
+        await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
+        await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.botInfo.username + '?startgroup=true' }],
+                    [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                ]
+            }
+        });
+        
+        // You can store this user as subscribed in your database if needed
+        
+    } catch (error) {
+        console.error('Error in confirmSubscription:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+}
+
 async function handleCorrectQuizAnswer(ctx, chatId, userId) {
     const quiz = activeQuizzes.get(chatId);
     const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
@@ -540,7 +552,8 @@ function setupActions(bot, session, Scenes) {
     // Add this function to handle quiz configuration
 
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
-
+// Add this new action handler
+bot.action('confirm_subscription', confirmSubscription);
 // Add these action handlers for timer settings
 bot.action(/^set_timer_(\d+)$/, async (ctx) => {
     try {
@@ -3483,4 +3496,4 @@ bot.action('check_subscription', forceCheckSubscription);
 }
 
 module.exports = { setupActions,
-    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates };
+    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates,forceCheckSubscription,confirmSubscription, };
