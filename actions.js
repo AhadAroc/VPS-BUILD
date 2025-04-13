@@ -487,7 +487,7 @@ async function configureQuiz(ctx) {
 function setupActions(bot, session, Scenes) {
     // Add this function to handle quiz configuration
 
-    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu,isSubscribed } = require('./commands');
 
 // Add these action handlers for timer settings
 bot.action(/^set_timer_(\d+)$/, async (ctx) => {
