@@ -126,8 +126,9 @@ module.exports = {
             fs.writeFileSync(configPath, configContent);
             
             // Create a custom bot file for this instance
-            const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
-            const botFileContent = `
+            // Create a custom bot file for this instance
+const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
+const botFileContent = `
 const { Telegraf, Markup } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
@@ -142,6 +143,17 @@ const { setupMiddlewares } = require('../middlewares');
 const { setupActions } = require('../actions');
 const database = require('../database');
 
+// Channel subscription check function
+async function isSubscribedToChannel(ctx, userId, channelUsername) {
+    try {
+        const chatMember = await ctx.telegram.getChatMember('@' + channelUsername, userId);
+        return ['creator', 'administrator', 'member'].includes(chatMember.status);
+    } catch (error) {
+        console.error('Error checking channel subscription:', error);
+        return false;
+    }
+}
+
 // Initialize bot
 async function initBot() {
     try {
@@ -154,6 +166,46 @@ async function initBot() {
         setupActions(bot);
         
         // Add your custom protection bot logic here
+        
+        // Add middleware to check channel subscription for all commands
+        bot.use(async (ctx, next) => {
+            // Skip subscription check for specific commands or in private chats
+            if (ctx.chat?.type === 'private' || !ctx.from) {
+                return next();
+            }
+            
+            // Define your source channel username
+            const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+            
+            // Check if user is subscribed
+            const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+            
+            if (!isSubscribed) {
+                return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                            [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                        ]
+                    }
+                });
+            }
+            
+            return next();
+        });
+        
+        // Handle subscription check callback
+        bot.action('check_subscription', async (ctx) => {
+            const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+            const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+            
+            if (isSubscribed) {
+                await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.');
+                await ctx.deleteMessage();
+            } else {
+                await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد.', { show_alert: true });
+            }
+        });
         
         bot.command('start', async (ctx) => {
             const userId = ctx.from.id;
@@ -252,17 +304,23 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
     }
 });
 // Show Active Bots
+// Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
-    const botIds = Object.keys(activeBots);
+    const userId = ctx.from.id;
     
-    if (botIds.length === 0) {
-        return ctx.answerCbQuery('🚫 لا يوجد أي بوتات نشطة.');
+    // Filter bots to only show those created by the current user
+    const userBotIds = Object.keys(activeBots).filter(botId => 
+        activeBots[botId].createdBy === userId
+    );
+    
+    if (userBotIds.length === 0) {
+        return ctx.answerCbQuery('🚫 لا يوجد أي بوتات نشطة خاصة بك.');
     }
 
-    let message = '🤖 <b>البوتات النشطة:</b>\n';
+    let message = '🤖 <b>البوتات النشطة الخاصة بك:</b>\n';
     const keyboard = [];
     
-    botIds.forEach((botId, index) => {
+    userBotIds.forEach((botId, index) => {
         const botInfo = activeBots[botId];
         message += `${index + 1}. <b>${botInfo.name}</b> - @${botInfo.username}\n`;
         keyboard.push([
@@ -287,8 +345,15 @@ bot.action('back_to_main_menu', (ctx) => {
 
 bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
     const botId = ctx.match[1];
+    const userId = ctx.from.id;
+    
     if (!activeBots[botId]) {
         return ctx.answerCbQuery('❌ البوت غير موجود أو تم حذفه بالفعل.');
+    }
+    
+    // Check if the user owns this bot
+    if (activeBots[botId].createdBy !== userId && userId !== ADMIN_ID) {
+        return ctx.answerCbQuery('❌ لا يمكنك حذف بوت لا تملكه.');
     }
     
     const botInfo = activeBots[botId];
@@ -321,12 +386,22 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
             console.error(`Error removing bot ${botId} from database:`, error);
         });
         
+        // IMPORTANT: Remove from userDeployments to allow creating new bots
+        if (userDeployments.get(userId) === botId) {
+            userDeployments.delete(userId);
+        }
+        
         await ctx.answerCbQuery(`✅ تم حذف البوت ${botInfo.name} بنجاح.`);
         
         // Refresh the active bots list
         ctx.editMessageText('جاري تحديث القائمة...');
         ctx.answerCbQuery();
-        ctx.dispatch('show_active_bots');
+        
+        // Show the main menu instead of the empty bots list
+        ctx.editMessageText('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
+            [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
+            [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
+        ]));
     });
 });
 
