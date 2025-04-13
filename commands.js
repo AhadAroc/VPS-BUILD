@@ -1,6 +1,6 @@
 //gayshit 
 
-const { adminOnly } = require('./middlewares');
+const { adminOnly, isSubscribed } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
 const { createPrimaryDevelopersTable } = require('./database');
@@ -1972,5 +1972,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed };
 
