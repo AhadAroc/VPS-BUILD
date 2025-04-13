@@ -377,21 +377,46 @@ async function getQuestionsForDifficulty(difficulty) {
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
-    bot.command('start', (ctx) => {
-    if (ctx.chat.type === 'private') {
-        // This is a DM
-        ctx.reply('مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }]
-                ]
+    bot.command('start', async (ctx) => {
+        if (ctx.chat.type === 'private') {
+            try {
+                const userId = ctx.from.id;
+                // Check if user is subscribed to the channel
+                const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+                
+                // Welcome message
+                const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
+                
+                if (isUserSubscribed) {
+                    // User is subscribed, show the "Add to Group" button
+                    await ctx.reply(welcomeMessage, {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                                [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                            ]
+                        }
+                    });
+                } else {
+                    // User is not subscribed, show subscription prompt
+                    await ctx.reply(welcomeMessage, {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                                [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                            ]
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error in start command:', error);
+                await ctx.reply('حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
             }
-        });
-    } else {
-        // This is a group chat, do nothing
-        return;
-    }
-});
+        } else {
+            // This is a group chat, do nothing
+            return;
+        }
+    });
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
