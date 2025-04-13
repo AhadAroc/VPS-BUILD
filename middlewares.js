@@ -60,30 +60,88 @@ async function isDeveloper(ctx, userId) {
 }
 
 async function isSubscribed(ctx, userId) {
+    // Check if we have a cached status for this user
+    const cacheKey = `subscription_${userId}`;
+    const cachedStatus = global.subscriptionCache ? global.subscriptionCache.get(cacheKey) : null;
+    
     try {
+        // Try to get the user's membership status
         const chatMember = await ctx.telegram.getChatMember('@ctrlsrc', userId);
+        const currentStatus = ['member', 'administrator', 'creator'].includes(chatMember.status);
+        
+        // Determine if status has changed
+        const statusChanged = cachedStatus !== undefined && cachedStatus !== currentStatus;
+        
+        // Update cache
+        if (!global.subscriptionCache) {
+            global.subscriptionCache = new Map();
+        }
+        global.subscriptionCache.set(cacheKey, currentStatus);
+        
         return {
-            isSubscribed: ['member', 'administrator', 'creator'].includes(chatMember.status),
-            statusChanged: false
+            isSubscribed: currentStatus,
+            statusChanged: statusChanged
         };
     } catch (error) {
         console.error('خطأ في التحقق من الاشتراك:', error);
         
-        // Check if the error is about member list being inaccessible
+        // Handle the "member list is inaccessible" error
         if (error.description && (
             error.description.includes('member list is inaccessible') || 
             error.description.includes('Bad Request')
         )) {
-            // Since we can't check directly, we'll assume the user is subscribed
-            // to prevent blocking legitimate users
-            console.log(`Cannot verify subscription for user ${userId}, assuming subscribed`);
+            // Try an alternative approach - send a message to the channel
+            try {
+                // Use the bot's getChat method to check if the channel exists and is accessible
+                const channelInfo = await ctx.telegram.getChat('@ctrlsrc');
+                console.log(`Channel exists: ${channelInfo.title}`);
+                
+                // Since we can't check membership directly, we'll use a workaround
+                // We'll assume the user is subscribed if they've been previously verified
+                // or if they're a developer
+                const isDev = await isDeveloper(ctx, userId);
+                
+                if (isDev) {
+                    return {
+                        isSubscribed: true,
+                        statusChanged: false
+                    };
+                }
+                
+                // If we have a cached status, use it
+                if (cachedStatus !== undefined) {
+                    return {
+                        isSubscribed: cachedStatus,
+                        statusChanged: false
+                    };
+                }
+                
+                // For new users without a cached status, we'll prompt them to verify
+                return {
+                    isSubscribed: false,
+                    statusChanged: false,
+                    needsVerification: true
+                };
+            } catch (channelError) {
+                console.error('Error checking channel:', channelError);
+                // If we can't even access the channel, assume the user is subscribed
+                // to prevent blocking legitimate users
+                return {
+                    isSubscribed: true,
+                    statusChanged: false
+                };
+            }
+        }
+        
+        // For other errors, check if we have a cached status
+        if (cachedStatus !== undefined) {
             return {
-                isSubscribed: true,
+                isSubscribed: cachedStatus,
                 statusChanged: false
             };
         }
         
-        // For other errors, also assume subscribed to avoid blocking users
+        // If all else fails, allow access to prevent blocking legitimate users
         return {
             isSubscribed: true,
             statusChanged: false
