@@ -360,48 +360,59 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
     
     // Stop the bot process using PM2
     const pm2 = require('pm2');
-    pm2.delete(`bot_${botId}`, async (err) => {
-        if (err) {
-            console.error(`Error stopping bot ${botInfo.username}:`, err);
+    pm2.connect(async (connectErr) => {
+        if (connectErr) {
+            console.error(`Error connecting to PM2:`, connectErr);
+            return ctx.answerCbQuery('❌ حدث خطأ أثناء الاتصال بمدير العمليات.');
         }
         
-        // Delete the bot files
-        try {
-            if (fs.existsSync(botInfo.configPath)) {
-                fs.unlinkSync(botInfo.configPath);
+        pm2.delete(`bot_${botId}`, async (err) => {
+            if (err) {
+                console.error(`Error stopping bot ${botInfo.username}:`, err);
             }
-            if (fs.existsSync(botInfo.botFilePath)) {
-                fs.unlinkSync(botInfo.botFilePath);
+            
+            // Delete the bot files
+            try {
+                if (fs.existsSync(botInfo.configPath)) {
+                    fs.unlinkSync(botInfo.configPath);
+                }
+                if (fs.existsSync(botInfo.botFilePath)) {
+                    fs.unlinkSync(botInfo.botFilePath);
+                }
+            } catch (error) {
+                console.error(`Error deleting bot files for ${botInfo.username}:`, error);
             }
-        } catch (error) {
-            console.error(`Error deleting bot files for ${botInfo.username}:`, error);
-        }
-    
-        // Remove from active bots
-        delete activeBots[botId];
         
-        // Remove from database
-        const CloneModel = mongoose.model('Clone');
-        await CloneModel.deleteOne({ botId: botId }).catch(error => {
-            console.error(`Error removing bot ${botId} from database:`, error);
+            // Remove from active bots
+            delete activeBots[botId];
+            
+            // Remove from database
+            const CloneModel = mongoose.model('Clone');
+            await CloneModel.deleteOne({ botId: botId }).catch(error => {
+                console.error(`Error removing bot ${botId} from database:`, error);
+            });
+            
+            // CRITICAL FIX: Make sure we're properly removing from userDeployments
+            // First, check if this user has this specific bot ID
+            if (userDeployments.get(userId) === parseInt(botId)) {
+                userDeployments.delete(userId);
+                console.log(`Removed user ${userId} from userDeployments map`);
+            }
+            
+            await ctx.answerCbQuery(`✅ تم حذف البوت ${botInfo.name} بنجاح.`);
+            
+            // Refresh the active bots list
+            ctx.editMessageText('جاري تحديث القائمة...');
+            
+            // Show the main menu instead of the empty bots list
+            ctx.editMessageText('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
+                [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
+                [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
+            ]));
+            
+            // Disconnect from PM2
+            pm2.disconnect();
         });
-        
-        // IMPORTANT: Remove from userDeployments to allow creating new bots
-        if (userDeployments.get(userId) === botId) {
-            userDeployments.delete(userId);
-        }
-        
-        await ctx.answerCbQuery(`✅ تم حذف البوت ${botInfo.name} بنجاح.`);
-        
-        // Refresh the active bots list
-        ctx.editMessageText('جاري تحديث القائمة...');
-        ctx.answerCbQuery();
-        
-        // Show the main menu instead of the empty bots list
-        ctx.editMessageText('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
-            [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
-            [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
-        ]));
     });
 });
 // Populate userDeployments map - Fixed version
