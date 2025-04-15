@@ -145,10 +145,74 @@ const { setupActions } = require('../actions');
 const database = require('../database');
 
 
-// Channel subscription check function
-// Channel subscription check function
-// Channel subscription check function
-// Channel subscription check function
+// Create a unique database connection for this bot instance
+// This ensures each bot has its own isolated database
+const botDbName = \`bot_\${config.botId}\`;
+const botMongoURI = process.env.MONGODB_URI.replace(/\\/[^/]*$/, \`/\${botDbName}\`);
+
+// Initialize the bot's own database connection
+mongoose.createConnection(botMongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    ssl: true,
+    tls: true,
+    tlsAllowInvalidCertificates: false
+}).then(connection => {
+    // Store the connection for this bot
+    global.botDbConnection = connection;
+    console.log(\`Connected to bot-specific database: \${botDbName}\`);
+    
+    // Initialize collections for this bot
+    setupBotCollections(connection);
+}).catch(err => {
+    console.error(\`Error connecting to bot-specific database \${botDbName}:\`, err);
+});
+
+// Function to set up the required collections for this bot
+function setupBotCollections(connection) {
+    // Create the necessary collections with their schemas
+    connection.model('Reply', new mongoose.Schema({
+        trigger_word: String,
+        response: String,
+        created_by: Number,
+        created_at: { type: Date, default: Date.now }
+    }));
+    
+    connection.model('User', new mongoose.Schema({
+        user_id: Number,
+        username: String,
+        first_name: String,
+        last_name: String,
+        joined_at: { type: Date, default: Date.now }
+    }));
+    
+    connection.model('Group', new mongoose.Schema({
+        chat_id: Number,
+        title: String,
+        joined_at: { type: Date, default: Date.now },
+        last_activity: Date
+    }));
+    
+    connection.model('Developer', new mongoose.Schema({
+        user_id: Number,
+        username: String,
+        promoted_at: Date,
+        promoted_by: Number
+    }));
+    
+    // Add more models as needed
+}
+
+// Modify the database functions to use the bot-specific connection
+const originalEnsureDatabaseInitialized = database.ensureDatabaseInitialized;
+database.ensureDatabaseInitialized = async function() {
+    // If we have a bot-specific connection, use it
+    if (global.botDbConnection) {
+        return global.botDbConnection;
+    }
+    // Otherwise fall back to the original function
+    return originalEnsureDatabaseInitialized();
+};
 // Channel subscription check function
 async function isSubscribedToChannel(ctx, userId, channelUsername) {
     try {
