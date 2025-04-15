@@ -19,7 +19,18 @@ mongoose.connect(mongoURI, {
   tls: true,
   tlsAllowInvalidCertificates: false
 });
+// Connect to the bot's specific database
+mongoose.connect(`mongodb://localhost:27017/${config.databaseName}`, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+});
 
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+    console.log('Connected to bot-specific database');
+});
+   
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
 // Heroku API key
@@ -607,54 +618,89 @@ async function checkAndUpdateActivation(cloneId, userId) {
         botToken: String,
         createdAt: Date,
         expiresAt: Date,
+        databaseName: String,
         statistics: {
             messagesProcessed: { type: Number, default: 0 },
             commandsExecuted: { type: Number, default: 0 },
         }
     }));
 
+    const databaseName = `bot_${botId}_db`;
+
     const newClone = new CloneModel({
         botId,
         botToken,
         createdAt: new Date(),
         expiresAt: expiryDate,
+        databaseName,
     });
 
     await newClone.save();
-    console.log(`Database entry created for bot ${botId}`);
+
+    // Create a new database for this bot
+    const db = mongoose.connection.useDb(databaseName);
+    
+    // Create necessary collections (e.g., 'replies')
+    await db.createCollection('replies');
+
+    console.log(`Database entry and new database created for bot ${botId}`);
 }
-async function cloneBot(originalBotToken, newBotToken) {
-    const cloneId = uuidv4();
-    const cloneName = `clone-${cloneId}`;
-  
+async function cloneBot(originalBotToken, newBotToken, botId) {
+    const cloneName = `bot_${botId}`;
+    const configPath = path.join(BOTS_DIR, `${cloneName}_config.js`);
+    const botFilePath = path.join(BOTS_DIR, `${cloneName}.js`);
+
     // Copy the original bot file
-    exec(`cp bot.js ${cloneName}.js`, (error) => {
-      if (error) {
-        console.error(`Error copying bot file: ${error}`);
-        return;
-      }
-  
-      // Replace the bot token in the new file
-      exec(`sed -i 's/const BOT_TOKEN = .*/const BOT_TOKEN = "${newBotToken}";/' ${cloneName}.js`, (error) => {
+    fs.copyFileSync(BOT_TEMPLATE_PATH, botFilePath);
+
+    // Create config file
+    const configContent = `
+module.exports = {
+    token: '${newBotToken}',
+    botId: '${botId}',
+    databaseName: 'bot_${botId}_db'
+};
+`;
+    fs.writeFileSync(configPath, configContent);
+
+    // Replace the config import in the new bot file
+    let botFileContent = fs.readFileSync(botFilePath, 'utf8');
+    botFileContent = botFileContent.replace(
+        "const config = require('./config');",
+        `const config = require('./${cloneName}_config');`
+    );
+    fs.writeFileSync(botFilePath, botFileContent);
+
+    // Start the new bot process with PM2
+    pm2.start({
+        script: botFilePath,
+        name: cloneName,
+        autorestart: true,
+    }, (error) => {
         if (error) {
-          console.error(`Error replacing token: ${error}`);
-          return;
-        }
-  
-        // Start the new bot process with PM2
-        exec(`pm2 start ${cloneName}.js --name ${cloneName}`, (error) => {
-          if (error) {
-            console.error(`Error starting clone: ${error}`);
+            console.error(`Error starting clone ${cloneName}:`, error);
             return;
-          }
-          console.log(`Clone ${cloneName} started successfully`);
-        });
-      });
+        }
+        console.log(`Clone ${cloneName} started successfully`);
     });
-  
+
     // Create a new database entry for the clone
-    await createCloneDbEntry(cloneId, newBotToken);
-  }
+    await createCloneDbEntry(botId, newBotToken, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+}
+async function checkForAutomaticReply(ctx) {
+    try {
+        console.log('Searching for reply with keyword:', ctx.message.text.trim());
+        return await db.collection('replies').findOne({
+            $or: [
+                { trigger_word: ctx.message.text.trim() },
+                { word: ctx.message.text.trim() }
+            ]
+        });
+    } catch (error) {
+        console.error('Error checking for automatic replies:', error);
+        return null;
+    }
+}
 async function cleanupDatabase() {
     const CloneModel = mongoose.model('Clone');
     const activeBotIds = Object.keys(activeBots);
