@@ -160,6 +160,12 @@ async function connectToMongoDB() {
     try {
         console.log('Attempting to connect to bot-specific MongoDB...');
         
+        // If we already have a connection, return it
+        if (db) {
+            console.log('Using existing database connection');
+            return db;
+        }
+        
         const options = {
             useNewUrlParser: true,
             useUnifiedTopology: true,
@@ -169,7 +175,7 @@ async function connectToMongoDB() {
         };
         
         const sanitizedUri = botMongoURI.replace(/\\/\\/([^:]+):([^@]+)@/, '//***:***@');
-        console.log(\`Connecting to: \${sanitizedUri} with options:\`, options);
+        
         
         const { MongoClient } = require('mongodb');
         client = new MongoClient(botMongoURI, options);
@@ -177,10 +183,6 @@ async function connectToMongoDB() {
         db = client.db(botDbName);
         
         console.log('Connected to bot-specific MongoDB successfully');
-        
-        // Set up initial collections and indexes
-        await setupDatabase();
-        
         return db;
     } catch (error) {
         console.error('Bot-specific MongoDB connection error:', error);
@@ -196,10 +198,22 @@ async function ensureDatabaseInitialized() {
     return db;
 }
 
+
 // Setup database with required collections and indexes
 async function setupDatabase() {
     try {
         console.log('Setting up bot-specific database collections...');
+        
+        // Make sure db is initialized
+        if (!db) {
+            console.log('Database not initialized yet, connecting first...');
+            await connectToMongoDB();
+            
+            // Double check that we have a connection
+            if (!db) {
+                throw new Error('Failed to establish database connection');
+            }
+        }
 
         // Ensure indexes for better query performance
         await db.collection('quiz_questions').createIndex({ category: 1, difficulty: 1 });
@@ -215,12 +229,13 @@ async function setupDatabase() {
         for (const collection of collections) {
             if (!(await db.listCollections({ name: collection }).hasNext())) {
                 await db.createCollection(collection);
-                console.log(\`Created collection: \${collection}\`);
+                
             }
         }
 
-        // Add primary developer if not exists
-        if (config.ownerId) {
+        // Add primary developer if not exists and if ownerId is defined
+        // Check if config.ownerId exists before trying to use it
+        if (config && config.ownerId) {
             const existingDev = await db.collection('developers').findOne({ user_id: config.ownerId });
             
             if (!existingDev) {
@@ -229,8 +244,10 @@ async function setupDatabase() {
                     username: 'primary_developer',
                     added_at: new Date()
                 });
-                console.log(\`Primary developer (\${config.ownerId}) added to database\`);
+                
             }
+        } else {
+            console.log('No owner ID defined in config, skipping primary developer setup');
         }
 
         console.log('Bot-specific database setup completed');
@@ -311,8 +328,15 @@ async function isSubscribedToChannel(ctx, userId, channelUsername) {
 // Initialize bot
 async function initBot() {
     try {
-        // Setup database
-        await database.setupDatabase();
+        // First, ensure database connection is established
+        console.log('Initializing database connection...');
+        await connectToMongoDB();
+        
+        if (!db) {
+            throw new Error('Failed to establish database connection');
+        }
+        
+        console.log('Database connection established, setting up bot...');
         
         // Setup middlewares, commands, and actions
         setupMiddlewares(bot);
@@ -322,49 +346,55 @@ async function initBot() {
         // Add your custom protection bot logic here
         
         // Add middleware to check channel subscription for all commands
-        // Add middleware to check channel subscription for all commands
-// Replace the existing middleware with this updated version
-bot.use(async (ctx, next) => {
-    // Skip subscription check for specific commands or in private chats
-    if (!ctx.from) {
-        return next();
-    }
-    
-    // Skip subscription check for the check_subscription callback
-    if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
-        return next();
-    }
-    
-    // Skip subscription check in group chats
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        return next();
-    }
-    
-    // Define your source channel username
-    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
-    
-    try {
-        // Check if user is subscribed
-        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
-        
-        if (!isSubscribed) {
-            // Send subscription message with inline keyboard
-            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
-                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
+        bot.use(async (ctx, next) => {
+            // Skip subscription check for specific commands or in private chats
+            if (!ctx.from) {
+                return next();
+            }
+            
+            // Skip subscription check for the check_subscription callback
+            if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+                return next();
+            }
+            
+            // Skip subscription check in group chats
+            if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+                return next();
+            }
+            
+            // Define your source channel username
+            const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+            
+            try {
+                // Check if user is subscribed
+                const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+                
+                if (!isSubscribed) {
+                    // Send subscription message with inline keyboard
+                    return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                            ]
+                        }
+                    });
                 }
-            });
-        }
+            } catch (error) {
+                console.error('Error in subscription check middleware:', error);
+                // On error, allow the user to proceed to avoid blocking legitimate users
+            }
+            
+            return next();
+        });
+
+        // Launch the bot
+        await bot.launch();
+        
     } catch (error) {
-        console.error('Error in subscription check middleware:', error);
-        // On error, allow the user to proceed to avoid blocking legitimate users
+        console.error('Error initializing bot:', error);
     }
-    
-    return next();
-});
+}
 
 // Add this error handler to handle group migration errors
 bot.catch((err, ctx) => {
