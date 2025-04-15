@@ -239,7 +239,7 @@ async function showHelp(ctx) {
 
 *السؤال الخامس : البوت بيه غلط ومدا يشتغل شنو الحل ؟*
 • يرجى تبليغ مطور السورس في رابط قناة السورس و ان شاء الله تنحل 🥲
-@Lorisiv
+@lorsiv
         `;
 
         await ctx.replyWithMarkdown(helpText, { disable_web_page_preview: true });
@@ -1997,5 +1997,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,promoteUser };
 
