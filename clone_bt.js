@@ -146,6 +146,8 @@ const database = require('../database');
 
 // Create a unique database connection for this bot instance
 // This ensures each bot has its own isolated database
+// Create a unique database connection for this bot instance
+// This ensures each bot has its own isolated database
 const botDbName = \`bot_\${config.botId}\`;
 const botMongoURI = process.env.MONGODB_URI.replace(/\\/[^/]*$/, \`/\${botDbName}\`);
 
@@ -169,6 +171,7 @@ async function connectToMongoDB() {
         const sanitizedUri = botMongoURI.replace(/\\/\\/([^:]+):([^@]+)@/, '//***:***@');
         console.log(\`Connecting to: \${sanitizedUri} with options:\`, options);
         
+        const { MongoClient } = require('mongodb');
         client = new MongoClient(botMongoURI, options);
         await client.connect();
         db = client.db(botDbName);
@@ -240,8 +243,9 @@ async function setupDatabase() {
 // Initialize the database connection
 connectToMongoDB().catch(console.error);
 
-// Override the database functions to use our bot-specific database
-const database = {
+// Create a custom database object for this bot instance
+// IMPORTANT: We're using a different variable name to avoid conflicts
+const botDatabase = {
     getDb: () => db,
     getClient: () => client,
     connectToMongoDB,
@@ -270,6 +274,10 @@ const database = {
     
     // Add more database functions as needed...
 };
+
+// Override the imported database with our custom one
+// This is the key fix - we're replacing the imported database with our custom one
+Object.assign(database, botDatabase);
 
 
 // Channel subscription check function
