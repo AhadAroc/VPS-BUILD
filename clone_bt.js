@@ -69,38 +69,6 @@ app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
 
-async function initializeClonedBotDatabase(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        
-        // Create collections for the cloned bot
-        await db.createCollection(`users_${botId}`);
-        await db.createCollection(`groups_${botId}`);
-        await db.createCollection(`replies_${botId}`);
-        await db.createCollection(`quiz_questions_${botId}`);
-        await db.createCollection(`quiz_scores_${botId}`);
-        
-        console.log(`Initialized database for cloned bot ${botId}`);
-    } catch (error) {
-        console.error(`Error initializing database for cloned bot ${botId}:`, error);
-    }
-}
-async function deleteClonedBotDatabase(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        
-        // Delete collections for the cloned bot
-        await db.collection(`users_${botId}`).drop();
-        await db.collection(`groups_${botId}`).drop();
-        await db.collection(`replies_${botId}`).drop();
-        await db.collection(`quiz_questions_${botId}`).drop();
-        await db.collection(`quiz_scores_${botId}`).drop();
-        
-        console.log(`Deleted database for cloned bot ${botId}`);
-    } catch (error) {
-        console.error(`Error deleting database for cloned bot ${botId}:`, error);
-    }
-}
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -497,10 +465,8 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
                 console.error(`Error removing bot ${botId} from database:`, error);
             });
             
-            // Delete the cloned bot's database
-            await deleteClonedBotDatabase(botId);
-            
             // CRITICAL FIX: Make sure we're properly removing from userDeployments
+            // First, check if this user has this specific bot ID
             if (userDeployments.get(userId) === parseInt(botId)) {
                 userDeployments.delete(userId);
                 console.log(`Removed user ${userId} from userDeployments map`);
@@ -656,12 +622,7 @@ async function checkAndUpdateActivation(cloneId, userId) {
 
     await newClone.save();
     console.log(`Database entry created for bot ${botId}`);
-
-    // Initialize the cloned bot's database
-    await initializeClonedBotDatabase(botId);
 }
-
-
 async function cloneBot(originalBotToken, newBotToken) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
