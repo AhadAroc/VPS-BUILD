@@ -1334,20 +1334,47 @@ createGroupsTable();
             console.error('Error loading active groups from database:', error);
         }
     }
-    function showRepliesMenu(ctx) {
+    function showRepliesMenu(ctx, botId) {
         const message = 'قسم الردود - اختر الإجراء المطلوب:';
         const keyboard = {
             inline_keyboard: [
-                [{ text: '• اضف رد عام •', callback_data: 'add_general_reply' }],
-                [{ text: '• حذف رد عام •', callback_data: 'delete_general_reply' }],
-                [{ text: '• عرض الردود العامة •', callback_data: 'list_general_replies' }],
-                [{ text: '❌ حذف جميع الردود', callback_data: 'delete_all_replies' }],
+                [{ text: '• اضف رد عام •', callback_data: `add_general_reply_${botId}` }],
+                [{ text: '• حذف رد عام •', callback_data: `delete_general_reply_${botId}` }],
+                [{ text: '• عرض الردود العامة •', callback_data: `list_general_replies_${botId}` }],
+                [{ text: '❌ حذف جميع الردود', callback_data: `delete_all_replies_${botId}` }],
                 [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
             ]
         };
     
         ctx.editMessageText(message, { reply_markup: keyboard });
     }
+    // Add a new reply for the cloned bot
+async function addClonedBotReply(botId, triggerWord, replyContent) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection(`replies_${botId}`).insertOne({
+        trigger_word: triggerWord,
+        content: replyContent,
+        created_at: new Date()
+    });
+}
+
+// Delete a reply for the cloned bot
+async function deleteClonedBotReply(botId, triggerWord) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection(`replies_${botId}`).deleteOne({ trigger_word: triggerWord });
+}
+
+// List all replies for the cloned bot
+async function listClonedBotReplies(botId) {
+    const db = await ensureDatabaseInitialized();
+    return await db.collection(`replies_${botId}`).find().toArray();
+}
+
+// Delete all replies for the cloned bot
+async function deleteAllClonedBotReplies(botId) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection(`replies_${botId}`).deleteMany({});
+}
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -1558,50 +1585,55 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 });
 
     // Modify the delete_general_reply action handler
-bot.action('delete_general_reply', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery('حذف رد عام');
-        ctx.reply('أرسل الكلمة التي تريد حذف الرد لها:');
-        awaitingDeleteReplyWord = true;
-    } else {
-        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
-bot.action('delete_all_replies', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery();
-        const confirmKeyboard = {
-            inline_keyboard: [
-                [{ text: '✅ نعم، احذف جميع الردود', callback_data: 'confirm_delete_all_replies' }],
-                [{ text: '❌ لا، إلغاء العملية', callback_data: 'cancel_delete_all_replies' }]
-            ]
-        };
-        ctx.editMessageText('⚠️ تحذير: هل أنت متأكد أنك تريد حذف جميع الردود؟ هذا الإجراء لا يمكن التراجع عنه.', { reply_markup: confirmKeyboard });
-    } else {
-        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
-
-bot.action('confirm_delete_all_replies', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        try {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').deleteMany({});
-            ctx.answerCbQuery('تم حذف جميع الردود بنجاح', { show_alert: true });
-            showRepliesMenu(ctx);
-        } catch (error) {
-            console.error('Error deleting all replies:', error);
-            ctx.answerCbQuery('حدث خطأ أثناء حذف الردود', { show_alert: true });
+    bot.action(/^delete_general_reply_(.+)$/, async (ctx) => {
+        const botId = ctx.match[1];
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('حذف رد عام');
+            ctx.reply('أرسل الكلمة التي تريد حذف الرد لها:');
+            ctx.session.awaitingDeleteReplyWord = true;
+            ctx.session.currentBotId = botId;
+        } else {
+            ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
         }
-    } else {
-        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
+    });
+    
+    bot.action(/^delete_all_replies_(.+)$/, async (ctx) => {
+        const botId = ctx.match[1];
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery();
+            const confirmKeyboard = {
+                inline_keyboard: [
+                    [{ text: '✅ نعم، احذف جميع الردود', callback_data: `confirm_delete_all_replies_${botId}` }],
+                    [{ text: '❌ لا، إلغاء العملية', callback_data: `cancel_delete_all_replies_${botId}` }]
+                ]
+            };
+            ctx.editMessageText('⚠️ تحذير: هل أنت متأكد أنك تريد حذف جميع الردود؟ هذا الإجراء لا يمكن التراجع عنه.', { reply_markup: confirmKeyboard });
+        } else {
+            ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    });
 
-bot.action('cancel_delete_all_replies', async (ctx) => {
-    await ctx.answerCbQuery('تم إلغاء عملية الحذف');
-    showRepliesMenu(ctx);
-});
+    bot.action(/^confirm_delete_all_replies_(.+)$/, async (ctx) => {
+        const botId = ctx.match[1];
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            try {
+                await deleteAllClonedBotReplies(botId);
+                ctx.answerCbQuery('تم حذف جميع الردود بنجاح', { show_alert: true });
+                showRepliesMenu(ctx, botId);
+            } catch (error) {
+                console.error('Error deleting all replies:', error);
+                ctx.answerCbQuery('حدث خطأ أثناء حذف الردود', { show_alert: true });
+            }
+        } else {
+            ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    });
+
+    bot.action(/^cancel_delete_all_replies_(.+)$/, async (ctx) => {
+        const botId = ctx.match[1];
+        await ctx.answerCbQuery('تم إلغاء عملية الحذف');
+        showRepliesMenu(ctx, botId);
+    });
     bot.action('dev_broadcast', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery();
@@ -1610,22 +1642,16 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
             ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
         }
     });
-    bot.action('list_general_replies', async (ctx) => {
+    bot.action(/^list_general_replies_(.+)$/, async (ctx) => {
+        const botId = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('عرض الردود العامة');
             try {
-                const db = await ensureDatabaseInitialized();
-                const replies = await db.collection('replies').find({}).toArray();
-                
+                const replies = await listClonedBotReplies(botId);
                 let replyList = 'الردود العامة:\n\n';
                 if (replies.length > 0) {
                     replies.forEach((reply, index) => {
-                        const triggerWord = reply.trigger_word || reply.word || 'غير معروف';
-                        const replyContent = reply.type === 'text' ? 
-                            (reply.text || 'نص غير متوفر') : 
-                            `${reply.type} (${reply.media_url ? 'متوفر' : 'غير متوفر'})`;
-                        
-                        replyList += `${index + 1}. الكلمة: ${triggerWord}\nالرد: ${replyContent}\n\n`;
+                        replyList += `${index + 1}. الكلمة: ${reply.trigger_word}\nالرد: ${reply.content}\n\n`;
                     });
                 } else {
                     replyList += 'لا توجد ردود عامة حالياً.';
@@ -1633,13 +1659,12 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
                 ctx.reply(replyList);
             } catch (error) {
                 console.error('Error fetching replies:', error);
-                ctx.reply('❌ حدث خطأ أثناء جلب الردود العامة.');
+                ctx.reply('حدث خطأ أثناء جلب الردود.');
             }
         } else {
             ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
         }
     });
-    
     // Add this callback handler for the start_quiz button
     bot.action('start_quiz', async (ctx) => {
         try {
@@ -2069,6 +2094,7 @@ bot.on('left_chat_member', (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
+        
     console.log('Received message:', ctx.message.text);
     if (await handleAwaitingReplyResponse(ctx)) return;
 
@@ -2285,7 +2311,33 @@ bot.on('left_chat_member', (ctx) => {
         }
     }
     
-    
+// Check if we're awaiting a reply word or response
+if (ctx.session.awaitingReplyWord) {
+    ctx.session.tempReplyWord = text;
+    ctx.reply('الآن أرسل الرد لهذه الكلمة:');
+    ctx.session.awaitingReplyWord = false;
+    ctx.session.awaitingReplyResponse = true;
+} else if (ctx.session.awaitingReplyResponse) {
+    const replyWord = ctx.session.tempReplyWord;
+    const replyContent = text;
+    await addClonedBotReply(ctx.session.currentBotId, replyWord, replyContent);
+    ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${replyWord}\nالرد: ${replyContent}`);
+    ctx.session.awaitingReplyResponse = false;
+    delete ctx.session.tempReplyWord;
+    delete ctx.session.currentBotId;
+} else if (ctx.session.awaitingDeleteReplyWord) {
+    await deleteClonedBotReply(ctx.session.currentBotId, text);
+    ctx.reply(`تم حذف الرد للكلمة "${text}" بنجاح.`);
+    ctx.session.awaitingDeleteReplyWord = false;
+    delete ctx.session.currentBotId;
+} else {
+    // Check for automatic replies
+    const replies = await listClonedBotReplies(botId);
+    const matchingReply = replies.find(reply => reply.trigger_word.toLowerCase() === text);
+    if (matchingReply) {
+        ctx.reply(matchingReply.content);
+    }
+}    
     
     // Handle awaiting delete reply word
     // Handle awaiting delete reply word
@@ -2711,15 +2763,17 @@ async function checkForAutomaticReply(ctx) {
 
 // Implement other helper functions similarly...
  
-    bot.action('add_general_reply', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('إضافة رد عام');
-            ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-            awaitingReplyWord = true;
-        } else {
-            ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-        }
-    });
+bot.action(/^add_general_reply_(.+)$/, async (ctx) => {
+    const botId = ctx.match[1];
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('إضافة رد عام');
+        ctx.reply('أرسل الكلمة المفتاحية للرد الجديد:');
+        ctx.session.awaitingReplyWord = true;
+        ctx.session.currentBotId = botId;
+    } else {
+        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
     
     function showDevelopersMenu(ctx) {
         const message = ' يرجى استخدام الاوامر لرفع مطور اساسي او مطور ثاني , قائمة المطورين - اختر الإجراء المطلوب:';
