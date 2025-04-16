@@ -261,8 +261,7 @@ bot.catch((err, ctx) => {
 
 
 
-        // Handle subscription check callback
-        // Handle subscription check callback
+      
 // Handle subscription check callback
 bot.action('check_subscription', async (ctx) => {
     const sourceChannel = 'Lorisiv'; // Change to your channel username without @
