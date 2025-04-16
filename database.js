@@ -76,7 +76,31 @@ async function getQuizQuestions(difficulty, count) {
 
     return finalQuestions;
 }
-
+async function createClonedDatabase(cloneId) {
+    const cloneDbName = `bot_${cloneId}_db`;
+    const cloneUri = mongoUri.replace(dbName, cloneDbName);
+    
+    try {
+        const cloneClient = new MongoClient(cloneUri, mongooseOptions);
+        await cloneClient.connect();
+        const cloneDb = cloneClient.db(cloneDbName);
+        
+        // Copy necessary collections from the original database
+        const collections = ['quiz_questions', 'quiz_scores', 'quiz_answers', 'replies', 'developers', 'groups', 'users'];
+        for (const collection of collections) {
+            await db.collection(collection).aggregate([
+                { $match: {} },
+                { $out: { db: cloneDbName, coll: collection } }
+            ]).toArray();
+        }
+        
+        console.log(`Cloned database created: ${cloneDbName}`);
+        return cloneDb;
+    } catch (error) {
+        console.error('Error creating cloned database:', error);
+        throw error;
+    }
+}
 // Helper function to shuffle an array
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -103,7 +127,7 @@ async function getQuizCategories() {
         return [];
     }
 }
-async function connectToMongoDB() {
+async function connectToMongoDB(customDbName = null) {
     try {
         console.log('Attempting to connect to MongoDB...');
         
@@ -115,10 +139,13 @@ async function connectToMongoDB() {
             connectTimeoutMS: 30000
         };
         
-        const sanitizedUri = mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+        const dbNameToUse = customDbName || dbName;
+        const uriToUse = mongoUri.replace(dbName, dbNameToUse);
+        
+        const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
         console.log(`Connecting to: ${sanitizedUri} with options:`, options);
         
-        await mongoose.connect(mongoUri, options);
+        await mongoose.connect(uriToUse, options);
         console.log('Connected to MongoDB successfully');
         return mongoose.connection.db;
     } catch (error) {
