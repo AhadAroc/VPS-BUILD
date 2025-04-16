@@ -1563,18 +1563,18 @@ bot.action('back_to_quiz_menu', async (ctx) => {
  
 bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     try {
-        const userId = parseInt(ctx.match[1]);
+        const botId = parseInt(ctx.match[1]);
         
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('إضافة رد عام');
             
-            // Store the user ID for whom we're adding the reply
-            ctx.session.addReplyForUserId = userId;
+            // Store the bot ID for which we're adding the reply
+            ctx.session.addReplyForBotId = botId;
             
             await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]
+                        [{ text: '🔙 رجوع', callback_data: 'cancel_add_reply' }]
                     ]
                 }
             });
@@ -1587,6 +1587,20 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     } catch (error) {
         console.error('Error in add_general_reply action:', error);
         await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
+    }
+});
+
+// Add a new action handler for canceling the add reply operation
+bot.action('cancel_add_reply', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('تم إلغاء إضافة الرد');
+        ctx.session.awaitingReplyWord = false;
+        ctx.session.awaitingReplyResponse = false;
+        ctx.session.addReplyForBotId = null;
+        await ctx.editMessageText('تم إلغاء عملية إضافة الرد. يمكنك بدء العملية من جديد في أي وقت.');
+    } catch (error) {
+        console.error('Error canceling add reply:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء إلغاء العملية.', { show_alert: true });
     }
 });
     // Modify the delete_general_reply action handler
