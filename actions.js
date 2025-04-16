@@ -1596,9 +1596,9 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
                 }
             });
 
-            // Set up a one-time listener for the next text message
-            bot.use(async (ctx, next) => {
-                if (ctx.message && ctx.message.text && ctx.session.awaitingReplyWord) {
+            // Set up a listener for the next text message
+            bot.on('text', async (ctx) => {
+                if (ctx.session.awaitingReplyWord) {
                     ctx.session.tempReplyWord = ctx.message.text.trim().toLowerCase();
                     ctx.session.awaitingReplyWord = false;
                     ctx.session.awaitingReplyResponse = true;
@@ -1610,36 +1610,51 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
                             ]
                         }
                     });
-                    return;
+                } else if (ctx.session.awaitingReplyResponse) {
+                    const replyContent = ctx.message.text.trim();
+
+                    // Save the reply to the database
+                    const db = await ensureDatabaseInitialized(ctx.session.addReplyForBotId);
+                    await db.collection('replies').insertOne({
+                        bot_id: ctx.session.addReplyForBotId,
+                        trigger_word: ctx.session.tempReplyWord,
+                        response: replyContent,
+                        media_type: 'text'
+                    });
+
+                    // Clear the session data
+                    delete ctx.session.addReplyForBotId;
+                    delete ctx.session.awaitingReplyWord;
+                    delete ctx.session.awaitingReplyResponse;
+                    delete ctx.session.tempReplyWord;
+
+                    await ctx.reply('تم إضافة الرد العام بنجاح!', {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🔙 العودة لقائمة الردود', callback_data: `back_to_replies_menu:${ctx.session.addReplyForBotId}` }]
+                            ]
+                        }
+                    });
                 }
-                return next();
             });
 
-            // Set up a one-time listener for the reply content
-            bot.use(async (ctx, next) => {
+            // Handle media messages (photo, video, sticker, etc.)
+            bot.on(['photo', 'video', 'animation', 'sticker'], async (ctx) => {
                 if (ctx.session.awaitingReplyResponse) {
-                    let mediaType = 'text';
-                    let replyContent = null;
-                    let fileId = null;
+                    let mediaType, fileId;
 
-                    if (ctx.message.text) {
-                        mediaType = 'text';
-                        replyContent = ctx.message.text.trim();
-                    } else if (ctx.message.photo) {
+                    if (ctx.message.photo) {
                         mediaType = 'photo';
                         fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                    } else if (ctx.message.sticker) {
-                        mediaType = 'sticker';
-                        fileId = ctx.message.sticker.file_id;
                     } else if (ctx.message.video) {
                         mediaType = 'video';
                         fileId = ctx.message.video.file_id;
                     } else if (ctx.message.animation) {
                         mediaType = 'animation';
                         fileId = ctx.message.animation.file_id;
-                    } else {
-                        await ctx.reply('عذرًا، هذا النوع من الوسائط غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو صورة متحركة.');
-                        return;
+                    } else if (ctx.message.sticker) {
+                        mediaType = 'sticker';
+                        fileId = ctx.message.sticker.file_id;
                     }
 
                     // Save the reply to the database
@@ -1647,7 +1662,7 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
                     await db.collection('replies').insertOne({
                         bot_id: ctx.session.addReplyForBotId,
                         trigger_word: ctx.session.tempReplyWord,
-                        response: replyContent || fileId,
+                        response: fileId,
                         media_type: mediaType
                     });
 
@@ -1665,8 +1680,8 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
                         }
                     });
                 }
-                return next();
             });
+
         } else {
             await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
         }
@@ -1675,7 +1690,6 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
     }
 });
-
 
 
 bot.action('cancel_add_reply', async (ctx) => {
