@@ -2,8 +2,10 @@
 let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
-// Add this at the top of your file with other imports
-const { Scenes } = require('telegraf');
+
+const { Scenes, session } = require('telegraf');
+bot.use(session());
+
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
