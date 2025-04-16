@@ -111,12 +111,9 @@ async function handleTextMessage(ctx) {
     }
     
     if (awaitingReplyResponse) {
-        // This will be handled by the media handlers
-        if (ctx.message.text) {
-            await handleAwaitingReplyResponse(ctx);
-        }
+        await handleAwaitingReplyResponse(ctx);
         return;
-    }}
+    }
     
     if (awaitingDeleteReplyWord) {
         await handleAwaitingDeleteReplyWord(ctx);
