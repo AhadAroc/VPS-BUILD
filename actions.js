@@ -1559,7 +1559,36 @@ bot.action('back_to_quiz_menu', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء العودة لقائمة المسابقات.');
     }
 });
-
+// Implement other helper functions similarly...
+ 
+bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
+    try {
+        const userId = parseInt(ctx.match[1]);
+        
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('إضافة رد عام');
+            
+            // Store the user ID for whom we're adding the reply
+            ctx.session.addReplyForUserId = userId;
+            
+            await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]
+                    ]
+                }
+            });
+            
+            // Set the state to await the trigger word
+            ctx.session.awaitingReplyWord = true;
+        } else {
+            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error in add_general_reply action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
+    }
+});
     // Modify the delete_general_reply action handler
     bot.action(/^delete_general_reply:(\d+)$/, async (ctx) => {
         try {
@@ -1709,7 +1738,11 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
     
                 if (replies.length === 0) {
-                    await ctx.editMessageText('لا توجد ردود مضافة لهذا البوت.');
+                    await ctx.editMessageText('لا توجد ردود مضافة لهذا البوت.', {
+                        reply_markup: {
+                            inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
+                        }
+                    });
                     return;
                 }
     
@@ -2823,36 +2856,7 @@ async function checkForAutomaticReply(ctx) {
     }
 }
 
-// Implement other helper functions similarly...
- 
-bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
-    try {
-        const userId = parseInt(ctx.match[1]);
-        
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('إضافة رد عام');
-            
-            // Store the user ID for whom we're adding the reply
-            ctx.session.addReplyForUserId = userId;
-            
-            await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]
-                    ]
-                }
-            });
-            
-            // Set the state to await the trigger word
-            ctx.session.awaitingReplyWord = true;
-        } else {
-            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-        }
-    } catch (error) {
-        console.error('Error in add_general_reply action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
-    }
-});
+
     
     function showDevelopersMenu(ctx) {
         const message = ' يرجى استخدام الاوامر لرفع مطور اساسي او مطور ثاني , قائمة المطورين - اختر الإجراء المطلوب:';
