@@ -623,7 +623,7 @@ async function checkAndUpdateActivation(cloneId, userId) {
     await newClone.save();
     console.log(`Database entry created for bot ${botId}`);
 }
-const { createClonedDatabase, connectToMongoDB } = require('./database');
+
 
 const { createClonedDatabase, connectToMongoDB } = require('./database');
 const { v4: uuidv4 } = require('uuid'); // Ensure you have this import for generating unique IDs
