@@ -625,13 +625,16 @@ async function checkAndUpdateActivation(cloneId, userId) {
 }
 const { createClonedDatabase, connectToMongoDB } = require('./database');
 
+const { createClonedDatabase, connectToMongoDB } = require('./database');
+const { v4: uuidv4 } = require('uuid'); // Ensure you have this import for generating unique IDs
+
 async function cloneBot(originalBotToken, newBotToken) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
     const cloneDbName = `bot_${cloneId}_db`;
 
     // Create a new database for this clone
-    await createClonedDatabase(cloneId);
+    await createClonedDatabase(cloneDbName);
 
     // Copy the original bot file
     exec(`cp bot.js ${cloneName}.js`, async (error) => {
