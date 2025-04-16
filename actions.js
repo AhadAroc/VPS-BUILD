@@ -1171,69 +1171,36 @@ async function saveCustomQuestion(chatId, question, answer) {
         throw error;
     }
 }
-// Add this function to handle awaiting reply response
+// Handle the reply response
 async function handleAwaitingReplyResponse(ctx) {
     if (!awaitingReplyResponse) return false;
 
     try {
-        // Check if it's a group chat
-        if (ctx.chat.type !== 'private') {
-            await ctx.reply('شلونكم ؟ 🌝');
+        const userState = userStates.get(ctx.from.id);
+        const botId = userState?.botId;
+
+        if (!botId) {
+            await ctx.reply('❌ حدث خطأ في تحديد معرف البوت. يرجى المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
             return true;
         }
 
-        // Continue with the reply saving process for private chats
+        // Continue with the reply saving process
         let mediaType = 'text';
         let replyText = null;
         let mediaUrl = null;
         let fileId = null;
 
-        // Validate that tempReplyWord is not empty or null
-        if (!tempReplyWord || tempReplyWord.trim() === '') {
-            await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            return true;
-        }
-
-        if (ctx.message.animation) {
-            mediaType = 'animation';
-            fileId = ctx.message.animation.file_id;
-        } else if (ctx.message.photo) {
-            mediaType = 'photo';
-            const photoArray = ctx.message.photo;
-            fileId = photoArray[photoArray.length - 1].file_id;
-        } else if (ctx.message.sticker) {
-            mediaType = 'sticker';
-            fileId = ctx.message.sticker.file_id;
-        } else if (ctx.message.video) {
-            mediaType = 'video';
-            fileId = ctx.message.video.file_id;
-        } else if (ctx.message.text) {
+        if (ctx.message.text) {
             mediaType = 'text';
             replyText = ctx.message.text.trim();
         } else {
-            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
+            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص.');
             awaitingReplyResponse = false;
-            tempReplyWord = '';
             return true;
         }
 
-        if (fileId) {
-            try {
-                const fileLink = await ctx.telegram.getFileLink(fileId);
-                mediaUrl = fileLink.href;
-            } catch (error) {
-                console.error('Error getting file link:', error);
-                await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-                return true;
-            }
-        }
-
-        const botId = ctx.botInfo.id;
-        const db = await ensureDatabaseInitialized(botId);
+        const db = await ensureDatabaseInitialized();
 
         // Check if trigger word already exists
         const existingReply = await db.collection('replies').findOne({ 
@@ -1244,7 +1211,6 @@ async function handleAwaitingReplyResponse(ctx) {
         if (existingReply) {
             await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
             awaitingReplyResponse = false;
-            tempReplyWord = '';
             return true;
         }
 
@@ -1270,7 +1236,6 @@ async function handleAwaitingReplyResponse(ctx) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
         awaitingReplyResponse = false;
-        tempReplyWord = '';
         return true;
     }
 }
@@ -1469,7 +1434,8 @@ bot.action('add_reply', async (ctx) => {
         // Use userStates to track the user's state
         userStates.set(ctx.from.id, {
             action: 'adding_reply',
-            step: 'awaiting_trigger'
+            step: 'awaiting_trigger',
+            botId: ctx.botInfo.id // Store the bot ID
         });
     } catch (error) {
         console.error('Error in add_reply action:', error);
