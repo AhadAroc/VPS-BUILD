@@ -69,38 +69,6 @@ app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
 
-async function initializeClonedBotDatabase(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        
-        // Create collections for the cloned bot
-        await db.createCollection(`users_${botId}`);
-        await db.createCollection(`groups_${botId}`);
-        await db.createCollection(`replies_${botId}`);
-        await db.createCollection(`quiz_questions_${botId}`);
-        await db.createCollection(`quiz_scores_${botId}`);
-        
-        console.log(`Initialized database for cloned bot ${botId}`);
-    } catch (error) {
-        console.error(`Error initializing database for cloned bot ${botId}:`, error);
-    }
-}
-async function deleteClonedBotDatabase(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        
-        // Delete collections for the cloned bot
-        await db.collection(`users_${botId}`).drop();
-        await db.collection(`groups_${botId}`).drop();
-        await db.collection(`replies_${botId}`).drop();
-        await db.collection(`quiz_questions_${botId}`).drop();
-        await db.collection(`quiz_scores_${botId}`).drop();
-        
-        console.log(`Deleted database for cloned bot ${botId}`);
-    } catch (error) {
-        console.error(`Error deleting database for cloned bot ${botId}:`, error);
-    }
-}
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -497,10 +465,8 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
                 console.error(`Error removing bot ${botId} from database:`, error);
             });
             
-            // Delete the cloned bot's database
-            await deleteClonedBotDatabase(botId);
-            
             // CRITICAL FIX: Make sure we're properly removing from userDeployments
+            // First, check if this user has this specific bot ID
             if (userDeployments.get(userId) === parseInt(botId)) {
                 userDeployments.delete(userId);
                 console.log(`Removed user ${userId} from userDeployments map`);
@@ -656,44 +622,78 @@ async function checkAndUpdateActivation(cloneId, userId) {
 
     await newClone.save();
     console.log(`Database entry created for bot ${botId}`);
-
-    // Initialize the cloned bot's database
-    await initializeClonedBotDatabase(botId);
 }
-
+const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 async function cloneBot(originalBotToken, newBotToken) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
-  
+    const cloneDbName = `bot_${cloneId}_db`;
+
+    // Create a new database for this clone
+    await createClonedDatabase(cloneId);
+
     // Copy the original bot file
-    exec(`cp bot.js ${cloneName}.js`, (error) => {
-      if (error) {
-        console.error(`Error copying bot file: ${error}`);
-        return;
-      }
-  
-      // Replace the bot token in the new file
-      exec(`sed -i 's/const BOT_TOKEN = .*/const BOT_TOKEN = "${newBotToken}";/' ${cloneName}.js`, (error) => {
+    exec(`cp bot.js ${cloneName}.js`, async (error) => {
         if (error) {
-          console.error(`Error replacing token: ${error}`);
-          return;
-        }
-  
-        // Start the new bot process with PM2
-        exec(`pm2 start ${cloneName}.js --name ${cloneName}`, (error) => {
-          if (error) {
-            console.error(`Error starting clone: ${error}`);
+            console.error(`Error copying bot file: ${error}`);
             return;
-          }
-          console.log(`Clone ${cloneName} started successfully`);
+        }
+
+        // Replace the bot token and database name in the new file
+        exec(`sed -i 's/const BOT_TOKEN = .*/const BOT_TOKEN = "${newBotToken}";/' ${cloneName}.js`, (error) => {
+            if (error) {
+                console.error(`Error replacing token: ${error}`);
+                return;
+            }
+
+            exec(`sed -i 's/const DB_NAME = .*/const DB_NAME = "${cloneDbName}";/' ${cloneName}.js`, (error) => {
+                if (error) {
+                    console.error(`Error replacing database name: ${error}`);
+                    return;
+                }
+
+                // Start the new bot process with PM2
+                exec(`pm2 start ${cloneName}.js --name ${cloneName}`, (error) => {
+                    if (error) {
+                        console.error(`Error starting clone: ${error}`);
+                        return;
+                    }
+                    console.log(`Clone ${cloneName} started successfully`);
+                });
+            });
         });
-      });
     });
-  
+
     // Create a new database entry for the clone
-    await createCloneDbEntry(cloneId, newBotToken);
-  }
+    await createCloneDbEntry(cloneId, newBotToken, cloneDbName);
+}
+
+async function createCloneDbEntry(botId, botToken, dbName) {
+    const db = await connectToMongoDB(dbName);
+    const CloneModel = mongoose.model('Clone', new mongoose.Schema({
+        botId: String,
+        botToken: String,
+        dbName: String,
+        createdAt: Date,
+        expiresAt: Date,
+        statistics: {
+            messagesProcessed: { type: Number, default: 0 },
+            commandsExecuted: { type: Number, default: 0 },
+        }
+    }));
+
+    const newClone = new CloneModel({
+        botId,
+        botToken,
+        dbName,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+    });
+
+    await newClone.save();
+    console.log(`Database entry created for bot ${botId}`);
+}
 async function cleanupDatabase() {
     const CloneModel = mongoose.model('Clone');
     const activeBotIds = Object.keys(activeBots);
