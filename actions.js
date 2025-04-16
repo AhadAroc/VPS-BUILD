@@ -1744,9 +1744,14 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
             const botId = ctx.match[1];
             const userId = ctx.from.id;
     
+            console.log(`Listing replies for bot ${botId}`);
+    
             if (await isDeveloper(ctx, userId)) {
                 const db = await ensureDatabaseInitialized(botId);
+                console.log(`Database initialized for bot ${botId}`);
+    
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
+                console.log(`Found ${replies.length} replies for bot ${botId}`);
     
                 if (replies.length === 0) {
                     await ctx.editMessageText('لا توجد ردود مضافة لهذا البوت.', {
@@ -1760,7 +1765,7 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
                 let message = 'قائمة الردود العامة:\n\n';
                 replies.forEach((reply, index) => {
                     message += `${index + 1}. الكلمة: ${reply.trigger_word}\n`;
-                    message += `   الرد: ${reply.response}\n\n`;
+                    message += `   الرد: ${reply.reply_text}\n\n`;
                 });
     
                 await ctx.editMessageText(message, {
@@ -2422,7 +2427,27 @@ bot.on('left_chat_member', (ctx) => {
         }
     }
     
-    
+    if (awaitingReplyResponse) {
+        const replyResponse = ctx.message.text;
+        try {
+            const db = await ensureDatabaseInitialized(tempBotId);
+            console.log(`Saving reply for bot ${tempBotId}: ${tempReplyWord} -> ${replyResponse}`);
+            await db.collection('replies').updateOne(
+                { trigger_word: tempReplyWord },
+                { $set: { trigger_word: tempReplyWord, reply_text: replyResponse, bot_id: tempBotId } },
+                { upsert: true }
+            );
+            
+            console.log(`Reply saved successfully for bot ${tempBotId}`);
+            ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${replyResponse}`);
+            awaitingReplyResponse = false;
+            tempBotId = null; // Clear the temporary botId
+        } catch (error) {
+            console.error('Error saving reply:', error);
+            ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+        }
+    }  
     
     // Handle awaiting delete reply word
     // Handle awaiting delete reply word
