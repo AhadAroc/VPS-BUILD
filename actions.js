@@ -3,7 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 // Add this at the top of your file with other imports
-const { Scenes } = require('telegraf');
+const { Telegraf,Scenes } = require('telegraf');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -48,9 +48,6 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-const stage = new Scenes.Stage([/* your scenes here */]);
-bot.use(session());
-bot.use(stage.middleware());
 
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
@@ -576,6 +573,9 @@ bot.action(/^set_timer_(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
     }
 });
+const stage = new Scenes.Stage([/* your scenes here */]);
+bot.use(session());
+bot.use(stage.middleware());
 
 bot.action('show_current_timer', async (ctx) => {
     try {
