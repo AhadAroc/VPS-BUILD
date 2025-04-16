@@ -1452,7 +1452,30 @@ async function listAllReplies(ctx, botId) {
         });
     }
 }
+// Add this action handler for adding a new reply
+bot.action('add_reply', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        // Check if the user is a developer or has the necessary permissions
+        const isDev = await isDeveloper(ctx, ctx.from.id);
+        if (!isDev) {
+            return ctx.reply('❌ هذا الأمر متاح فقط للمطورين.');
+        }
 
+        // Prompt the user to enter the trigger word
+        await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
+        
+        // Use userStates to track the user's state
+        userStates.set(ctx.from.id, {
+            action: 'adding_reply',
+            step: 'awaiting_trigger'
+        });
+    } catch (error) {
+        console.error('Error in add_reply action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة رد جديد.');
+    }
+});
 // Add this to your callback query handler
 // Add this to your callback query handler
 bot.action('list_replies', async (ctx) => {
