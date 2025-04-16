@@ -6,8 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const express = require('express');
-// Add this at the top of your file
-const subscriptionCache = {};
 const mongoURI = process.env.MONGODB_URI;
 // Store user deployments
 const userDeployments = new Map();
@@ -178,18 +176,6 @@ async function isSubscribedToChannel(ctx, userId, channelUsername) {
         return true;
     }
 }
-
-async function isUserSubscribed(ctx, channelUsername) {
-    try {
-        const member = await ctx.telegram.getChatMember(channelUsername, ctx.from.id);
-        // These statuses mean the user is a valid member
-        return ['member', 'administrator', 'creator'].includes(member.status);
-    } catch (error) {
-        console.error('Subscription check failed:', error);
-        return false;
-    }
-}
-
 // Initialize bot
 async function initBot() {
     try {
@@ -206,10 +192,42 @@ async function initBot() {
         // Add middleware to check channel subscription for all commands
         // Add middleware to check channel subscription for all commands
 // Add middleware to check channel subscription for all commands
-// Add this at the top of your file
-const subscriptionCache = {};
-
-
+bot.use(async (ctx, next) => {
+    // Skip subscription check for specific commands or in private chats
+    if (!ctx.from) {
+        return next();
+    }
+    
+    // Skip subscription check for the check_subscription callback
+    if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+        return next();
+    }
+    
+    // Define your source channel username
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        // Check if user is subscribed
+        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+        
+        if (!isSubscribed) {
+            // Send subscription message with inline keyboard
+            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error in subscription check middleware:', error);
+        // On error, allow the user to proceed to avoid blocking legitimate users
+    }
+    
+    return next();
+});
 
 // Add this error handler to handle group migration errors
 bot.catch((err, ctx) => {
@@ -228,7 +246,8 @@ bot.catch((err, ctx) => {
 
 
 
-      
+        // Handle subscription check callback
+        // Handle subscription check callback
 // Handle subscription check callback
 bot.action('check_subscription', async (ctx) => {
     const sourceChannel = 'Lorisiv'; // Change to your channel username without @
@@ -236,12 +255,14 @@ bot.action('check_subscription', async (ctx) => {
     try {
         await ctx.answerCbQuery('⏳ جاري التحقق من الاشتراك...');
         
-        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
+        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
         
         if (isSubscribed) {
-            subscriptionCache[ctx.from.id] = { isSubscribed: true };
             await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.', { show_alert: true });
+            // Try to delete the subscription message
             await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
+            
+            // Send a welcome message with the "Add to Group" button
             await ctx.reply('مرحباً بك في البوت! يمكنك الآن استخدام جميع الميزات.', {
                 reply_markup: {
                     inline_keyboard: [
@@ -558,7 +579,6 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
-
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
@@ -996,12 +1016,6 @@ app.listen(PORT, '0.0.0.0', () => {
     cleanupDatabase();
 });
 
-// Clear the cache every hour
-setInterval(() => {
-    for (const userId in subscriptionCache) {
-        delete subscriptionCache[userId];
-    }
-}, 3600000); // 1 hour in milliseconds
 
 // Start the bot
 bot.launch().then(() => {
