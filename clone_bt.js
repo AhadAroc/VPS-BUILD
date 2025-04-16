@@ -149,16 +149,7 @@ const database = require('../database');
 // Channel subscription check function
 
 
-async function isUserSubscribed(ctx, channelUsername) {
-    try {
-        const member = await ctx.telegram.getChatMember(channelUsername, ctx.from.id);
-        // These statuses mean the user is a valid member
-        return ['member', 'administrator', 'creator'].includes(member.status);
-    } catch (error) {
-        console.error('Subscription check failed:', error);
-        return false;
-    }
-}
+
 
 // Initialize bot
 async function initBot() {
