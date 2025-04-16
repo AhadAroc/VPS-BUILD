@@ -628,6 +628,8 @@ async function checkAndUpdateActivation(cloneId, userId) {
 const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 
+
+
 async function cloneBot(originalBotToken, newBotToken) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
@@ -707,6 +709,24 @@ async function cleanupDatabase() {
     } catch (error) {
         console.error('Error cleaning up database:', error);
     }
+}
+async function addReplyToBotDatabase(botId, triggerWord, replyContent) {
+    const dbName = `bot_${botId}_db`;
+    const db = await connectToMongoDB(dbName);
+    const ReplyModel = db.model('Reply', new mongoose.Schema({
+        trigger_word: String,
+        content: String,
+        createdAt: Date
+    }));
+
+    const newReply = new ReplyModel({
+        trigger_word: triggerWord,
+        content: replyContent,
+        createdAt: new Date()
+    });
+
+    await newReply.save();
+    console.log(`Reply added for bot ${botId}`);
 }
 // Load existing bots on startup
 // Load existing bots on startup
