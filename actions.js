@@ -2792,78 +2792,52 @@ bot.on('text', async (ctx) => {
 
     await next();
 });
-// Add these handlers for media types
+// For photo handler
 bot.on('photo', async (ctx) => {
-    if (awaitingReplyResponse) {
-        await handleMediaReplyResponse(ctx, 'photo');
-        return;
-    }
-    
-    // Your existing photo handling code...
-    // If you're in a group, check for any restrictions
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        const chatId = ctx.chat.id;
-        const photoRestricted = photoRestrictionStatus.get(chatId);
-        
-        if (photoRestricted) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
-                try {
-                    await ctx.deleteMessage();
-                    await ctx.reply('❌ عذرًا، إرسال الصور غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                } catch (error) {
-                    console.error('Error in photo restriction:', error);
-                }
-                return;
-            }
+    try {
+        // First check if we're awaiting a reply response
+        if (awaitingReplyResponse) {
+            const handled = await handleMediaReplyResponse(ctx, 'photo');
+            if (handled) return;
         }
+        
+        // Rest of your photo handling logic
+        // ...
+    } catch (error) {
+        console.error('Error handling photo message:', error);
     }
-    
-    // Track photos for media cleaning if needed
-    const chatId = ctx.chat.id;
-    const messageId = ctx.message.message_id;
-    const timestamp = Date.now();
-    
-    let photos = photoMessages.get(chatId) || [];
-    photos.push({ messageId, timestamp });
-    photoMessages.set(chatId, photos);
 });
 
+// For video handler
 bot.on('video', async (ctx) => {
-    if (awaitingReplyResponse) {
-        await handleMediaReplyResponse(ctx, 'video');
-        return;
-    }
-    
-    // Your existing video handling code...
-    // If you're in a group, check for any restrictions
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+    try {
         const chatId = ctx.chat.id;
-        const videoRestricted = videoRestrictionStatus.get(chatId);
-        
-        if (videoRestricted) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
-                try {
-                    await ctx.deleteMessage();
-                    await ctx.reply('❌ عذرًا، إرسال الفيديوهات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                } catch (error) {
-                    console.error('Error in video restriction:', error);
-                }
+        const isRestricted = videoRestrictionStatus.get(chatId);
+
+        // First check if we're awaiting a reply response
+        if (awaitingReplyResponse) {
+            const handled = await handleMediaReplyResponse(ctx, 'video');
+            if (handled) return;
+        }
+
+        // Video restriction check
+        if (isRestricted) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الفيديوهات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
                 return;
             }
         }
+
+        // Continue with any existing video handling logic...
+    } catch (error) {
+        console.error('Error handling video message:', error);
     }
-    
-    // Track videos for media cleaning if needed
-    const chatId = ctx.chat.id;
-    const messageId = ctx.message.message_id;
-    const timestamp = Date.now();
-    
-    let videos = videoMessages.get(chatId) || [];
-    videos.push({ messageId, timestamp });
-    videoMessages.set(chatId, videos);
 });
+
+// Similarly for document, sticker, and animation handlers
 
 bot.on('document', async (ctx) => {
     if (awaitingReplyResponse) {
@@ -3093,18 +3067,21 @@ async function handleMediaReplyResponse(ctx, mediaType) {
                 
                 await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح. نوع الرد: ${mediaType}`);
             }
+            
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            return true;
+            
         } catch (error) {
             console.error('Error adding/updating media reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى لاحقًا.');
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            return true;
         }
-
-        // Reset state
-        tempReplyWord = '';
-        awaitingReplyResponse = false;
-        return true;
     } catch (error) {
         console.error('Error in handleMediaReplyResponse:', error);
-        await ctx.reply('❌ حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقًا.');
+        await ctx.reply('❌ حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
         awaitingReplyResponse = false;
         return true;
     }
