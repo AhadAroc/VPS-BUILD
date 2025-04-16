@@ -1398,9 +1398,9 @@ createGroupsTable();
         }
     }
 // Add this function to handle the list replies button
-async function listAllReplies(ctx) {
+async function listAllReplies(ctx, botId) {
     try {
-        const replies = await getAllReplies();
+        const replies = await getAllReplies(botId);
         
         if (!replies || replies.length === 0) {
             await ctx.editMessageText('الردود العامة:\n\nلا توجد ردود عامة حالياً', {
@@ -1454,8 +1454,11 @@ async function listAllReplies(ctx) {
 }
 
 // Add this to your callback query handler
-bot.action('list_replies', listAllReplies);
-
+// Add this to your callback query handler
+bot.action('list_replies', async (ctx) => {
+    const botId = ctx.botInfo.id;
+    await listAllReplies(ctx, botId);
+});
 // Update the dev_replies handler to include the list option
 bot.action('dev_replies', async (ctx) => {
     try {
@@ -1474,15 +1477,15 @@ bot.action('dev_replies', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء تحميل قسم الردود');
     }
 });
-    async function getAllReplies() {
-        try {
-            const db = await ensureDatabaseInitialized();
-            return await db.collection('replies').find({}).toArray();
-        } catch (error) {
-            console.error('Error fetching all replies:', error);
-            return [];
-        }
+async function getAllReplies(botId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        return await db.collection('replies').find({ bot_id: botId }).toArray();
+    } catch (error) {
+        console.error('Error fetching all replies:', error);
+        return [];
     }
+}
     function showRepliesMenu(ctx) {
         const botId = ctx.botInfo.id;
         const message = 'قسم الردود - اختر الإجراء المطلوب:';
