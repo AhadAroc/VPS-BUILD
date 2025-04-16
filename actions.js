@@ -3,7 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 
-const { Scenes, session } = require('telegraf');
+
 
 
 // Make sure this is at the top of your file
