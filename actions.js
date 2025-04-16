@@ -79,7 +79,6 @@ async function saveFile(fileLink, fileName) {
 
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
-// Simplify your handleTextMessage function
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
@@ -168,7 +167,7 @@ async function handleTextMessage(ctx) {
         // Only send the "I don't understand" message in private chats
         // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
-}}
+}
 
 // Add this function to check subscription status directly
 async function checkSubscriptionStatus(ctx, userId) {
