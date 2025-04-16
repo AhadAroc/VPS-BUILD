@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const express = require('express');
+// Add this at the top of your file
+const subscriptionCache = {};
 const mongoURI = process.env.MONGODB_URI;
 // Store user deployments
 const userDeployments = new Map();
@@ -192,26 +194,38 @@ async function initBot() {
         // Add middleware to check channel subscription for all commands
         // Add middleware to check channel subscription for all commands
 // Add middleware to check channel subscription for all commands
+// Add this at the top of your file
+const subscriptionCache = {};
+
+// Modify the middleware to use the cache
 bot.use(async (ctx, next) => {
-    // Skip subscription check for specific commands or in private chats
     if (!ctx.from) {
         return next();
     }
-    
-    // Skip subscription check for the check_subscription callback
-    if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+
+    const userId = ctx.from.id;
+    const sourceChannel = 'Lorisiv';
+
+    // Check if the subscription status is cached
+    if (subscriptionCache[userId]) {
+        if (!subscriptionCache[userId].isSubscribed) {
+            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
         return next();
     }
-    
-    // Define your source channel username
-    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
-    
+
     try {
-        // Check if user is subscribed
-        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
-        
+        const isSubscribed = await isSubscribedToChannel(ctx, userId, sourceChannel);
+        subscriptionCache[userId] = { isSubscribed };
+
         if (!isSubscribed) {
-            // Send subscription message with inline keyboard
             return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
                 reply_markup: {
                     inline_keyboard: [
@@ -223,9 +237,8 @@ bot.use(async (ctx, next) => {
         }
     } catch (error) {
         console.error('Error in subscription check middleware:', error);
-        // On error, allow the user to proceed to avoid blocking legitimate users
     }
-    
+
     return next();
 });
 
@@ -1016,6 +1029,12 @@ app.listen(PORT, '0.0.0.0', () => {
     cleanupDatabase();
 });
 
+// Clear the cache every hour
+setInterval(() => {
+    for (const userId in subscriptionCache) {
+        delete subscriptionCache[userId];
+    }
+}, 3600000); // 1 hour in milliseconds
 
 // Start the bot
 bot.launch().then(() => {
