@@ -3,7 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 // Add this at the top of your file with other imports
-const {Telegraf, Scenes } = require('telegraf');
+const { Scenes } = require('telegraf');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
