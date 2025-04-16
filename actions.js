@@ -1581,13 +1581,17 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery('إضافة رد عام');
         ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-        awaitingReplyWord = true;
-        tempBotId = botId; // Store the botId for later use
+        
+        // Use a user state object instead of global variables
+        userStates.set(ctx.from.id, {
+            action: 'adding_reply',
+            step: 'awaiting_trigger',
+            botId: botId
+        });
     } else {
         ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
-
           
 
 bot.action('cancel_add_reply', async (ctx) => {
@@ -1744,24 +1748,16 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
             const botId = ctx.match[1];
             const userId = ctx.from.id;
     
-            console.log(`Listing replies for bot ${botId}`);
-    
             if (await isDeveloper(ctx, userId)) {
                 await ctx.answerCbQuery('عرض الردود العامة');
                 
                 const db = await ensureDatabaseInitialized(botId);
-                console.log(`Database initialized for bot ${botId}`);
-    
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
-                console.log(`Found ${replies.length} replies for bot ${botId}`);
     
                 let replyList = 'الردود العامة:\n\n';
                 if (replies.length > 0) {
                     replies.forEach((reply, index) => {
-                        const triggerWord = reply.trigger_word || 'غير معروف';
-                        const replyContent = reply.reply_text || 'نص غير متوفر';
-                        
-                        replyList += `${index + 1}. الكلمة: ${triggerWord}\nالرد: ${replyContent}\n\n`;
+                        replyList += `${index + 1}. الكلمة: ${reply.trigger_word}\nالرد: ${reply.reply_text}\n\n`;
                     });
                 } else {
                     replyList += 'لا توجد ردود عامة حالياً.';
@@ -2378,7 +2374,23 @@ bot.on('left_chat_member', (ctx) => {
         }
     }
     
-    
+    if (userState && userState.action === 'adding_reply') {
+        if (userState.step === 'awaiting_trigger') {
+            userState.triggerWord = ctx.message.text;
+            userState.step = 'awaiting_response';
+            ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
+        } else if (userState.step === 'awaiting_response') {
+            const db = await ensureDatabaseInitialized(userState.botId);
+            await db.collection('replies').insertOne({
+                bot_id: userState.botId,
+                trigger_word: userState.triggerWord,
+                reply_text: ctx.message.text
+            });
+
+            ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${ctx.message.text}`);
+            userStates.delete(userId);
+        }
+    }
     // Handle awaiting reply word
     if (ctx.chat.type === 'private') {
         // Handle awaiting states in DMs only
