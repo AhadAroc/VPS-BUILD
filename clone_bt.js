@@ -147,9 +147,48 @@ const database = require('../database');
 
 
 // Channel subscription check function
+// Channel subscription check function
+// Channel subscription check function
+// Channel subscription check function
+// Channel subscription check function
+async function isSubscribedToChannel(ctx, userId, channelUsername) {
+    try {
+        // Make sure channelUsername doesn't include the @ symbol
+        const formattedChannelUsername = channelUsername.replace('@', '');
+        
+        // Try to get chat member directly
+        const chatMember = await ctx.telegram.getChatMember('@' + formattedChannelUsername, userId);
+        
+        // These statuses mean the user is in the channel
+        return ['creator', 'administrator', 'member'].includes(chatMember.status);
+    } catch (error) {
+        console.error('Error checking channel subscription for user ' + userId + ' in channel @' + channelUsername + ':', error.description || error);
+        
+        // If we get "member list is inaccessible" error, we need a different approach
+        if (error.description && (
+            error.description.includes('member list is inaccessible') || 
+            error.description.includes('Bad Request')
+        )) {
+            // Since we can't check directly, we'll assume the user needs to subscribe
+            // This will show the subscription message to the user
+            return false;
+        }
+        
+        // For other errors, allow access to prevent blocking legitimate users
+        return true;
+    }
+}
 
-
-
+async function isUserSubscribed(ctx, channelUsername) {
+    try {
+        const member = await ctx.telegram.getChatMember(channelUsername, ctx.from.id);
+        // These statuses mean the user is a valid member
+        return ['member', 'administrator', 'creator'].includes(member.status);
+    } catch (error) {
+        console.error('Subscription check failed:', error);
+        return false;
+    }
+}
 
 // Initialize bot
 async function initBot() {
@@ -170,7 +209,6 @@ async function initBot() {
 // Add this at the top of your file
 const subscriptionCache = {};
 
-// Modify the middleware to use the cache
 
 
 // Add this error handler to handle group migration errors
@@ -191,7 +229,35 @@ bot.catch((err, ctx) => {
 
 
       
-
+// Handle subscription check callback
+bot.action('check_subscription', async (ctx) => {
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        await ctx.answerCbQuery('⏳ جاري التحقق من الاشتراك...');
+        
+        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
+        
+        if (isSubscribed) {
+            subscriptionCache[ctx.from.id] = { isSubscribed: true };
+            await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.', { show_alert: true });
+            await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
+            await ctx.reply('مرحباً بك في البوت! يمكنك الآن استخدام جميع الميزات.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.me.username + '?startgroup=true' }],
+                        [{ text: 'قناة المطور', url: 'https://t.me/Lorisiv' }]
+                    ]
+                }
+            });
+        } else {
+            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد. يرجى الاشتراك ثم المحاولة مرة أخرى.', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error checking subscription in callback:', error);
+        await ctx.answerCbQuery('⚠️ حدث خطأ أثناء التحقق من الاشتراك. يمكنك المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
         
         bot.command('start', async (ctx) => {
             const userId = ctx.from.id;
