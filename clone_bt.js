@@ -178,6 +178,18 @@ async function isSubscribedToChannel(ctx, userId, channelUsername) {
         return true;
     }
 }
+
+async function isUserSubscribed(ctx, channelUsername) {
+    try {
+        const member = await ctx.telegram.getChatMember(channelUsername, ctx.from.id);
+        // These statuses mean the user is a valid member
+        return ['member', 'administrator', 'creator'].includes(member.status);
+    } catch (error) {
+        console.error('Subscription check failed:', error);
+        return false;
+    }
+}
+
 // Initialize bot
 async function initBot() {
     try {
@@ -591,16 +603,6 @@ function loadExistingBots() {
         // Call populateUserDeployments after all bots are loaded
         setTimeout(populateUserDeployments, 5000);
     });
-}
-async function isUserSubscribed(ctx, channelUsername) {
-    try {
-        const member = await ctx.telegram.getChatMember(channelUsername, ctx.from.id);
-        // These statuses mean the user is a valid member
-        return ['member', 'administrator', 'creator'].includes(member.status);
-    } catch (error) {
-        console.error('Subscription check failed:', error);
-        return false;
-    }
 }
 
 async function checkAndUpdateActivation(cloneId, userId) {
