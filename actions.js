@@ -551,10 +551,8 @@ async function configureQuiz(ctx) {
 // ... (rest of the existing imports and variables)
 function setupActions(bot, session, Scenes) {
     // Add this function to handle quiz configuration
-
+   
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
-
-  bot.use(session());
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
 // Add these action handlers for timer settings
