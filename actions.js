@@ -1491,53 +1491,13 @@ bot.action('dev_replies', async (ctx) => {
                     [{ text: 'عرض الردود', callback_data: 'list_replies' }],
                     [{ text: 'إضافة رد', callback_data: 'add_reply' }],
                     [{ text: 'حذف رد', callback_data: 'delete_reply' }],
-                    [{ text: 'رجوع', callback_data: 'back_to_main' }]
+                    [{ text: 'رجوع', callback_data: 'back_to_dev_panel' }]
                 ]
             }
         });
     } catch (error) {
         console.error('Error in dev_replies handler:', error);
         await ctx.answerCbQuery('حدث خطأ أثناء تحميل قسم الردود');
-    }
-});
-bot.action('back_to_main', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-
-        // Check if the user has the necessary permissions
-        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
-        const isVIPUser = await isVIP(ctx, ctx.from.id);
-
-        if (!isAdmin && !isSecDev && !isVIPUser) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والمستخدمين المميزين فقط.', { show_alert: true });
-        }
-
-        // Get the original photo URL
-        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
-        
-        // Edit the message to show the main menu again
-        await ctx.editMessageMedia(
-            {
-                type: 'photo',
-                media: photoUrl,
-                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا . اختر خيارًا:'
-            },
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                        [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-                    ]
-                }
-            }
-        );
-    } catch (error) {
-        console.error('Error returning to main menu:', error);
-        await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
 async function getAllReplies(botId) {
