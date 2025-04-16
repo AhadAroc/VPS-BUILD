@@ -552,8 +552,9 @@ async function configureQuiz(ctx) {
 function setupActions(bot) {
 
     // Add this function to handle quiz configuration
-    const { Scenes } = require('telegraf');
-    const session = require('telegraf/session');
+    
+    const { Scenes, session } = require('telegraf');
+
 
     // Initialize session middleware
     bot.use(session());
