@@ -1747,34 +1747,33 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
             console.log(`Listing replies for bot ${botId}`);
     
             if (await isDeveloper(ctx, userId)) {
+                await ctx.answerCbQuery('عرض الردود العامة');
+                
                 const db = await ensureDatabaseInitialized(botId);
                 console.log(`Database initialized for bot ${botId}`);
     
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
                 console.log(`Found ${replies.length} replies for bot ${botId}`);
     
-                if (replies.length === 0) {
-                    await ctx.editMessageText('لا توجد ردود مضافة لهذا البوت.', {
-                        reply_markup: {
-                            inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
-                        }
+                let replyList = 'الردود العامة:\n\n';
+                if (replies.length > 0) {
+                    replies.forEach((reply, index) => {
+                        const triggerWord = reply.trigger_word || 'غير معروف';
+                        const replyContent = reply.reply_text || 'نص غير متوفر';
+                        
+                        replyList += `${index + 1}. الكلمة: ${triggerWord}\nالرد: ${replyContent}\n\n`;
                     });
-                    return;
+                } else {
+                    replyList += 'لا توجد ردود عامة حالياً.';
                 }
     
-                let message = 'قائمة الردود العامة:\n\n';
-                replies.forEach((reply, index) => {
-                    message += `${index + 1}. الكلمة: ${reply.trigger_word}\n`;
-                    message += `   الرد: ${reply.reply_text}\n\n`;
-                });
-    
-                await ctx.editMessageText(message, {
+                await ctx.editMessageText(replyList, {
                     reply_markup: {
                         inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
                     }
                 });
             } else {
-                await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+                await ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
             }
         } catch (error) {
             console.error('Error in list_general_replies action:', error);
