@@ -237,6 +237,8 @@ bot.use(async (ctx, next) => {
         }
     } catch (error) {
         console.error('Error in subscription check middleware:', error);
+        // Assume subscribed on error to avoid blocking users
+        subscriptionCache[userId] = { isSubscribed: true };
     }
 
     return next();
@@ -271,11 +273,9 @@ bot.action('check_subscription', async (ctx) => {
         const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
         
         if (isSubscribed) {
+            subscriptionCache[ctx.from.id] = { isSubscribed: true };
             await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.', { show_alert: true });
-            // Try to delete the subscription message
             await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
-            
-            // Send a welcome message with the "Add to Group" button
             await ctx.reply('مرحباً بك في البوت! يمكنك الآن استخدام جميع الميزات.', {
                 reply_markup: {
                     inline_keyboard: [
