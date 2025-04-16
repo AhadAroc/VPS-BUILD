@@ -198,6 +198,7 @@ async function initBot() {
 const subscriptionCache = {};
 
 // Modify the middleware to use the cache
+// Modify the middleware to use the cache
 bot.use(async (ctx, next) => {
     if (!ctx.from) {
         return next();
@@ -208,7 +209,8 @@ bot.use(async (ctx, next) => {
 
     // Check if the subscription status is cached
     if (subscriptionCache[userId]) {
-        if (!subscriptionCache[userId].isSubscribed) {
+        if (!subscriptionCache[userId].isSubscribed && !subscriptionCache[userId].messageSent) {
+            subscriptionCache[userId].messageSent = true; // Mark message as sent
             return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
                 reply_markup: {
                     inline_keyboard: [
@@ -222,10 +224,12 @@ bot.use(async (ctx, next) => {
     }
 
     try {
-        const isSubscribed = await isSubscribedToChannel(ctx, userId, sourceChannel);
-        subscriptionCache[userId] = { isSubscribed };
+        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
+
+        subscriptionCache[userId] = { isSubscribed, messageSent: false };
 
         if (!isSubscribed) {
+            subscriptionCache[userId].messageSent = true; // Mark message as sent
             return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
                 reply_markup: {
                     inline_keyboard: [
@@ -237,6 +241,8 @@ bot.use(async (ctx, next) => {
         }
     } catch (error) {
         console.error('Error in subscription check middleware:', error);
+        // Assume subscribed on error to avoid blocking users
+        subscriptionCache[userId] = { isSubscribed: true, messageSent: false };
     }
 
     return next();
