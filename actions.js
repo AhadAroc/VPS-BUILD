@@ -135,43 +135,61 @@ if (userStates.has(userId)) {
                 let replyText = null;
                 let fileId = null;
                 let mediaUrl = null;
-
-                              // Determine media type
-                              if (message.text) {
-                                replyText = message.text.trim();
-                            } else if (message.sticker) {
-                                mediaType = 'sticker';
-                                fileId = message.sticker.file_id;
-                            } else if (message.photo) {
-                                mediaType = 'photo';
-                                fileId = message.photo[message.photo.length - 1].file_id;
-                            } else if (message.video) {
-                                mediaType = 'video';
-                                fileId = message.video.file_id;
-                            } else if (message.audio) {
-                                mediaType = 'audio';
-                                fileId = message.audio.file_id;
-                            } else if (message.voice) {
-                                mediaType = 'voice';
-                                fileId = message.voice.file_id;
-                            } else if (message.document) {
-                                mediaType = 'document';
-                                fileId = message.document.file_id;
-                            } else {
-                                await ctx.reply('❌ نوع الرسالة غير مدعوم. أرسل نصًا أو وسائط فقط.');
-                                userStates.delete(userId);
-                                return;
-                            }
-
+        
+                // Determine media type
+                if (message.text) {
+                    mediaType = 'text';
+                    replyText = message.text.trim();
+                } else if (message.sticker) {
+                    mediaType = 'sticker';
+                    fileId = message.sticker.file_id;
+                } else if (message.photo) {
+                    mediaType = 'photo';
+                    fileId = message.photo[message.photo.length - 1].file_id;
+                    console.log("Photo received, file_id:", fileId); // Add logging
+                } else if (message.video) {
+                    mediaType = 'video';
+                    fileId = message.video.file_id;
+                } else if (message.audio) {
+                    mediaType = 'audio';
+                    fileId = message.audio.file_id;
+                } else if (message.voice) {
+                    mediaType = 'voice';
+                    fileId = message.voice.file_id;
+                } else if (message.document) {
+                    mediaType = 'document';
+                    fileId = message.document.file_id;
+                } else {
+                    await ctx.reply('❌ نوع الرسالة غير مدعوم. أرسل نصًا أو وسائط فقط.');
+                    userStates.delete(userId);
+                    return;
+                }
+        
                 // Get media URL if needed
                 if (fileId) {
-                    const fileLink = await ctx.telegram.getFileLink(fileId);
-                    mediaUrl = fileLink.href;
+                    try {
+                        const fileLink = await ctx.telegram.getFileLink(fileId);
+                        mediaUrl = fileLink.href;
+                        console.log("Media URL obtained:", mediaUrl); // Add logging
+                    } catch (fileError) {
+                        console.error("Error getting file link:", fileError);
+                        await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. الرجاء المحاولة مرة أخرى.');
+                        return;
+                    }
                 }
-
+        
                 const db = await ensureDatabaseInitialized(userState.botId);
-
-                // Insert into DB
+        
+                // Insert into DB with explicit logging
+                console.log("Saving to database with data:", {
+                    bot_id: userState.botId,
+                    trigger_word: userState.triggerWord,
+                    type: mediaType,
+                    text: replyText,
+                    file_id: fileId,
+                    media_url: mediaUrl
+                });
+        
                 await db.collection('replies').insertOne({
                     bot_id: userState.botId,
                     trigger_word: userState.triggerWord,
@@ -184,7 +202,7 @@ if (userStates.has(userId)) {
                     created_at: new Date(),
                     created_by: userId
                 });
-
+        
                 await ctx.reply(`✅ تم إضافة الرد (${mediaType}) بنجاح للكلمة: "${userState.triggerWord}"`);
                 userStates.delete(userId);
                 return;
