@@ -1767,11 +1767,28 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
                     replyList += 'لا توجد ردود عامة حالياً.';
                 }
     
-                await ctx.editMessageText(replyList, {
-                    reply_markup: {
-                        inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
+                // Split the message if it's too long
+                const maxLength = 4096; // Telegram's max message length
+                if (replyList.length > maxLength) {
+                    const chunks = replyList.match(new RegExp(`.{1,${maxLength}}`, 'g'));
+                    for (let i = 0; i < chunks.length; i++) {
+                        if (i === 0) {
+                            await ctx.editMessageText(chunks[i], {
+                                reply_markup: {
+                                    inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
+                                }
+                            });
+                        } else {
+                            await ctx.reply(chunks[i]);
+                        }
                     }
-                });
+                } else {
+                    await ctx.editMessageText(replyList, {
+                        reply_markup: {
+                            inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
+                        }
+                    });
+                }
             } else {
                 await ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
             }
