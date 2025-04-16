@@ -2,7 +2,7 @@
 let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
-
+let tempBotId = null;
 
 
 
@@ -1577,120 +1577,18 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 // Implement other helper functions similarly...
  
 bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
-    try {
-        const botId = parseInt(ctx.match[1]);
-        
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('إضافة رد عام');
-            
-            // Use context to store temporary data
-            ctx.session = ctx.session || {};
-            ctx.session.addReplyForBotId = botId;
-            ctx.session.awaitingReplyWord = true;
-
-            await ctx.editMessageText('أرسل الكلمة أو العبارة التي تريد إضافة رد عام لها:', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🔙 رجوع', callback_data: 'cancel_add_reply' }]
-                    ]
-                }
-            });
-
-            // Set up a listener for the next text message
-            bot.on('text', async (ctx) => {
-                if (ctx.session.awaitingReplyWord) {
-                    ctx.session.tempReplyWord = ctx.message.text.trim().toLowerCase();
-                    ctx.session.awaitingReplyWord = false;
-                    ctx.session.awaitingReplyResponse = true;
-
-                    await ctx.reply(`تم استلام الكلمة: "${ctx.session.tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`, {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔙 إلغاء', callback_data: 'cancel_add_reply' }]
-                            ]
-                        }
-                    });
-                } else if (ctx.session.awaitingReplyResponse) {
-                    const replyContent = ctx.message.text.trim();
-
-                    // Save the reply to the database
-                    const db = await ensureDatabaseInitialized(ctx.session.addReplyForBotId);
-                    await db.collection('replies').insertOne({
-                        bot_id: ctx.session.addReplyForBotId,
-                        trigger_word: ctx.session.tempReplyWord,
-                        response: replyContent,
-                        media_type: 'text'
-                    });
-
-                    // Clear the session data
-                    delete ctx.session.addReplyForBotId;
-                    delete ctx.session.awaitingReplyWord;
-                    delete ctx.session.awaitingReplyResponse;
-                    delete ctx.session.tempReplyWord;
-
-                    await ctx.reply('تم إضافة الرد العام بنجاح!', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔙 العودة لقائمة الردود', callback_data: `back_to_replies_menu:${ctx.session.addReplyForBotId}` }]
-                            ]
-                        }
-                    });
-                }
-            });
-
-            // Handle media messages (photo, video, sticker, etc.)
-            bot.on(['photo', 'video', 'animation', 'sticker'], async (ctx) => {
-                if (ctx.session.awaitingReplyResponse) {
-                    let mediaType, fileId;
-
-                    if (ctx.message.photo) {
-                        mediaType = 'photo';
-                        fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                    } else if (ctx.message.video) {
-                        mediaType = 'video';
-                        fileId = ctx.message.video.file_id;
-                    } else if (ctx.message.animation) {
-                        mediaType = 'animation';
-                        fileId = ctx.message.animation.file_id;
-                    } else if (ctx.message.sticker) {
-                        mediaType = 'sticker';
-                        fileId = ctx.message.sticker.file_id;
-                    }
-
-                    // Save the reply to the database
-                    const db = await ensureDatabaseInitialized(ctx.session.addReplyForBotId);
-                    await db.collection('replies').insertOne({
-                        bot_id: ctx.session.addReplyForBotId,
-                        trigger_word: ctx.session.tempReplyWord,
-                        response: fileId,
-                        media_type: mediaType
-                    });
-
-                    // Clear the session data
-                    delete ctx.session.addReplyForBotId;
-                    delete ctx.session.awaitingReplyWord;
-                    delete ctx.session.awaitingReplyResponse;
-                    delete ctx.session.tempReplyWord;
-
-                    await ctx.reply('تم إضافة الرد العام بنجاح!', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔙 العودة لقائمة الردود', callback_data: `back_to_replies_menu:${ctx.session.addReplyForBotId}` }]
-                            ]
-                        }
-                    });
-                }
-            });
-
-        } else {
-            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-        }
-    } catch (error) {
-        console.error('Error in add_general_reply action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
+    const botId = parseInt(ctx.match[1]);
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('إضافة رد عام');
+        ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
+        awaitingReplyWord = true;
+        tempBotId = botId; // Store the botId for later use
+    } else {
+        ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
 
+          
 
 bot.action('cancel_add_reply', async (ctx) => {
     try {
