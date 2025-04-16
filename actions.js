@@ -1397,6 +1397,92 @@ createGroupsTable();
             console.error('Error loading active groups from database:', error);
         }
     }
+// Add this function to handle the list replies button
+async function listAllReplies(ctx) {
+    try {
+        const replies = await getAllReplies();
+        
+        if (!replies || replies.length === 0) {
+            await ctx.editMessageText('الردود العامة:\n\nلا توجد ردود عامة حالياً', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'رجوع', callback_data: 'dev_replies' }]
+                    ]
+                }
+            });
+            return;
+        }
+        
+        // Format the replies list
+        let message = 'الردود العامة:\n\n';
+        replies.forEach((reply, index) => {
+            const triggerWord = reply.trigger_word || reply.word || 'غير معروف';
+            let responseText = reply.reply_text || reply.text || '[محتوى وسائط]';
+            
+            // Truncate long responses
+            if (responseText.length > 30) {
+                responseText = responseText.substring(0, 27) + '...';
+            }
+            
+            message += `${index + 1}. "${triggerWord}" ➡️ "${responseText}"\n`;
+        });
+        
+        // Add pagination if the list is too long
+        if (message.length > 4000) {
+            message = message.substring(0, 3900) + '\n\n... والمزيد من الردود';
+        }
+        
+        await ctx.editMessageText(message, {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'إضافة رد', callback_data: 'add_reply' }, { text: 'حذف رد', callback_data: 'delete_reply' }],
+                    [{ text: 'رجوع', callback_data: 'dev_replies' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error listing replies:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة عرض الردود');
+        await ctx.editMessageText('حدث خطأ أثناء محاولة عرض الردود. الرجاء المحاولة مرة أخرى.', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'رجوع', callback_data: 'dev_replies' }]
+                ]
+            }
+        });
+    }
+}
+
+// Add this to your callback query handler
+bot.action('list_replies', listAllReplies);
+
+// Update the dev_replies handler to include the list option
+bot.action('dev_replies', async (ctx) => {
+    try {
+        await ctx.editMessageText('قسم الردود التلقائية:', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'عرض الردود', callback_data: 'list_replies' }],
+                    [{ text: 'إضافة رد', callback_data: 'add_reply' }],
+                    [{ text: 'حذف رد', callback_data: 'delete_reply' }],
+                    [{ text: 'رجوع', callback_data: 'dev_panel' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error in dev_replies handler:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء تحميل قسم الردود');
+    }
+});
+    async function getAllReplies() {
+        try {
+            const db = await ensureDatabaseInitialized();
+            return await db.collection('replies').find({}).toArray();
+        } catch (error) {
+            console.error('Error fetching all replies:', error);
+            return [];
+        }
+    }
     function showRepliesMenu(ctx) {
         const botId = ctx.botInfo.id;
         const message = 'قسم الردود - اختر الإجراء المطلوب:';
