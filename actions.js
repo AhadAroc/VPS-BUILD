@@ -1868,7 +1868,7 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
     });
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
         try {
-            const botId = ctx.match[1];
+            const botId = parseInt(ctx.match[1]);
             const userId = ctx.from.id;
     
             if (await isDeveloper(ctx, userId)) {
