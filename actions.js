@@ -3,7 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
-const userStates = new Map();
+
 
 
 // Make sure this is at the top of your file
@@ -39,7 +39,7 @@ const QUIZ_STATE = {
     ACTIVE: 3
 };
 
-
+const userStates = new Map();
 const {isAdminOrOwner,isVIP} = require('./commands');    
 const axios = require('axios');
 const fs = require('fs');
@@ -1581,17 +1581,13 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery('إضافة رد عام');
         ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-        
-        // Use userStates instead of userState
-        userStates.set(ctx.from.id, {
-            action: 'adding_reply',
-            step: 'awaiting_trigger',
-            botId: botId
-        });
+        awaitingReplyWord = true;
+        tempBotId = botId; // Store the botId for later use
     } else {
         ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
+
           
 
 bot.action('cancel_add_reply', async (ctx) => {
@@ -1749,44 +1745,31 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
             const userId = ctx.from.id;
     
             if (await isDeveloper(ctx, userId)) {
-                await ctx.answerCbQuery('عرض الردود العامة');
-                
                 const db = await ensureDatabaseInitialized(botId);
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
     
-                let replyList = 'الردود العامة:\n\n';
-                if (replies.length > 0) {
-                    replies.forEach((reply, index) => {
-                        replyList += `${index + 1}. الكلمة: ${reply.trigger_word}\nالرد: ${reply.reply_text}\n\n`;
-                    });
-                } else {
-                    replyList += 'لا توجد ردود عامة حالياً.';
-                }
-    
-                // Split the message if it's too long
-                const maxLength = 4096; // Telegram's max message length
-                if (replyList.length > maxLength) {
-                    const chunks = replyList.match(new RegExp(`.{1,${maxLength}}`, 'g'));
-                    for (let i = 0; i < chunks.length; i++) {
-                        if (i === 0) {
-                            await ctx.editMessageText(chunks[i], {
-                                reply_markup: {
-                                    inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
-                                }
-                            });
-                        } else {
-                            await ctx.reply(chunks[i]);
-                        }
-                    }
-                } else {
-                    await ctx.editMessageText(replyList, {
+                if (replies.length === 0) {
+                    await ctx.editMessageText('لا توجد ردود مضافة لهذا البوت.', {
                         reply_markup: {
                             inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
                         }
                     });
+                    return;
                 }
+    
+                let message = 'قائمة الردود العامة:\n\n';
+                replies.forEach((reply, index) => {
+                    message += `${index + 1}. الكلمة: ${reply.trigger_word}\n`;
+                    message += `   الرد: ${reply.response}\n\n`;
+                });
+    
+                await ctx.editMessageText(message, {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
+                    }
+                });
             } else {
-                await ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+                await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
             }
         } catch (error) {
             console.error('Error in list_general_replies action:', error);
@@ -2374,23 +2357,7 @@ bot.on('left_chat_member', (ctx) => {
         }
     }
     
-    if (userState && userState.action === 'adding_reply') {
-        if (userState.step === 'awaiting_trigger') {
-            userState.triggerWord = ctx.message.text;
-            userState.step = 'awaiting_response';
-            ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
-        } else if (userState.step === 'awaiting_response') {
-            const db = await ensureDatabaseInitialized(userState.botId);
-            await db.collection('replies').insertOne({
-                bot_id: userState.botId,
-                trigger_word: userState.triggerWord,
-                reply_text: ctx.message.text
-            });
-
-            ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${ctx.message.text}`);
-            userStates.delete(userId);
-        }
-    }
+    
     // Handle awaiting reply word
     if (ctx.chat.type === 'private') {
         // Handle awaiting states in DMs only
@@ -2455,27 +2422,7 @@ bot.on('left_chat_member', (ctx) => {
         }
     }
     
-    if (awaitingReplyResponse) {
-        const replyResponse = ctx.message.text;
-        try {
-            const db = await ensureDatabaseInitialized(tempBotId);
-            console.log(`Saving reply for bot ${tempBotId}: ${tempReplyWord} -> ${replyResponse}`);
-            await db.collection('replies').updateOne(
-                { trigger_word: tempReplyWord },
-                { $set: { trigger_word: tempReplyWord, reply_text: replyResponse, bot_id: tempBotId } },
-                { upsert: true }
-            );
-            
-            console.log(`Reply saved successfully for bot ${tempBotId}`);
-            ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${replyResponse}`);
-            awaitingReplyResponse = false;
-            tempBotId = null; // Clear the temporary botId
-        } catch (error) {
-            console.error('Error saving reply:', error);
-            ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-            awaitingReplyResponse = false;
-        }
-    }  
+    
     
     // Handle awaiting delete reply word
     // Handle awaiting delete reply word
