@@ -4,7 +4,7 @@ let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 
 const { Scenes, session } = require('telegraf');
-bot.use(session());
+
 
 // Make sure this is at the top of your file
 const activeGroups = new Map();
@@ -553,6 +553,8 @@ function setupActions(bot, session, Scenes) {
     // Add this function to handle quiz configuration
 
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
+
+  bot.use(session());
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
 // Add these action handlers for timer settings
