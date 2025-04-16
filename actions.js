@@ -86,6 +86,21 @@ async function handleTextMessage(ctx) {
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
+    // Check if the user is an owner, developer, or admin
+    const isAuthorized = await isOwner(userId) || await isDeveloper(userId) || await isAdmin(ctx, userId);
+
+    if (isAuthorized) {
+        // Check for automatic replies only for authorized users
+        const reply = await checkForAutomaticReply(ctx);
+        if (reply) {
+            console.log('Found matching reply:', reply);
+            const sent = await sendReply(ctx, reply);
+            if (sent) return;
+        } else {
+            console.log('No matching reply found for:', userText);
+        }
+    }
+
     // Handle state-based operations first
     if (awaitingReplyWord) {
         tempReplyWord = userText;
@@ -2832,23 +2847,13 @@ if (ctx.chat.type === 'private') {
 // based on your existing code and requirements.
 
 async function checkForAutomaticReply(ctx) {
+    const userText = ctx.message.text.trim().toLowerCase();
     try {
         const db = await ensureDatabaseInitialized();
-        const userText = ctx.message.text.trim().toLowerCase();
-        console.log('Searching for reply with keyword:', userText);
-        
-        // Search with a more comprehensive query that covers all your different field structures
-        const reply = await db.collection('replies').findOne({
-            $or: [
-                { trigger_word: userText },
-                { word: userText }
-            ]
-        });
-
-        console.log('Reply search result:', reply);
+        const reply = await db.collection('replies').findOne({ trigger_word: userText });
         return reply;
     } catch (error) {
-        console.error('Error checking for automatic replies:', error);
+        console.error('Error checking for reply:', error);
         return null;
     }
 }
