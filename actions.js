@@ -117,56 +117,100 @@ async function handleTextMessage(ctx) {
     }
 
     // Check for user state
-    if (userStates.has(userId)) {
-        const userState = userStates.get(userId);
-        if (userState.action === 'adding_reply') {
-            if (userState.step === 'awaiting_trigger') {
-                userState.triggerWord = userText;
-                userState.step = 'awaiting_response';
-                await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
-                return;
-            } else if (userState.step === 'awaiting_response') {
-                try {
-                    const db = await ensureDatabaseInitialized(userState.botId);
-                    await db.collection('replies').insertOne({
-                        bot_id: userState.botId,
-                        trigger_word: userState.triggerWord,
-                        word: userState.triggerWord, // Add this for consistency
-                        type: 'text',
-                        text: ctx.message.text,
-                        reply_text: ctx.message.text, // Add this for backward compatibility
-                        created_at: new Date(),
-                        created_by: userId
-                    });
-                    
-                    await ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${ctx.message.text}`);
-                    userStates.delete(userId);
-                    return;
-                } catch (error) {
-                    console.error('Error saving reply:', error);
-                    await ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+if (userStates.has(userId)) {
+    const userState = userStates.get(userId);
+
+    if (userState.action === 'adding_reply') {
+        if (userState.step === 'awaiting_trigger') {
+            userState.triggerWord = userText;
+            userState.step = 'awaiting_response';
+            await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
+            return;
+        }
+
+        if (userState.step === 'awaiting_response') {
+            try {
+                const message = ctx.message;
+                let mediaType = 'text';
+                let replyText = null;
+                let fileId = null;
+                let mediaUrl = null;
+
+                // Determine media type
+                if (message.text) {
+                    replyText = message.text.trim();
+                } else if (message.photo) {
+                    mediaType = 'photo';
+                    fileId = message.photo[message.photo.length - 1].file_id;
+                } else if (message.video) {
+                    mediaType = 'video';
+                    fileId = message.video.file_id;
+                } else if (message.audio) {
+                    mediaType = 'audio';
+                    fileId = message.audio.file_id;
+                } else if (message.voice) {
+                    mediaType = 'voice';
+                    fileId = message.voice.file_id;
+                } else if (message.document) {
+                    mediaType = 'document';
+                    fileId = message.document.file_id;
+                } else {
+                    await ctx.reply('❌ نوع الرسالة غير مدعوم. أرسل نصًا أو وسائط فقط.');
                     userStates.delete(userId);
                     return;
                 }
+
+                // Get media URL if needed
+                if (fileId) {
+                    const fileLink = await ctx.telegram.getFileLink(fileId);
+                    mediaUrl = fileLink.href;
+                }
+
+                const db = await ensureDatabaseInitialized(userState.botId);
+
+                // Insert into DB
+                await db.collection('replies').insertOne({
+                    bot_id: userState.botId,
+                    trigger_word: userState.triggerWord,
+                    word: userState.triggerWord,
+                    type: mediaType,
+                    text: replyText,
+                    reply_text: replyText,
+                    file_id: fileId,
+                    media_url: mediaUrl,
+                    created_at: new Date(),
+                    created_by: userId
+                });
+
+                await ctx.reply(`✅ تم إضافة الرد (${mediaType}) بنجاح للكلمة: "${userState.triggerWord}"`);
+                userStates.delete(userId);
+                return;
+            } catch (err) {
+                console.error('💥 Failed to save reply:', err);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                userStates.delete(userId);
+                return;
             }
         }
     }
+}
 
-    // Check for automatic replies - this should work in both private and group chats
-    const reply = await checkForAutomaticReply(ctx);
-    if (reply) {
-        console.log('Found matching reply:', reply);
-        const sent = await sendReply(ctx, reply);
-        if (sent) return;
-    } else {
-        console.log('No matching reply found for:', userText);
-    }
 
-    // If we reach here in a private chat, it means we didn't handle the message
-    if (ctx.chat.type === 'private') {
-        // Only send the "I don't understand" message in private chats
-        // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
-    }
+// Check for automatic replies - this should work in both private and group chats
+const reply = await checkForAutomaticReply(ctx);
+if (reply) {
+    console.log('Found matching reply:', reply);
+    const sent = await sendReply(ctx, reply);
+    if (sent) return;
+} else {
+    console.log('No matching reply found for:', userText);
+}
+
+// If we reach here in a private chat, it means we didn't handle the message
+if (ctx.chat.type === 'private') {
+    // Only send the "I don't understand" message in private chats
+    // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
+}
 }
 
 // Add this function to check subscription status directly
