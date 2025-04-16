@@ -222,7 +222,8 @@ bot.use(async (ctx, next) => {
     }
 
     try {
-        const isSubscribed = await isSubscribedToChannel(ctx, userId, sourceChannel);
+        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
+
         subscriptionCache[userId] = { isSubscribed };
 
         if (!isSubscribed) {
@@ -269,7 +270,7 @@ bot.action('check_subscription', async (ctx) => {
     try {
         await ctx.answerCbQuery('⏳ جاري التحقق من الاشتراك...');
         
-        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
         
         if (isSubscribed) {
             subscriptionCache[ctx.from.id] = { isSubscribed: true };
@@ -591,6 +592,17 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
+async function isUserSubscribed(ctx, channelUsername) {
+    try {
+        const member = await ctx.telegram.getChatMember(channelUsername, ctx.from.id);
+        // These statuses mean the user is a valid member
+        return ['member', 'administrator', 'creator'].includes(member.status);
+    } catch (error) {
+        console.error('Subscription check failed:', error);
+        return false;
+    }
+}
+
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
