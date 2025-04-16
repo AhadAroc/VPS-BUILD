@@ -549,9 +549,22 @@ async function configureQuiz(ctx) {
 
 
 // ... (rest of the existing imports and variables)
-function setupActions(bot, session, Scenes) {
+function setupActions(bot) {
+
     // Add this function to handle quiz configuration
-   
+    const { Scenes } = require('telegraf');
+    const session = require('telegraf/session');
+
+    // Initialize session middleware
+    bot.use(session());
+
+    // Create a new stage for scenes
+    const stage = new Scenes.Stage([/* your scenes here */]);
+
+    // Use the stage middleware
+    bot.use(stage.middleware());
+
+
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
@@ -1591,31 +1604,23 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     }
 });
 
-bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
-    try {
-        const botId = parseInt(ctx.match[1]);
-        
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('إضافة رد عام');
+// Now set up your action handlers
+    bot.action('add_general_reply', async (ctx) => {
+        try {
+            // Ensure the session object exists
+            ctx.session = ctx.session || {};
             
-            // Use userStates to store temporary data
-            userStates.set(ctx.from.id, { addReplyForBotId: botId, awaitingReplyWord: true });
-            
-            await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🔙 رجوع', callback_data: 'cancel_add_reply' }]
-                    ]
-                }
-            });
-        } else {
-            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+            // Now you can safely set properties on the session
+            ctx.session.addReplyForBotId = 'general';
+            await ctx.answerCbQuery();
+            await ctx.reply('الرجاء إدخال الكلمة أو العبارة التي تريد إضافة رد لها:');
+            // Enter the scene for adding a reply
+            return ctx.scene.enter('addReplyScene');
+        } catch (error) {
+            console.error('Error in add_general_reply action:', error);
+            await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام.');
         }
-    } catch (error) {
-        console.error('Error in add_general_reply action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
-    }
-});
+    });
 
 bot.action('cancel_add_reply', async (ctx) => {
     try {
