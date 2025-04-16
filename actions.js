@@ -2938,8 +2938,7 @@ async function checkForAutomaticReply(ctx) {
         const reply = await db.collection('replies').findOne({
             $or: [
                 { trigger_word: userText },
-                { word: userText },
-                { trigger_word: { $regex: new RegExp('^' + userText + '$', 'i') } }
+                { word: userText }
             ]
         });
 
@@ -3691,39 +3690,51 @@ async function sendReply(ctx, reply) {
         
         // Handle different reply structures
         if (reply.reply_text) {
-            await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+            await ctx.reply(reply.reply_text);
+            return true;
+        } else if (reply.text) {
+            await ctx.reply(reply.text);
             return true;
         }
         
-        switch (reply.type) {
-            case "text":
-                await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case "photo":
-                await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case "animation":
-                await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case "video":
-                await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case "sticker":
-                await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case "document":
-                await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            default:
-                // If no type but we have text content
-                if (reply.text) {
-                    await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    console.log("Unknown reply type or missing content:", reply);
+        // If we have a type field, handle different media types
+        if (reply.type) {
+            switch (reply.type) {
+                case "text":
+                    await ctx.reply(reply.text);
+                    break;
+                case "photo":
+                    if (reply.file_id) {
+                        await ctx.replyWithPhoto(reply.file_id);
+                    }
+                    break;
+                case "animation":
+                    if (reply.file_id) {
+                        await ctx.replyWithAnimation(reply.file_id);
+                    }
+                    break;
+                case "video":
+                    if (reply.file_id) {
+                        await ctx.replyWithVideo(reply.file_id);
+                    }
+                    break;
+                case "sticker":
+                    if (reply.file_id) {
+                        await ctx.replyWithSticker(reply.file_id);
+                    }
+                    break;
+                case "document":
+                    if (reply.file_id) {
+                        await ctx.replyWithDocument(reply.file_id);
+                    }
+                    break;
+                default:
                     return false;
-                }
+            }
+            return true;
         }
-        return true;
+        
+        return false;
     } catch (error) {
         console.error('Error sending reply:', error);
         return false;
