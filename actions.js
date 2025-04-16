@@ -597,7 +597,7 @@ async function configureQuiz(ctx) {
 function setupActions(bot) {
 
     // Add this function to handle quiz configuration
-    
+    const userStates = new Map();
     const { Scenes, session } = require('telegraf');
 
 
