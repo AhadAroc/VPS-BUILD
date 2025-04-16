@@ -209,53 +209,7 @@ async function initBot() {
 // Add this at the top of your file
 const subscriptionCache = {};
 
-// Modify the middleware to use the cache
-bot.use(async (ctx, next) => {
-    if (!ctx.from) {
-        return next();
-    }
 
-    const userId = ctx.from.id;
-    const sourceChannel = 'Lorisiv';
-
-    // Check if the subscription status is cached
-    if (subscriptionCache[userId]) {
-        if (!subscriptionCache[userId].isSubscribed) {
-            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
-                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
-                }
-            });
-        }
-        return next();
-    }
-
-    try {
-        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
-
-        subscriptionCache[userId] = { isSubscribed };
-
-        if (!isSubscribed) {
-            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
-                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in subscription check middleware:', error);
-        // Assume subscribed on error to avoid blocking users
-        subscriptionCache[userId] = { isSubscribed: true };
-    }
-
-    return next();
-});
 
 // Add this error handler to handle group migration errors
 bot.catch((err, ctx) => {
