@@ -1491,7 +1491,7 @@ bot.action('dev_replies', async (ctx) => {
                     [{ text: 'عرض الردود', callback_data: 'list_replies' }],
                     [{ text: 'إضافة رد', callback_data: 'add_reply' }],
                     [{ text: 'حذف رد', callback_data: 'delete_reply' }],
-                    [{ text: 'رجوع', callback_data: 'showDevPanel' }]
+                    [{ text: 'رجوع', callback_data: 'back_to_dev_panel' }]
                 ]
             }
         });
