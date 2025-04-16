@@ -3,7 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
-
+const userStates = new Map();
 
 
 // Make sure this is at the top of your file
@@ -39,7 +39,7 @@ const QUIZ_STATE = {
     ACTIVE: 3
 };
 
-const userStates = new Map();
+
 const {isAdminOrOwner,isVIP} = require('./commands');    
 const axios = require('axios');
 const fs = require('fs');
@@ -1582,7 +1582,7 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery('إضافة رد عام');
         ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
         
-        // Use a user state object instead of global variables
+        // Use userStates instead of userState
         userStates.set(ctx.from.id, {
             action: 'adding_reply',
             step: 'awaiting_trigger',
