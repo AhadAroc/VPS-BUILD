@@ -136,29 +136,32 @@ if (userStates.has(userId)) {
                 let fileId = null;
                 let mediaUrl = null;
 
-                // Determine media type
-                if (message.text) {
-                    replyText = message.text.trim();
-                } else if (message.photo) {
-                    mediaType = 'photo';
-                    fileId = message.photo[message.photo.length - 1].file_id;
-                } else if (message.video) {
-                    mediaType = 'video';
-                    fileId = message.video.file_id;
-                } else if (message.audio) {
-                    mediaType = 'audio';
-                    fileId = message.audio.file_id;
-                } else if (message.voice) {
-                    mediaType = 'voice';
-                    fileId = message.voice.file_id;
-                } else if (message.document) {
-                    mediaType = 'document';
-                    fileId = message.document.file_id;
-                } else {
-                    await ctx.reply('❌ نوع الرسالة غير مدعوم. أرسل نصًا أو وسائط فقط.');
-                    userStates.delete(userId);
-                    return;
-                }
+                              // Determine media type
+                              if (message.text) {
+                                replyText = message.text.trim();
+                            } else if (message.sticker) {
+                                mediaType = 'sticker';
+                                fileId = message.sticker.file_id;
+                            } else if (message.photo) {
+                                mediaType = 'photo';
+                                fileId = message.photo[message.photo.length - 1].file_id;
+                            } else if (message.video) {
+                                mediaType = 'video';
+                                fileId = message.video.file_id;
+                            } else if (message.audio) {
+                                mediaType = 'audio';
+                                fileId = message.audio.file_id;
+                            } else if (message.voice) {
+                                mediaType = 'voice';
+                                fileId = message.voice.file_id;
+                            } else if (message.document) {
+                                mediaType = 'document';
+                                fileId = message.document.file_id;
+                            } else {
+                                await ctx.reply('❌ نوع الرسالة غير مدعوم. أرسل نصًا أو وسائط فقط.');
+                                userStates.delete(userId);
+                                return;
+                            }
 
                 // Get media URL if needed
                 if (fileId) {
