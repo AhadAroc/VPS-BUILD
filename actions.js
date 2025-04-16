@@ -86,21 +86,6 @@ async function handleTextMessage(ctx) {
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
-    // Check if the user is an owner, developer, or admin
-    const isAuthorized = await isOwner(userId) || await isDeveloper(userId) || await isAdmin(ctx, userId);
-
-    if (isAuthorized) {
-        // Check for automatic replies only for authorized users
-        const reply = await checkForAutomaticReply(ctx);
-        if (reply) {
-            console.log('Found matching reply:', reply);
-            const sent = await sendReply(ctx, reply);
-            if (sent) return;
-        } else {
-            console.log('No matching reply found for:', userText);
-        }
-    }
-
     // Handle state-based operations first
     if (awaitingReplyWord) {
         tempReplyWord = userText;
@@ -1200,36 +1185,56 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
-        // Continue with the reply saving process
         let mediaType = 'text';
         let replyText = null;
         let mediaUrl = null;
         let fileId = null;
 
-        if (ctx.message.text) {
+        const message = ctx.message;
+
+        if (message.text) {
             mediaType = 'text';
-            replyText = ctx.message.text.trim();
+            replyText = message.text.trim();
+        } else if (message.photo) {
+            mediaType = 'photo';
+            fileId = message.photo[message.photo.length - 1].file_id;
+        } else if (message.video) {
+            mediaType = 'video';
+            fileId = message.video.file_id;
+        } else if (message.audio) {
+            mediaType = 'audio';
+            fileId = message.audio.file_id;
+        } else if (message.voice) {
+            mediaType = 'voice';
+            fileId = message.voice.file_id;
+        } else if (message.document) {
+            mediaType = 'document';
+            fileId = message.document.file_id;
         } else {
-            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص.');
+            await ctx.reply('❌ نوع الوسائط غير مدعوم حالياً. يرجى إرسال نص أو صورة أو فيديو أو صوت.');
             awaitingReplyResponse = false;
             return true;
         }
 
+        // Optionally: get file URL if you need it
+        if (fileId) {
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            mediaUrl = fileLink.href;
+        }
+
         const db = await ensureDatabaseInitialized();
 
-        // Check if trigger word already exists
-        const existingReply = await db.collection('replies').findOne({ 
+        const existingReply = await db.collection('replies').findOne({
             trigger_word: tempReplyWord,
             bot_id: botId
         });
-        
+
         if (existingReply) {
             await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
             awaitingReplyResponse = false;
             return true;
         }
 
-        // Add the reply to the database
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             type: mediaType,
@@ -1243,10 +1248,10 @@ async function handleAwaitingReplyResponse(ctx) {
 
         await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
-        // Reset state
         tempReplyWord = '';
         awaitingReplyResponse = false;
         return true;
+
     } catch (error) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
@@ -1254,6 +1259,7 @@ async function handleAwaitingReplyResponse(ctx) {
         return true;
     }
 }
+
 // Add these action handlers
 bot.action('add_another_question', async (ctx) => {
     await ctx.answerCbQuery();
@@ -2792,300 +2798,7 @@ bot.on('text', async (ctx) => {
 
     await next();
 });
-// For photo handler
-bot.on('photo', async (ctx) => {
-    try {
-        // First check if we're awaiting a reply response
-        if (awaitingReplyResponse) {
-            const handled = await handleMediaReplyResponse(ctx, 'photo');
-            if (handled) return;
-        }
-        
-        // Rest of your photo handling logic
-        // ...
-    } catch (error) {
-        console.error('Error handling photo message:', error);
-    }
-});
 
-// For video handler
-bot.on('video', async (ctx) => {
-    try {
-        const chatId = ctx.chat.id;
-        const isRestricted = videoRestrictionStatus.get(chatId);
-
-        // First check if we're awaiting a reply response
-        if (awaitingReplyResponse) {
-            const handled = await handleMediaReplyResponse(ctx, 'video');
-            if (handled) return;
-        }
-
-        // Video restriction check
-        if (isRestricted) {
-            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
-            
-            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
-                await ctx.deleteMessage();
-                await ctx.reply('❌ عذرًا، إرسال الفيديوهات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                return;
-            }
-        }
-
-        // Continue with any existing video handling logic...
-    } catch (error) {
-        console.error('Error handling video message:', error);
-    }
-});
-
-// Similarly for document, sticker, and animation handlers
-
-bot.on('document', async (ctx) => {
-    if (awaitingReplyResponse) {
-        await handleMediaReplyResponse(ctx, 'document');
-        return;
-    }
-    
-    // Your existing document handling code...
-    // If you're in a group, check for any restrictions
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        const chatId = ctx.chat.id;
-        const documentRestricted = documentRestrictionStatus.get(chatId);
-        
-        if (documentRestricted) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
-                try {
-                    await ctx.deleteMessage();
-                    await ctx.reply('❌ عذرًا، إرسال الملفات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                } catch (error) {
-                    console.error('Error in document restriction:', error);
-                }
-                return;
-            }
-        }
-    }
-    
-    // Track documents for media cleaning if needed
-    const chatId = ctx.chat.id;
-    const messageId = ctx.message.message_id;
-    const timestamp = Date.now();
-    
-    let documents = documentMessages.get(chatId) || [];
-    documents.push({ messageId, timestamp });
-    documentMessages.set(chatId, documents);
-});
-
-bot.on('sticker', async (ctx) => {
-    if (awaitingReplyResponse) {
-        await handleMediaReplyResponse(ctx, 'sticker');
-        return;
-    }
-    
-    // Your existing sticker handling code...
-    // If you're in a group, check for any restrictions
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        const chatId = ctx.chat.id;
-        const stickerRestricted = stickerRestrictionStatus.get(chatId);
-        
-        if (stickerRestricted) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
-                try {
-                    await ctx.deleteMessage();
-                    await ctx.reply('❌ عذرًا، إرسال الملصقات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                } catch (error) {
-                    console.error('Error in sticker restriction:', error);
-                }
-                return;
-            }
-        }
-    }
-    
-    // Track stickers for media cleaning if needed
-    const chatId = ctx.chat.id;
-    const messageId = ctx.message.message_id;
-    const timestamp = Date.now();
-    
-    let stickers = stickerMessages.get(chatId) || [];
-    stickers.push({ messageId, timestamp });
-    stickerMessages.set(chatId, stickers);
-});
-
-bot.on('animation', async (ctx) => {
-    if (awaitingReplyResponse) {
-        await handleMediaReplyResponse(ctx, 'animation');
-        return;
-    }
-    
-    // Your existing animation handling code...
-    // If you're in a group, check for any restrictions
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        const chatId = ctx.chat.id;
-        const animationRestricted = animationRestrictionStatus.get(chatId);
-        
-        if (animationRestricted) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
-                try {
-                    await ctx.deleteMessage();
-                    await ctx.reply('❌ عذرًا، إرسال الصور المتحركة غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                } catch (error) {
-                    console.error('Error in animation restriction:', error);
-                }
-                return;
-            }
-        }
-    }
-    
-    // Track animations for media cleaning if needed
-    const chatId = ctx.chat.id;
-    const messageId = ctx.message.message_id;
-    const timestamp = Date.now();
-    
-    let animations = animationMessages.get(chatId) || [];
-    animations.push({ messageId, timestamp });
-    animationMessages.set(chatId, animations);
-});
-// Function to handle media replies
-async function handleMediaReplyResponse(ctx, mediaType) {
-    if (!awaitingReplyResponse) return false;
-
-    try {
-        const userId = ctx.from.id;
-        const username = ctx.from.username || '';
-        const userState = userStates.get(userId);
-        const botId = userState?.botId || tempBotId;
-
-        if (!botId && !tempReplyWord) {
-            await ctx.reply('❌ حدث خطأ في تحديد معرف البوت أو الكلمة المفتاحية. يرجى المحاولة مرة أخرى.');
-            awaitingReplyResponse = false;
-            return true;
-        }
-
-        let fileId = null;
-        let mediaUrl = null;
-        let caption = null;
-        let additionalData = {};
-
-        // Extract the appropriate file_id and metadata based on media type
-        switch (mediaType) {
-            case 'photo':
-                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                caption = ctx.message.caption || '';
-                break;
-            case 'video':
-                fileId = ctx.message.video.file_id;
-                caption = ctx.message.caption || '';
-                additionalData = {
-                    duration: ctx.message.video.duration,
-                    width: ctx.message.video.width,
-                    height: ctx.message.video.height,
-                    mime_type: ctx.message.video.mime_type
-                };
-                break;
-            case 'document':
-                fileId = ctx.message.document.file_id;
-                caption = ctx.message.caption || '';
-                additionalData = {
-                    file_name: ctx.message.document.file_name,
-                    mime_type: ctx.message.document.mime_type,
-                    file_size: ctx.message.document.file_size
-                };
-                break;
-            case 'sticker':
-                fileId = ctx.message.sticker.file_id;
-                additionalData = {
-                    emoji: ctx.message.sticker.emoji,
-                    set_name: ctx.message.sticker.set_name,
-                    is_animated: ctx.message.sticker.is_animated,
-                    is_video: ctx.message.sticker.is_video
-                };
-                break;
-            case 'animation':
-                fileId = ctx.message.animation.file_id;
-                caption = ctx.message.caption || '';
-                additionalData = {
-                    duration: ctx.message.animation.duration,
-                    width: ctx.message.animation.width,
-                    height: ctx.message.animation.height,
-                    mime_type: ctx.message.animation.mime_type
-                };
-                break;
-            default:
-                await ctx.reply('❌ نوع الوسائط غير مدعوم.');
-                awaitingReplyResponse = false;
-                return true;
-        }
-
-        // If we're in a group with a username, create a direct link to the message
-        if (ctx.chat.type !== 'private' && ctx.chat.username) {
-            mediaUrl = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
-        }
-
-        try {
-            const db = await ensureDatabaseInitialized();
-            
-            // Check if trigger word already exists
-            const existingReply = await db.collection('replies').findOne({ 
-                trigger_word: tempReplyWord,
-                bot_id: botId || { $exists: false }
-            });
-            
-            if (existingReply) {
-                // Update existing reply
-                await db.collection('replies').updateOne(
-                    { _id: existingReply._id },
-                    { 
-                        $set: {
-                            type: mediaType,
-                            text: caption,
-                            media_url: mediaUrl,
-                            file_id: fileId,
-                            updated_at: new Date(),
-                            updated_by: userId,
-                            ...additionalData
-                        }
-                    }
-                );
-                
-                await ctx.reply(`✅ تم تحديث الرد للكلمة "${tempReplyWord}" بنجاح. نوع الرد: ${mediaType}`);
-            } else {
-                // Add new reply
-                await db.collection('replies').insertOne({
-                    trigger_word: tempReplyWord,
-                    word: tempReplyWord,
-                    type: mediaType,
-                    text: caption,
-                    media_url: mediaUrl,
-                    file_id: fileId,
-                    created_at: new Date(),
-                    created_by: userId,
-                    username: username,
-                    bot_id: botId || undefined,
-                    ...additionalData
-                });
-                
-                await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح. نوع الرد: ${mediaType}`);
-            }
-            
-            // Reset the state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            return true;
-            
-        } catch (error) {
-            console.error('Error adding/updating media reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى.');
-            awaitingReplyResponse = false;
-            return true;
-        }
-    } catch (error) {
-        console.error('Error in handleMediaReplyResponse:', error);
-        await ctx.reply('❌ حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
-        awaitingReplyResponse = false;
-        return true;
-    }
-}
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
@@ -3140,13 +2853,23 @@ if (ctx.chat.type === 'private') {
 // based on your existing code and requirements.
 
 async function checkForAutomaticReply(ctx) {
-    const userText = ctx.message.text.trim().toLowerCase();
     try {
         const db = await ensureDatabaseInitialized();
-        const reply = await db.collection('replies').findOne({ trigger_word: userText });
+        const userText = ctx.message.text.trim().toLowerCase();
+        console.log('Searching for reply with keyword:', userText);
+        
+        // Search with a more comprehensive query that covers all your different field structures
+        const reply = await db.collection('replies').findOne({
+            $or: [
+                { trigger_word: userText },
+                { word: userText }
+            ]
+        });
+
+        console.log('Reply search result:', reply);
         return reply;
     } catch (error) {
-        console.error('Error checking for reply:', error);
+        console.error('Error checking for automatic replies:', error);
         return null;
     }
 }
@@ -3884,103 +3607,57 @@ async function getCustomBotName(chatId) {
         return null;
     }
 }
-// Add this function to properly check and save replies
-async function saveReply(triggerWord, replyContent, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        
-        // Determine the type of reply based on the content
-        let replyData = {
-            trigger_word: triggerWord,
-            word: triggerWord,
-            created_at: new Date(),
-            created_by: userId
-        };
-        
-        if (typeof replyContent === 'string') {
-            // Text reply
-            replyData.type = 'text';
-            replyData.text = replyContent;
-            replyData.reply_text = replyContent;
-        } else if (replyContent.type) {
-            // Media reply with type already specified
-            replyData = { ...replyData, ...replyContent };
-        } else {
-            // Unknown format, log it for debugging
-            console.log('Unknown reply format:', replyContent);
-            return false;
-        }
-        
-        // Check if a reply for this trigger word already exists
-        const existingReply = await db.collection('replies').findOne({ trigger_word: triggerWord });
-        
-        if (existingReply) {
-            // Update existing reply
-            await db.collection('replies').updateOne(
-                { trigger_word: triggerWord },
-                { $set: replyData }
-            );
-        } else {
-            // Insert new reply
-            await db.collection('replies').insertOne(replyData);
-        }
-        
-        return true;
-    } catch (error) {
-        console.error('Error saving reply:', error);
-        return false;
-    }
-}
 //check this later maybe its not saving the replays because of this 
-// Update your sendReply function to handle media types
 async function sendReply(ctx, reply) {
     try {
-        const chatId = ctx.chat.id;
+        if (!reply) return false;
         
-        switch (reply.type) {
-            case 'text':
-                await ctx.reply(reply.text);
-                break;
-            case 'photo':
-                if (reply.file_id) {
-                    await ctx.replyWithPhoto(reply.file_id, { caption: reply.text });
-                } else if (reply.media_url) {
-                    await ctx.replyWithPhoto({ url: reply.media_url }, { caption: reply.text });
-                }
-                break;
-            case 'video':
-                if (reply.file_id) {
-                    await ctx.replyWithVideo(reply.file_id, { caption: reply.text });
-                } else if (reply.media_url) {
-                    await ctx.replyWithVideo({ url: reply.media_url }, { caption: reply.text });
-                }
-                break;
-            case 'document':
-                if (reply.file_id) {
-                    await ctx.replyWithDocument(reply.file_id, { caption: reply.text });
-                } else if (reply.media_url) {
-                    await ctx.replyWithDocument({ url: reply.media_url }, { caption: reply.text });
-                }
-                break;
-            case 'sticker':
-                if (reply.file_id) {
-                    await ctx.replyWithSticker(reply.file_id);
-                }
-                break;
-            case 'animation':
-                if (reply.file_id) {
-                    await ctx.replyWithAnimation(reply.file_id, { caption: reply.text });
-                } else if (reply.media_url) {
-                    await ctx.replyWithAnimation({ url: reply.media_url }, { caption: reply.text });
-                }
-                break;
-            default:
-                console.log('Unknown reply type:', reply.type);
-                return false;
+        // Handle different reply structures
+        if (reply.reply_text) {
+            await ctx.reply(reply.reply_text);
+            return true;
+        } else if (reply.text) {
+            await ctx.reply(reply.text);
+            return true;
         }
         
-        // If we reach here, we couldn't handle the reply format
-        console.log('Unrecognized reply format:', reply);
+        // If we have a type field, handle different media types
+        if (reply.type) {
+            switch (reply.type) {
+                case "text":
+                    await ctx.reply(reply.text);
+                    break;
+                case "photo":
+                    if (reply.file_id) {
+                        await ctx.replyWithPhoto(reply.file_id);
+                    }
+                    break;
+                case "animation":
+                    if (reply.file_id) {
+                        await ctx.replyWithAnimation(reply.file_id);
+                    }
+                    break;
+                case "video":
+                    if (reply.file_id) {
+                        await ctx.replyWithVideo(reply.file_id);
+                    }
+                    break;
+                case "sticker":
+                    if (reply.file_id) {
+                        await ctx.replyWithSticker(reply.file_id);
+                    }
+                    break;
+                case "document":
+                    if (reply.file_id) {
+                        await ctx.replyWithDocument(reply.file_id);
+                    }
+                    break;
+                default:
+                    return false;
+            }
+            return true;
+        }
+        
         return false;
     } catch (error) {
         console.error('Error sending reply:', error);
