@@ -1568,8 +1568,8 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('إضافة رد عام');
             
-            // Store the bot ID for which we're adding the reply
-            ctx.session.addReplyForBotId = botId;
+            // Use context to store temporary data
+            ctx.scene.state.addReplyForBotId = botId;
             
             await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
                 reply_markup: {
@@ -1579,8 +1579,8 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
                 }
             });
             
-            // Set the state to await the trigger word
-            ctx.session.awaitingReplyWord = true;
+            // Use context to set the state
+            ctx.scene.state.awaitingReplyWord = true;
         } else {
             await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
         }
@@ -1590,13 +1590,42 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     }
 });
 
-// Add a new action handler for canceling the add reply operation
+bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
+    try {
+        const botId = parseInt(ctx.match[1]);
+        
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('إضافة رد عام');
+            
+            // Use context to store temporary data
+            ctx.scene.state.addReplyForBotId = botId;
+            
+            await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔙 رجوع', callback_data: 'cancel_add_reply' }]
+                    ]
+                }
+            });
+            
+            // Use context to set the state
+            ctx.scene.state.awaitingReplyWord = true;
+        } else {
+            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error in add_general_reply action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء إضافة الرد العام. الرجاء المحاولة مرة أخرى.', { show_alert: true });
+    }
+});
+
+// Modify the cancel_add_reply action as well
 bot.action('cancel_add_reply', async (ctx) => {
     try {
         await ctx.answerCbQuery('تم إلغاء إضافة الرد');
-        ctx.session.awaitingReplyWord = false;
-        ctx.session.awaitingReplyResponse = false;
-        ctx.session.addReplyForBotId = null;
+        ctx.scene.state.awaitingReplyWord = false;
+        ctx.scene.state.awaitingReplyResponse = false;
+        ctx.scene.state.addReplyForBotId = null;
         await ctx.editMessageText('تم إلغاء عملية إضافة الرد. يمكنك بدء العملية من جديد في أي وقت.');
     } catch (error) {
         console.error('Error canceling add reply:', error);
