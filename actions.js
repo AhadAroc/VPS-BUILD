@@ -3,7 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 // Add this at the top of your file with other imports
-const { Scenes } = require('telegraf');
+const {Telegraf, Scenes } = require('telegraf');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -48,7 +48,9 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-
+const stage = new Scenes.Stage([/* your scenes here */]);
+bot.use(session());
+bot.use(stage.middleware());
 
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
@@ -1569,7 +1571,7 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
             await ctx.answerCbQuery('إضافة رد عام');
             
             // Use context to store temporary data
-            ctx.scene.state.addReplyForBotId = botId;
+            ctx.session.addReplyForBotId = botId;
             
             await ctx.editMessageText('أرسل الكلمة التي تريد إضافة رد لها:', {
                 reply_markup: {
@@ -1580,7 +1582,7 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
             });
             
             // Use context to set the state
-            ctx.scene.state.awaitingReplyWord = true;
+            ctx.session.awaitingReplyWord = true;
         } else {
             await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
         }
@@ -1619,13 +1621,12 @@ bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
     }
 });
 
-// Modify the cancel_add_reply action as well
 bot.action('cancel_add_reply', async (ctx) => {
     try {
         await ctx.answerCbQuery('تم إلغاء إضافة الرد');
-        ctx.scene.state.awaitingReplyWord = false;
-        ctx.scene.state.awaitingReplyResponse = false;
-        ctx.scene.state.addReplyForBotId = null;
+        ctx.session.awaitingReplyWord = false;
+        ctx.session.awaitingReplyResponse = false;
+        ctx.session.addReplyForBotId = null;
         await ctx.editMessageText('تم إلغاء عملية إضافة الرد. يمكنك بدء العملية من جديد في أي وقت.');
     } catch (error) {
         console.error('Error canceling add reply:', error);
