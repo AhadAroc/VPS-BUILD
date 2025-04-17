@@ -2480,12 +2480,25 @@ bot.on('text', async (ctx) => {
             const db = await ensureDatabaseInitialized();
             console.log('Searching for reply with keyword:', text);
             
-            const reply = await db.collection('replies').findOne({
+            // First try to find a bot-specific reply
+            const botId = ctx.botInfo.id; // Get the current bot's ID
+            let reply = await db.collection('replies').findOne({
+                bot_id: botId,
                 $or: [
                     { trigger_word: text },
                     { word: text }
                 ]
             });
+            
+            // If no bot-specific reply is found, try to find a global reply
+            if (!reply) {
+                reply = await db.collection('replies').findOne({
+                    $or: [
+                        { trigger_word: text },
+                        { word: text }
+                    ]
+                });
+            }
             
             console.log('Reply search result:', reply);
             
