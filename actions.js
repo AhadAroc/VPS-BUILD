@@ -2449,7 +2449,26 @@ bot.on('left_chat_member', (ctx) => {
                     awaitingReplyResponse = true;
                     return;
                 }
-                
+                // Check if we're awaiting a reply response
+        if (awaitingReplyResponse) {
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'text',
+                    text: text,
+                    created_at: new Date(),
+                    created_by: userId
+                });
+                await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${tempReplyWord}" بنجاح.`);
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving text reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد النصي. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        }
                 if (awaitingDeleteReplyWord) {
                     const wordToDelete = text;
                     try {
@@ -2647,46 +2666,46 @@ bot.on('left_chat_member', (ctx) => {
     });
     
     // Add handlers for other message types
-    bot.on(['photo', 'animation', 'video', 'sticker', 'document'], async (ctx) => {
-        if (awaitingReplyResponse) {
-            try {
-                const db = await ensureDatabaseInitialized();
-                let fileId, type;
-                
-                if (ctx.message.photo) {
-                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                    type = 'photo';
-                } else if (ctx.message.animation) {
-                    fileId = ctx.message.animation.file_id;
-                    type = 'animation';
-                } else if (ctx.message.video) {
-                    fileId = ctx.message.video.file_id;
-                    type = 'video';
-                } else if (ctx.message.sticker) {
-                    fileId = ctx.message.sticker.file_id;
-                    type = 'sticker';
-                } else if (ctx.message.document) {
-                    fileId = ctx.message.document.file_id;
-                    type = 'document';
-                }
-                
-                await db.collection('replies').insertOne({
-                    trigger_word: tempReplyWord,
-                    type: type,
-                    file_id: fileId,
-                    created_at: new Date(),
-                    created_by: ctx.from.id
-                });
-                
-                await ctx.reply(`✅ تم حفظ الرد (${type}) للكلمة "${tempReplyWord}" بنجاح.`);
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-            } catch (error) {
-                console.error('Error saving media reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى.');
+bot.on(['photo', 'animation', 'video', 'sticker', 'document'], async (ctx) => {
+    if (awaitingReplyResponse) {
+        try {
+            const db = await ensureDatabaseInitialized();
+            let fileId, type;
+            
+            if (ctx.message.photo) {
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                type = 'photo';
+            } else if (ctx.message.animation) {
+                fileId = ctx.message.animation.file_id;
+                type = 'animation';
+            } else if (ctx.message.video) {
+                fileId = ctx.message.video.file_id;
+                type = 'video';
+            } else if (ctx.message.sticker) {
+                fileId = ctx.message.sticker.file_id;
+                type = 'sticker';
+            } else if (ctx.message.document) {
+                fileId = ctx.message.document.file_id;
+                type = 'document';
             }
+            
+            await db.collection('replies').insertOne({
+                trigger_word: tempReplyWord,
+                type: type,
+                file_id: fileId,
+                created_at: new Date(),
+                created_by: ctx.from.id
+            });
+            
+            await ctx.reply(`✅ تم حفظ الرد (${type}) للكلمة "${tempReplyWord}" بنجاح.`);
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        } catch (error) {
+            console.error('Error saving media reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى.');
         }
-    });
+    }
+});
 
 
 
