@@ -1523,6 +1523,15 @@ bot.action('add_reply', async (ctx) => {
             step: 'awaiting_trigger',
             botId: ctx.botInfo.id // Store the bot ID
         });
+
+        // Add a cancel button
+        await ctx.reply('يمكنك إلغاء العملية في أي وقت بالضغط على الزر أدناه:', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '❌ إلغاء', callback_data: 'cancel_add_reply' }]
+                ]
+            }
+        });
     } catch (error) {
         console.error('Error in add_reply action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة رد جديد.');
@@ -2440,99 +2449,32 @@ bot.on('left_chat_member', (ctx) => {
             const chatId = ctx.chat.id;
             const userId = ctx.from.id;
             
-            // Handle awaiting states in private chats
-            if (ctx.chat.type === 'private') {
-                if (awaitingReplyWord) {
-                    tempReplyWord = text;
-                    await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص، صورة، GIF، فيديو، ملصق، أو مستند):`);
-                    awaitingReplyWord = false;
-                    awaitingReplyResponse = true;
-                    return;
-                }
-                // Check if we're awaiting a reply response
-        if (awaitingReplyResponse) {
-            try {
-                const db = await ensureDatabaseInitialized();
-                await db.collection('replies').insertOne({
-                    trigger_word: tempReplyWord,
-                    type: 'text',
-                    text: text,
-                    created_at: new Date(),
-                    created_by: userId
-                });
-                await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${tempReplyWord}" بنجاح.`);
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-            } catch (error) {
-                console.error('Error saving text reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد النصي. يرجى المحاولة مرة أخرى.');
-            }
-            return;
-        }
-                if (awaitingDeleteReplyWord) {
-                    const wordToDelete = text;
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        const result = await db.collection('replies').deleteOne({
-                            $or: [
-                                { trigger_word: wordToDelete },
-                                { word: wordToDelete }
-                            ]
-                        });
-                        
-                        if (result.deletedCount > 0) {
-                            await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
-                        } else {
-                            await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
-                        }
-                    } catch (error) {
-                        console.error('Error deleting reply:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
-                    }
-                    
-                    awaitingDeleteReplyWord = false;
-                    return;
-                }
-                
-                if (awaitingBotName) {
-                    const newBotName = text;
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        await db.collection('bot_custom_names').updateOne(
-                            { bot_id: ctx.botInfo.id },
-                            { $set: { name: newBotName } },
-                            { upsert: true }
-                        );
-                        
-                        await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
-                    } catch (error) {
-                        console.error('Error updating bot name:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
-                    }
-                    
-                    awaitingBotName = false;
-                    return;
-                }
-                
-                if (awaitingReplyResponse) {
+            if (userState && userState.action === 'adding_reply') {
+                if (userState.step === 'awaiting_trigger') {
+                    // Save the trigger word and ask for the reply
+                    userState.triggerWord = ctx.message.text.trim();
+                    userState.step = 'awaiting_reply';
+                    await ctx.reply(`تم استلام الكلمة المفتاحية: "${userState.triggerWord}". الآن أرسل الرد (نص، صورة، GIF، فيديو، ملصق، أو مستند):`);
+                } else if (userState.step === 'awaiting_reply') {
+                    // Save the text reply
                     try {
                         const db = await ensureDatabaseInitialized();
                         await db.collection('replies').insertOne({
-                            trigger_word: tempReplyWord,
+                            trigger_word: userState.triggerWord,
                             type: 'text',
-                            text: text,
+                            text: ctx.message.text,
                             created_at: new Date(),
-                            created_by: userId
+                            created_by: userId,
+                            bot_id: userState.botId
                         });
-                        await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${tempReplyWord}" بنجاح.`);
-                        awaitingReplyResponse = false;
-                        tempReplyWord = '';
+                        await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${userState.triggerWord}" بنجاح.`);
+                        userStates.delete(userId);
                     } catch (error) {
                         console.error('Error saving text reply:', error);
                         await ctx.reply('❌ حدث خطأ أثناء حفظ الرد النصي. يرجى المحاولة مرة أخرى.');
                     }
-                    return;
                 }
+                return;
             }
             
             // Check if there's an active quiz in this chat
@@ -2665,9 +2607,12 @@ bot.on('left_chat_member', (ctx) => {
         }
     });
     
-    // Add handlers for other message types
-bot.on(['photo', 'animation', 'video', 'sticker', 'document'], async (ctx) => {
-    if (awaitingReplyResponse) {
+   // Add this handler for media messages
+bot.on(['photo', 'video', 'animation', 'audio', 'voice', 'document', 'sticker'], async (ctx) => {
+    const userId = ctx.from.id;
+    const userState = userStates.get(userId);
+
+    if (userState && userState.action === 'adding_reply' && userState.step === 'awaiting_reply') {
         try {
             const db = await ensureDatabaseInitialized();
             let fileId, type;
@@ -2675,31 +2620,37 @@ bot.on(['photo', 'animation', 'video', 'sticker', 'document'], async (ctx) => {
             if (ctx.message.photo) {
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
                 type = 'photo';
-            } else if (ctx.message.animation) {
-                fileId = ctx.message.animation.file_id;
-                type = 'animation';
             } else if (ctx.message.video) {
                 fileId = ctx.message.video.file_id;
                 type = 'video';
-            } else if (ctx.message.sticker) {
-                fileId = ctx.message.sticker.file_id;
-                type = 'sticker';
+            } else if (ctx.message.animation) {
+                fileId = ctx.message.animation.file_id;
+                type = 'animation';
+            } else if (ctx.message.audio) {
+                fileId = ctx.message.audio.file_id;
+                type = 'audio';
+            } else if (ctx.message.voice) {
+                fileId = ctx.message.voice.file_id;
+                type = 'voice';
             } else if (ctx.message.document) {
                 fileId = ctx.message.document.file_id;
                 type = 'document';
+            } else if (ctx.message.sticker) {
+                fileId = ctx.message.sticker.file_id;
+                type = 'sticker';
             }
             
             await db.collection('replies').insertOne({
-                trigger_word: tempReplyWord,
+                trigger_word: userState.triggerWord,
                 type: type,
                 file_id: fileId,
                 created_at: new Date(),
-                created_by: ctx.from.id
+                created_by: userId,
+                bot_id: userState.botId
             });
             
-            await ctx.reply(`✅ تم حفظ الرد (${type}) للكلمة "${tempReplyWord}" بنجاح.`);
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+            await ctx.reply(`✅ تم حفظ الرد (${type}) للكلمة "${userState.triggerWord}" بنجاح.`);
+            userStates.delete(userId);
         } catch (error) {
             console.error('Error saving media reply:', error);
             await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى.');
