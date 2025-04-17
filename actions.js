@@ -2906,17 +2906,19 @@ async function handleAwaitingReplyWord(ctx) {
 // Add this function to handle awaiting text reply response
 async function handleAwaitingReplyResponse(ctx) {
     const text = ctx.message.text.trim();
+    const userState = userStates.get(ctx.from.id);
+    const botId = ctx.botInfo.id; // Get the current bot's ID
     try {
         const db = await ensureDatabaseInitialized();
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
-            word: tempReplyWord,
-            type: 'text',
-            text: text,
-            reply_text: text,
+            type: mediaType,
+            text: replyText,
+            media_url: mediaUrl,
+            file_id: fileId,
             created_at: new Date(),
             created_by: ctx.from.id,
-            username: ctx.from.username
+            bot_id: botId // Use the current bot's ID
         });
         
         await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
@@ -3290,24 +3292,22 @@ if (reply) {
 
 async function checkForAutomaticReply(ctx) {
     try {
-        const db = await ensureDatabaseInitialized();
-        const userText = ctx.message.text.trim().toLowerCase();
-        const botId = ctx.botInfo.id; // Get the current bot's ID
-        
-        console.log(`Searching for reply with keyword: ${userText} for bot: ${botId}`);
-        
-        const reply = await db.collection('replies').findOne({
-            bot_id: botId,
-            $or: [
-                { trigger_word: userText },
-                { word: userText }
-            ]
-        });
+        const userText = ctx.message.text.toLowerCase();
+        const currentBotId = ctx.botInfo.id; // Get the current bot's ID
 
-        console.log('Reply search result:', reply);
-        return reply;
+        const db = await ensureDatabaseInitialized();
+        const replies = await db.collection('replies').find({
+            bot_id: currentBotId // Filter replies by the current bot's ID
+        }).toArray();
+
+        for (const reply of replies) {
+            if (reply.trigger_word && userText.includes(reply.trigger_word.toLowerCase())) {
+                return reply;
+            }
+        }
+        return null;
     } catch (error) {
-        console.error('Error checking for automatic replies:', error);
+        console.error('Error checking for automatic reply:', error);
         return null;
     }
 }
