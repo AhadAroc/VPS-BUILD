@@ -2595,142 +2595,68 @@ bot.on('text', async (ctx) => {
 
 // Updated handleMediaReply function to check both global and user-specific states
 // Consolidated media handler function
+// Consolidated media reply handler
 async function handleMediaReply(ctx, mediaType) {
     try {
         const userId = ctx.from.id;
         
-        // Check if we're awaiting a reply response (either global or user-specific)
-        const isAwaitingGlobal = awaitingReplyResponse;
-        const isAwaitingUserSpecific = userStates && userStates.has(userId) && 
-                                      userStates.get(userId).action === 'adding_reply' && 
-                                      userStates.get(userId).step === 'awaiting_response';
-        
-        if (!isAwaitingGlobal && !isAwaitingUserSpecific) {
-            return false; // Not handling this media
+        // Check if we're awaiting a reply response
+        if (!awaitingReplyResponse || !tempReplyWord) {
+            return false; // Not handling this media as a reply
         }
 
-        console.log(`Processing ${mediaType} as a reply. Global state: ${isAwaitingGlobal}, User state: ${isAwaitingUserSpecific}`);
-
-        // Get the trigger word (either from global or user-specific state)
-        let triggerWord;
-        let botId = null;
+        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
         
-        if (isAwaitingUserSpecific) {
-            const userState = userStates.get(userId);
-            triggerWord = userState.triggerWord;
-            botId = userState.botId; // For bot clones
-        } else {
-            triggerWord = tempReplyWord;
-        }
-        
-        if (!triggerWord || triggerWord.trim() === '') {
-            console.error('No trigger word found for media reply');
-            await ctx.reply('❌ حدث خطأ: لم يتم العثور على الكلمة المفتاحية. يرجى بدء العملية من جديد.');
-            
-            // Reset states
-            if (isAwaitingUserSpecific) {
-                userStates.delete(userId);
-            } else {
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-            }
-            return true; // We handled it, even though there was an error
-        }
-        
-        const username = ctx.from.username;
         let fileId, additionalData = {};
         
-        // Extract the appropriate file ID and any additional metadata based on media type
+        // Extract the appropriate file ID based on media type
         switch (mediaType) {
             case 'photo':
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
                 break;
             case 'video':
                 fileId = ctx.message.video.file_id;
-                additionalData = {
-                    duration: ctx.message.video.duration,
-                    width: ctx.message.video.width,
-                    height: ctx.message.video.height,
-                    mime_type: ctx.message.video.mime_type
-                };
                 break;
             case 'animation':
                 fileId = ctx.message.animation.file_id;
-                additionalData = {
-                    duration: ctx.message.animation.duration,
-                    width: ctx.message.animation.width,
-                    height: ctx.message.animation.height
-                };
                 break;
             case 'document':
                 fileId = ctx.message.document.file_id;
-                additionalData = {
-                    file_name: ctx.message.document.file_name,
-                    mime_type: ctx.message.document.mime_type
-                };
                 break;
             case 'sticker':
                 fileId = ctx.message.sticker.file_id;
-                additionalData = {
-                    emoji: ctx.message.sticker.emoji,
-                    set_name: ctx.message.sticker.set_name,
-                    is_animated: ctx.message.sticker.is_animated
-                };
                 break;
             default:
                 return false; // Unsupported media type
         }
-
+        
         try {
             // Save to database
-            const db = await ensureDatabaseInitialized(botId);
-            
-            // Create the document to insert
-            const replyDocument = {
-                trigger_word: triggerWord,
-                word: triggerWord,
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
                 file_id: fileId,
                 created_at: new Date(),
                 created_by: userId,
-                username: username,
-                ...additionalData
-            };
+                username: ctx.from.username || ''
+            });
             
-            // If this is for a bot clone, add the bot_id
-            if (botId) {
-                replyDocument.bot_id = botId;
-            }
+            // Send confirmation
+            await ctx.reply(`✅ تم إضافة ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
             
-            console.log(`Saving ${mediaType} reply to database:`, replyDocument);
-            
-            // Insert into the database
-            await db.collection('replies').insertOne(replyDocument);
-            
-            // Send confirmation message
-            const mediaTypeArabic = getMediaTypeInArabic(mediaType);
-            await ctx.reply(`✅ تم حفظ ${mediaTypeArabic} كرد للكلمة "${triggerWord}" بنجاح.`);
-            
-            // Reset the state
-            if (isAwaitingUserSpecific) {
-                userStates.delete(userId);
-            } else {
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-            }
+            // Reset state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
             
             return true; // Successfully handled
         } catch (error) {
             console.error(`Error saving ${mediaType} reply:`, error);
             await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
             
-            // Reset the state even on error
-            if (isAwaitingUserSpecific) {
-                userStates.delete(userId);
-            } else {
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-            }
+            // Reset state even on error
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
             
             return true; // We still handled it, even though there was an error
         }
@@ -2738,19 +2664,6 @@ async function handleMediaReply(ctx, mediaType) {
         console.error(`Error in handleMediaReply for ${mediaType}:`, error);
         return false; // Error occurred
     }
-}
-
-// Helper function to get Arabic names for media types
-function getMediaTypeInArabic(mediaType) {
-    const mediaTypes = {
-        'photo': 'الصورة',
-        'video': 'الفيديو',
-        'animation': 'الصورة المتحركة',
-        'document': 'المستند',
-        'sticker': 'الملصق'
-    };
-    
-    return mediaTypes[mediaType] || mediaType;
 }
 
 // Helper function to get Arabic names for media types
@@ -3071,6 +2984,91 @@ bot.on('video', async (ctx) => {
 // Replace your existing photo handler with this one
 // Clean up duplicate handlers and use the consolidated function
 // Photo handler
+// Consolidated media reply handler
+async function handleMediaReply(ctx, mediaType) {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check if we're awaiting a reply response
+        if (!awaitingReplyResponse || !tempReplyWord) {
+            return false; // Not handling this media as a reply
+        }
+
+        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
+        
+        let fileId, additionalData = {};
+        
+        // Extract the appropriate file ID based on media type
+        switch (mediaType) {
+            case 'photo':
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                break;
+            case 'video':
+                fileId = ctx.message.video.file_id;
+                break;
+            case 'animation':
+                fileId = ctx.message.animation.file_id;
+                break;
+            case 'document':
+                fileId = ctx.message.document.file_id;
+                break;
+            case 'sticker':
+                fileId = ctx.message.sticker.file_id;
+                break;
+            default:
+                return false; // Unsupported media type
+        }
+        
+        try {
+            // Save to database
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                trigger_word: tempReplyWord.trim().toLowerCase(),
+                type: mediaType,
+                file_id: fileId,
+                created_at: new Date(),
+                created_by: userId,
+                username: ctx.from.username || ''
+            });
+            
+            // Send confirmation
+            await ctx.reply(`✅ تم إضافة ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            
+            // Reset state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // Successfully handled
+        } catch (error) {
+            console.error(`Error saving ${mediaType} reply:`, error);
+            await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
+            
+            // Reset state even on error
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // We still handled it, even though there was an error
+        }
+    } catch (error) {
+        console.error(`Error in handleMediaReply for ${mediaType}:`, error);
+        return false; // Error occurred
+    }
+}
+
+// Helper function to get Arabic names for media types
+function getMediaTypeInArabic(mediaType) {
+    const mediaTypes = {
+        'photo': 'الصورة',
+        'video': 'الفيديو',
+        'animation': 'الصورة المتحركة',
+        'document': 'المستند',
+        'sticker': 'الملصق'
+    };
+    
+    return mediaTypes[mediaType] || mediaType;
+}
+
+// Clean up the duplicate handlers and use this single handler for each media type
 bot.on('photo', async (ctx) => {
     try {
         // First check if this is a reply to a trigger word
@@ -3188,6 +3186,93 @@ bot.on('sticker', async (ctx) => {
         // Continue with any existing sticker handling logic...
     } catch (error) {
         console.error('Error handling sticker message:', error);
+    }
+});
+
+// Text handler for setting up the trigger word
+bot.on('text', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const text = ctx.message.text.trim();
+
+        // Handle awaiting reply word
+        if (awaitingReplyWord) {
+            tempReplyWord = text.toLowerCase();
+            await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص، صورة، فيديو، ملصق، GIF، أو مستند):`);
+            awaitingReplyWord = false;
+            awaitingReplyResponse = true;
+            return;
+        }
+
+        // Handle awaiting text reply response
+        if (awaitingReplyResponse) {
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord.toLowerCase(),
+                    type: 'text',
+                    text: text,
+                    created_at: new Date(),
+                    created_by: userId,
+                    username: ctx.from.username || ''
+                });
+                
+                await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
+                
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving text reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            }
+            return;
+        }
+
+        // Check for automatic replies
+        try {
+            const db = await ensureDatabaseInitialized();
+            const reply = await db.collection('replies').findOne({ 
+                trigger_word: text.toLowerCase() 
+            });
+            
+            if (reply) {
+                // Send the appropriate reply based on type
+                if (reply.type === 'text') {
+                    await ctx.reply(reply.text);
+                } else if (reply.file_id) {
+                    // Send media based on type
+                    switch (reply.type) {
+                        case 'photo':
+                            await ctx.replyWithPhoto(reply.file_id);
+                            break;
+                        case 'video':
+                            await ctx.replyWithVideo(reply.file_id);
+                            break;
+                        case 'animation':
+                            await ctx.replyWithAnimation(reply.file_id);
+                            break;
+                        case 'document':
+                            await ctx.replyWithDocument(reply.file_id);
+                            break;
+                        case 'sticker':
+                            await ctx.replyWithSticker(reply.file_id);
+                            break;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking for automatic reply:', error);
+        }
+
+        // Continue with other text message handling...
+        
+    } catch (error) {
+        console.error('Error handling text message:', error);
     }
 });
 // Implement the other helper functions (handleQuizAnswer, checkForAutomaticReply, sendReply, etc.) 
