@@ -2593,7 +2593,110 @@ bot.on('text', async (ctx) => {
     }
 });
 
+// Add this function to handle media replies
+async function handleMediaReply(ctx, mediaType) {
+    try {
+        // Check if we're awaiting a reply response
+        if (!awaitingReplyResponse) {
+            return false; // Not handling this media
+        }
 
+        const userId = ctx.from.id;
+        const username = ctx.from.username;
+        let fileId, additionalData = {};
+        
+        // Extract the appropriate file ID and any additional metadata based on media type
+        switch (mediaType) {
+            case 'photo':
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                break;
+            case 'video':
+                fileId = ctx.message.video.file_id;
+                additionalData = {
+                    duration: ctx.message.video.duration,
+                    width: ctx.message.video.width,
+                    height: ctx.message.video.height,
+                    mime_type: ctx.message.video.mime_type
+                };
+                break;
+            case 'animation':
+                fileId = ctx.message.animation.file_id;
+                additionalData = {
+                    duration: ctx.message.animation.duration,
+                    width: ctx.message.animation.width,
+                    height: ctx.message.animation.height
+                };
+                break;
+            case 'document':
+                fileId = ctx.message.document.file_id;
+                additionalData = {
+                    file_name: ctx.message.document.file_name,
+                    mime_type: ctx.message.document.mime_type
+                };
+                break;
+            case 'sticker':
+                fileId = ctx.message.sticker.file_id;
+                additionalData = {
+                    emoji: ctx.message.sticker.emoji,
+                    set_name: ctx.message.sticker.set_name,
+                    is_animated: ctx.message.sticker.is_animated
+                };
+                break;
+            default:
+                return false; // Unsupported media type
+        }
+
+        try {
+            // Save to database
+            const db = await ensureDatabaseInitialized();
+            
+            // Create the document to insert
+            const replyDocument = {
+                trigger_word: tempReplyWord,
+                word: tempReplyWord,
+                type: mediaType,
+                file_id: fileId,
+                created_at: new Date(),
+                created_by: userId,
+                username: username,
+                ...additionalData
+            };
+            
+            // Insert into the database
+            await db.collection('replies').insertOne(replyDocument);
+            
+            // Send confirmation message
+            const mediaTypeArabic = getMediaTypeInArabic(mediaType);
+            await ctx.reply(`✅ تم حفظ ${mediaTypeArabic} كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // Successfully handled
+        } catch (error) {
+            console.error(`Error saving ${mediaType} reply:`, error);
+            await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
+            return true; // We still handled it, even though there was an error
+        }
+    } catch (error) {
+        console.error(`Error in handleMediaReply for ${mediaType}:`, error);
+        return false; // Error occurred
+    }
+}
+
+// Helper function to get Arabic names for media types
+function getMediaTypeInArabic(mediaType) {
+    const mediaTypes = {
+        'photo': 'الصورة',
+        'video': 'الفيديو',
+        'animation': 'الصورة المتحركة',
+        'document': 'المستند',
+        'sticker': 'الملصق'
+    };
+    
+    return mediaTypes[mediaType] || mediaType;
+}
 
     //this fucks how the bot starts
      // Replace the problematic message handler with this one
@@ -2799,7 +2902,49 @@ if (ctx.chat.type === 'private') {
     }
 }
 
+// Add this function to handle awaiting reply word
+async function handleAwaitingReplyWord(ctx) {
+    tempReplyWord = ctx.message.text.trim().toLowerCase();
+    await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص، صورة، فيديو، ملصق، GIF، أو مستند):`);
+    awaitingReplyWord = false;
+    awaitingReplyResponse = true;
+    return true;
+}
 
+// Add this function to handle awaiting text reply response
+async function handleAwaitingReplyResponse(ctx) {
+    const text = ctx.message.text.trim();
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            word: tempReplyWord,
+            type: 'text',
+            text: text,
+            reply_text: text,
+            created_at: new Date(),
+            created_by: ctx.from.id,
+            username: ctx.from.username
+        });
+        
+        await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
+        
+        // Reset the state
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        
+        return true;
+    } catch (error) {
+        console.error('Error saving text reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+        
+        // Reset the state
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        
+        return true;
+    }
+}
     // Handle awaiting reply word
     if (awaitingReplyWord) {
         await handleAwaitingReplyWord(ctx);
@@ -2827,7 +2972,128 @@ if (ctx.chat.type === 'private') {
     // If we reach here, it's an unhandled text message
     await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
 }
+// Replace your existing video handler with this one
+bot.on('video', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const isRestricted = videoRestrictionStatus.get(chatId);
 
+        // Check if this is a reply to a trigger word
+        if (await handleMediaReply(ctx, 'video')) {
+            return; // Media was handled as a reply
+        }
+
+        // Continue with restriction check
+        if (isRestricted) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الفيديوهات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+
+        // Continue with any existing video handling logic...
+    } catch (error) {
+        console.error('Error handling video message:', error);
+    }
+});
+
+// Replace your existing photo handler with this one
+bot.on('photo', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        
+        // Check if this is a reply to a trigger word
+        if (await handleMediaReply(ctx, 'photo')) {
+            return; // Media was handled as a reply
+        }
+        
+        const isRestricted = photoRestrictionStatus.get(chatId);
+
+        if (isRestricted) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الصور غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+
+        // Continue with existing photo handling logic...
+        if (!photoMessages.has(chatId)) {
+            photoMessages.set(chatId, []);
+        }
+        photoMessages.get(chatId).push({
+            messageId: ctx.message.message_id,
+            timestamp: Date.now()
+        });
+
+        // Keep only the last 100 photos
+        const photos = photoMessages.get(chatId);
+        if (photos.length > 100) {
+            photos.shift();
+        }
+    } catch (error) {
+        console.error('Error handling photo message:', error);
+    }
+});
+
+// Add handlers for other media types
+bot.on('animation', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        
+        // Check if this is a reply to a trigger word
+        if (await handleMediaReply(ctx, 'animation')) {
+            return; // Media was handled as a reply
+        }
+        
+        const isRestricted = gifRestrictionStatus.get(chatId);
+
+        if (isRestricted) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الصور المتحركة غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+
+        // Continue with any existing GIF handling logic...
+    } catch (error) {
+        console.error('Error handling GIF message:', error);
+    }
+});
+
+bot.on('document', async (ctx) => {
+    try {
+        // Check if this is a reply to a trigger word
+        if (await handleMediaReply(ctx, 'document')) {
+            return; // Media was handled as a reply
+        }
+        
+        // Continue with any existing document handling logic...
+    } catch (error) {
+        console.error('Error handling document message:', error);
+    }
+});
+
+bot.on('sticker', async (ctx) => {
+    try {
+        // Check if this is a reply to a trigger word
+        if (await handleMediaReply(ctx, 'sticker')) {
+            return; // Media was handled as a reply
+        }
+        
+        // Continue with any existing sticker handling logic...
+    } catch (error) {
+        console.error('Error handling sticker message:', error);
+    }
+});
 // Implement the other helper functions (handleQuizAnswer, checkForAutomaticReply, sendReply, etc.) 
 // based on your existing code and requirements.
 
