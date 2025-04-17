@@ -138,12 +138,115 @@ async function connectToMongoDB(customDbName = null) {
         const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
         console.log(`Connecting to: ${sanitizedUri} with options:`, options);
         
+        // If we're already connected to the same database, return the existing connection
+        if (mongoose.connection.readyState === 1 && 
+            mongoose.connection.name === dbNameToUse) {
+            console.log(`Already connected to MongoDB database: ${dbNameToUse}`);
+            return mongoose.connection.db;
+        }
+        
         await mongoose.connect(uriToUse, options);
-        console.log('Connected to MongoDB successfully');
-        return mongoose.connection.db;
+        console.log(`Connected to MongoDB database: ${dbNameToUse} successfully`);
+        
+        // Store the current database connection
+        db = mongoose.connection.db;
+        
+        return db;
     } catch (error) {
         console.error('MongoDB connection error:', error);
         throw error;
+    }
+}
+/**
+ * Get a database connection for a specific bot
+ * @param {string} botId - The bot ID to get a database for
+ * @returns {Promise<Object>} - The database connection
+ */
+async function getBotDatabase(botId) {
+    try {
+        if (!botId) {
+            return await ensureDatabaseInitialized();
+        }
+        
+        const botDbName = `bot_${botId}_db`;
+        return await connectToMongoDB(botDbName);
+    } catch (error) {
+        console.error(`Error getting database for bot ${botId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Save a reply for a specific bot
+ * @param {string} botId - The bot ID
+ * @param {string} triggerWord - The trigger word
+ * @param {string} replyType - The type of reply (text, photo, video, etc.)
+ * @param {string} replyContent - The content of the reply
+ * @returns {Promise<Object>} - The result of the operation
+ */
+async function saveBotReply(botId, triggerWord, replyType, replyContent) {
+    try {
+        const botDb = await getBotDatabase(botId);
+        
+        const result = await botDb.collection('replies').updateOne(
+            { trigger_word: triggerWord.toLowerCase().trim() },
+            { 
+                $set: { 
+                    type: replyType,
+                    content: replyContent,
+                    updated_at: new Date() 
+                }
+            },
+            { upsert: true }
+        );
+        
+        console.log(`Reply saved for bot ${botId}, trigger: ${triggerWord}, type: ${replyType}`);
+        return result;
+    } catch (error) {
+        console.error(`Error saving reply for bot ${botId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Get a reply for a specific bot
+ * @param {string} botId - The bot ID
+ * @param {string} triggerWord - The trigger word
+ * @returns {Promise<Object>} - The reply object or null if not found
+ */
+async function getBotReply(botId, triggerWord) {
+    try {
+        const botDb = await getBotDatabase(botId);
+        
+        const reply = await botDb.collection('replies').findOne({
+            trigger_word: triggerWord.toLowerCase().trim()
+        });
+        
+        return reply;
+    } catch (error) {
+        console.error(`Error getting reply for bot ${botId}, trigger: ${triggerWord}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Delete a reply for a specific bot
+ * @param {string} botId - The bot ID
+ * @param {string} triggerWord - The trigger word
+ * @returns {Promise<boolean>} - True if deleted, false otherwise
+ */
+async function deleteBotReply(botId, triggerWord) {
+    try {
+        const botDb = await getBotDatabase(botId);
+        
+        const result = await botDb.collection('replies').deleteOne({
+            trigger_word: triggerWord.toLowerCase().trim()
+        });
+        
+        return result.deletedCount > 0;
+    } catch (error) {
+        console.error(`Error deleting reply for bot ${botId}, trigger: ${triggerWord}:`, error);
+        return false;
     }
 }
 async function getUserStatistics(userId) {
@@ -229,13 +332,33 @@ async function loadActiveGroupsFromDatabase() {
     }
 }
 
-async function ensureDatabaseInitialized() {
-    if (!db) {
-        await connectToMongoDB();
+async function ensureDatabaseInitialized(botId = null) {
+    try {
+        // If botId is provided, use a specific database for this bot
+        const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
+        return await connectToMongoDB(dbName);
+    } catch (error) {
+        console.error('Error initializing database:', error);
+        throw error;
     }
-    return db;
 }
-
+async function getReplyForBot(botId, triggerWord) {
+    try {
+        // Use the specific database for this bot
+        const dbName = `bot_${botId}_db`;
+        const db = await connectToMongoDB(dbName);
+        
+        // Find the reply in this bot's database
+        const reply = await db.collection('replies').findOne({
+            trigger_word: triggerWord.toLowerCase().trim()
+        });
+        
+        return reply;
+    } catch (error) {
+        console.error(`Error getting reply for bot ${botId}:`, error);
+        return null;
+    }
+}
 async function setupDatabase() {
     try {
         console.log('Setting up MongoDB connection...');
@@ -347,19 +470,16 @@ async function getReply(triggerWord, botId = null) {
     }
 }
 
-async function saveReply(triggerWord, replyType, replyContent, botId = null) {
+async function saveReply(botId, triggerWord, replyContent, replyType = 'text') {
     try {
-        const db = await ensureDatabaseInitialized();
-        const query = botId ? 
-            { bot_id: botId, trigger_word: triggerWord.toLowerCase() } : 
-            { trigger_word: triggerWord.toLowerCase() };
-            
+        // Use the specific database for this bot
+        const dbName = `bot_${botId}_db`;
+        const db = await connectToMongoDB(dbName);
+        
         const result = await db.collection('replies').updateOne(
-            query,
+            { trigger_word: triggerWord.toLowerCase().trim() },
             { 
                 $set: { 
-                    bot_id: botId,
-                    trigger_word: triggerWord.toLowerCase(),
                     type: replyType,
                     content: replyContent,
                     updated_at: new Date() 
@@ -369,7 +489,7 @@ async function saveReply(triggerWord, replyType, replyContent, botId = null) {
         );
         return result;
     } catch (error) {
-        console.error('Error saving reply:', error);
+        console.error(`Error saving reply for bot ${botId}:`, error);
         throw error;
     }
 }
@@ -540,7 +660,7 @@ module.exports = {
     getReply,
     saveReply,
     deleteReply,
-    
+    getReplyForBot,
     // Developer functions
     getDevelopers,
     isDeveloper,
