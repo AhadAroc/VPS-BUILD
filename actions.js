@@ -1171,7 +1171,6 @@ async function saveCustomQuestion(chatId, question, answer) {
         throw error;
     }
 }
-// Handle the reply response
 async function handleAwaitingReplyResponse(ctx) {
     if (!awaitingReplyResponse) return false;
 
@@ -1214,6 +1213,8 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
+        console.log(`Media Type: ${mediaType}, File ID: ${fileId}, Reply Text: ${replyText}`);
+
         const db = await ensureDatabaseInitialized();
 
         // Check if trigger word already exists
@@ -1229,7 +1230,7 @@ async function handleAwaitingReplyResponse(ctx) {
         }
 
         // Add the reply to the database
-        await db.collection('replies').insertOne({
+        const result = await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             type: mediaType,
             text: replyText,
@@ -1238,6 +1239,8 @@ async function handleAwaitingReplyResponse(ctx) {
             created_by: ctx.from.id,
             bot_id: botId
         });
+
+        console.log('Database Insert Result:', result);
 
         await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
