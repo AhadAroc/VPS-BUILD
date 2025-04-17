@@ -126,10 +126,11 @@ async function handleTextMessage(ctx) {
                 await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
                 return;
             } else if (userState.step === 'awaiting_response') {
-                if (!ctx.message.photo && !ctx.message.video && !ctx.message.voice && !ctx.message.document && !ctx.message.audio && !ctx.message.sticker && !ctx.message.animation) {
-                    await ctx.reply('❌ من فضلك أرسل وسائط فقط (صورة، فيديو، ملاحظة صوتية، ملف، ملصق، إلخ).');
-                    return;
-                }
+                 // Let the main handler take care of the media
+    if (!ctx.message.photo && !ctx.message.video && !ctx.message.voice && !ctx.message.document && !ctx.message.audio && !ctx.message.sticker && !ctx.message.animation) {
+        await ctx.reply('❌ من فضلك أرسل وسائط فقط (صورة، فيديو، ملاحظة صوتية، ملف، ملصق، إلخ).');
+        return;
+    }
                 try {
                     const db = await ensureDatabaseInitialized(userState.botId);
                     await db.collection('replies').insertOne({
@@ -2650,69 +2651,112 @@ function getMediaTypeInArabic(mediaType) {
 
     //this fucks how the bot starts
      // Replace the problematic message handler with this one
-     
-     bot.on('message', async (ctx) => {
-        const userId = ctx.from.id;
+     bot.on('message', async (ctx, next) => {
+        try {
+            console.log('Received message:', ctx.message);
     
-        if (userStates.has(userId)) {
-            const userState = userStates.get(userId);
+            const userId = ctx.from.id;
+            const username = ctx.from.username;
+            const message = ctx.message;
+            const chatId = ctx.chat.id;
     
-            if (userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
-                try {
+            updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
+    
+            if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+                updateActiveGroups(ctx.chat.id, ctx.chat.title);
+            }
+    
+            // Check if user is in 'adding_reply' state
+            if (userStates.has(userId)) {
+                const userState = userStates.get(userId);
+    
+                if (userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
                     const db = await ensureDatabaseInitialized(userState.botId);
-                    
-                    const reply = {
+    
+                    const commonData = {
                         bot_id: userState.botId,
                         trigger_word: userState.triggerWord,
-                        word: userState.triggerWord,
-                        type: 'media',
                         created_at: new Date(),
                         created_by: userId
                     };
     
                     if (ctx.message.photo) {
-                        reply.media_type = 'photo';
-                        reply.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                    } else if (ctx.message.video) {
-                        reply.media_type = 'video';
-                        reply.file_id = ctx.message.video.file_id;
-                    } else if (ctx.message.voice) {
-                        reply.media_type = 'voice';
-                        reply.file_id = ctx.message.voice.file_id;
-                    } else if (ctx.message.audio) {
-                        reply.media_type = 'audio';
-                        reply.file_id = ctx.message.audio.file_id;
-                    } else if (ctx.message.document) {
-                        reply.media_type = 'document';
-                        reply.file_id = ctx.message.document.file_id;
-                    } else if (ctx.message.sticker) {
-                        reply.media_type = 'sticker';
-                        reply.file_id = ctx.message.sticker.file_id;
+                        const fileId = ctx.message.photo.at(-1).file_id;
+                        await db.collection('replies').insertOne({
+                            ...commonData,
+                            type: 'photo',
+                            file_id: fileId
+                        });
+                        await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${userState.triggerWord}" بنجاح.`);
                     } else if (ctx.message.animation) {
-                        reply.media_type = 'animation';
-                        reply.file_id = ctx.message.animation.file_id;
+                        await db.collection('replies').insertOne({
+                            ...commonData,
+                            type: 'animation',
+                            file_id: ctx.message.animation.file_id
+                        });
+                        await ctx.reply(`✅ تم حفظ الـ GIF كرد للكلمة "${userState.triggerWord}" بنجاح.`);
+                    } else if (ctx.message.document) {
+                        await db.collection('replies').insertOne({
+                            ...commonData,
+                            type: 'document',
+                            file_id: ctx.message.document.file_id,
+                            file_name: ctx.message.document.file_name,
+                            mime_type: ctx.message.document.mime_type
+                        });
+                        await ctx.reply(`✅ تم حفظ المستند كرد للكلمة "${userState.triggerWord}" بنجاح.`);
+                    } else if (ctx.message.sticker) {
+                        await db.collection('replies').insertOne({
+                            ...commonData,
+                            type: 'sticker',
+                            file_id: ctx.message.sticker.file_id
+                        });
+                        await ctx.reply(`✅ تم حفظ الملصق كرد للكلمة "${userState.triggerWord}" بنجاح.`);
+                    } else if (ctx.message.video) {
+                        await db.collection('replies').insertOne({
+                            ...commonData,
+                            type: 'video',
+                            file_id: ctx.message.video.file_id,
+                            duration: ctx.message.video.duration,
+                            width: ctx.message.video.width,
+                            height: ctx.message.video.height,
+                            mime_type: ctx.message.video.mime_type
+                        });
+                        await ctx.reply(`✅ تم حفظ الفيديو كرد للكلمة "${userState.triggerWord}" بنجاح.`);
                     } else {
-                        await ctx.reply('❌ نوع الوسائط غير مدعوم.');
+                        await ctx.reply('❌ فقط وسائط مسموح بها (صورة، فيديو، ملصق، مستند، GIF). أعد الإرسال.');
                         return;
                     }
     
-                    await db.collection('replies').insertOne(reply);
-    
-                    await ctx.reply(`✅ تم حفظ رد الوسائط!\nالكلمة: ${userState.triggerWord}`);
-                    userStates.delete(userId);
-                    return;
-                } catch (err) {
-                    console.error('Error saving media reply:', err);
-                    await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
+                    // Clean up state after success
                     userStates.delete(userId);
                     return;
                 }
             }
+    
+            // Handle quiz input if needed
+            if (chatStates.has(chatId)) {
+                await handleCustomQuestionInput(ctx);
+                return;
+            }
+    
+            // Handle text message normally
+            if (message.text) {
+                await handleTextMessage(ctx);
+                return;
+            }
+    
+            // For any unhandled media outside of reply context
+            await ctx.reply('عاشوا 👍');
+    
+        } catch (error) {
+            console.error('Error in message handler:', error);
+            await ctx.reply('حدث خطأ أثناء معالجة رسالتك. الرجاء المحاولة مرة أخرى لاحقًا.');
         }
     
-        // other logic for general messages...
+        await next();
     });
-       
+    
+   
 
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
