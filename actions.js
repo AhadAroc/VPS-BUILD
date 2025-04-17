@@ -1185,17 +1185,31 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
-        // Continue with the reply saving process
+        // Determine media type and extract relevant information
         let mediaType = 'text';
         let replyText = null;
-        let mediaUrl = null;
         let fileId = null;
 
         if (ctx.message.text) {
             mediaType = 'text';
             replyText = ctx.message.text.trim();
+        } else if (ctx.message.photo) {
+            mediaType = 'photo';
+            fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        } else if (ctx.message.video) {
+            mediaType = 'video';
+            fileId = ctx.message.video.file_id;
+        } else if (ctx.message.animation) {
+            mediaType = 'animation';
+            fileId = ctx.message.animation.file_id;
+        } else if (ctx.message.sticker) {
+            mediaType = 'sticker';
+            fileId = ctx.message.sticker.file_id;
+        } else if (ctx.message.document) {
+            mediaType = 'document';
+            fileId = ctx.message.document.file_id;
         } else {
-            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص.');
+            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو وسائط مدعومة.');
             awaitingReplyResponse = false;
             return true;
         }
@@ -1219,7 +1233,6 @@ async function handleAwaitingReplyResponse(ctx) {
             trigger_word: tempReplyWord,
             type: mediaType,
             text: replyText,
-            media_url: mediaUrl,
             file_id: fileId,
             created_at: new Date(),
             created_by: ctx.from.id,
