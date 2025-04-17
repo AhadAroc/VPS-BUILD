@@ -2971,22 +2971,23 @@ async function handleAwaitingReplyWord(ctx) {
     return true;
 }
 
-// Add this function to handle awaiting text reply response
+// Update the handleAwaitingReplyResponse function to properly include bot_id
 async function handleAwaitingReplyResponse(ctx) {
     const text = ctx.message.text.trim();
-    const userState = userStates.get(ctx.from.id);
+    const userId = ctx.from.id;
     const botId = ctx.botInfo.id; // Get the current bot's ID
+    
     try {
         const db = await ensureDatabaseInitialized();
         await db.collection('replies').insertOne({
-            trigger_word: tempReplyWord,
-            type: mediaType,
-            text: replyText,
-            media_url: mediaUrl,
-            file_id: fileId,
+            bot_id: botId, // Always include the bot_id
+            trigger_word: tempReplyWord.toLowerCase(),
+            type: 'text',
+            text: text,
+            reply_text: text, // For backward compatibility
             created_at: new Date(),
-            created_by: ctx.from.id,
-            bot_id: botId // Use the current bot's ID
+            created_by: userId,
+            username: ctx.from.username || ''
         });
         
         await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
@@ -3007,33 +3008,31 @@ async function handleAwaitingReplyResponse(ctx) {
         return true;
     }
 }
-    // Handle awaiting reply word
-    if (awaitingReplyWord) {
-        await handleAwaitingReplyWord(ctx);
-        return;
-    }
 
-    // Handle awaiting delete reply word
-    if (awaitingDeleteReplyWord) {
-        await handleAwaitingDeleteReplyWord(ctx);
-        return;
-    }
 
-    // Handle awaiting bot name
-    if (awaitingBotName) {
-        await handleAwaitingBotName(ctx);
-        return;
-    }
 
-    // Handle awaiting reply response
-    if (awaitingReplyResponse) {
-        await handleAwaitingReplyResponse(ctx);
-        return;
-    }
+
+
+
+
+
+
+
+
+
 
     // If we reach here, it's an unhandled text message
     await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
 }
+
+
+
+
+
+
+
+
+
 // Replace your existing video handler with this one
 bot.on('video', async (ctx) => {
     try {
@@ -3066,20 +3065,80 @@ bot.on('video', async (ctx) => {
 // Clean up duplicate handlers and use the consolidated function
 // Photo handler
 // Consolidated media reply handler
+// Update the checkForAutomaticReply function to properly filter by bot_id
+async function checkForAutomaticReply(ctx) {
+    try {
+        const userText = ctx.message.text.toLowerCase();
+        const currentBotId = ctx.botInfo.id; // Get the current bot's ID
+
+        const db = await ensureDatabaseInitialized();
+        const reply = await db.collection('replies').findOne({
+            bot_id: currentBotId, // Ensure we're filtering by the current bot's ID
+            $or: [
+                { trigger_word: userText },
+                { word: userText }
+            ]
+        });
+
+        return reply;
+    } catch (error) {
+        console.error('Error checking for automatic reply:', error);
+        return null;
+    }
+}
+
+// Update the handleAwaitingReplyResponse function to properly include bot_id
+async function handleAwaitingReplyResponse(ctx) {
+    const text = ctx.message.text.trim();
+    const userId = ctx.from.id;
+    const botId = ctx.botInfo.id; // Get the current bot's ID
+    
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').insertOne({
+            bot_id: botId, // Always include the bot_id
+            trigger_word: tempReplyWord.toLowerCase(),
+            type: 'text',
+            text: text,
+            reply_text: text, // For backward compatibility
+            created_at: new Date(),
+            created_by: userId,
+            username: ctx.from.username || ''
+        });
+        
+        await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
+        
+        // Reset the state
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        
+        return true;
+    } catch (error) {
+        console.error('Error saving text reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+        
+        // Reset the state
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        
+        return true;
+    }
+}
+
+// Update the handleMediaReply function to properly include bot_id
 async function handleMediaReply(ctx, mediaType) {
     try {
         const userId = ctx.from.id;
+        const botId = ctx.botInfo.id; // Get the current bot's ID
         
-        // Check if we're awaiting a reply response
         if (!awaitingReplyResponse || !tempReplyWord) {
-            return false; // Not handling this media as a reply
+            return false;
         }
 
-        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
+        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord} for bot: ${botId}`);
         
-        let fileId, additionalData = {};
+        let fileId;
         
-        // Extract the appropriate file ID based on media type
         switch (mediaType) {
             case 'photo':
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
@@ -3097,43 +3156,40 @@ async function handleMediaReply(ctx, mediaType) {
                 fileId = ctx.message.sticker.file_id;
                 break;
             default:
-                return false; // Unsupported media type
+                return false;
         }
         
         try {
-            // Save to database
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
-                bot_id: ctx.botInfo.id,
+                bot_id: botId, // Always include the bot_id
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
-                content: fileId, // or text content for text replies
+                file_id: fileId,
+                content: fileId, // For consistency
                 created_at: new Date(),
                 created_by: userId,
                 username: ctx.from.username || ''
             });
             
-            // Send confirmation
             await ctx.reply(`✅ تم إضافة ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
             
-            // Reset state
             awaitingReplyResponse = false;
             tempReplyWord = '';
             
-            return true; // Successfully handled
+            return true;
         } catch (error) {
             console.error(`Error saving ${mediaType} reply:`, error);
             await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
             
-            // Reset state even on error
             awaitingReplyResponse = false;
             tempReplyWord = '';
             
-            return true; // We still handled it, even though there was an error
+            return true;
         }
     } catch (error) {
         console.error(`Error in handleMediaReply for ${mediaType}:`, error);
-        return false; // Error occurred
+        return false;
     }
 }
 
@@ -3358,6 +3414,7 @@ if (reply) {
 // Implement the other helper functions (handleQuizAnswer, checkForAutomaticReply, sendReply, etc.) 
 // based on your existing code and requirements.
 
+// Update the checkForAutomaticReply function to properly filter by bot_id
 async function checkForAutomaticReply(ctx) {
     try {
         const userText = ctx.message.text.toLowerCase();
@@ -3365,8 +3422,11 @@ async function checkForAutomaticReply(ctx) {
 
         const db = await ensureDatabaseInitialized();
         const reply = await db.collection('replies').findOne({
-            bot_id: currentBotId,
-            trigger_word: { $regex: new RegExp(userText, 'i') }
+            bot_id: currentBotId, // Ensure we're filtering by the current bot's ID
+            $or: [
+                { trigger_word: userText },
+                { word: userText }
+            ]
         });
 
         return reply;
