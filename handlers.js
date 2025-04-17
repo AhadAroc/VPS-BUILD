@@ -143,12 +143,14 @@ bot.on('video', async (ctx) => {
     }
 });
 // Register the text handler
+// Register the text handler
 bot.on('text', async (ctx) => {
     console.log('Received text:', ctx.message.text);
 
     const userId = ctx.from.id;
     const username = ctx.from.username;
     const text = ctx.message.text.toLowerCase();
+    const botId = ctx.botInfo.id; // Get the current bot's ID
 
     if (awaitingReplyWord) {
         tempReplyWord = text;
@@ -160,27 +162,53 @@ bot.on('text', async (ctx) => {
         try {
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').updateOne(
-                { trigger_word: tempReplyWord },
-                { $set: { trigger_word: tempReplyWord, reply_text: replyResponse } },
+                { bot_id: botId, trigger_word: tempReplyWord },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        trigger_word: tempReplyWord, 
+                        type: 'text',
+                        content: replyResponse,
+                        reply_text: replyResponse,
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        created_by: userId,
+                        username: username || ''
+                    }
+                },
                 { upsert: true }
             );
             
             ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${replyResponse}`);
             awaitingReplyResponse = false;
+            tempReplyWord = '';
         } catch (error) {
             console.error('Error saving reply:', error);
             ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
             awaitingReplyResponse = false;
+            tempReplyWord = '';
         }
     } else if (awaitingDeleteReplyWord) {
         try {
             const db = await ensureDatabaseInitialized();
-            const result = await db.collection('replies').deleteOne({ trigger_word: text });
+            const result = await db.collection('replies').deleteOne({ 
+                bot_id: botId,
+                trigger_word: text 
+            });
             
             if (result.deletedCount > 0) {
                 ctx.reply(`تم حذف الرد للكلمة "${text}" بنجاح.`);
             } else {
-                ctx.reply(`لم يتم العثور على رد للكلمة "${text}".`);
+                // If not found with bot_id, try without bot_id (for backward compatibility)
+                const fallbackResult = await db.collection('replies').deleteOne({ 
+                    trigger_word: text 
+                });
+                
+                if (fallbackResult.deletedCount > 0) {
+                    ctx.reply(`تم حذف الرد للكلمة "${text}" بنجاح.`);
+                } else {
+                    ctx.reply(`لم يتم العثور على رد للكلمة "${text}".`);
+                }
             }
             awaitingDeleteReplyWord = false;
         } catch (error) {
@@ -202,15 +230,64 @@ bot.on('text', async (ctx) => {
         // Check if the message matches any reply trigger
         try {
             const db = await ensureDatabaseInitialized();
-            const reply = await db.collection('replies').findOne({ trigger_word: text });
+            
+            // First try to find a bot-specific reply
+            let reply = await db.collection('replies').findOne({ 
+                bot_id: botId,
+                trigger_word: text 
+            });
+            
+            // If no bot-specific reply is found, try to find a global reply
+            if (!reply) {
+                reply = await db.collection('replies').findOne({
+                    $or: [
+                        { bot_id: null, trigger_word: text },
+                        { bot_id: { $exists: false }, trigger_word: text }
+                    ]
+                });
+            }
             
             if (reply) {
-                ctx.reply(reply.reply_text);
+                if (reply.type === 'text' || !reply.type) {
+                    // Handle legacy format or text type
+                    ctx.reply(reply.reply_text || reply.content);
+                } else {
+                    // Handle media types
+                    const fileId = reply.file_id || reply.content;
+                    switch (reply.type) {
+                        case 'photo':
+                            await ctx.replyWithPhoto(fileId);
+                            break;
+                        case 'video':
+                            await ctx.replyWithVideo(fileId);
+                            break;
+                        case 'animation':
+                            await ctx.replyWithAnimation(fileId);
+                            break;
+                        case 'document':
+                            await ctx.replyWithDocument(fileId);
+                            break;
+                        case 'sticker':
+                            await ctx.replyWithSticker(fileId);
+                            break;
+                        default:
+                            console.log(`Unsupported reply type: ${reply.type}`);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error checking for reply:', error);
         }
     }
+
+    // Update last interaction for the user
+    updateLastInteraction(userId);
+    
+    // If in a group, update the group's active status
+    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+        updateActiveGroups(ctx);
+    }
+});
 
     // Update last interaction for the user
     updateLastInteraction(userId);
