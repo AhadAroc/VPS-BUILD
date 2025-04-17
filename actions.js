@@ -2,10 +2,8 @@
 let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
-let tempBotId = null;
-const userStates = new Map();
-
-
+// Add this at the top of your file with other imports
+const { Scenes } = require('telegraf');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -26,7 +24,7 @@ cloudinary.config({
 });
 // Add this to your global variables
 const quizSettings = new Map();
-const { isDeveloper,isSubscribed } = require('./middlewares');
+const { isDeveloper } = require('./middlewares');
 const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
@@ -49,6 +47,7 @@ const mediaDir = path.join(__dirname, 'media');
 if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
+
 
 
 // Function to download and save file
@@ -82,219 +81,45 @@ async function saveFile(fileLink, fileName) {
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    const userText = ctx.message.text.trim().toLowerCase();
-
-    console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
-
-    // Handle state-based operations first
-    if (awaitingReplyWord) {
-        tempReplyWord = userText;
-        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-        awaitingReplyWord = false;
-        awaitingReplyResponse = true;
-        return;
-    }
-    
-    if (awaitingReplyResponse) {
-        await handleAwaitingReplyResponse(ctx);
-        return;
-    }
-    
-    if (awaitingDeleteReplyWord) {
-        await handleAwaitingDeleteReplyWord(ctx);
-        return;
-    }
-    
-    if (awaitingBotName) {
-        await handleAwaitingBotName(ctx);
-        return;
-    }
+    const userAnswer = ctx.message.text.trim().toLowerCase();
 
     // Check for active quiz
-    if (activeQuizzes.has(chatId) && activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
-        await handleQuizAnswer(ctx, chatId, userId, userText);
+    if (activeQuizzes.has(chatId)) {
+        await handleQuizAnswer(ctx, chatId, userId, userAnswer);
         return;
     }
 
-    // Check for user state
-if (userStates.has(userId)) {
-    const userState = userStates.get(userId);
-
-    if (userState.action === 'adding_reply') {
-        if (userState.step === 'awaiting_trigger') {
-            userState.triggerWord = userText;
-            userState.step = 'awaiting_response';
-            await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
+    // ✅ Only check auto-replies in DMs
+    if (ctx.chat.type === 'private') {
+        const reply = await checkForAutomaticReply(ctx);
+        if (reply) {
+            await sendReply(ctx, reply);
             return;
         }
 
-        if (userState.step === 'awaiting_response') {
-            try {
-                const message = ctx.message;
-                let mediaType = 'text';
-                let replyText = null;
-                let fileId = null;
-                let mediaUrl = null;
-        
-                // Determine media type
-                if (message.text) {
-                    mediaType = 'text';
-                    replyText = message.text.trim();
-                } else if (message.sticker) {
-                    mediaType = 'sticker';
-                    fileId = message.sticker.file_id;
-                } else if (message.photo) {
-                    mediaType = 'photo';
-                    fileId = message.photo[message.photo.length - 1].file_id;
-                    console.log("Photo received, file_id:", fileId); // Add logging
-                } else if (message.video) {
-                    mediaType = 'video';
-                    fileId = message.video.file_id;
-                } else if (message.audio) {
-                    mediaType = 'audio';
-                    fileId = message.audio.file_id;
-                } else if (message.voice) {
-                    mediaType = 'voice';
-                    fileId = message.voice.file_id;
-                } else if (message.document) {
-                    mediaType = 'document';
-                    fileId = message.document.file_id;
-                } else {
-                    await ctx.reply('❌ نوع الرسالة غير مدعوم. أرسل نصًا أو وسائط فقط.');
-                    userStates.delete(userId);
-                    return;
-                }
-        
-                // Get media URL if needed
-                if (fileId) {
-                    try {
-                        const fileLink = await ctx.telegram.getFileLink(fileId);
-                        mediaUrl = fileLink.href;
-                        console.log("Media URL obtained:", mediaUrl); // Add logging
-                    } catch (fileError) {
-                        console.error("Error getting file link:", fileError);
-                        await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. الرجاء المحاولة مرة أخرى.');
-                        return;
-                    }
-                }
-        
-                const db = await ensureDatabaseInitialized(userState.botId);
-        
-                // Insert into DB with explicit logging
-                console.log("Saving to database with data:", {
-                    bot_id: userState.botId,
-                    trigger_word: userState.triggerWord,
-                    type: mediaType,
-                    text: replyText,
-                    file_id: fileId,
-                    media_url: mediaUrl
-                });
-        
-                await db.collection('replies').insertOne({
-                    bot_id: userState.botId,
-                    trigger_word: userState.triggerWord,
-                    word: userState.triggerWord,
-                    type: mediaType,
-                    text: replyText,
-                    reply_text: replyText,
-                    file_id: fileId,
-                    media_url: mediaUrl,
-                    created_at: new Date(),
-                    created_by: userId
-                });
-        
-                await ctx.reply(`✅ تم إضافة الرد (${mediaType}) بنجاح للكلمة: "${userState.triggerWord}"`);
-                userStates.delete(userId);
-                return;
-            } catch (err) {
-                console.error('💥 Failed to save reply:', err);
-                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                userStates.delete(userId);
-                return;
-            }
+        // Handle reply setup states
+        if (awaitingReplyWord) {
+            await handleAwaitingReplyWord(ctx);
+            return;
         }
-    }
-}
 
-
-// Check for automatic replies - this should work in both private and group chats
-const reply = await checkForAutomaticReply(ctx);
-if (reply) {
-    console.log('Found matching reply:', reply);
-    const sent = await sendReply(ctx, reply);
-    if (sent) return;
-} else {
-    console.log('No matching reply found for:', userText);
-}
-
-// If we reach here in a private chat, it means we didn't handle the message
-if (ctx.chat.type === 'private') {
-    // Only send the "I don't understand" message in private chats
-    // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
-}
-}
-
-// Add this function to check subscription status directly
-async function checkSubscriptionStatus(ctx, userId) {
-    try {
-        const channelUsername = 'ctrlsrc'; // Your channel username without @
-        
-        // Try to get the user's status in the channel
-        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
-        
-        // Check if the user is a member of the channel
-        const status = member.status;
-        if (status === 'member' || status === 'administrator' || status === 'creator') {
-            return true;
+        if (awaitingDeleteReplyWord) {
+            await handleAwaitingDeleteReplyWord(ctx);
+            return;
         }
-        return false;
-    } catch (error) {
-        console.error('Error checking subscription status:', error);
-        return false;
-    }
-}
 
-// Replace your forceCheckSubscription function with this
-async function forceCheckSubscription(ctx) {
-    try {
-        await ctx.answerCbQuery('جاري التحقق من الاشتراك...');
-        
-        // Instead of checking directly, we'll ask the user to join and then click a button
-        await ctx.reply('للاستمرار في استخدام البوت، يرجى:',
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '1. اشترك في القناة', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '2. تحقق من الاشتراك', callback_data: 'confirm_subscription' }]
-                    ]
-                }
-            }
-        );
-    } catch (error) {
-        console.error('Error in forceCheckSubscription:', error);
-        await ctx.answerCbQuery('❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
-    }
-}
-async function confirmSubscription(ctx) {
-    try {
-        // Here we assume the user has subscribed since they clicked the button
-        // This is more reliable than checking membership which often fails
-        
-        await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
-        await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.botInfo.username + '?startgroup=true' }],
-                    [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
-                ]
-            }
-        });
-        
-        // You can store this user as subscribed in your database if needed
-        
-    } catch (error) {
-        console.error('Error in confirmSubscription:', error);
-        await ctx.answerCbQuery('❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+        if (awaitingBotName) {
+            await handleAwaitingBotName(ctx);
+            return;
+        }
+
+        if (awaitingReplyResponse) {
+            await handleAwaitingReplyResponse(ctx);
+            return;
+        }
+
+        // Fallback for unrecognized messages in DMs only
+        await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
 }
 
@@ -659,26 +484,11 @@ async function configureQuiz(ctx) {
 
 
 // ... (rest of the existing imports and variables)
-function setupActions(bot) {
-
+function setupActions(bot, session, Scenes) {
     // Add this function to handle quiz configuration
-    const userStates = new Map();
-    const { Scenes, session } = require('telegraf');
-
-
-    // Initialize session middleware
-    bot.use(session());
-
-    // Create a new stage for scenes
-    const stage = new Scenes.Stage([/* your scenes here */]);
-
-    // Use the stage middleware
-    bot.use(stage.middleware());
-
 
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
-// Add this new action handler
-bot.action('confirm_subscription', confirmSubscription);
+
 // Add these action handlers for timer settings
 bot.action(/^set_timer_(\d+)$/, async (ctx) => {
     try {
@@ -1236,70 +1046,82 @@ async function saveCustomQuestion(chatId, question, answer) {
         throw error;
     }
 }
-// Handle the reply response
+// Add this function to handle awaiting reply response
 async function handleAwaitingReplyResponse(ctx) {
     if (!awaitingReplyResponse) return false;
 
     try {
-        const userState = userStates.get(ctx.from.id);
-        const botId = userState?.botId;
-
-        if (!botId) {
-            await ctx.reply('❌ حدث خطأ في تحديد معرف البوت. يرجى المحاولة مرة أخرى.');
-            awaitingReplyResponse = false;
+        // Check if it's a group chat
+        if (ctx.chat.type !== 'private') {
+            await ctx.reply('شلونكم ؟ 🌝');
             return true;
         }
 
+        // Continue with the reply saving process for private chats
         let mediaType = 'text';
         let replyText = null;
         let mediaUrl = null;
         let fileId = null;
 
-        const message = ctx.message;
-
-        if (message.text) {
-            mediaType = 'text';
-            replyText = message.text.trim();
-        } else if (message.photo) {
-            mediaType = 'photo';
-            fileId = message.photo[message.photo.length - 1].file_id;
-        } else if (message.video) {
-            mediaType = 'video';
-            fileId = message.video.file_id;
-        } else if (message.audio) {
-            mediaType = 'audio';
-            fileId = message.audio.file_id;
-        } else if (message.voice) {
-            mediaType = 'voice';
-            fileId = message.voice.file_id;
-        } else if (message.document) {
-            mediaType = 'document';
-            fileId = message.document.file_id;
-        } else {
-            await ctx.reply('❌ نوع الوسائط غير مدعوم حالياً. يرجى إرسال نص أو صورة أو فيديو أو صوت.');
+        // Validate that tempReplyWord is not empty or null
+        if (!tempReplyWord || tempReplyWord.trim() === '') {
+            await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
             awaitingReplyResponse = false;
+            tempReplyWord = '';
             return true;
         }
 
-        // Optionally: get file URL if you need it
+        if (ctx.message.animation) {
+            mediaType = 'animation';
+            fileId = ctx.message.animation.file_id;
+        } else if (ctx.message.photo) {
+            mediaType = 'photo';
+            const photoArray = ctx.message.photo;
+            fileId = photoArray[photoArray.length - 1].file_id;
+        } else if (ctx.message.sticker) {
+            mediaType = 'sticker';
+            fileId = ctx.message.sticker.file_id;
+        } else if (ctx.message.video) {
+            mediaType = 'video';
+            fileId = ctx.message.video.file_id;
+        } else if (ctx.message.text) {
+            mediaType = 'text';
+            replyText = ctx.message.text.trim();
+        } else {
+            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            return true;
+        }
+
         if (fileId) {
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            mediaUrl = fileLink.href;
+            try {
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaUrl = fileLink.href;
+            } catch (error) {
+                console.error('Error getting file link:', error);
+                await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+                return true;
+            }
         }
 
         const db = await ensureDatabaseInitialized();
 
-        const existingReply = await db.collection('replies').findOne({
-            trigger_word: tempReplyWord,
-            bot_id: botId
+        // Check if trigger word already exists
+        const existingReply = await db.collection('replies').findOne({ 
+            trigger_word: tempReplyWord 
         });
-
+        
         if (existingReply) {
             await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
             awaitingReplyResponse = false;
+            tempReplyWord = '';
             return true;
         }
 
+        // Add the reply to the database
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             type: mediaType,
@@ -1307,24 +1129,23 @@ async function handleAwaitingReplyResponse(ctx) {
             media_url: mediaUrl,
             file_id: fileId,
             created_at: new Date(),
-            created_by: ctx.from.id,
-            bot_id: botId
+            created_by: ctx.from.id
         });
 
         await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
+        // Reset state
         tempReplyWord = '';
         awaitingReplyResponse = false;
         return true;
-
     } catch (error) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
         awaitingReplyResponse = false;
+        tempReplyWord = '';
         return true;
     }
 }
-
 // Add these action handlers
 bot.action('add_another_question', async (ctx) => {
     await ctx.answerCbQuery();
@@ -1448,128 +1269,14 @@ createGroupsTable();
             console.error('Error loading active groups from database:', error);
         }
     }
-// Add this function to handle the list replies button
-async function listAllReplies(ctx, botId) {
-    try {
-        const replies = await getAllReplies(botId);
-        
-        if (!replies || replies.length === 0) {
-            await ctx.editMessageText('الردود العامة:\n\nلا توجد ردود عامة حالياً', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'رجوع', callback_data: 'dev_replies' }]
-                    ]
-                }
-            });
-            return;
-        }
-        
-        // Format the replies list
-        let message = 'الردود العامة:\n\n';
-        replies.forEach((reply, index) => {
-            const triggerWord = reply.trigger_word || reply.word || 'غير معروف';
-            let responseText = reply.reply_text || reply.text || '[محتوى وسائط]';
-            
-            // Truncate long responses
-            if (responseText.length > 30) {
-                responseText = responseText.substring(0, 27) + '...';
-            }
-            
-            message += `${index + 1}. "${triggerWord}" ➡️ "${responseText}"\n`;
-        });
-        
-        // Add pagination if the list is too long
-        if (message.length > 4000) {
-            message = message.substring(0, 3900) + '\n\n... والمزيد من الردود';
-        }
-        
-        await ctx.editMessageText(message, {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'إضافة رد', callback_data: 'add_reply' }, { text: 'حذف رد', callback_data: 'delete_reply' }],
-                    [{ text: 'رجوع', callback_data: 'dev_replies' }]
-                ]
-            }
-        });
-    } catch (error) {
-        console.error('Error listing replies:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة عرض الردود');
-        await ctx.editMessageText('حدث خطأ أثناء محاولة عرض الردود. الرجاء المحاولة مرة أخرى.', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'رجوع', callback_data: 'dev_replies' }]
-                ]
-            }
-        });
-    }
-}
-// Add this action handler for adding a new reply
-bot.action('add_reply', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        
-        // Check if the user is a developer or has the necessary permissions
-        const isDev = await isDeveloper(ctx, ctx.from.id);
-        if (!isDev) {
-            return ctx.reply('❌ هذا الأمر متاح فقط للمطورين.');
-        }
-
-        // Prompt the user to enter the trigger word
-        await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-        
-        // Use userStates to track the user's state
-        userStates.set(ctx.from.id, {
-            action: 'adding_reply',
-            step: 'awaiting_trigger',
-            botId: ctx.botInfo.id // Store the bot ID
-        });
-    } catch (error) {
-        console.error('Error in add_reply action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة رد جديد.');
-    }
-});
-// Add this to your callback query handler
-// Add this to your callback query handler
-bot.action('list_replies', async (ctx) => {
-    const botId = ctx.botInfo.id;
-    await listAllReplies(ctx, botId);
-});
-// Update the dev_replies handler to include the list option
-bot.action('dev_replies', async (ctx) => {
-    try {
-        await ctx.editMessageText('قسم الردود التلقائية:', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'عرض الردود', callback_data: 'list_replies' }],
-                    [{ text: 'إضافة رد', callback_data: 'add_reply' }],
-                    [{ text: 'حذف رد', callback_data: 'delete_reply' }],
-                    [{ text: 'رجوع', callback_data: 'back_to_dev_panel' }]
-                ]
-            }
-        });
-    } catch (error) {
-        console.error('Error in dev_replies handler:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء تحميل قسم الردود');
-    }
-});
-async function getAllReplies(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        return await db.collection('replies').find({ bot_id: botId }).toArray();
-    } catch (error) {
-        console.error('Error fetching all replies:', error);
-        return [];
-    }
-}
     function showRepliesMenu(ctx) {
-        const botId = ctx.botInfo.id;
         const message = 'قسم الردود - اختر الإجراء المطلوب:';
         const keyboard = {
             inline_keyboard: [
-                [{ text: '• اضف رد عام •', callback_data: `add_general_reply:${botId}` }],
-                [{ text: '• حذف رد عام •', callback_data: `delete_general_reply:${botId}` }],
-                [{ text: '• عرض الردود العامة •', callback_data: `list_general_replies:${botId}` }],
-                [{ text: '❌ حذف جميع الردود', callback_data: `delete_all_replies:${botId}` }],
+                [{ text: '• اضف رد عام •', callback_data: 'add_general_reply' }],
+                [{ text: '• حذف رد عام •', callback_data: 'delete_general_reply' }],
+                [{ text: '• عرض الردود العامة •', callback_data: 'list_general_replies' }],
+                [{ text: '❌ حذف جميع الردود', callback_data: 'delete_all_replies' }],
                 [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
             ]
         };
@@ -1660,6 +1367,7 @@ bot.action('show_commands', async (ctx) => {
             '🔹 */تنزيل مميز* – تنزيل مميز\n' +
             '🔹 */لستة مميز* – عرض قائمة المميزين\n' +
             '🔹 */ترقية ادمن* – ترقية إلى أدمن\n' +
+            '🔹 */ترقية منشئ* – ترقية إلى منشئ\n' +
             '🔹 */تنزيل* – إزالة رتبة الأدمن\n' +
             '🔹 */ترقية مطور* – ترقية إلى مطور\n' +
             '🔹 */ترقية مطور ثانوي* – ترقية إلى مطور ثانوي\n' +
@@ -1783,223 +1491,87 @@ bot.action('back_to_quiz_menu', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء العودة لقائمة المسابقات.');
     }
 });
-// Implement other helper functions similarly...
- 
-bot.action(/^add_general_reply:(\d+)$/, async (ctx) => {
-    const botId = parseInt(ctx.match[1]);
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery('إضافة رد عام');
-        ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
-        
-        // Use userStates instead of userState
-        userStates.set(ctx.from.id, {
-            action: 'adding_reply',
-            step: 'awaiting_trigger',
-            botId: botId
-        });
-    } else {
-        ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
-          
 
-bot.action('cancel_add_reply', async (ctx) => {
-    try {
-        await ctx.answerCbQuery('تم إلغاء إضافة الرد');
-        userStates.delete(ctx.from.id);
-        await ctx.editMessageText('تم إلغاء عملية إضافة الرد. يمكنك بدء العملية من جديد في أي وقت.');
-    } catch (error) {
-        console.error('Error canceling add reply:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء إلغاء العملية.', { show_alert: true });
-    }
-});
     // Modify the delete_general_reply action handler
-    bot.action(/^delete_general_reply:(\d+)$/, async (ctx) => {
-        try {
-            const botId = ctx.match[1];
-            const userId = ctx.from.id;
-    
-            if (await isDeveloper(ctx, userId)) {
-                const db = await ensureDatabaseInitialized(botId);
-                
-                // Fetch all replies for this bot
-                const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
-                
-                if (replies.length === 0) {
-                    await ctx.answerCbQuery('لا توجد ردود لحذفها.', { show_alert: true });
-                    return;
-                }
-    
-                // Create inline keyboard with reply options
-                const keyboard = replies.map(reply => [{
-                    text: reply.trigger_word,
-                    callback_data: `confirm_delete_reply:${botId}:${reply._id}`
-                }]);
-    
-                keyboard.push([{ text: 'إلغاء', callback_data: `cancel_delete_reply:${botId}` }]);
-    
-                await ctx.editMessageText('اختر الرد الذي تريد حذفه:', {
-                    reply_markup: { inline_keyboard: keyboard }
-                });
-            } else {
-                await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-            }
-        } catch (error) {
-            console.error('Error in delete_general_reply action:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء محاولة حذف الرد. الرجاء المحاولة مرة أخرى.', { show_alert: true });
-        }
-    });
-    bot.action(/^delete_all_replies:(\d+)$/, async (ctx) => {
-        try {
-            const botId = ctx.match[1];
-            const userId = ctx.from.id;
-    
-            if (await isDeveloper(ctx, userId)) {
-                await ctx.answerCbQuery();
-                await ctx.editMessageText('هل أنت متأكد أنك تريد حذف جميع الردود لهذا البوت؟', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'نعم، احذف الكل', callback_data: `confirm_delete_all_replies:${botId}` }],
-                            [{ text: 'إلغاء', callback_data: `cancel_delete_all_replies:${botId}` }]
-                        ]
-                    }
-                });
-            } else {
-                await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-            }
-        } catch (error) {
-            console.error('Error in delete_all_replies action:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء محاولة حذف جميع الردود. الرجاء المحاولة مرة أخرى.', { show_alert: true });
-        }
-    });
-
-    bot.action(/^confirm_delete_all_replies:(\d+)$/, async (ctx) => {
-        try {
-            const botId = ctx.match[1];
-            const db = await ensureDatabaseInitialized(botId);
-            await db.collection('replies').deleteMany({ bot_id: botId });
-            await ctx.answerCbQuery('تم حذف جميع الردود بنجاح');
-            await ctx.editMessageText('تم حذف جميع الردود لهذا البوت.', {
-                reply_markup: {
-                    inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
-                }
-            });
-        } catch (error) {
-            console.error('Error in confirm_delete_all_replies action:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء حذف جميع الردود. الرجاء المحاولة مرة أخرى.', { show_alert: true });
-        }
-    });
-    
-    bot.action(/^cancel_delete_all_replies:(\d+)$/, async (ctx) => {
-        const botId = ctx.match[1];
-        await ctx.answerCbQuery('تم إلغاء عملية حذف جميع الردود');
-        await ctx.editMessageText('تم إلغاء عملية حذف جميع الردود.', {
-            reply_markup: {
-                inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
-            }
-        });
-    });
-// Additional actions for confirmation and cancellation
-
-bot.action(/^confirm_delete_reply:(\d+):(.+)$/, async (ctx) => {
-    try {
-        const [botId, replyId] = ctx.match.slice(1);
-        const db = await ensureDatabaseInitialized(botId);
-        await db.collection('replies').deleteOne({ _id: ObjectId(replyId), bot_id: botId });
-        await ctx.answerCbQuery('تم حذف الرد بنجاح');
-        await ctx.editMessageText('تم حذف الرد. هل تريد حذف رد آخر؟', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'حذف رد آخر', callback_data: `delete_general_reply:${botId}` }],
-                    [{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]
-                ]
-            }
-        });
-    } catch (error) {
-        console.error('Error in confirm_delete_reply action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء حذف الرد. الرجاء المحاولة مرة أخرى.', { show_alert: true });
+bot.action('delete_general_reply', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('حذف رد عام');
+        ctx.reply('أرسل الكلمة التي تريد حذف الرد لها:');
+        awaitingDeleteReplyWord = true;
+    } else {
+        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
-bot.action(/^back_to_replies_menu:(\d+)$/, async (ctx) => {
-    const botId = ctx.match[1];
-    await ctx.answerCbQuery();
-    await ctx.editMessageText('قائمة إدارة الردود العامة:', {
-        reply_markup: {
+bot.action('delete_all_replies', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        const confirmKeyboard = {
             inline_keyboard: [
-                [{ text: 'إضافة رد جديد', callback_data: `add_general_reply:${botId}` }],
-                [{ text: 'حذف رد', callback_data: `delete_general_reply:${botId}` }],
-                [{ text: 'عرض الردود', callback_data: `list_general_replies:${botId}` }],
-                [{ text: 'حذف جميع الردود', callback_data: `delete_all_replies:${botId}` }],
-                [{ text: 'رجوع للقائمة الرئيسية', callback_data: 'back_to_main_menu' }]
+                [{ text: '✅ نعم، احذف جميع الردود', callback_data: 'confirm_delete_all_replies' }],
+                [{ text: '❌ لا، إلغاء العملية', callback_data: 'cancel_delete_all_replies' }]
             ]
-        }
-    });
+        };
+        ctx.editMessageText('⚠️ تحذير: هل أنت متأكد أنك تريد حذف جميع الردود؟ هذا الإجراء لا يمكن التراجع عنه.', { reply_markup: confirmKeyboard });
+    } else {
+        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
 });
-bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
-    const botId = ctx.match[1];
-    await ctx.answerCbQuery('تم إلغاء عملية الحذف');
-    await ctx.editMessageText('تم إلغاء عملية حذف الرد.', {
-        reply_markup: {
-            inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
+
+bot.action('confirm_delete_all_replies', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').deleteMany({});
+            ctx.answerCbQuery('تم حذف جميع الردود بنجاح', { show_alert: true });
+            showRepliesMenu(ctx);
+        } catch (error) {
+            console.error('Error deleting all replies:', error);
+            ctx.answerCbQuery('حدث خطأ أثناء حذف الردود', { show_alert: true });
         }
-    });
+    } else {
+        ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
+
+bot.action('cancel_delete_all_replies', async (ctx) => {
+    await ctx.answerCbQuery('تم إلغاء عملية الحذف');
+    showRepliesMenu(ctx);
 });
     bot.action('dev_broadcast', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery();
-            ctx.reply('لإرسال رسالة إذاعة، استخدم الأمر التالي:\n/اذاعة [الرسالة]\n\nمثال:\nاذاعة مرحبا بالجميع!');
+            ctx.reply('لإرسال رسالة إذاعة، استخدم الأمر التالي:\n/اذاعة [الرسالة]\n\nمثال:\n/اذاعة مرحبا بالجميع!');
         } else {
             ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
         }
     });
-    bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
-        try {
-            const botId = parseInt(ctx.match[1]);
-            const userId = ctx.from.id;
-    
-            if (await isDeveloper(ctx, userId)) {
-                await ctx.answerCbQuery('عرض الردود العامة');
+    bot.action('list_general_replies', async (ctx) => {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('عرض الردود العامة');
+            try {
+                const db = await ensureDatabaseInitialized();
+                const replies = await db.collection('replies').find({}).toArray();
                 
-                const db = await ensureDatabaseInitialized(botId);
-                const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
-    
                 let replyList = 'الردود العامة:\n\n';
                 if (replies.length > 0) {
                     replies.forEach((reply, index) => {
-                        replyList += `${index + 1}. الكلمة: ${reply.trigger_word}\nالرد: ${reply.reply_text}\n\n`;
+                        const triggerWord = reply.trigger_word || reply.word || 'غير معروف';
+                        const replyContent = reply.type === 'text' ? 
+                            (reply.text || 'نص غير متوفر') : 
+                            `${reply.type} (${reply.media_url ? 'متوفر' : 'غير متوفر'})`;
+                        
+                        replyList += `${index + 1}. الكلمة: ${triggerWord}\nالرد: ${replyContent}\n\n`;
                     });
                 } else {
                     replyList += 'لا توجد ردود عامة حالياً.';
                 }
-    
-                // Split the message if it's too long
-                const maxLength = 4096; // Telegram's max message length
-                if (replyList.length > maxLength) {
-                    const chunks = replyList.match(new RegExp(`.{1,${maxLength}}`, 'g'));
-                    for (let i = 0; i < chunks.length; i++) {
-                        if (i === 0) {
-                            await ctx.editMessageText(chunks[i], {
-                                reply_markup: {
-                                    inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
-                                }
-                            });
-                        } else {
-                            await ctx.reply(chunks[i]);
-                        }
-                    }
-                } else {
-                    await ctx.editMessageText(replyList, {
-                        reply_markup: {
-                            inline_keyboard: [[{ text: 'رجوع', callback_data: `back_to_replies_menu:${botId}` }]]
-                        }
-                    });
-                }
-            } else {
-                await ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
+                ctx.reply(replyList);
+            } catch (error) {
+                console.error('Error fetching replies:', error);
+                ctx.reply('❌ حدث خطأ أثناء جلب الردود العامة.');
             }
-        } catch (error) {
-            console.error('Error in list_general_replies action:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء عرض قائمة الردود. الرجاء المحاولة مرة أخرى.', { show_alert: true });
+        } else {
+            ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
         }
     });
     
@@ -2431,252 +2003,391 @@ bot.on('left_chat_member', (ctx) => {
 
 // Register the text handler
     // For the text handler that's causing errors, update it to:
-    // Register the text handler
-bot.on('text', async (ctx) => {
-    try {
-        console.log('Received message:', ctx.message.text);
+    bot.on('text', async (ctx) => {
+    console.log('Received message:', ctx.message.text);
+    if (await handleAwaitingReplyResponse(ctx)) return;
+
+  const text = ctx.message.text.trim().toLowerCase();
+
+  // Check if this matches a saved trigger word
+  const db = await ensureDatabaseInitialized();
+  const reply = await db.collection('replies').findOne({ trigger_word: text });
+
+ if (reply) {
+  switch (reply.type) {
+    case "text":
+      await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
+      break;
+    case "photo":
+      await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+      break;
+    case "animation":
+      await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+      break;
+    case "video":
+      await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+      break;
+    case "sticker":
+      await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+      break;
+    case "document":
+      await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+      break;
+    default:
+      await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
+  }
+}
+
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const userAnswer = ctx.message.text.trim().toLowerCase();
+    
+    if (chatStates.has(ctx.chat.id)) {
+        await handleCustomQuestionInput(ctx);
+        return;
+    }
+
+    // Check if there's an active quiz in this chat
+    if (activeQuizzes.has(chatId)) {
+        const quiz = activeQuizzes.get(chatId);
+        console.log('Quiz state:', quiz.state);
+        console.log('Current question index:', quiz.currentQuestionIndex);
         
-        // First, handle any awaiting states
-        if (await handleAwaitingReplyResponse(ctx)) return;
-        
-        const text = ctx.message.text.trim().toLowerCase();
-        const chatId = ctx.chat.id;
-        const userId = ctx.from.id;
-        
-        // Handle awaiting states in private chats
-        if (ctx.chat.type === 'private') {
-            if (awaitingReplyWord) {
-                tempReplyWord = text;
-                await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-                awaitingReplyWord = false;
-                awaitingReplyResponse = true;
+        // Check if the quiz is in the active state
+        if (quiz.state === QUIZ_STATE.ACTIVE) {
+            const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
+            const correctAnswer = currentQuestion.answer.toLowerCase();
+            
+            // Initialize attempts tracking for this question if it doesn't exist
+            if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
+                quiz.attempts.set(quiz.currentQuestionIndex, new Set());
+            }
+            
+            const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
+            
+            // Check if the user has already answered correctly
+            if (questionAttempts.has(userId)) {
+                // User already answered correctly, ignore silently
                 return;
             }
             
-            if (awaitingDeleteReplyWord) {
-                const wordToDelete = text;
-                try {
-                    const db = await ensureDatabaseInitialized();
-                    const result = await db.collection('replies').deleteOne({
-                        $or: [
-                            { trigger_word: wordToDelete },
-                            { word: wordToDelete }
-                        ]
-                    });
+            // Check if the answer is correct
+            if (userAnswer === correctAnswer) {
+                // Mark this user as having answered correctly
+                questionAttempts.add(userId);
+                
+                // Update user's score
+                if (!quiz.scores.has(userId)) {
+                    quiz.scores.set(userId, 0);
+                }
+                
+                // Add points based on difficulty
+                let points = 1;
+                if (quiz.difficulty === 'medium') points = 2;
+                if (quiz.difficulty === 'hard') points = 3;
+                
+                quiz.scores.set(userId, quiz.scores.get(userId) + points);
+                
+                // Reply to the user
+                await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
+                    reply_to_message_id: ctx.message.message_id
+                });
+                
+                // Move to the next question after a short delay
+                setTimeout(async () => {
+                    quiz.currentQuestionIndex++;
                     
-                    if (result.deletedCount > 0) {
-                        await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
+                    // Check if we've reached the end of the quiz
+                    if (quiz.currentQuestionIndex >= quiz.questions.length) {
+                        await endQuiz(ctx, chatId);
                     } else {
-                        await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+                        // Show the next question
+                        await askNextQuestion(chatId, ctx.telegram);
                     }
-                } catch (error) {
-                    console.error('Error deleting reply:', error);
-                    await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
-                }
-                
-                awaitingDeleteReplyWord = false;
-                return;
+                }, 2000);
             }
-            
-            if (awaitingBotName) {
-                const newBotName = text;
-                try {
-                    const db = await ensureDatabaseInitialized();
-                    await db.collection('bot_custom_names').updateOne(
-                        { bot_id: ctx.botInfo.id },
-                        { $set: { name: newBotName } },
-                        { upsert: true }
-                    );
-                    
-                    await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
-                } catch (error) {
-                    console.error('Error updating bot name:', error);
-                    await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
-                }
-                
-                awaitingBotName = false;
-                return;
-            }
+            // Incorrect answers are now ignored silently
+            return; // Exit the handler after processing quiz answer
         }
-        
-        // Check if there's an active quiz in this chat
-        if (activeQuizzes && activeQuizzes.has(chatId)) {
-            const quiz = activeQuizzes.get(chatId);
-            
-            // Check if the quiz is in the active state
-            if (quiz && quiz.state === QUIZ_STATE.ACTIVE) {
-                const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-                const correctAnswer = currentQuestion.answer.toLowerCase();
-                
-                // Initialize attempts tracking for this question if it doesn't exist
-                if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
-                    quiz.attempts.set(quiz.currentQuestionIndex, new Set());
-                }
-                
-                const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
-                
-                // Check if the user has already answered correctly
-                if (questionAttempts.has(userId)) {
-                    // User already answered correctly, ignore silently
-                    return;
-                }
-                
-                // Check if the answer is correct
-                if (text === correctAnswer) {
-                    // Mark this user as having answered correctly
-                    questionAttempts.add(userId);
-                    
-                    // Update user's score
-                    if (!quiz.scores.has(userId)) {
-                        quiz.scores.set(userId, 0);
-                    }
-                    
-                    // Add points based on difficulty
-                    let points = 1;
-                    if (quiz.difficulty === 'medium') points = 2;
-                    if (quiz.difficulty === 'hard') points = 3;
-                    
-                    quiz.scores.set(userId, quiz.scores.get(userId) + points);
-                    
-                    // Reply to the user
-                    await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
-                        reply_to_message_id: ctx.message.message_id
-                    });
-                    
-                    // Move to the next question after a short delay
-                    setTimeout(async () => {
-                        quiz.currentQuestionIndex++;
-                        
-                        // Check if we've reached the end of the quiz
-                        if (quiz.currentQuestionIndex >= quiz.questions.length) {
-                            await endQuiz(ctx, chatId);
-                        } else {
-                            // Show the next question
-                            await askNextQuestion(chatId, ctx.telegram);
-                        }
-                    }, 2000);
-                }
-                // Incorrect answers are now ignored silently
-                return; // Exit the handler after processing quiz answer
-            }
-        }
-        
-        // Check for automatic replies
+    }
+    
+    // Handle other text messages (non-quiz related)
+    
+    // Check for automatic replies
+    if (ctx.chat.type === 'private') {
+        // Only scan for keyword replies in DMs
         try {
             const db = await ensureDatabaseInitialized();
-            console.log('Searching for reply with keyword:', text);
-            
             const reply = await db.collection('replies').findOne({
                 $or: [
-                    { trigger_word: text },
-                    { word: text }
+                    { trigger_word: userAnswer },
+                    { word: userAnswer }
                 ]
             });
-            
-            console.log('Reply search result:', reply);
-            
+    
             if (reply) {
-                // Handle different reply structures
-                if (reply.reply_text) {
-                    await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                    return;
-                }
-                
-                // Handle typed replies
                 switch (reply.type) {
                     case "text":
-                        await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+                        await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
                         break;
                     case "photo":
-                        if (reply.file_id) {
-                            await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
+                        await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                         break;
                     case "animation":
-                        if (reply.file_id) {
-                            await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
+                        await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                         break;
                     case "video":
-                        if (reply.file_id) {
-                            await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
+                        await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                         break;
                     case "sticker":
-                        if (reply.file_id) {
-                            await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
+                        await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                         break;
                     case "document":
-                        if (reply.file_id) {
-                            await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
+                        await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                         break;
                     default:
-                        // If no type is specified but we have text, send it
-                        if (reply.text) {
-                            await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                        } else if (reply.reply_text) {
-                            await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                        } else {
-                            console.log('No valid content found in reply:', reply);
-                        }
+                        await ctx.reply("⚠️ نوع الرد غير مدعوم.", { reply_to_message_id: ctx.message.message_id });
                 }
                 return;
             }
         } catch (error) {
             console.error('Error checking for automatic replies:', error);
         }
-        
-        // Handle user states for bot clones
-        if (userStates && userStates.has(userId)) {
-            const userState = userStates.get(userId);
-            
-            if (userState.action === 'adding_reply') {
-                if (userState.step === 'awaiting_trigger') {
-                    userState.triggerWord = text;
-                    userState.step = 'awaiting_response';
-                    await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
-                    return;
-                } else if (userState.step === 'awaiting_response') {
-                    try {
-                        const db = await ensureDatabaseInitialized(userState.botId);
-                        await db.collection('replies').insertOne({
-                            bot_id: userState.botId,
-                            trigger_word: userState.triggerWord,
-                            word: userState.triggerWord,
-                            type: 'text',
-                            text: text,
-                            reply_text: text,
-                            created_at: new Date(),
-                            created_by: userId
-                        });
-                        
-                        await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${text}`);
-                        userStates.delete(userId);
-                        return;
-                    } catch (error) {
-                        console.error('Error saving reply for bot clone:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                        userStates.delete(userId);
-                        return;
-                    }
-                }
-            }
-        }
-        
-        // Update active groups if in a group chat
-        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-            try {
-                await updateActiveGroups(ctx);
-            } catch (error) {
-                console.error('Error updating active groups:', error);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error in text handler:', error);
     }
+    
+    
+    // Handle awaiting reply word
+    if (ctx.chat.type === 'private') {
+        // Handle awaiting states in DMs only
+        if (awaitingReplyWord) {
+            tempReplyWord = ctx.message.text;
+            await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+            awaitingReplyWord = false;
+            awaitingReplyResponse = true;
+            return;
+        }
+    
+        if (awaitingDeleteReplyWord) {
+            const wordToDelete = ctx.message.text.trim();
+            try {
+                const db = await ensureDatabaseInitialized();
+                const result = await db.collection('replies').deleteOne({
+                    $or: [
+                        { trigger_word: wordToDelete },
+                        { word: wordToDelete }
+                    ]
+                });
+    
+                if (result.deletedCount > 0) {
+                    await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
+                } else {
+                    await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+                }
+            } catch (error) {
+                console.error('Error deleting reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
+            }
+    
+            awaitingDeleteReplyWord = false;
+            return;
+        }
+    
+        if (awaitingBotName) {
+            const newBotName = ctx.message.text.trim();
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('bot_custom_names').updateOne(
+                    { bot_id: bot.botInfo.id },
+                    { $set: { name: newBotName } },
+                    { upsert: true }
+                );
+    
+                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
+            } catch (error) {
+                console.error('Error updating bot name:', error);
+                await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
+            }
+    
+            awaitingBotName = false;
+            return;
+        }
+
+        
+        if (ctx.chat.type === 'private') 
+        if (awaitingReplyResponse) {
+            await handleAwaitingReplyResponse(ctx);
+            return;
+        }
+    }
+    
+    
+    
+    // Handle awaiting delete reply word
+    // Handle awaiting delete reply word
+if (awaitingDeleteReplyWord) {
+    const wordToDelete = ctx.message.text.trim();
+    try {
+        const db = await ensureDatabaseInitialized();
+        const result = await db.collection('replies').deleteOne({
+            $or: [
+                { trigger_word: wordToDelete },
+                { word: wordToDelete }
+            ]
+        });
+        
+        if (result.deletedCount > 0) {
+            await ctx.reply(`✅ تم حذف الرد للكلمة "${wordToDelete}" بنجاح.`);
+        } else {
+            await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${wordToDelete}".`);
+        }
+    } catch (error) {
+        console.error('Error deleting reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حذف الرد.');
+    }
+    
+    awaitingDeleteReplyWord = false;
+    return;
+}
+    
+    // Handle awaiting bot name
+    if (awaitingBotName) {
+        const newBotName = ctx.message.text.trim();
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('bot_custom_names').updateOne(
+                { bot_id: bot.botInfo.id },
+                { $set: { name: newBotName } },
+                { upsert: true }
+            );
+            
+            await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" بنجاح.`);
+        } catch (error) {
+            console.error('Error updating bot name:', error);
+            await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت.');
+        }
+        
+        awaitingBotName = false;
+        return;
+    }
+    
+  
+// Handle awaiting reply response
+if (awaitingReplyResponse) {
+    let mediaType = 'text';
+    let replyText = null;
+    let mediaUrl = null;
+    let fileId = null;
+
+    if (!tempReplyWord || tempReplyWord.trim() === '') {
+        await ctx.reply('❌ الكلمة المفتاحية غير صالحة. يرجى بدء العملية من جديد باستخدام أمر إضافة رد.');
+        awaitingReplyResponse = false;
+        return;
+    }
+
+    if (ctx.message.text) {
+        mediaType = 'text';
+        replyText = ctx.message.text.trim();
+    } else if (ctx.message.photo || ctx.message.sticker || ctx.message.video || ctx.message.animation) {
+        if (ctx.message.photo) {
+            const photoArray = ctx.message.photo;
+            const largestPhoto = photoArray[photoArray.length - 1];
+            const fileId = largestPhoto.file_id;
+            await ctx.reply(`📷 Received a photo. File ID: ${fileId}`);
+        } else if (ctx.message.sticker) {
+            mediaType = 'sticker';
+            fileId = ctx.message.sticker.file_id;
+        } else if (ctx.message.video) {
+            mediaType = 'video';
+            fileId = ctx.message.video.file_id;
+        } else if (ctx.message.animation) {
+            mediaType = 'animation';
+            fileId = ctx.message.animation.file_id;
+        }
+
+        if (fileId) {
+            try {
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaUrl = fileLink.href;
+            } catch (error) {
+                console.error('Error getting file link:', error);
+                await ctx.reply('❌ حدث خطأ أثناء معالجة الملف. يرجى المحاولة مرة أخرى.');
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+                return;
+            }
+        } else {
+            await ctx.reply('❌ لم يتم العثور على ملف صالح. يرجى المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            return;
+        }
+    } else {
+        await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو صورة أو ملصق أو فيديو أو GIF.');
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        return;
+    }
+    
+    try {
+        const db = await ensureDatabaseInitialized();
+
+        const existingReply = await db.collection('replies').findOne({ 
+            $or: [
+                { trigger_word: tempReplyWord },
+                { word: tempReplyWord }
+            ]
+        });
+        
+        if (existingReply) {
+            await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            return;
+        }
+
+        // Add the reply to the database
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            word: tempReplyWord,
+            type: mediaType,
+            text: replyText,
+            media_url: mediaUrl,
+            file_id: fileId,
+            created_at: new Date(),
+            created_by: ctx.from.id
+        });
+
+        // Confirm the save and send the media back
+        await ctx.reply(`✅ تم حفظ ${mediaType} للكلمة "${tempReplyWord}" بنجاح.`);
+        
+        // Send the media back as confirmation
+        if (mediaType === 'text') {
+            await ctx.reply(`الرد المحفوظ للكلمة "${tempReplyWord}":\n${replyText}`);
+        } else if (mediaType === 'photo') {
+            await ctx.replyWithPhoto(fileId, { caption: `الرد المحفوظ للكلمة "${tempReplyWord}"` });
+        } else if (mediaType === 'sticker') {
+            await ctx.replyWithSticker(fileId);
+        } else if (mediaType === 'video') {
+            await ctx.replyWithVideo(fileId, { caption: `الرد المحفوظ للكلمة "${tempReplyWord}"` });
+        } else if (mediaType === 'animation') {
+            await ctx.replyWithAnimation(fileId, { caption: `الرد المحفوظ للكلمة "${tempReplyWord}"` });
+        }
+
+        // Reset state
+        tempReplyWord = '';
+        awaitingReplyResponse = false;
+    } catch (error) {
+        console.error('Error adding reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+    }
+    return;
+}
+
+    
+    // Handle other commands or messages here
+    // ...
 });
 
 
@@ -2920,26 +2631,30 @@ if (ctx.chat.type === 'private') {
 async function checkForAutomaticReply(ctx) {
     try {
         const db = await ensureDatabaseInitialized();
-        const userText = ctx.message.text.trim().toLowerCase();
-        console.log('Searching for reply with keyword:', userText);
-        
-        // Search with a more comprehensive query that covers all your different field structures
-        const reply = await db.collection('replies').findOne({
+        console.log('Searching for reply with keyword:', ctx.message.text.trim());
+        return await db.collection('replies').findOne({
             $or: [
-                { trigger_word: userText },
-                { word: userText }
+                { trigger_word: ctx.message.text.trim() },
+                { word: ctx.message.text.trim() }
             ]
         });
-
-        console.log('Reply search result:', reply);
-        return reply;
     } catch (error) {
         console.error('Error checking for automatic replies:', error);
         return null;
     }
 }
 
-
+// Implement other helper functions similarly...
+ 
+    bot.action('add_general_reply', async (ctx) => {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('إضافة رد عام');
+            ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
+            awaitingReplyWord = true;
+        } else {
+            ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    });
     
     function showDevelopersMenu(ctx) {
         const message = ' يرجى استخدام الاوامر لرفع مطور اساسي او مطور ثاني , قائمة المطورين - اختر الإجراء المطلوب:';
@@ -3645,7 +3360,41 @@ bot.action('remove_custom_chat_name', async (ctx) => {
 });
 
 
-
+async function forceCheckSubscription(ctx) {
+    const userId = ctx.from.id;
+    try {
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        if (isSubscribed) {
+            if (statusChanged) {
+                // User just subscribed, show the new prompt
+                await ctx.answerCbQuery('✅ شكراً لاشتراكك في القناة!', { show_alert: true });
+                await ctx.reply('شكراً لاشتراكك! يمكنك الآن استخدام البوت.', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                        ]
+                    }
+                });
+            } else {
+                await ctx.answerCbQuery('✅ أنت مشترك في القناة.', { show_alert: true });
+            }
+        } else {
+            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة. يرجى الاشتراك للاستمرار.', { show_alert: true });
+            await ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error in forceCheckSubscription:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+}
 // ✅ Show list of active groups
 function getActiveGroups() {
     if (activeGroups.size === 0) return '❌ لا توجد مجموعات نشطة.';
@@ -3672,61 +3421,36 @@ async function getCustomBotName(chatId) {
         return null;
     }
 }
-//check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
-        if (!reply) return false;
-        
-        // Handle different reply structures
-        if (reply.reply_text) {
-            await ctx.reply(reply.reply_text);
-            return true;
-        } else if (reply.text) {
-            await ctx.reply(reply.text);
-            return true;
+        switch (reply.type) {
+            case 'text':
+                await ctx.reply(reply.text);
+                break;
+            case 'photo':
+                await ctx.replyWithPhoto(reply.file_id);
+                break;
+            case 'animation':
+                await ctx.replyWithAnimation(reply.file_id);
+                break;
+            case 'video':
+                await ctx.replyWithVideo(reply.file_id);
+                break;
+            case 'document':
+                await ctx.replyWithDocument(reply.file_id, { 
+                    filename: reply.file_name,
+                    mime_type: reply.mime_type 
+                });
+                break;
+            case 'sticker':
+                await ctx.replyWithSticker(reply.file_id);
+                break;
+            default:
+                await ctx.reply('⚠️ نوع الرد غير مدعوم.');
         }
-        
-        // If we have a type field, handle different media types
-        if (reply.type) {
-            switch (reply.type) {
-                case "text":
-                    await ctx.reply(reply.text);
-                    break;
-                case "photo":
-                    if (reply.file_id) {
-                        await ctx.replyWithPhoto(reply.file_id);
-                    }
-                    break;
-                case "animation":
-                    if (reply.file_id) {
-                        await ctx.replyWithAnimation(reply.file_id);
-                    }
-                    break;
-                case "video":
-                    if (reply.file_id) {
-                        await ctx.replyWithVideo(reply.file_id);
-                    }
-                    break;
-                case "sticker":
-                    if (reply.file_id) {
-                        await ctx.replyWithSticker(reply.file_id);
-                    }
-                    break;
-                case "document":
-                    if (reply.file_id) {
-                        await ctx.replyWithDocument(reply.file_id);
-                    }
-                    break;
-                default:
-                    return false;
-            }
-            return true;
-        }
-        
-        return false;
     } catch (error) {
         console.error('Error sending reply:', error);
-        return false;
+        await ctx.reply('❌ حدث خطأ أثناء إرسال الرد. يرجى المحاولة مرة أخرى.');
     }
 }
 
@@ -3741,4 +3465,4 @@ bot.action('check_subscription', forceCheckSubscription);
 }
 
 module.exports = { setupActions,
-    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates,forceCheckSubscription,confirmSubscription, };
+    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates };
