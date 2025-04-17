@@ -2491,14 +2491,57 @@ bot.on('left_chat_member', (ctx) => {
     }
     
     
-    // Handle awaiting reply word
     if (ctx.chat.type === 'private') {
-        // Handle awaiting states in DMs only
         if (awaitingReplyWord) {
             tempReplyWord = ctx.message.text;
-            await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+            await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص، صورة، GIF، ملصق، فيديو أو مستند):`);
             awaitingReplyWord = false;
             awaitingReplyResponse = true;
+            return;
+        }
+    
+        if (awaitingReplyResponse) {
+            try {
+                const db = await ensureDatabaseInitialized();
+                let replyData = {
+                    trigger_word: tempReplyWord,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                };
+    
+                if (ctx.message.text) {
+                    replyData.type = 'text';
+                    replyData.text = ctx.message.text;
+                } else if (ctx.message.photo) {
+                    replyData.type = 'photo';
+                    replyData.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                } else if (ctx.message.animation) {
+                    replyData.type = 'animation';
+                    replyData.file_id = ctx.message.animation.file_id;
+                } else if (ctx.message.sticker) {
+                    replyData.type = 'sticker';
+                    replyData.file_id = ctx.message.sticker.file_id;
+                } else if (ctx.message.video) {
+                    replyData.type = 'video';
+                    replyData.file_id = ctx.message.video.file_id;
+                } else if (ctx.message.document) {
+                    replyData.type = 'document';
+                    replyData.file_id = ctx.message.document.file_id;
+                    replyData.file_name = ctx.message.document.file_name;
+                } else {
+                    await ctx.reply('❌ نوع الرد غير مدعوم. الرجاء إرسال نص، صورة، GIF، ملصق، فيديو أو مستند.');
+                    return;
+                }
+    
+                await db.collection('replies').insertOne(replyData);
+                await ctx.reply(`✅ تم إضافة الرد بنجاح للكلمة "${tempReplyWord}"!`);
+                
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+            }
             return;
         }
     
@@ -2544,13 +2587,6 @@ bot.on('left_chat_member', (ctx) => {
             }
     
             awaitingBotName = false;
-            return;
-        }
-
-        
-        if (ctx.chat.type === 'private') 
-        if (awaitingReplyResponse) {
-            await handleAwaitingReplyResponse(ctx);
             return;
         }
     }
