@@ -76,28 +76,21 @@ async function getQuizQuestions(difficulty, count) {
 
     return finalQuestions;
 }
-async function createClonedDatabase(cloneId) {
-    const cloneDbName = `bot_${cloneId}_db`;
-    const cloneUri = mongoUri.replace(dbName, cloneDbName);
-    
+// Add a new function to create a cloned database with proper structure
+async function createClonedDatabase(botId) {
     try {
-        const cloneClient = new MongoClient(cloneUri, mongooseOptions);
-        await cloneClient.connect();
-        const cloneDb = cloneClient.db(cloneDbName);
+        console.log(`Creating cloned database for bot ${botId}...`);
         
-        // Copy necessary collections from the original database
-        const collections = ['quiz_questions', 'quiz_scores', 'quiz_answers', 'replies', 'developers', 'groups', 'users'];
-        for (const collection of collections) {
-            await db.collection(collection).aggregate([
-                { $match: {} },
-                { $out: { db: cloneDbName, coll: collection } }
-            ]).toArray();
-        }
+        // We'll use the same database but with bot_id field to separate data
+        const db = await ensureDatabaseInitialized();
         
-        console.log(`Cloned database created: ${cloneDbName}`);
-        return cloneDb;
+        // Create indexes for the bot_id field in relevant collections
+        await db.collection('replies').createIndex({ bot_id: 1, trigger_word: 1 });
+        
+        console.log(`Cloned database structure created for bot ${botId}`);
+        return db;
     } catch (error) {
-        console.error('Error creating cloned database:', error);
+        console.error(`Error creating cloned database for bot ${botId}:`, error);
         throw error;
     }
 }
@@ -339,22 +332,36 @@ async function getReplies() {
     }
 }
 
-async function getReply(triggerWord) {
+// Modify the getReply function to filter by bot_id
+async function getReply(triggerWord, botId = null) {
     try {
-        return await db.collection('replies').findOne({ trigger_word: triggerWord });
+        const db = await ensureDatabaseInitialized();
+        const query = botId ? 
+            { bot_id: botId, trigger_word: triggerWord.toLowerCase() } : 
+            { trigger_word: triggerWord.toLowerCase() };
+            
+        return await db.collection('replies').findOne(query);
     } catch (error) {
         console.error(`Error fetching reply for trigger "${triggerWord}":`, error);
         return null;
     }
 }
 
-async function saveReply(triggerWord, replyText) {
+async function saveReply(triggerWord, replyType, replyContent, botId = null) {
     try {
+        const db = await ensureDatabaseInitialized();
+        const query = botId ? 
+            { bot_id: botId, trigger_word: triggerWord.toLowerCase() } : 
+            { trigger_word: triggerWord.toLowerCase() };
+            
         const result = await db.collection('replies').updateOne(
-            { trigger_word: triggerWord },
+            query,
             { 
                 $set: { 
-                    reply_text: replyText, 
+                    bot_id: botId,
+                    trigger_word: triggerWord.toLowerCase(),
+                    type: replyType,
+                    content: replyContent,
                     updated_at: new Date() 
                 }
             },
