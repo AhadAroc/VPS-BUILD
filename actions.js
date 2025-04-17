@@ -75,7 +75,43 @@ async function saveFile(fileLink, fileName) {
     }
 }
 
+// Add this new function to handle image replies
+async function handleImageReply(ctx) {
+    try {
+        let fileId;
+        if (ctx.message.photo) {
+            // If it's a photo, get the file_id of the largest size
+            fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        } else if (ctx.message.document) {
+            // If it's a document, use its file_id
+            fileId = ctx.message.document.file_id;
+        }
 
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        
+        // Save the file
+        const fileName = `${Date.now()}_${ctx.from.id}.jpg`;
+        await saveFile(fileLink, fileName);
+
+        // Save to database
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            type: 'image',
+            file_name: fileName,
+            created_at: new Date(),
+            created_by: ctx.from.id
+        });
+
+        await ctx.reply(`تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح!`);
+    } catch (error) {
+        console.error('Error handling image reply:', error);
+        await ctx.reply('حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+    } finally {
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+    }
+}
 
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
@@ -86,14 +122,24 @@ async function handleTextMessage(ctx) {
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
-    // Handle state-based operations first
     if (awaitingReplyWord) {
         tempReplyWord = userText;
-        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الصورة التي تريد إضافتها كرد لهذه الكلمة:`);
         awaitingReplyWord = false;
         awaitingReplyResponse = true;
         return;
     }
+    
+    if (awaitingReplyResponse) {
+        if (ctx.message.photo || (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('image/'))) {
+            // Handle image reply
+            await handleImageReply(ctx);
+        } else {
+            await ctx.reply('عذرًا، يرجى إرسال صورة فقط كرد.');
+        }
+        return;
+    }
+    
     
     if (awaitingReplyResponse) {
         await handleAwaitingReplyResponse(ctx);
