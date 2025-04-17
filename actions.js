@@ -2593,15 +2593,33 @@ bot.on('text', async (ctx) => {
     }
 });
 
-// Add this function to handle media replies
+// Updated handleMediaReply function to check both global and user-specific states
 async function handleMediaReply(ctx, mediaType) {
     try {
-        // Check if we're awaiting a reply response
-        if (!awaitingReplyResponse) {
+        const userId = ctx.from.id;
+        
+        // Check if we're awaiting a reply response (either global or user-specific)
+        const isAwaitingGlobal = awaitingReplyResponse;
+        const isAwaitingUserSpecific = userStates && userStates.has(userId) && 
+                                      userStates.get(userId).action === 'adding_reply' && 
+                                      userStates.get(userId).step === 'awaiting_response';
+        
+        if (!isAwaitingGlobal && !isAwaitingUserSpecific) {
             return false; // Not handling this media
         }
 
-        const userId = ctx.from.id;
+        // Get the trigger word (either from global or user-specific state)
+        let triggerWord;
+        let botId = null;
+        
+        if (isAwaitingUserSpecific) {
+            const userState = userStates.get(userId);
+            triggerWord = userState.triggerWord;
+            botId = userState.botId; // For bot clones
+        } else {
+            triggerWord = tempReplyWord;
+        }
+        
         const username = ctx.from.username;
         let fileId, additionalData = {};
         
@@ -2648,12 +2666,12 @@ async function handleMediaReply(ctx, mediaType) {
 
         try {
             // Save to database
-            const db = await ensureDatabaseInitialized();
+            const db = await ensureDatabaseInitialized(botId);
             
             // Create the document to insert
             const replyDocument = {
-                trigger_word: tempReplyWord,
-                word: tempReplyWord,
+                trigger_word: triggerWord,
+                word: triggerWord,
                 type: mediaType,
                 file_id: fileId,
                 created_at: new Date(),
@@ -2662,21 +2680,39 @@ async function handleMediaReply(ctx, mediaType) {
                 ...additionalData
             };
             
+            // If this is for a bot clone, add the bot_id
+            if (botId) {
+                replyDocument.bot_id = botId;
+            }
+            
             // Insert into the database
             await db.collection('replies').insertOne(replyDocument);
             
             // Send confirmation message
             const mediaTypeArabic = getMediaTypeInArabic(mediaType);
-            await ctx.reply(`✅ تم حفظ ${mediaTypeArabic} كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            await ctx.reply(`✅ تم حفظ ${mediaTypeArabic} كرد للكلمة "${triggerWord}" بنجاح.`);
             
             // Reset the state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+            if (isAwaitingUserSpecific) {
+                userStates.delete(userId);
+            } else {
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            }
             
             return true; // Successfully handled
         } catch (error) {
             console.error(`Error saving ${mediaType} reply:`, error);
             await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
+            
+            // Reset the state even on error
+            if (isAwaitingUserSpecific) {
+                userStates.delete(userId);
+            } else {
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            }
+            
             return true; // We still handled it, even though there was an error
         }
     } catch (error) {
