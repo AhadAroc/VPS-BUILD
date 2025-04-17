@@ -1410,6 +1410,7 @@ async function listAllReplies(ctx, botId) {
 }
 // Add this action handler for adding a new reply
 bot.action('add_reply', async (ctx) => {
+    awaitingReplyWord = true;
     try {
         await ctx.answerCbQuery();
         
