@@ -1463,50 +1463,7 @@ bot.action('add_reply', async (ctx) => {
     }
 });
 
-bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
-    try {
-        const userId = ctx.from?.id;
-        if (!userId) {
-            console.error('User ID is undefined');
-            return;
-        }
 
-        const userState = userStates.get(userId);
-
-        if (userState && userState.action === 'adding_reply') {
-            if (userState.step === 'awaiting_trigger') {
-                if (!ctx.message?.text) {
-                    await ctx.reply('❌ الرجاء إرسال نص للكلمة المفتاحية.');
-                    return;
-                }
-                userState.triggerWord = ctx.message.text.trim();
-                userState.step = 'awaiting_reply';
-                await ctx.reply(`تم تسجيل الكلمة المفتاحية: "${userState.triggerWord}". الآن أرسل الرد (نص أو وسائط):`);
-            } else if (userState.step === 'awaiting_reply') {
-                const replyData = await handleMediaReply(ctx, userState);
-                if (replyData) {
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        await db.collection('replies').insertOne(replyData);
-                        let confirmationMessage = `✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!\n`;
-                        confirmationMessage += `نوع الوسائط: ${replyData.type}\n`;
-                        await ctx.reply(confirmationMessage);
-                    } catch (dbError) {
-                        console.error('Error saving reply to database:', dbError);
-                        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد في قاعدة البيانات. الرجاء المحاولة مرة أخرى.');
-                    }
-                }
-                userStates.delete(userId);
-            }
-        } else {
-            // Handle normal messages (not in reply adding state)
-            // You can add your existing message handling logic here
-        }
-    } catch (error) {
-        console.error('Error in message handler:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة. الرجاء المحاولة مرة أخرى لاحقًا.');
-    }
-});
 // Add this to your callback query handler
 // Add this to your callback query handler
 bot.action('list_replies', async (ctx) => {
