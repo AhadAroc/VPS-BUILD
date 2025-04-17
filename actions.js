@@ -2365,8 +2365,7 @@ bot.on('left_chat_member', (ctx) => {
 });    
 
 
-// Register the text handler
-// Register the text handler
+
     // For the text handler that's causing errors, update it to:
     bot.on('text', async (ctx) => {
     console.log('Received message:', ctx.message.text);
@@ -2818,7 +2817,59 @@ async function checkForAutomaticReply(ctx) {
             const username = ctx.from.username;
             const message = ctx.message;
             const chatId = ctx.chat.id;
-    
+            if (userState && userState.action === 'adding_reply') {
+                if (userState.step === 'awaiting_trigger') {
+                    // Save the trigger word and ask for the reply
+                    userState.triggerWord = ctx.message.text.toLowerCase();
+                    userState.step = 'awaiting_reply';
+                    await ctx.reply(`تم استلام الكلمة المفتاحية: "${userState.triggerWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+                } else if (userState.step === 'awaiting_reply') {
+                    try {
+                        const db = await ensureDatabaseInitialized();
+                        const replyData = {
+                            trigger_word: userState.triggerWord,
+                            bot_id: userState.botId,
+                            created_at: new Date(),
+                            created_by: userId
+                        };
+        
+                        if (ctx.message.text) {
+                            replyData.type = 'text';
+                            replyData.text = ctx.message.text;
+                        } else if (ctx.message.photo) {
+                            replyData.type = 'photo';
+                            replyData.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                        } else if (ctx.message.video) {
+                            replyData.type = 'video';
+                            replyData.file_id = ctx.message.video.file_id;
+                        } else if (ctx.message.animation) {
+                            replyData.type = 'animation';
+                            replyData.file_id = ctx.message.animation.file_id;
+                        } else if (ctx.message.sticker) {
+                            replyData.type = 'sticker';
+                            replyData.file_id = ctx.message.sticker.file_id;
+                        } else if (ctx.message.document) {
+                            replyData.type = 'document';
+                            replyData.file_id = ctx.message.document.file_id;
+                        } else {
+                            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص أو وسائط مدعومة.');
+                            return;
+                        }
+        
+                        await db.collection('replies').insertOne(replyData);
+                        await ctx.reply(`✅ تم إضافة الرد بنجاح للكلمة المفتاحية: "${userState.triggerWord}"`);
+                    } catch (error) {
+                        console.error('Error saving reply:', error);
+                        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. يرجى المحاولة مرة أخرى.');
+                    } finally {
+                        // Clear the user state
+                        userStates.delete(userId);
+                    }
+                }
+            } else {
+                // If not handling a reply addition, pass to the next middleware
+                return next();
+            }
             // Update last interaction for the user
             updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
             
