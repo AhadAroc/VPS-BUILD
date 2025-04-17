@@ -1439,6 +1439,9 @@ bot.action('add_reply', async (ctx) => {
 });
 
 bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
+    // Add this debug line to see the full message object
+    console.log('Full message object:', JSON.stringify(ctx.message, null, 2));
+    
     console.log('Media handler triggered:', {
         hasText: !!ctx.message.text,
         hasPhoto: !!ctx.message.photo,
@@ -1448,6 +1451,7 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
         hasDocument: !!ctx.message.document,
         userState: userStates.get(ctx.from.id)
     });
+    
     const userId = ctx.from.id;
     const userState = userStates.get(userId);
 
@@ -1470,9 +1474,12 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                 let mediaType = 'text';
                 let isLocallyStored = false;
 
-                if (ctx.message.text) {
-                    replyData.type = 'text';
-                    replyData.text = ctx.message.text;
+                // Check for GIF/animation first since Telegram sometimes sends them with text
+                if (ctx.message.animation) {
+                    mediaType = 'animation';
+                    replyData.type = 'animation';
+                    replyData.file_id = ctx.message.animation.file_id;
+                    isLocallyStored = true;
                 } else if (ctx.message.photo) {
                     mediaType = 'photo';
                     replyData.type = 'photo';
@@ -1482,11 +1489,6 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                     mediaType = 'video';
                     replyData.type = 'video';
                     replyData.file_id = ctx.message.video.file_id;
-                    isLocallyStored = true;
-                } else if (ctx.message.animation) {
-                    mediaType = 'animation';
-                    replyData.type = 'animation';
-                    replyData.file_id = ctx.message.animation.file_id;
                     isLocallyStored = true;
                 } else if (ctx.message.sticker) {
                     mediaType = 'sticker';
@@ -1499,6 +1501,9 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                     replyData.file_id = ctx.message.document.file_id;
                     replyData.file_name = ctx.message.document.file_name;
                     isLocallyStored = true;
+                } else if (ctx.message.text) {
+                    replyData.type = 'text';
+                    replyData.text = ctx.message.text;
                 }
 
                 await db.collection('replies').insertOne(replyData);
