@@ -221,15 +221,6 @@ bot.on('text', async (ctx) => {
     }
 });
 
-    // Update last interaction for the user
-    updateLastInteraction(userId);
-    
-    // If in a group, update the group's active status
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        updateActiveGroups(ctx);
-    }
-});
-
 
     
 
