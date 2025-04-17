@@ -2542,42 +2542,7 @@ bot.on('text', async (ctx) => {
             console.error('Error checking for automatic replies:', error);
         }
         
-        // Handle user states for bot clones
-        if (userStates && userStates.has(userId)) {
-            const userState = userStates.get(userId);
-            
-            if (userState.action === 'adding_reply') {
-                if (userState.step === 'awaiting_trigger') {
-                    userState.triggerWord = text;
-                    userState.step = 'awaiting_response';
-                    await ctx.reply('الآن أرسل الرد👍👍👍👍👍 إضافته لهذه الكلمة:');
-                    return;
-                } else if (userState.step === 'awaiting_response') {
-                    try {
-                        const db = await ensureDatabaseInitialized(userState.botId);
-                        await db.collection('replies').insertOne({
-                            bot_id: userState.botId,
-                            trigger_word: userState.triggerWord,
-                            word: userState.triggerWord,
-                            type: 'text',
-                            text: text,
-                            reply_text: text,
-                            created_at: new Date(),
-                            created_by: userId
-                        });
-                        
-                        await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${text}`);
-                        userStates.delete(userId);
-                        return;
-                    } catch (error) {
-                        console.error('Error saving reply for bot clone:', error);
-                        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                        userStates.delete(userId);
-                        return;
-                    }
-                }
-            }
-        }
+        
         
         // Update active groups if in a group chat
         if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
