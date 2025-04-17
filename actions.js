@@ -2632,10 +2632,11 @@ async function handleMediaReply(ctx, mediaType) {
         }
         
         try {
-            // Save to database with bot_id
-            const db = await ensureDatabaseInitialized();
+            // Save to the bot-specific database
+            const dbName = `bot_${botId}_db`;
+            const db = await connectToMongoDB(dbName);
+            
             await db.collection('replies').insertOne({
-                bot_id: botId,
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
                 content: fileId,
@@ -3192,6 +3193,7 @@ bot.on('sticker', async (ctx) => {
 });
 
 // Text handler for setting up the trigger word
+// Text handler for setting up the trigger word
 bot.on('text', async (ctx) => {
     try {
         const userId = ctx.from.id;
@@ -3233,44 +3235,83 @@ bot.on('text', async (ctx) => {
             return;
         }
 
-        // Check for automatic replies
-        // Check for automatic replies
-// Check for automatic replies
-const reply = await checkForAutomaticReply(ctx);
-if (reply) {
-    try {
-        if (reply.type === 'text') {
-            await ctx.reply(reply.content);
-        } else if (reply.content) {
-            switch (reply.type) {
-                case 'photo':
-                    await ctx.replyWithPhoto(reply.content);
-                    break;
-                case 'video':
-                    await ctx.replyWithVideo(reply.content);
-                    break;
-                case 'animation':
-                    await ctx.replyWithAnimation(reply.content);
-                    break;
-                case 'document':
-                    await ctx.replyWithDocument(reply.content);
-                    break;
-                case 'sticker':
-                    await ctx.replyWithSticker(reply.content);
-                    break;
-                default:
-                    console.log(`Unsupported reply type: ${reply.type}`);
+        if (awaitingDeleteReplyWord) {
+            try {
+                const db = await ensureDatabaseInitialized();
+                const result = await db.collection('replies').deleteOne({ 
+                    bot_id: botId,
+                    trigger_word: text.toLowerCase() 
+                });
+                
+                if (result.deletedCount > 0) {
+                    await ctx.reply(`✅ تم حذف الرد للكلمة "${text}" بنجاح.`);
+                } else {
+                    await ctx.reply(`❌ لم يتم العثور على رد للكلمة "${text}".`);
+                }
+                
+                awaitingDeleteReplyWord = false;
+            } catch (error) {
+                console.error('Error deleting reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حذف الرد. الرجاء المحاولة مرة أخرى.');
+                awaitingDeleteReplyWord = false;
+            }
+            return;
+        }
+
+        if (awaitingBotName) {
+            try {
+                await ctx.telegram.setMyName(text);
+                await ctx.reply(`✅ تم تغيير اسم البوت بنجاح إلى: ${text}`);
+                awaitingBotName = false;
+            } catch (error) {
+                console.error('Error changing bot name:', error);
+                await ctx.reply('❌ حدث خطأ أثناء تغيير اسم البوت. الرجاء المحاولة مرة أخرى.');
+                awaitingBotName = false;
+            }
+            return;
+        }
+
+        // Check for automatic replies in private chats
+        if (ctx.chat.type === 'private') {
+            const reply = await checkForAutomaticReply(ctx);
+            if (reply) {
+                try {
+                    if (reply.type === 'text') {
+                        await ctx.reply(reply.content);
+                    } else if (reply.content) {
+                        switch (reply.type) {
+                            case 'photo':
+                                await ctx.replyWithPhoto(reply.content);
+                                break;
+                            case 'video':
+                                await ctx.replyWithVideo(reply.content);
+                                break;
+                            case 'animation':
+                                await ctx.replyWithAnimation(reply.content);
+                                break;
+                            case 'document':
+                                await ctx.replyWithDocument(reply.content);
+                                break;
+                            case 'sticker':
+                                await ctx.replyWithSticker(reply.content);
+                                break;
+                            default:
+                                console.log(`Unsupported reply type: ${reply.type}`);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error sending automatic reply:', error);
+                }
             }
         }
-    } catch (error) {
-        console.error('Error sending automatic reply:', error);
-    }
-}
 
-// Continue with other text message handling...
-
-        // Continue with other text message handling...
+        // Update last interaction for the user
+        updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
         
+        // If in a group, update the group's active status
+        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+            updateActiveGroups(ctx.chat.id, ctx.chat.title);
+        }
     } catch (error) {
         console.error('Error handling text message:', error);
     }
