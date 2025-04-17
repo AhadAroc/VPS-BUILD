@@ -2542,7 +2542,74 @@ bot.on('text', async (ctx) => {
             console.error('Error checking for automatic replies:', error);
         }
         
-        
+      // Handle user states for bot clones
+if (userStates && userStates.has(userId)) {
+    const userState = userStates.get(userId);
+    
+    if (userState.action === 'adding_reply') {
+        if (userState.step === 'awaiting_trigger') {
+            userState.triggerWord = text;
+            userState.step = 'awaiting_response';
+            await ctx.reply('الآن أرسل الرد (وسائط فقط، مثل صورة أو فيديو):');
+            return;
+        } else if (userState.step === 'awaiting_response') {
+            // Reject if the message is only text
+            if (!ctx.message.photo && !ctx.message.video && !ctx.message.voice && !ctx.message.document && !ctx.message.audio && !ctx.message.sticker && !ctx.message.animation) {
+                await ctx.reply('❌ من فضلك أرسل وسائط فقط (صورة، فيديو، ملاحظة صوتية، ملف، ملصق، إلخ).');
+                return;
+            }
+
+            try {
+                const db = await ensureDatabaseInitialized(userState.botId);
+                
+                const reply = {
+                    bot_id: userState.botId,
+                    trigger_word: userState.triggerWord,
+                    word: userState.triggerWord,
+                    type: 'media',
+                    created_at: new Date(),
+                    created_by: userId
+                };
+
+                // Store file info depending on media type
+                if (ctx.message.photo) {
+                    reply.media_type = 'photo';
+                    reply.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                } else if (ctx.message.video) {
+                    reply.media_type = 'video';
+                    reply.file_id = ctx.message.video.file_id;
+                } else if (ctx.message.voice) {
+                    reply.media_type = 'voice';
+                    reply.file_id = ctx.message.voice.file_id;
+                } else if (ctx.message.audio) {
+                    reply.media_type = 'audio';
+                    reply.file_id = ctx.message.audio.file_id;
+                } else if (ctx.message.document) {
+                    reply.media_type = 'document';
+                    reply.file_id = ctx.message.document.file_id;
+                } else if (ctx.message.sticker) {
+                    reply.media_type = 'sticker';
+                    reply.file_id = ctx.message.sticker.file_id;
+                } else if (ctx.message.animation) {
+                    reply.media_type = 'animation';
+                    reply.file_id = ctx.message.animation.file_id;
+                }
+
+                await db.collection('replies').insertOne(reply);
+
+                await ctx.reply(`✅ تم إضافة رد وسائط بنجاح!\nالكلمة: ${userState.triggerWord}`);
+                userStates.delete(userId);
+                return;
+            } catch (error) {
+                console.error('Error saving media reply for bot clone:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                userStates.delete(userId);
+                return;
+            }
+        }
+    }
+}
+  
         
         // Update active groups if in a group chat
         if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
