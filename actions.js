@@ -1439,6 +1439,15 @@ bot.action('add_reply', async (ctx) => {
 });
 
 bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
+    console.log('Media handler triggered:', {
+        hasText: !!ctx.message.text,
+        hasPhoto: !!ctx.message.photo,
+        hasVideo: !!ctx.message.video,
+        hasAnimation: !!ctx.message.animation,
+        hasSticker: !!ctx.message.sticker,
+        hasDocument: !!ctx.message.document,
+        userState: userStates.get(ctx.from.id)
+    });
     const userId = ctx.from.id;
     const userState = userStates.get(userId);
 
