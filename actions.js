@@ -1410,7 +1410,6 @@ async function listAllReplies(ctx, botId) {
 }
 // Add this action handler for adding a new reply
 bot.action('add_reply', async (ctx) => {
-    awaitingReplyWord = true;
     try {
         await ctx.answerCbQuery();
         
@@ -1429,9 +1428,68 @@ bot.action('add_reply', async (ctx) => {
             step: 'awaiting_trigger',
             botId: ctx.botInfo.id // Store the bot ID
         });
+
+        // Add a message about supported media types
+        await ctx.reply('يمكنك إضافة رد نصي أو وسائط (صورة، فيديو، GIF، ملصق، أو مستند). أرسل الرد الذي تريده بعد إدخال الكلمة المفتاحية.');
+
     } catch (error) {
         console.error('Error in add_reply action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة رد جديد.');
+    }
+});
+
+// Add this function to handle the reply input
+bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
+    const userId = ctx.from.id;
+    const userState = userStates.get(userId);
+
+    if (userState && userState.action === 'adding_reply') {
+        if (userState.step === 'awaiting_trigger') {
+            // Save the trigger word and move to the next step
+            userState.triggerWord = ctx.message.text;
+            userState.step = 'awaiting_reply';
+            await ctx.reply(`تم تسجيل الكلمة المفتاحية: "${ctx.message.text}". الآن أرسل الرد (نص أو وسائط):`);
+        } else if (userState.step === 'awaiting_reply') {
+            try {
+                const db = await ensureDatabaseInitialized();
+                let replyData = {
+                    trigger_word: userState.triggerWord,
+                    bot_id: userState.botId,
+                    created_at: new Date(),
+                    created_by: userId
+                };
+
+                if (ctx.message.text) {
+                    replyData.type = 'text';
+                    replyData.text = ctx.message.text;
+                } else if (ctx.message.photo) {
+                    replyData.type = 'photo';
+                    replyData.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                } else if (ctx.message.video) {
+                    replyData.type = 'video';
+                    replyData.file_id = ctx.message.video.file_id;
+                } else if (ctx.message.animation) {
+                    replyData.type = 'animation';
+                    replyData.file_id = ctx.message.animation.file_id;
+                } else if (ctx.message.sticker) {
+                    replyData.type = 'sticker';
+                    replyData.file_id = ctx.message.sticker.file_id;
+                } else if (ctx.message.document) {
+                    replyData.type = 'document';
+                    replyData.file_id = ctx.message.document.file_id;
+                    replyData.file_name = ctx.message.document.file_name;
+                }
+
+                await db.collection('replies').insertOne(replyData);
+                await ctx.reply(`✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!`);
+                
+                // Clear the user state
+                userStates.delete(userId);
+            } catch (error) {
+                console.error('Error saving reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+            }
+        }
     }
 });
 // Add this to your callback query handler
