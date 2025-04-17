@@ -1469,6 +1469,7 @@ bot.action('dev_replies', async (ctx) => {
 async function getAllReplies(botId) {
     try {
         const db = await ensureDatabaseInitialized();
+        // Fetch replies specific to the bot ID
         return await db.collection('replies').find({ bot_id: botId }).toArray();
     } catch (error) {
         console.error('Error fetching all replies:', error);
@@ -2347,6 +2348,21 @@ bot.on('left_chat_member', (ctx) => {
     // For the text handler that's causing errors, update it to:
     // Register the text handler
 bot.on('text', async (ctx) => {
+    try {
+        const botId = ctx.botInfo.id;
+        const messageText = ctx.message.text.trim();
+
+        // Fetch replies specific to this bot
+        const replies = await getAllReplies(botId);
+
+        // Find a matching reply
+        const reply = replies.find(r => r.trigger_word === messageText);
+        if (reply) {
+            await ctx.reply(reply.reply_text);
+        }
+    } catch (error) {
+        console.error('Error handling message:', error);
+    }
     try {
         console.log('Received message:', ctx.message.text);
         
