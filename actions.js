@@ -2594,6 +2594,7 @@ bot.on('text', async (ctx) => {
 });
 
 // Updated handleMediaReply function to check both global and user-specific states
+// Consolidated media handler function
 async function handleMediaReply(ctx, mediaType) {
     try {
         const userId = ctx.from.id;
@@ -2608,6 +2609,8 @@ async function handleMediaReply(ctx, mediaType) {
             return false; // Not handling this media
         }
 
+        console.log(`Processing ${mediaType} as a reply. Global state: ${isAwaitingGlobal}, User state: ${isAwaitingUserSpecific}`);
+
         // Get the trigger word (either from global or user-specific state)
         let triggerWord;
         let botId = null;
@@ -2618,6 +2621,20 @@ async function handleMediaReply(ctx, mediaType) {
             botId = userState.botId; // For bot clones
         } else {
             triggerWord = tempReplyWord;
+        }
+        
+        if (!triggerWord || triggerWord.trim() === '') {
+            console.error('No trigger word found for media reply');
+            await ctx.reply('❌ حدث خطأ: لم يتم العثور على الكلمة المفتاحية. يرجى بدء العملية من جديد.');
+            
+            // Reset states
+            if (isAwaitingUserSpecific) {
+                userStates.delete(userId);
+            } else {
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            }
+            return true; // We handled it, even though there was an error
         }
         
         const username = ctx.from.username;
@@ -2685,6 +2702,8 @@ async function handleMediaReply(ctx, mediaType) {
                 replyDocument.bot_id = botId;
             }
             
+            console.log(`Saving ${mediaType} reply to database:`, replyDocument);
+            
             // Insert into the database
             await db.collection('replies').insertOne(replyDocument);
             
@@ -2719,6 +2738,19 @@ async function handleMediaReply(ctx, mediaType) {
         console.error(`Error in handleMediaReply for ${mediaType}:`, error);
         return false; // Error occurred
     }
+}
+
+// Helper function to get Arabic names for media types
+function getMediaTypeInArabic(mediaType) {
+    const mediaTypes = {
+        'photo': 'الصورة',
+        'video': 'الفيديو',
+        'animation': 'الصورة المتحركة',
+        'document': 'المستند',
+        'sticker': 'الملصق'
+    };
+    
+    return mediaTypes[mediaType] || mediaType;
 }
 
 // Helper function to get Arabic names for media types
@@ -3037,15 +3069,17 @@ bot.on('video', async (ctx) => {
 });
 
 // Replace your existing photo handler with this one
+// Clean up duplicate handlers and use the consolidated function
+// Photo handler
 bot.on('photo', async (ctx) => {
     try {
-        const chatId = ctx.chat.id;
-        
-        // Check if this is a reply to a trigger word
+        // First check if this is a reply to a trigger word
         if (await handleMediaReply(ctx, 'photo')) {
             return; // Media was handled as a reply
         }
         
+        // If not a reply, continue with restriction check
+        const chatId = ctx.chat.id;
         const isRestricted = photoRestrictionStatus.get(chatId);
 
         if (isRestricted) {
@@ -3058,7 +3092,7 @@ bot.on('photo', async (ctx) => {
             }
         }
 
-        // Continue with existing photo handling logic...
+        // Track photos for other features
         if (!photoMessages.has(chatId)) {
             photoMessages.set(chatId, []);
         }
@@ -3077,16 +3111,42 @@ bot.on('photo', async (ctx) => {
     }
 });
 
-// Add handlers for other media types
+// Video handler
+bot.on('video', async (ctx) => {
+    try {
+        // First check if this is a reply to a trigger word
+        if (await handleMediaReply(ctx, 'video')) {
+            return; // Media was handled as a reply
+        }
+        
+        // If not a reply, continue with restriction check
+        const chatId = ctx.chat.id;
+        const isRestricted = videoRestrictionStatus.get(chatId);
+
+        if (isRestricted) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الفيديوهات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Error handling video message:', error);
+    }
+});
+
+// Animation (GIF) handler
 bot.on('animation', async (ctx) => {
     try {
-        const chatId = ctx.chat.id;
-        
-        // Check if this is a reply to a trigger word
+        // First check if this is a reply to a trigger word
         if (await handleMediaReply(ctx, 'animation')) {
             return; // Media was handled as a reply
         }
         
+        // If not a reply, continue with restriction check
+        const chatId = ctx.chat.id;
         const isRestricted = gifRestrictionStatus.get(chatId);
 
         if (isRestricted) {
@@ -3098,13 +3158,12 @@ bot.on('animation', async (ctx) => {
                 return;
             }
         }
-
-        // Continue with any existing GIF handling logic...
     } catch (error) {
-        console.error('Error handling GIF message:', error);
+        console.error('Error handling animation message:', error);
     }
 });
 
+// Document handler
 bot.on('document', async (ctx) => {
     try {
         // Check if this is a reply to a trigger word
@@ -3118,6 +3177,7 @@ bot.on('document', async (ctx) => {
     }
 });
 
+// Sticker handler
 bot.on('sticker', async (ctx) => {
     try {
         // Check if this is a reply to a trigger word
