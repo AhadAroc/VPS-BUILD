@@ -2344,22 +2344,41 @@ bot.on('left_chat_member', (ctx) => {
 
 
 // Register the text handler
-    // For the text handler that's causing errors, update it to:
-    // Register the text handler
 bot.on('text', async (ctx) => {
     try {
-        console.log('Received message:', ctx.message.text);
+        console.log('Debug: Received text message:', ctx.message.text);
         
-        // First, handle any awaiting states
-        if (await handleAwaitingReplyResponse(ctx)) return;
-        
+        const db = await ensureDatabaseInitialized();
         const text = ctx.message.text.trim().toLowerCase();
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
+
+        console.log('Debug: Processed message details:', { text, chatId, userId });
+
+        // Check for automatic replies
+        console.log('Debug: Searching for reply with keyword:', text);
         
+        const reply = await db.collection('replies').findOne({
+            $or: [
+                { trigger_word: text },
+                { word: text }
+            ]
+        });
+        
+        console.log('Debug: Reply search result:', JSON.stringify(reply, null, 2));
+        
+        if (reply) {
+            console.log('Debug: Sending automatic reply');
+            await sendReply(ctx, reply);
+            return;
+        }
+
         // Handle awaiting states in private chats
         if (ctx.chat.type === 'private') {
+            console.log('Debug: Processing private chat message');
+
             if (awaitingReplyWord) {
+                console.log('Debug: Handling awaiting reply word');
                 tempReplyWord = text;
                 await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
                 awaitingReplyWord = false;
@@ -2368,9 +2387,9 @@ bot.on('text', async (ctx) => {
             }
             
             if (awaitingDeleteReplyWord) {
+                console.log('Debug: Handling awaiting delete reply word');
                 const wordToDelete = text;
                 try {
-                    const db = await ensureDatabaseInitialized();
                     const result = await db.collection('replies').deleteOne({
                         $or: [
                             { trigger_word: wordToDelete },
@@ -2393,9 +2412,9 @@ bot.on('text', async (ctx) => {
             }
             
             if (awaitingBotName) {
+                console.log('Debug: Handling awaiting bot name');
                 const newBotName = text;
                 try {
-                    const db = await ensureDatabaseInitialized();
                     await db.collection('bot_custom_names').updateOne(
                         { bot_id: ctx.botInfo.id },
                         { $set: { name: newBotName } },
@@ -2415,10 +2434,12 @@ bot.on('text', async (ctx) => {
         
         // Check if there's an active quiz in this chat
         if (activeQuizzes && activeQuizzes.has(chatId)) {
+            console.log('Debug: Processing active quiz');
             const quiz = activeQuizzes.get(chatId);
             
             // Check if the quiz is in the active state
             if (quiz && quiz.state === QUIZ_STATE.ACTIVE) {
+                console.log('Debug: Quiz is active, processing answer');
                 const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
                 const correctAnswer = currentQuestion.answer.toLowerCase();
                 
@@ -2431,12 +2452,13 @@ bot.on('text', async (ctx) => {
                 
                 // Check if the user has already answered correctly
                 if (questionAttempts.has(userId)) {
-                    // User already answered correctly, ignore silently
+                    console.log('Debug: User already answered correctly');
                     return;
                 }
                 
                 // Check if the answer is correct
                 if (text === correctAnswer) {
+                    console.log('Debug: Correct answer provided');
                     // Mark this user as having answered correctly
                     questionAttempts.add(userId);
                     
@@ -2463,99 +2485,37 @@ bot.on('text', async (ctx) => {
                         
                         // Check if we've reached the end of the quiz
                         if (quiz.currentQuestionIndex >= quiz.questions.length) {
+                            console.log('Debug: Quiz ended, calling endQuiz');
                             await endQuiz(ctx, chatId);
                         } else {
-                            // Show the next question
+                            console.log('Debug: Moving to next question');
                             await askNextQuestion(chatId, ctx.telegram);
                         }
                     }, 2000);
+                } else {
+                    console.log('Debug: Incorrect answer, ignoring silently');
                 }
-                // Incorrect answers are now ignored silently
                 return; // Exit the handler after processing quiz answer
             }
         }
         
-        // Check for automatic replies
-        try {
-            const db = await ensureDatabaseInitialized();
-            console.log('Searching for reply with keyword:', text);
-            
-            const reply = await db.collection('replies').findOne({
-                $or: [
-                    { trigger_word: text },
-                    { word: text }
-                ]
-            });
-            
-            console.log('Reply search result:', reply);
-            
-            if (reply) {
-                // Handle different reply structures
-                if (reply.reply_text) {
-                    await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                    return;
-                }
-                
-                // Handle typed replies
-                switch (reply.type) {
-                    case "text":
-                        await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                        break;
-                    case "photo":
-                        if (reply.file_id) {
-                            await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
-                        break;
-                    case "animation":
-                        if (reply.file_id) {
-                            await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
-                        break;
-                    case "video":
-                        if (reply.file_id) {
-                            await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
-                        break;
-                    case "sticker":
-                        if (reply.file_id) {
-                            await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
-                        break;
-                    case "document":
-                        if (reply.file_id) {
-                            await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        }
-                        break;
-                    default:
-                        // If no type is specified but we have text, send it
-                        if (reply.text) {
-                            await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                        } else if (reply.reply_text) {
-                            await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                        } else {
-                            console.log('No valid content found in reply:', reply);
-                        }
-                }
-                return;
-            }
-        } catch (error) {
-            console.error('Error checking for automatic replies:', error);
-        }
-        
         // Handle user states for bot clones
         if (userStates && userStates.has(userId)) {
+            console.log('Debug: Processing user state for bot clone');
             const userState = userStates.get(userId);
             
             if (userState.action === 'adding_reply') {
                 if (userState.step === 'awaiting_trigger') {
+                    console.log('Debug: Awaiting trigger word for new reply');
                     userState.triggerWord = text;
                     userState.step = 'awaiting_response';
                     await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
                     return;
                 } else if (userState.step === 'awaiting_response') {
+                    console.log('Debug: Saving new reply');
                     try {
-                        const db = await ensureDatabaseInitialized(userState.botId);
-                        await db.collection('replies').insertOne({
+                        const cloneDb = await ensureDatabaseInitialized(userState.botId);
+                        await cloneDb.collection('replies').insertOne({
                             bot_id: userState.botId,
                             trigger_word: userState.triggerWord,
                             word: userState.triggerWord,
@@ -2581,6 +2541,7 @@ bot.on('text', async (ctx) => {
         
         // Update active groups if in a group chat
         if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+            console.log('Debug: Updating active groups');
             try {
                 await updateActiveGroups(ctx);
             } catch (error) {
@@ -2588,8 +2549,11 @@ bot.on('text', async (ctx) => {
             }
         }
         
+        console.log('Debug: No specific action taken for this message');
+        
     } catch (error) {
         console.error('Error in text handler:', error);
+        await ctx.reply('حدث خطأ أثناء معالجة رسالتك. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 });
 
@@ -3589,19 +3553,27 @@ async function getCustomBotName(chatId) {
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
-        if (!reply) return false;
+        if (!reply) {
+            console.log('Debug: No reply object received');
+            return false;
+        }
         
+        console.log('Debug: Received reply object:', JSON.stringify(reply, null, 2));
+
         // Handle different reply structures
         if (reply.reply_text) {
+            console.log('Debug: Sending text reply');
             await ctx.reply(reply.reply_text);
             return true;
         } else if (reply.text) {
+            console.log('Debug: Sending text reply');
             await ctx.reply(reply.text);
             return true;
         }
         
         // If we have a type field, handle different media types
         if (reply.type) {
+            console.log(`Debug: Sending ${reply.type} reply`);
             switch (reply.type) {
                 case "text":
                     await ctx.reply(reply.text);
@@ -3609,34 +3581,46 @@ async function sendReply(ctx, reply) {
                 case "photo":
                     if (reply.file_id) {
                         await ctx.replyWithPhoto(reply.file_id);
+                    } else {
+                        console.log('Debug: Photo file_id is missing');
                     }
                     break;
                 case "animation":
                     if (reply.file_id) {
                         await ctx.replyWithAnimation(reply.file_id);
+                    } else {
+                        console.log('Debug: Animation file_id is missing');
                     }
                     break;
                 case "video":
                     if (reply.file_id) {
                         await ctx.replyWithVideo(reply.file_id);
+                    } else {
+                        console.log('Debug: Video file_id is missing');
                     }
                     break;
                 case "sticker":
                     if (reply.file_id) {
                         await ctx.replyWithSticker(reply.file_id);
+                    } else {
+                        console.log('Debug: Sticker file_id is missing');
                     }
                     break;
                 case "document":
                     if (reply.file_id) {
                         await ctx.replyWithDocument(reply.file_id);
+                    } else {
+                        console.log('Debug: Document file_id is missing');
                     }
                     break;
                 default:
+                    console.log(`Debug: Unknown reply type: ${reply.type}`);
                     return false;
             }
             return true;
         }
         
+        console.log('Debug: No valid reply structure found');
         return false;
     } catch (error) {
         console.error('Error sending reply:', error);
