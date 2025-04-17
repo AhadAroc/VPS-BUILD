@@ -1439,9 +1439,10 @@ bot.action('add_reply', async (ctx) => {
 });
 
 bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
-    // Add this debug line to see the full message object
+    // Debug the full message object to understand its structure
     console.log('Full message object:', JSON.stringify(ctx.message, null, 2));
     
+    // Log what types of media are detected
     console.log('Media handler triggered:', {
         hasText: !!ctx.message.text,
         hasPhoto: !!ctx.message.photo,
@@ -1455,6 +1456,7 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
     const userId = ctx.from.id;
     const userState = userStates.get(userId);
 
+    // If user is in the process of adding a reply
     if (userState && userState.action === 'adding_reply') {
         if (userState.step === 'awaiting_trigger') {
             // Save the trigger word and move to the next step
@@ -1471,46 +1473,79 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                     created_by: userId
                 };
 
+                // Determine the type of media and handle accordingly
                 let mediaType = 'text';
+                let fileId = null;
+                let fileName = null;
                 let isLocallyStored = false;
 
-                // Check for GIF/animation first since Telegram sometimes sends them with text
+                // Check for different media types in priority order
                 if (ctx.message.animation) {
                     mediaType = 'animation';
-                    replyData.type = 'animation';
-                    replyData.file_id = ctx.message.animation.file_id;
+                    fileId = ctx.message.animation.file_id;
+                    fileName = `animation_${Date.now()}.mp4`;
                     isLocallyStored = true;
-                } else if (ctx.message.photo) {
+                } else if (ctx.message.photo && ctx.message.photo.length > 0) {
                     mediaType = 'photo';
-                    replyData.type = 'photo';
-                    replyData.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                    // Get the highest resolution photo
+                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                    fileName = `photo_${Date.now()}.jpg`;
                     isLocallyStored = true;
                 } else if (ctx.message.video) {
                     mediaType = 'video';
-                    replyData.type = 'video';
-                    replyData.file_id = ctx.message.video.file_id;
+                    fileId = ctx.message.video.file_id;
+                    fileName = `video_${Date.now()}.mp4`;
                     isLocallyStored = true;
                 } else if (ctx.message.sticker) {
                     mediaType = 'sticker';
-                    replyData.type = 'sticker';
-                    replyData.file_id = ctx.message.sticker.file_id;
+                    fileId = ctx.message.sticker.file_id;
+                    fileName = `sticker_${Date.now()}.webp`;
                     isLocallyStored = true;
                 } else if (ctx.message.document) {
                     mediaType = 'document';
-                    replyData.type = 'document';
-                    replyData.file_id = ctx.message.document.file_id;
-                    replyData.file_name = ctx.message.document.file_name;
+                    fileId = ctx.message.document.file_id;
+                    fileName = ctx.message.document.file_name || `document_${Date.now()}`;
                     isLocallyStored = true;
                 } else if (ctx.message.text) {
-                    replyData.type = 'text';
+                    mediaType = 'text';
                     replyData.text = ctx.message.text;
+                } else {
+                    // Unsupported media type
+                    await ctx.reply('❌ نوع الوسائط غير مدعوم. يرجى إرسال نص، صورة، فيديو، ملصق، أو ملف.');
+                    return;
                 }
 
+                // If we have media, download and save it
+                if (isLocallyStored && fileId) {
+                    try {
+                        // Get file link from Telegram
+                        const fileLink = await ctx.telegram.getFileLink(fileId);
+                        
+                        // Save the file locally
+                        await saveFile(fileLink, fileName);
+                        
+                        // Update reply data with file information
+                        replyData.type = mediaType;
+                        replyData.file_id = fileId;
+                        replyData.file_name = fileName;
+                    } catch (fileError) {
+                        console.error('Error saving media file:', fileError);
+                        await ctx.reply('❌ حدث خطأ أثناء حفظ الملف. يرجى المحاولة مرة أخرى.');
+                        return;
+                    }
+                } else {
+                    replyData.type = 'text';
+                }
+
+                // Save to database
                 await db.collection('replies').insertOne(replyData);
 
+                // Confirm to the user
                 let confirmationMessage = `✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!\n`;
                 confirmationMessage += `نوع الوسائط: ${mediaType}\n`;
-                confirmationMessage += `تم التخزين محليًا: ${isLocallyStored ? 'نعم' : 'لا'}`;
+                if (isLocallyStored) {
+                    confirmationMessage += `تم التخزين محليًا: نعم`;
+                }
 
                 await ctx.reply(confirmationMessage);
                 
@@ -1519,8 +1554,12 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
             } catch (error) {
                 console.error('Error saving reply:', error);
                 await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                userStates.delete(userId);
             }
         }
+    } else {
+        // Handle normal messages (not in reply adding state)
+        // You can add your existing message handling logic here
     }
 });
 // Add this to your callback query handler
@@ -2851,7 +2890,20 @@ if (awaitingReplyResponse) {
 });
 
 
-
+// Function to check for automatic replies
+async function checkForAutomaticReply(ctx) {
+    try {
+        const text = ctx.message.text.toLowerCase();
+        const db = await ensureDatabaseInitialized();
+        
+        // Find a reply that matches the trigger word
+        const reply = await db.collection('replies').findOne({ trigger_word: text });
+        return reply;
+    } catch (error) {
+        console.error('Error checking for automatic reply:', error);
+        return null;
+    }
+}
 
     //this fucks how the bot starts
      // Replace the problematic message handler with this one
@@ -3186,36 +3238,101 @@ if (awaitingReplyResponse) {
         await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
     
-    async function sendReply(ctx, reply) {
-        try {
-            switch (reply.type) {
-                case 'text':
-                    await ctx.reply(reply.text);
-                    break;
-                case 'photo':
-                    await ctx.replyWithPhoto(reply.file_id);
-                    break;
-                case 'document':
-                    await ctx.replyWithDocument(reply.file_id);
-                    break;
-                case 'animation':
-                    await ctx.replyWithAnimation(reply.file_id);
-                    break;
-                case 'sticker':
-                    await ctx.replyWithSticker(reply.file_id);
-                    break;
-                case 'video':
-                    await ctx.replyWithVideo(reply.file_id);
-                    break;
-                default:
-                    console.error('Unknown reply type:', reply.type);
-                    await ctx.reply('عذرًا، حدث خطأ في إرسال الرد.');
-            }
-        } catch (error) {
-            console.error('Error sending reply:', error);
-            await ctx.reply('عذرًا، حدث خطأ في إرسال الرد.');
+    // Function to send a reply based on its type
+async function sendReply(ctx, reply) {
+    try {
+        const chatId = ctx.chat.id;
+        
+        switch (reply.type) {
+            case 'text':
+                await ctx.reply(reply.text);
+                break;
+                
+            case 'photo':
+                if (reply.file_id) {
+                    try {
+                        // Try to send using file_id first (faster)
+                        await ctx.replyWithPhoto(reply.file_id);
+                    } catch (error) {
+                        // If file_id fails, try to send using the saved file
+                        if (reply.file_name) {
+                            const filePath = path.join('/var/www/bot_media', reply.file_name);
+                            await ctx.replyWithPhoto({ source: filePath });
+                        } else {
+                            await ctx.reply('❌ الصورة غير متوفرة.');
+                        }
+                    }
+                }
+                break;
+                
+            case 'video':
+                if (reply.file_id) {
+                    try {
+                        await ctx.replyWithVideo(reply.file_id);
+                    } catch (error) {
+                        if (reply.file_name) {
+                            const filePath = path.join('/var/www/bot_media', reply.file_name);
+                            await ctx.replyWithVideo({ source: filePath });
+                        } else {
+                            await ctx.reply('❌ الفيديو غير متوفر.');
+                        }
+                    }
+                }
+                break;
+                
+            case 'animation':
+                if (reply.file_id) {
+                    try {
+                        await ctx.replyWithAnimation(reply.file_id);
+                    } catch (error) {
+                        if (reply.file_name) {
+                            const filePath = path.join('/var/www/bot_media', reply.file_name);
+                            await ctx.replyWithAnimation({ source: filePath });
+                        } else {
+                            await ctx.reply('❌ الصورة المتحركة غير متوفرة.');
+                        }
+                    }
+                }
+                break;
+                
+            case 'sticker':
+                if (reply.file_id) {
+                    try {
+                        await ctx.replyWithSticker(reply.file_id);
+                    } catch (error) {
+                        if (reply.file_name) {
+                            const filePath = path.join('/var/www/bot_media', reply.file_name);
+                            await ctx.replyWithSticker({ source: filePath });
+                        } else {
+                            await ctx.reply('❌ الملصق غير متوفر.');
+                        }
+                    }
+                }
+                break;
+                
+            case 'document':
+                if (reply.file_id) {
+                    try {
+                        await ctx.replyWithDocument(reply.file_id);
+                    } catch (error) {
+                        if (reply.file_name) {
+                            const filePath = path.join('/var/www/bot_media', reply.file_name);
+                            await ctx.replyWithDocument({ source: filePath });
+                        } else {
+                            await ctx.reply('❌ الملف غير متوفر.');
+                        }
+                    }
+                }
+                break;
+                
+            default:
+                await ctx.reply('❌ نوع الرد غير مدعوم.');
         }
+    } catch (error) {
+        console.error('Error sending reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إرسال الرد.');
     }
+}
 
 
     
