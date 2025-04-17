@@ -77,7 +77,51 @@ async function saveFile(fileLink, fileName) {
 
 
 
-    
+  
+
+// Add these new handler functions:
+async function handleTextMessage(ctx, text) {
+    const reply = await checkForAutomaticReply(ctx);
+    if (reply) {
+        console.log('Found matching reply:', reply);
+        const sent = await sendReply(ctx, reply);
+        if (sent) return;
+    } else {
+        console.log('No matching reply found for:', text);
+    }
+
+    // If we reach here in a private chat, it means we didn't handle the message
+    if (ctx.chat.type === 'private') {
+        // Only send the "I don't understand" message in private chats
+        // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
+    }
+}
+
+async function handlePhotoMessage(ctx) {
+    // Handle photo messages
+    // You can add specific logic for photos here
+}
+
+async function handleVideoMessage(ctx) {
+    // Handle video messages
+    // You can add specific logic for videos here
+}
+
+async function handleAudioMessage(ctx) {
+    // Handle audio messages
+    // You can add specific logic for audio here
+}
+
+async function handleVoiceMessage(ctx) {
+    // Handle voice messages
+    // You can add specific logic for voice messages here
+}
+
+async function handleDocumentMessage(ctx) {
+    // Handle document messages
+    // You can add specific logic for documents here
+}
+
 async function handleUserState(ctx) {
     const userState = userStates.get(ctx.from.id);
 
@@ -2591,30 +2635,30 @@ bot.on('text', async (ctx) => {
     //this fucks how the bot starts
      // Replace the problematic message handler with this one
      
-     bot.on('message', async (ctx) => {
-        try {
-            console.log('Received message:', ctx.message);
-    
-            const userId = ctx.from.id;
-            const username = ctx.from.username;
-            const chatId = ctx.chat.id;
-    
-            // Update last interaction
-            await updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
-    
-            // Update group status if in group chat
-            if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-                await updateActiveGroups(ctx.chat.id, ctx.chat.title);
-            }
-    
-            // Check if chat is in custom question state
-            if (chatStates.has(chatId)) {
-                await handleCustomQuestionInput(ctx);
-                return;
-            }
-    
-           
-    
+    bot.on('message', async (ctx, next) => {
+  
+    try {
+        console.log('Received message:', ctx.message);
+
+        const userId = ctx.from.id;
+        const username = ctx.from.username;
+        const message = ctx.message;
+        const chatId = ctx.chat.id;
+
+        // Update last interaction for the user
+        updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
+        
+        // If in a group, update the group's active status
+        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+            updateActiveGroups(ctx.chat.id, ctx.chat.title);
+        }
+
+        // Handle custom question input for quizzes
+        if (chatStates.has(chatId)) {
+            await handleCustomQuestionInput(ctx);
+            return;
+        }
+
         // Handle photos
                 // Handle photos
     // Handle photos
