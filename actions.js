@@ -2348,9 +2348,77 @@ bot.on('left_chat_member', (ctx) => {
     // For the text handler that's causing errors, update it to:
     // Register the text handler
 bot.on('text', async (ctx) => {
+    // Handle awaiting states first
+    if (awaitingReplyWord) {
+        tempReplyWord = text.toLowerCase();
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص، صورة، فيديو، ملصق، GIF، أو مستند):`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
+        return;
+    }
+
+    if (awaitingReplyResponse) {
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                bot_id: botId,
+                trigger_word: tempReplyWord.toLowerCase(),
+                type: 'text',
+                content: text,
+                created_at: new Date(),
+                created_by: userId,
+                username: ctx.from.username || ''
+            });
+            
+            await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
+            
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        } catch (error) {
+            console.error('Error saving text reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+            
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        }
+        return;
+    }
+
+    // Check for automatic replies
+    const reply = await checkForAutomaticReply(ctx);
+    if (reply) {
+        try {
+            switch (reply.type) {
+                case 'text':
+                    await ctx.reply(reply.content);
+                    break;
+                case 'photo':
+                    await ctx.replyWithPhoto(reply.content);
+                    break;
+                case 'video':
+                    await ctx.replyWithVideo(reply.content);
+                    break;
+                case 'animation':
+                    await ctx.replyWithAnimation(reply.content);
+                    break;
+                case 'document':
+                    await ctx.replyWithDocument(reply.content);
+                    break;
+                case 'sticker':
+                    await ctx.replyWithSticker(reply.content);
+                    break;
+                default:
+                    console.log(`Unsupported reply type: ${reply.type}`);
+            }
+        } catch (error) {
+            console.error('Error sending automatic reply:', error);
+        }
+    }
     try {
+        
         const botId = ctx.botInfo.id;
         const messageText = ctx.message.text.trim();
+        const userId = ctx.from.id;
 
         // Fetch replies specific to this bot
         const replies = await getAllReplies(botId);
@@ -3296,16 +3364,12 @@ async function checkForAutomaticReply(ctx) {
         const currentBotId = ctx.botInfo.id; // Get the current bot's ID
 
         const db = await ensureDatabaseInitialized();
-        const replies = await db.collection('replies').find({
-            bot_id: currentBotId // Filter replies by the current bot's ID
-        }).toArray();
+        const reply = await db.collection('replies').findOne({
+            bot_id: currentBotId,
+            trigger_word: { $regex: new RegExp(userText, 'i') }
+        });
 
-        for (const reply of replies) {
-            if (reply.trigger_word && userText.includes(reply.trigger_word.toLowerCase())) {
-                return reply;
-            }
-        }
-        return null;
+        return reply;
     } catch (error) {
         console.error('Error checking for automatic reply:', error);
         return null;
