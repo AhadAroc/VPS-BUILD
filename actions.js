@@ -2630,12 +2630,11 @@ async function handleMediaReply(ctx, mediaType) {
         }
         
         try {
-            const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
-                bot_id: botId,
+                bot_id: ctx.botInfo.id,
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
-                file_id: fileId,
+                content: fileId, // or text content for text replies
                 created_at: new Date(),
                 created_by: userId,
                 username: ctx.from.username || ''
@@ -3229,6 +3228,7 @@ bot.on('text', async (ctx) => {
 
         // Check for automatic replies
         // Check for automatic replies
+// Check for automatic replies
 const reply = await checkForAutomaticReply(ctx);
 if (reply) {
     try {
