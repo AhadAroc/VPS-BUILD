@@ -2550,7 +2550,7 @@ bot.on('text', async (ctx) => {
                 if (userState.step === 'awaiting_trigger') {
                     userState.triggerWord = text;
                     userState.step = 'awaiting_response';
-                    await ctx.reply('الآن أرسل الرد👍👍👍👍👍 إضافته لهذه الكلمة:');
+                    await ctx.reply(' ارسل الرد المقابل:');
                     return;
                 } else if (userState.step === 'awaiting_response') {
                     try {
@@ -2599,17 +2599,16 @@ bot.on('text', async (ctx) => {
 async function handleMediaReply(ctx, mediaType) {
     try {
         const userId = ctx.from.id;
+        const botId = ctx.botInfo.id; // Get the current bot's ID
         
-        // Check if we're awaiting a reply response
         if (!awaitingReplyResponse || !tempReplyWord) {
-            return false; // Not handling this media as a reply
+            return false;
         }
 
-        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
+        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord} for bot: ${botId}`);
         
-        let fileId, additionalData = {};
+        let fileId;
         
-        // Extract the appropriate file ID based on media type
         switch (mediaType) {
             case 'photo':
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
@@ -2627,13 +2626,13 @@ async function handleMediaReply(ctx, mediaType) {
                 fileId = ctx.message.sticker.file_id;
                 break;
             default:
-                return false; // Unsupported media type
+                return false;
         }
         
         try {
-            // Save to database
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
+                bot_id: botId,
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
                 file_id: fileId,
@@ -2642,27 +2641,24 @@ async function handleMediaReply(ctx, mediaType) {
                 username: ctx.from.username || ''
             });
             
-            // Send confirmation
             await ctx.reply(`✅ تم إضافة ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
             
-            // Reset state
             awaitingReplyResponse = false;
             tempReplyWord = '';
             
-            return true; // Successfully handled
+            return true;
         } catch (error) {
             console.error(`Error saving ${mediaType} reply:`, error);
             await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
             
-            // Reset state even on error
             awaitingReplyResponse = false;
             tempReplyWord = '';
             
-            return true; // We still handled it, even though there was an error
+            return true;
         }
     } catch (error) {
         console.error(`Error in handleMediaReply for ${mediaType}:`, error);
-        return false; // Error occurred
+        return false;
     }
 }
 
@@ -3194,8 +3190,8 @@ bot.on('text', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const text = ctx.message.text.trim();
+        const botId = ctx.botInfo.id; // Get the current bot's ID
 
-        // Handle awaiting reply word
         if (awaitingReplyWord) {
             tempReplyWord = text.toLowerCase();
             await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص، صورة، فيديو، ملصق، GIF، أو مستند):`);
@@ -3204,11 +3200,11 @@ bot.on('text', async (ctx) => {
             return;
         }
 
-        // Handle awaiting text reply response
         if (awaitingReplyResponse) {
             try {
                 const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
+                    bot_id: botId,
                     trigger_word: tempReplyWord.toLowerCase(),
                     type: 'text',
                     text: text,
@@ -3219,14 +3215,12 @@ bot.on('text', async (ctx) => {
                 
                 await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
                 
-                // Reset the state
                 awaitingReplyResponse = false;
                 tempReplyWord = '';
             } catch (error) {
                 console.error('Error saving text reply:', error);
                 await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
                 
-                // Reset the state
                 awaitingReplyResponse = false;
                 tempReplyWord = '';
             }
@@ -3234,40 +3228,39 @@ bot.on('text', async (ctx) => {
         }
 
         // Check for automatic replies
-        try {
-            const db = await ensureDatabaseInitialized();
-            const reply = await db.collection('replies').findOne({ 
-                trigger_word: text.toLowerCase() 
-            });
-            
-            if (reply) {
-                // Send the appropriate reply based on type
-                if (reply.type === 'text') {
-                    await ctx.reply(reply.text);
-                } else if (reply.file_id) {
-                    // Send media based on type
-                    switch (reply.type) {
-                        case 'photo':
-                            await ctx.replyWithPhoto(reply.file_id);
-                            break;
-                        case 'video':
-                            await ctx.replyWithVideo(reply.file_id);
-                            break;
-                        case 'animation':
-                            await ctx.replyWithAnimation(reply.file_id);
-                            break;
-                        case 'document':
-                            await ctx.replyWithDocument(reply.file_id);
-                            break;
-                        case 'sticker':
-                            await ctx.replyWithSticker(reply.file_id);
-                            break;
-                    }
-                }
+        // Check for automatic replies
+const reply = await checkForAutomaticReply(ctx);
+if (reply) {
+    try {
+        if (reply.type === 'text') {
+            await ctx.reply(reply.content);
+        } else if (reply.content) {
+            switch (reply.type) {
+                case 'photo':
+                    await ctx.replyWithPhoto(reply.content);
+                    break;
+                case 'video':
+                    await ctx.replyWithVideo(reply.content);
+                    break;
+                case 'animation':
+                    await ctx.replyWithAnimation(reply.content);
+                    break;
+                case 'document':
+                    await ctx.replyWithDocument(reply.content);
+                    break;
+                case 'sticker':
+                    await ctx.replyWithSticker(reply.content);
+                    break;
+                default:
+                    console.log(`Unsupported reply type: ${reply.type}`);
             }
-        } catch (error) {
-            console.error('Error checking for automatic reply:', error);
         }
+    } catch (error) {
+        console.error('Error sending automatic reply:', error);
+    }
+}
+
+// Continue with other text message handling...
 
         // Continue with other text message handling...
         
@@ -3282,10 +3275,12 @@ async function checkForAutomaticReply(ctx) {
     try {
         const db = await ensureDatabaseInitialized();
         const userText = ctx.message.text.trim().toLowerCase();
-        console.log('Searching for reply with keyword:', userText);
+        const botId = ctx.botInfo.id; // Get the current bot's ID
         
-        // Search with a more comprehensive query that covers all your different field structures
+        console.log(`Searching for reply with keyword: ${userText} for bot: ${botId}`);
+        
         const reply = await db.collection('replies').findOne({
+            bot_id: botId,
             $or: [
                 { trigger_word: userText },
                 { word: userText }
