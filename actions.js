@@ -1451,19 +1451,24 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
     try {
         // Debug logging
         console.log('Received message:', {
-            from: ctx.from.id,
-            chat: ctx.chat.id,
-            type: ctx.updateSubTypes[0],
-            text: ctx.message.text,
-            hasMedia: !!ctx.message.photo || !!ctx.message.video || !!ctx.message.animation || !!ctx.message.sticker || !!ctx.message.document
+            from: ctx.from?.id,
+            chat: ctx.chat?.id,
+            type: ctx.updateSubTypes?.[0] || 'unknown',
+            text: ctx.message?.text,
+            hasMedia: !!(ctx.message?.photo || ctx.message?.video || ctx.message?.animation || ctx.message?.sticker || ctx.message?.document)
         });
 
-        const userId = ctx.from.id;
+        const userId = ctx.from?.id;
+        if (!userId) {
+            console.error('User ID is undefined');
+            return;
+        }
+
         const userState = userStates.get(userId);
 
         if (userState && userState.action === 'adding_reply') {
             if (userState.step === 'awaiting_trigger') {
-                if (!ctx.message.text) {
+                if (!ctx.message?.text) {
                     await ctx.reply('❌ الرجاء إرسال نص للكلمة المفتاحية.');
                     return;
                 }
@@ -1483,27 +1488,27 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                 let fileId = null;
                 let fileName = null;
 
-                if (ctx.message.animation) {
+                if (ctx.message?.animation) {
                     mediaType = 'animation';
                     fileId = ctx.message.animation.file_id;
                     fileName = `animation_${Date.now()}.mp4`;
-                } else if (ctx.message.photo && ctx.message.photo.length > 0) {
+                } else if (ctx.message?.photo && ctx.message.photo.length > 0) {
                     mediaType = 'photo';
                     fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
                     fileName = `photo_${Date.now()}.jpg`;
-                } else if (ctx.message.video) {
+                } else if (ctx.message?.video) {
                     mediaType = 'video';
                     fileId = ctx.message.video.file_id;
                     fileName = `video_${Date.now()}.mp4`;
-                } else if (ctx.message.sticker) {
+                } else if (ctx.message?.sticker) {
                     mediaType = 'sticker';
                     fileId = ctx.message.sticker.file_id;
                     fileName = `sticker_${Date.now()}.webp`;
-                } else if (ctx.message.document) {
+                } else if (ctx.message?.document) {
                     mediaType = 'document';
                     fileId = ctx.message.document.file_id;
                     fileName = ctx.message.document.file_name || `document_${Date.now()}`;
-                } else if (ctx.message.text) {
+                } else if (ctx.message?.text) {
                     mediaType = 'text';
                     replyData.text = ctx.message.text;
                 } else {
