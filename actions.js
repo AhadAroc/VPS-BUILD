@@ -2892,63 +2892,88 @@ async function handleAwaitingReplyWord(ctx) {
     return true;
 }
 
-// Add this function to handle awaiting text reply response
+// Handle the reply response
 async function handleAwaitingReplyResponse(ctx) {
-    const text = ctx.message.text.trim();
+    if (!awaitingReplyResponse) return false;
+
     try {
+        const userState = userStates.get(ctx.from.id);
+        const botId = userState?.botId;
+
+        if (!botId) {
+            await ctx.reply('❌ حدث خطأ في تحديد معرف البوت. يرجى المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            return true;
+        }
+
+        // Continue with the reply saving process
+        let mediaType = 'text';
+        let replyText = null;
+        let mediaUrl = null;
+        let fileId = null;
+
+        if (ctx.message.text) {
+            mediaType = 'text';
+            replyText = ctx.message.text.trim();
+            
+            // Check if the message contains the instruction text and remove it
+            const instructionText = 'الآن أرسل الرد';
+            if (replyText.includes(instructionText)) {
+                replyText = replyText.replace(instructionText, '').trim();
+                console.log(`Cleaned reply text: "${replyText}"`);
+            }
+            
+            // Check if the message contains "إضافته لهذه الكلمة" and remove it
+            const additionalText = 'إضافته لهذه الكلمة';
+            if (replyText.includes(additionalText)) {
+                replyText = replyText.replace(additionalText, '').trim();
+                console.log(`Further cleaned reply text: "${replyText}"`);
+            }
+        } else {
+            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص.');
+            awaitingReplyResponse = false;
+            return true;
+        }
+
         const db = await ensureDatabaseInitialized();
-        await db.collection('replies').insertOne({
+
+        // Check if trigger word already exists
+        const existingReply = await db.collection('replies').findOne({ 
             trigger_word: tempReplyWord,
-            word: tempReplyWord,
-            type: 'text',
-            text: text,
-            reply_text: text,
-            created_at: new Date(),
-            created_by: ctx.from.id,
-            username: ctx.from.username
+            bot_id: botId
         });
         
-        await ctx.reply(`✅ تم إضافة الرد النصي بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
-        
-        // Reset the state
-        awaitingReplyResponse = false;
+        if (existingReply) {
+            await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
+            awaitingReplyResponse = false;
+            return true;
+        }
+
+        // Add the reply to the database
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            type: mediaType,
+            text: replyText,
+            media_url: mediaUrl,
+            file_id: fileId,
+            created_at: new Date(),
+            created_by: ctx.from.id,
+            bot_id: botId
+        });
+
+        await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
+
+        // Reset state
         tempReplyWord = '';
-        
+        awaitingReplyResponse = false;
         return true;
     } catch (error) {
-        console.error('Error saving text reply:', error);
-        await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-        
-        // Reset the state
+        console.error('Error adding reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
         awaitingReplyResponse = false;
-        tempReplyWord = '';
-        
         return true;
     }
 }
-    // Handle awaiting reply word
-    if (awaitingReplyWord) {
-        await handleAwaitingReplyWord(ctx);
-        return;
-    }
-
-    // Handle awaiting delete reply word
-    if (awaitingDeleteReplyWord) {
-        await handleAwaitingDeleteReplyWord(ctx);
-        return;
-    }
-
-    // Handle awaiting bot name
-    if (awaitingBotName) {
-        await handleAwaitingBotName(ctx);
-        return;
-    }
-
-    // Handle awaiting reply response
-    if (awaitingReplyResponse) {
-        await handleAwaitingReplyResponse(ctx);
-        return;
-    }
 
     // If we reach here, it's an unhandled text message
     await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
