@@ -1540,7 +1540,7 @@ bot.action('cancel_delete_all_replies', async (ctx) => {
     bot.action('dev_broadcast', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery();
-            ctx.reply('لإرسال رسالة إذاعة، استخدم الأمر التالي:\n/اذاعة [الرسالة]\n\nمثال:\n/اذاعة مرحبا بالجميع!');
+            ctx.reply('لإرسال رسالة إذاعة، استخدم الأمر التالي:\n/اذاعة [الرسالة]\n\nمثال:\nاذاعة مرحبا بالجميع!');
         } else {
             ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
         }
