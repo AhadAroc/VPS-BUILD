@@ -1,4 +1,8 @@
 
+
+
+
+
 const { MongoClient } = require('mongodb');
 const { mongoUri, dbName } = require('./config');
 const { getDevelopers, getReplies, addReply, updateReply } = require('./database');
@@ -157,7 +161,7 @@ bot.on('text', async (ctx) => {
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').updateOne(
                 { trigger_word: tempReplyWord },
-                { $set: { trigger_word: tempReplyWord, reply_type: 'text', reply_content: replyResponse } },
+                { $set: { trigger_word: tempReplyWord, reply_text: replyResponse } },
                 { upsert: true }
             );
             
@@ -201,22 +205,7 @@ bot.on('text', async (ctx) => {
             const reply = await db.collection('replies').findOne({ trigger_word: text });
             
             if (reply) {
-                switch (reply.reply_type) {
-                    case 'text':
-                        await ctx.reply(reply.reply_content);
-                        break;
-                    case 'gif':
-                        await ctx.replyWithAnimation(reply.reply_content);
-                        break;
-                    case 'photo':
-                        await ctx.replyWithPhoto(reply.reply_content);
-                        break;
-                    case 'video':
-                        await ctx.replyWithVideo(reply.reply_content);
-                        break;
-                    default:
-                        await ctx.reply('نوع الرد غير معروف.');
-                }
+                ctx.reply(reply.reply_text);
             }
         } catch (error) {
             console.error('Error checking for reply:', error);
@@ -280,24 +269,6 @@ bot.on('text', async (ctx) => {
     
     // Add this to your existing message handler for GIFs
     bot.on('animation', async (ctx) => {
-        if (awaitingReplyResponse) {
-            const gifFileId = ctx.message.animation.file_id;
-            try {
-                const db = await ensureDatabaseInitialized();
-                await db.collection('replies').updateOne(
-                    { trigger_word: tempReplyWord },
-                    { $set: { trigger_word: tempReplyWord, reply_type: 'gif', reply_content: gifFileId } },
-                    { upsert: true }
-                );
-                
-                ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: GIF`);
-                awaitingReplyResponse = false;
-            } catch (error) {
-                console.error('Error saving GIF reply:', error);
-                ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                awaitingReplyResponse = false;
-            }
-        }
         try {
             const chatId = ctx.chat.id;
             const isRestricted = gifRestrictionStatus.get(chatId);
