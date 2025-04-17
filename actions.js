@@ -959,7 +959,59 @@ async function generateBackup() {
         return null;
     }
 }
+// Function to save text and media replies
+async function saveReply(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const messageId = ctx.message.message_id;
+        const chatId = ctx.chat.id;
+        const db = await ensureDatabaseInitialized();
 
+        if (ctx.message.text) {
+            // Save text reply
+            const text = ctx.message.text.trim();
+            await db.collection('replies').insertOne({
+                chat_id: chatId,
+                user_id: userId,
+                message_id: messageId,
+                type: 'text',
+                content: text,
+                created_at: new Date()
+            });
+            await ctx.reply('✅ تم حفظ الرد النصي بنجاح!');
+        } else if (ctx.message.photo || ctx.message.document) {
+            // Save media reply
+            let fileId;
+            if (ctx.message.photo) {
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+            } else if (ctx.message.document) {
+                fileId = ctx.message.document.file_id;
+            }
+
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            const fileName = `${Date.now()}_${userId}.jpg`;
+            const filePath = path.join('/var/www/bot_media', fileName);
+
+            await saveFile(fileLink, fileName);
+
+            await db.collection('replies').insertOne({
+                chat_id: chatId,
+                user_id: userId,
+                message_id: messageId,
+                type: 'media',
+                file_id: fileId,
+                file_name: fileName,
+                created_at: new Date()
+            });
+            await ctx.reply('✅ تم حفظ الرد الإعلامي بنجاح!');
+        } else {
+            await ctx.reply('❌ لا يوجد نص أو وسائط لحفظها.');
+        }
+    } catch (error) {
+        console.error('Error saving reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة حفظ الرد.');
+    }
+}
 async function cleanSubscribers() {
     try {
         const db = await ensureDatabaseInitialized();
