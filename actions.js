@@ -89,7 +89,7 @@ async function handleTextMessage(ctx) {
     // Handle state-based operations first
     if (awaitingReplyWord) {
         tempReplyWord = userText;
-        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضا👍👍👍👍👍👍👍ة:`);
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
         awaitingReplyWord = false;
         awaitingReplyResponse = true;
         return;
@@ -2550,7 +2550,7 @@ bot.on('text', async (ctx) => {
                 if (userState.step === 'awaiting_trigger') {
                     userState.triggerWord = text;
                     userState.step = 'awaiting_response';
-                    await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
+                    await ctx.reply('الآن أرسل الرد👍👍👍👍👍 إضافته لهذه الكلمة:');
                     return;
                 } else if (userState.step === 'awaiting_response') {
                     try {
