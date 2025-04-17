@@ -3018,9 +3018,10 @@ async function handleMediaReply(ctx, mediaType) {
             // Save to database
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
+                bot_id: ctx.botInfo.id,
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
-                file_id: fileId,
+                content: fileId, // or text content for text replies
                 created_at: new Date(),
                 created_by: userId,
                 username: ctx.from.username || ''
