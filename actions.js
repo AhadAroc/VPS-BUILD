@@ -2709,7 +2709,7 @@ bot.on('text', async (ctx) => {
 
         // Handle photos
                 // Handle photos
-        // Handle photos
+    // Handle photos
 if (ctx.message.photo && awaitingReplyResponse) {
     const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
     console.log('Photo file ID:', fileId); // Debugging line
@@ -2735,6 +2735,7 @@ if (ctx.message.photo && awaitingReplyResponse) {
     // If a photo is received but we're not awaiting a reply, ignore it
     return;
 }
+
 
 // Repeat similar debugging for other media types (animations, documents, stickers, videos)
 
