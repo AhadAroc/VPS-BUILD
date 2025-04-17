@@ -2428,7 +2428,32 @@ bot.on('left_chat_member', (ctx) => {
     }
 });    
 
-
+// Handle photos
+bot.on('photo', async (ctx) => {
+    if (awaitingReplyResponse) {
+        const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        console.log('Photo file ID:', fileId); // Debugging line
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                trigger_word: tempReplyWord,
+                type: 'photo',
+                file_id: fileId,
+                created_at: new Date(),
+                created_by: ctx.from.id
+            });
+            await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        } catch (error) {
+            console.error('Error saving photo reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
+        }
+    } else {
+        console.log('Photo received but not awaiting a reply.');
+    }
+});
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     // Register the text handler
