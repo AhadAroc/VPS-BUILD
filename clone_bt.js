@@ -729,23 +729,42 @@ async function cleanupDatabase() {
         console.error('Error cleaning up database:', error);
     }
 }
-async function addReplyToBotDatabase(botId, triggerWord, replyContent) {
-    const dbName = `bot_${botId}_db`;
-    const db = await connectToMongoDB(dbName);
-    const ReplyModel = db.model('Reply', new mongoose.Schema({
-        trigger_word: String,
-        content: String,
-        createdAt: Date
-    }));
+async function addReplyToBotDatabase(botId, triggerWord, replyContent, replyType = 'text') {
+    try {
+        const dbName = `bot_${botId}_db`;
+        const db = await connectToMongoDB(dbName);
+        
+        // Create a more comprehensive schema for replies
+        const ReplyModel = db.model('Reply', new mongoose.Schema({
+            bot_id: String,
+            trigger_word: { type: String, lowercase: true, trim: true },
+            type: { type: String, default: 'text' },
+            content: String,
+            created_at: { type: Date, default: Date.now },
+            updated_at: { type: Date, default: Date.now }
+        }));
 
-    const newReply = new ReplyModel({
-        trigger_word: triggerWord,
-        content: replyContent,
-        createdAt: new Date()
-    });
+        // Create a new reply with the bot_id included
+        const newReply = new ReplyModel({
+            bot_id: botId,
+            trigger_word: triggerWord.toLowerCase().trim(),
+            type: replyType,
+            content: replyContent,
+            created_at: new Date(),
+            updated_at: new Date()
+        });
 
-    await newReply.save();
-    console.log(`Reply added for bot ${botId}`);
+        await newReply.save();
+        console.log(`Reply added for bot ${botId}: "${triggerWord}" (${replyType})`);
+        
+        // Create an index on bot_id and trigger_word if it doesn't exist
+        await db.collection('replies').createIndex({ bot_id: 1, trigger_word: 1 });
+        
+        return { success: true, message: 'Reply added successfully' };
+    } catch (error) {
+        console.error(`Error adding reply for bot ${botId}:`, error);
+        return { success: false, message: 'Error adding reply', error: error.message };
+    }
 }
 // Load existing bots on startup
 // Load existing bots on startup
