@@ -79,16 +79,19 @@ async function saveFile(fileLink, fileName) {
 
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
-async function handleMessage(ctx) {
+async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    const message = ctx.message;
+    const userText = ctx.message.text.trim().toLowerCase();
 
-    console.log(`Processing message from user ${userId} in chat ${chatId}`);
+    console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
     // Handle state-based operations first
     if (awaitingReplyWord) {
-        await handleAwaitingReplyWord(ctx);
+        tempReplyWord = userText;
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
         return;
     }
     
@@ -109,55 +112,54 @@ async function handleMessage(ctx) {
 
     // Check for active quiz
     if (activeQuizzes.has(chatId) && activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
-        if (message.text) {
-            await handleQuizAnswer(ctx, chatId, userId, message.text.trim().toLowerCase());
-        } else {
-            await ctx.reply('الرجاء إرسال إجابتك كنص فقط.');
-        }
+        await handleQuizAnswer(ctx, chatId, userId, userText);
         return;
     }
 
     // Check for user state
     if (userStates.has(userId)) {
-        await handleUserState(ctx);
-        return;
+        const userState = userStates.get(userId);
+        if (userState.action === 'adding_reply') {
+            if (userState.step === 'awaiting_trigger') {
+                userState.triggerWord = userText;
+                userState.step = 'awaiting_response';
+                await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
+                return;
+            } else if (userState.step === 'awaiting_response') {
+                try {
+                    const db = await ensureDatabaseInitialized(userState.botId);
+                    await db.collection('replies').insertOne({
+                        bot_id: userState.botId,
+                        trigger_word: userState.triggerWord,
+                        word: userState.triggerWord, // Add this for consistency
+                        type: 'text',
+                        text: ctx.message.text,
+                        reply_text: ctx.message.text, // Add this for backward compatibility
+                        created_at: new Date(),
+                        created_by: userId
+                    });
+                    
+                    await ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${ctx.message.text}`);
+                    userStates.delete(userId);
+                    return;
+                } catch (error) {
+                    console.error('Error saving reply:', error);
+                    await ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                    userStates.delete(userId);
+                    return;
+                }
+            }
+        }
     }
 
-    // Handle different types of messages
-    if (message.text) {
-        await handleTextMessage(ctx, message.text);
-    } else if (message.photo) {
-        await handlePhotoMessage(ctx);
-    } else if (message.video) {
-        await handleVideoMessage(ctx);
-    } else if (message.audio) {
-        await handleAudioMessage(ctx);
-    } else if (message.voice) {
-        await handleVoiceMessage(ctx);
-    } else if (message.document) {
-        await handleDocumentMessage(ctx);
-    } else {
-        await ctx.reply('عذرًا، هذا النوع من الرسائل غير مدعوم حاليًا.');
-    }
-
-    // Update last interaction for the user
-    await updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
-    
-    // If in a group, update the group's active status
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        await updateActiveGroups(ctx);
-    }
-}
-
-// Add these new handler functions:
-async function handleTextMessage(ctx, text) {
+    // Check for automatic replies - this should work in both private and group chats
     const reply = await checkForAutomaticReply(ctx);
     if (reply) {
         console.log('Found matching reply:', reply);
         const sent = await sendReply(ctx, reply);
         if (sent) return;
     } else {
-        console.log('No matching reply found for:', text);
+        console.log('No matching reply found for:', userText);
     }
 
     // If we reach here in a private chat, it means we didn't handle the message
@@ -165,69 +167,6 @@ async function handleTextMessage(ctx, text) {
         // Only send the "I don't understand" message in private chats
         // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
-}
-
-async function handlePhotoMessage(ctx) {
-    // Handle photo messages
-    // You can add specific logic for photos here
-}
-
-async function handleVideoMessage(ctx) {
-    // Handle video messages
-    // You can add specific logic for videos here
-}
-
-async function handleAudioMessage(ctx) {
-    // Handle audio messages
-    // You can add specific logic for audio here
-}
-
-async function handleVoiceMessage(ctx) {
-    // Handle voice messages
-    // You can add specific logic for voice messages here
-}
-
-async function handleDocumentMessage(ctx) {
-    // Handle document messages
-    // You can add specific logic for documents here
-}
-
-async function handleUserState(ctx) {
-    const userState = userStates.get(ctx.from.id);
-
-    if (userState.action === 'adding_reply') {
-        if (userState.step === 'awaiting_trigger') {
-            userState.triggerWord = ctx.message.text;
-            userState.step = 'awaiting_response';
-            await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
-            return;
-        }
-
-        if (userState.step === 'awaiting_response') {
-            await handleReplyResponse(ctx, userState);
-            return;
-        }
-    }
-
-    // Add other user state handling as needed
-}
-
-
-// Check for automatic replies - this should work in both private and group chats
-const reply = await checkForAutomaticReply(ctx);
-if (reply) {
-    console.log('Found matching reply:', reply);
-    const sent = await sendReply(ctx, reply);
-    if (sent) return;
-} else {
-    console.log('No matching reply found for:', userText);
-}
-
-// If we reach here in a private chat, it means we didn't handle the message
-if (ctx.chat.type === 'private') {
-    // Only send the "I don't understand" message in private chats
-    // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
-}
 }
 
 // Add this function to check subscription status directly
@@ -1246,56 +1185,36 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
+        // Continue with the reply saving process
         let mediaType = 'text';
         let replyText = null;
         let mediaUrl = null;
         let fileId = null;
 
-        const message = ctx.message;
-
-        if (message.text) {
+        if (ctx.message.text) {
             mediaType = 'text';
-            replyText = message.text.trim();
-        } else if (message.photo) {
-            mediaType = 'photo';
-            fileId = message.photo[message.photo.length - 1].file_id;
-        } else if (message.video) {
-            mediaType = 'video';
-            fileId = message.video.file_id;
-        } else if (message.audio) {
-            mediaType = 'audio';
-            fileId = message.audio.file_id;
-        } else if (message.voice) {
-            mediaType = 'voice';
-            fileId = message.voice.file_id;
-        } else if (message.document) {
-            mediaType = 'document';
-            fileId = message.document.file_id;
+            replyText = ctx.message.text.trim();
         } else {
-            await ctx.reply('❌ نوع الوسائط غير مدعوم حالياً. يرجى إرسال نص أو صورة أو فيديو أو صوت.');
+            await ctx.reply('❌ نوع الرسالة غير مدعوم. يرجى إرسال نص.');
             awaitingReplyResponse = false;
             return true;
         }
 
-        // Optionally: get file URL if you need it
-        if (fileId) {
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            mediaUrl = fileLink.href;
-        }
-
         const db = await ensureDatabaseInitialized();
 
-        const existingReply = await db.collection('replies').findOne({
+        // Check if trigger word already exists
+        const existingReply = await db.collection('replies').findOne({ 
             trigger_word: tempReplyWord,
             bot_id: botId
         });
-
+        
         if (existingReply) {
             await ctx.reply(`❌ الكلمة المفتاحية "${tempReplyWord}" موجودة بالفعل. يرجى اختيار كلمة أخرى.`);
             awaitingReplyResponse = false;
             return true;
         }
 
+        // Add the reply to the database
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             type: mediaType,
@@ -1309,10 +1228,10 @@ async function handleAwaitingReplyResponse(ctx) {
 
         await ctx.reply(`✅ تم إضافة الرد للكلمة "${tempReplyWord}" بنجاح.`);
 
+        // Reset state
         tempReplyWord = '';
         awaitingReplyResponse = false;
         return true;
-
     } catch (error) {
         console.error('Error adding reply:', error);
         await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى لاحقًا.');
@@ -1320,7 +1239,6 @@ async function handleAwaitingReplyResponse(ctx) {
         return true;
     }
 }
-
 // Add these action handlers
 bot.action('add_another_question', async (ctx) => {
     await ctx.answerCbQuery();
@@ -2424,32 +2342,7 @@ bot.on('left_chat_member', (ctx) => {
     }
 });    
 
-// Handle photos
-bot.on('photo', async (ctx) => {
-    if (awaitingReplyResponse) {
-        const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-        console.log('Photo file ID:', fileId); // Debugging line
-        try {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                trigger_word: tempReplyWord,
-                type: 'photo',
-                file_id: fileId,
-                created_at: new Date(),
-                created_by: ctx.from.id
-            });
-            await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
-            // Reset the state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-        } catch (error) {
-            console.error('Error saving photo reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
-        }
-    } else {
-        console.log('Photo received but not awaiting a reply.');
-    }
-});
+
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     // Register the text handler
@@ -2706,7 +2599,6 @@ bot.on('text', async (ctx) => {
      // Replace the problematic message handler with this one
      
     bot.on('message', async (ctx, next) => {
-  
     try {
         console.log('Received message:', ctx.message);
 
@@ -2731,35 +2623,30 @@ bot.on('text', async (ctx) => {
 
         // Handle photos
                 // Handle photos
-    // Handle photos
-if (ctx.message.photo && awaitingReplyResponse) {
-    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-    console.log('Photo file ID:', fileId); // Debugging line
-    try {
-        const db = await ensureDatabaseInitialized();
-        await db.collection('replies').insertOne({
-            trigger_word: tempReplyWord,
-            type: 'photo',
-            file_id: fileId,
-            created_at: new Date(),
-            created_by: ctx.from.id
-        });
-        await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
-        // Reset the state
-        awaitingReplyResponse = false;
-        tempReplyWord = '';
-    } catch (error) {
-        console.error('Error saving photo reply:', error);
-        await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
-    }
-    return;
-} else if (ctx.message.photo) {
-    // If a photo is received but we're not awaiting a reply, ignore it
-    return;
-}
-
-
-// Repeat similar debugging for other media types (animations, documents, stickers, videos)
+        if (ctx.message.photo && awaitingReplyResponse) {
+            const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    trigger_word: tempReplyWord,
+                    type: 'photo',
+                    file_id: fileId,
+                    created_at: new Date(),
+                    created_by: ctx.from.id
+                });
+                await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+                // Reset the state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            } catch (error) {
+                console.error('Error saving photo reply:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
+            }
+            return;
+        } else if (ctx.message.photo) {
+            // If a photo is received but we're not awaiting a reply, ignore it
+            return;
+        }
 
         // Handle animations (GIFs)
                 // Handle animations (GIFs)
