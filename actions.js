@@ -1438,7 +1438,6 @@ bot.action('add_reply', async (ctx) => {
     }
 });
 
-// Add this function to handle the reply input
 bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
     const userId = ctx.from.id;
     const userState = userStates.get(userId);
