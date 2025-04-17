@@ -77,7 +77,77 @@ async function saveFile(fileLink, fileName) {
 
 
 
-  
+    // Add this function to handle quiz answers
+// Add this after the showQuizMenu function
+async function handleMessage(ctx) {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const message = ctx.message;
+
+    console.log(`Processing message from user ${userId} in chat ${chatId}`);
+
+    // Handle state-based operations first
+    if (awaitingReplyWord) {
+        await handleAwaitingReplyWord(ctx);
+        return;
+    }
+    
+    if (awaitingReplyResponse) {
+        await handleAwaitingReplyResponse(ctx);
+        return;
+    }
+    
+    if (awaitingDeleteReplyWord) {
+        await handleAwaitingDeleteReplyWord(ctx);
+        return;
+    }
+    
+    if (awaitingBotName) {
+        await handleAwaitingBotName(ctx);
+        return;
+    }
+
+    // Check for active quiz
+    if (activeQuizzes.has(chatId) && activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
+        if (message.text) {
+            await handleQuizAnswer(ctx, chatId, userId, message.text.trim().toLowerCase());
+        } else {
+            await ctx.reply('الرجاء إرسال إجابتك كنص فقط.');
+        }
+        return;
+    }
+
+    // Check for user state
+    if (userStates.has(userId)) {
+        await handleUserState(ctx);
+        return;
+    }
+
+    // Handle different types of messages
+    if (message.text) {
+        await handleTextMessage(ctx, message.text);
+    } else if (message.photo) {
+        await handlePhotoMessage(ctx);
+    } else if (message.video) {
+        await handleVideoMessage(ctx);
+    } else if (message.audio) {
+        await handleAudioMessage(ctx);
+    } else if (message.voice) {
+        await handleVoiceMessage(ctx);
+    } else if (message.document) {
+        await handleDocumentMessage(ctx);
+    } else {
+        await ctx.reply('عذرًا، هذا النوع من الرسائل غير مدعوم حاليًا.');
+    }
+
+    // Update last interaction for the user
+    await updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
+    
+    // If in a group, update the group's active status
+    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+        await updateActiveGroups(ctx);
+    }
+}
 
 // Add these new handler functions:
 async function handleTextMessage(ctx, text) {
