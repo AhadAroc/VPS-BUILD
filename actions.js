@@ -1459,29 +1459,47 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                     created_by: userId
                 };
 
+                let mediaType = 'text';
+                let isLocallyStored = false;
+
                 if (ctx.message.text) {
                     replyData.type = 'text';
                     replyData.text = ctx.message.text;
                 } else if (ctx.message.photo) {
+                    mediaType = 'photo';
                     replyData.type = 'photo';
                     replyData.file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                    isLocallyStored = true;
                 } else if (ctx.message.video) {
+                    mediaType = 'video';
                     replyData.type = 'video';
                     replyData.file_id = ctx.message.video.file_id;
+                    isLocallyStored = true;
                 } else if (ctx.message.animation) {
+                    mediaType = 'animation';
                     replyData.type = 'animation';
                     replyData.file_id = ctx.message.animation.file_id;
+                    isLocallyStored = true;
                 } else if (ctx.message.sticker) {
+                    mediaType = 'sticker';
                     replyData.type = 'sticker';
                     replyData.file_id = ctx.message.sticker.file_id;
+                    isLocallyStored = true;
                 } else if (ctx.message.document) {
+                    mediaType = 'document';
                     replyData.type = 'document';
                     replyData.file_id = ctx.message.document.file_id;
                     replyData.file_name = ctx.message.document.file_name;
+                    isLocallyStored = true;
                 }
 
                 await db.collection('replies').insertOne(replyData);
-                await ctx.reply(`✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!`);
+
+                let confirmationMessage = `✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!\n`;
+                confirmationMessage += `نوع الوسائط: ${mediaType}\n`;
+                confirmationMessage += `تم التخزين محليًا: ${isLocallyStored ? 'نعم' : 'لا'}`;
+
+                await ctx.reply(confirmationMessage);
                 
                 // Clear the user state
                 userStates.delete(userId);
