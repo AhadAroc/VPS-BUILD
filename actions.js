@@ -2709,30 +2709,34 @@ bot.on('text', async (ctx) => {
 
         // Handle photos
                 // Handle photos
-        if (ctx.message.photo && awaitingReplyResponse) {
-            const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-            try {
-                const db = await ensureDatabaseInitialized();
-                await db.collection('replies').insertOne({
-                    trigger_word: tempReplyWord,
-                    type: 'photo',
-                    file_id: fileId,
-                    created_at: new Date(),
-                    created_by: ctx.from.id
-                });
-                await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
-                // Reset the state
-                awaitingReplyResponse = false;
-                tempReplyWord = '';
-            } catch (error) {
-                console.error('Error saving photo reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
-            }
-            return;
-        } else if (ctx.message.photo) {
-            // If a photo is received but we're not awaiting a reply, ignore it
-            return;
-        }
+        // Handle photos
+if (ctx.message.photo && awaitingReplyResponse) {
+    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+    console.log('Photo file ID:', fileId); // Debugging line
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').insertOne({
+            trigger_word: tempReplyWord,
+            type: 'photo',
+            file_id: fileId,
+            created_at: new Date(),
+            created_by: ctx.from.id
+        });
+        await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+        // Reset the state
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+    } catch (error) {
+        console.error('Error saving photo reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة كرد. يرجى المحاولة مرة أخرى.');
+    }
+    return;
+} else if (ctx.message.photo) {
+    // If a photo is received but we're not awaiting a reply, ignore it
+    return;
+}
+
+// Repeat similar debugging for other media types (animations, documents, stickers, videos)
 
         // Handle animations (GIFs)
                 // Handle animations (GIFs)
