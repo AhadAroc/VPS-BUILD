@@ -89,7 +89,7 @@ async function handleTextMessage(ctx) {
     // Handle state-based operations first
     if (awaitingReplyWord) {
         tempReplyWord = userText;
-        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضا👍👍👍👍👍👍👍ة:`);
         awaitingReplyWord = false;
         awaitingReplyResponse = true;
         return;
