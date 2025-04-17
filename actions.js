@@ -1448,32 +1448,29 @@ bot.action('add_reply', async (ctx) => {
 });
 
 bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ctx) => {
-    // Debug the full message object to understand its structure
-    console.log('Full message object:', JSON.stringify(ctx.message, null, 2));
-    
-    // Log what types of media are detected
-    console.log('Media handler triggered:', {
-        hasText: !!ctx.message.text,
-        hasPhoto: !!ctx.message.photo,
-        hasVideo: !!ctx.message.video,
-        hasAnimation: !!ctx.message.animation,
-        hasSticker: !!ctx.message.sticker,
-        hasDocument: !!ctx.message.document,
-        userState: userStates.get(ctx.from.id)
-    });
-    
-    const userId = ctx.from.id;
-    const userState = userStates.get(userId);
+    try {
+        // Debug logging
+        console.log('Received message:', {
+            from: ctx.from.id,
+            chat: ctx.chat.id,
+            type: ctx.updateSubTypes[0],
+            text: ctx.message.text,
+            hasMedia: !!ctx.message.photo || !!ctx.message.video || !!ctx.message.animation || !!ctx.message.sticker || !!ctx.message.document
+        });
 
-    // If user is in the process of adding a reply
-    if (userState && userState.action === 'adding_reply') {
-        if (userState.step === 'awaiting_trigger') {
-            // Save the trigger word and move to the next step
-            userState.triggerWord = ctx.message.text;
-            userState.step = 'awaiting_reply';
-            await ctx.reply(`تم تسجيل الكلمة المفتاحية: "${ctx.message.text}". الآن أرسل الرد (نص أو وسائط):`);
-        } else if (userState.step === 'awaiting_reply') {
-            try {
+        const userId = ctx.from.id;
+        const userState = userStates.get(userId);
+
+        if (userState && userState.action === 'adding_reply') {
+            if (userState.step === 'awaiting_trigger') {
+                if (!ctx.message.text) {
+                    await ctx.reply('❌ الرجاء إرسال نص للكلمة المفتاحية.');
+                    return;
+                }
+                userState.triggerWord = ctx.message.text.trim();
+                userState.step = 'awaiting_reply';
+                await ctx.reply(`تم تسجيل الكلمة المفتاحية: "${userState.triggerWord}". الآن أرسل الرد (نص أو وسائط):`);
+            } else if (userState.step === 'awaiting_reply') {
                 const db = await ensureDatabaseInitialized();
                 let replyData = {
                     trigger_word: userState.triggerWord,
@@ -1482,58 +1479,42 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                     created_by: userId
                 };
 
-                // Determine the type of media and handle accordingly
                 let mediaType = 'text';
                 let fileId = null;
                 let fileName = null;
-                let isLocallyStored = false;
 
-                // Check for different media types in priority order
                 if (ctx.message.animation) {
                     mediaType = 'animation';
                     fileId = ctx.message.animation.file_id;
                     fileName = `animation_${Date.now()}.mp4`;
-                    isLocallyStored = true;
                 } else if (ctx.message.photo && ctx.message.photo.length > 0) {
                     mediaType = 'photo';
-                    // Get the highest resolution photo
                     fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
                     fileName = `photo_${Date.now()}.jpg`;
-                    isLocallyStored = true;
                 } else if (ctx.message.video) {
                     mediaType = 'video';
                     fileId = ctx.message.video.file_id;
                     fileName = `video_${Date.now()}.mp4`;
-                    isLocallyStored = true;
                 } else if (ctx.message.sticker) {
                     mediaType = 'sticker';
                     fileId = ctx.message.sticker.file_id;
                     fileName = `sticker_${Date.now()}.webp`;
-                    isLocallyStored = true;
                 } else if (ctx.message.document) {
                     mediaType = 'document';
                     fileId = ctx.message.document.file_id;
                     fileName = ctx.message.document.file_name || `document_${Date.now()}`;
-                    isLocallyStored = true;
                 } else if (ctx.message.text) {
                     mediaType = 'text';
                     replyData.text = ctx.message.text;
                 } else {
-                    // Unsupported media type
                     await ctx.reply('❌ نوع الوسائط غير مدعوم. يرجى إرسال نص، صورة، فيديو، ملصق، أو ملف.');
                     return;
                 }
 
-                // If we have media, download and save it
-                if (isLocallyStored && fileId) {
+                if (fileId) {
                     try {
-                        // Get file link from Telegram
                         const fileLink = await ctx.telegram.getFileLink(fileId);
-                        
-                        // Save the file locally
                         await saveFile(fileLink, fileName);
-                        
-                        // Update reply data with file information
                         replyData.type = mediaType;
                         replyData.file_id = fileId;
                         replyData.file_name = fileName;
@@ -1546,29 +1527,28 @@ bot.on(['text', 'photo', 'video', 'animation', 'sticker', 'document'], async (ct
                     replyData.type = 'text';
                 }
 
-                // Save to database
-                await db.collection('replies').insertOne(replyData);
-
-                // Confirm to the user
-                let confirmationMessage = `✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!\n`;
-                confirmationMessage += `نوع الوسائط: ${mediaType}\n`;
-                if (isLocallyStored) {
-                    confirmationMessage += `تم التخزين محليًا: نعم`;
+                try {
+                    await db.collection('replies').insertOne(replyData);
+                    let confirmationMessage = `✅ تم إضافة الرد بنجاح للكلمة "${userState.triggerWord}"!\n`;
+                    confirmationMessage += `نوع الوسائط: ${mediaType}\n`;
+                    if (fileId) {
+                        confirmationMessage += `تم التخزين محليًا: نعم`;
+                    }
+                    await ctx.reply(confirmationMessage);
+                } catch (dbError) {
+                    console.error('Error saving reply to database:', dbError);
+                    await ctx.reply('❌ حدث خطأ أثناء حفظ الرد في قاعدة البيانات. الرجاء المحاولة مرة أخرى.');
                 }
 
-                await ctx.reply(confirmationMessage);
-                
-                // Clear the user state
-                userStates.delete(userId);
-            } catch (error) {
-                console.error('Error saving reply:', error);
-                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
                 userStates.delete(userId);
             }
+        } else {
+            // Handle normal messages (not in reply adding state)
+            // You can add your existing message handling logic here
         }
-    } else {
-        // Handle normal messages (not in reply adding state)
-        // You can add your existing message handling logic here
+    } catch (error) {
+        console.error('Error in message handler:', error);
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 });
 // Add this to your callback query handler
