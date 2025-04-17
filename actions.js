@@ -2583,10 +2583,11 @@ bot.on('left_chat_member', (ctx) => {
 // Updated handleMediaReply function to check both global and user-specific states
 // Consolidated media handler function
 // Consolidated media reply handler
+// Improved consolidated media reply handler
 async function handleMediaReply(ctx, mediaType) {
     try {
         const userId = ctx.from.id;
-        const botId = ctx.botInfo.id; // Get the current bot's ID
+        const botId = ctx.botInfo.id;
         
         // Check if we're awaiting a reply response
         if (!awaitingReplyResponse || !tempReplyWord) {
@@ -2595,42 +2596,81 @@ async function handleMediaReply(ctx, mediaType) {
 
         console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
         
-        let fileId;
+        let fileId, additionalData = {};
         
-        // Extract the appropriate file ID based on media type
+        // Extract the appropriate file ID and any additional metadata based on media type
         switch (mediaType) {
             case 'photo':
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                additionalData = {
+                    width: ctx.message.photo[ctx.message.photo.length - 1].width,
+                    height: ctx.message.photo[ctx.message.photo.length - 1].height
+                };
                 break;
             case 'video':
                 fileId = ctx.message.video.file_id;
+                additionalData = {
+                    duration: ctx.message.video.duration,
+                    width: ctx.message.video.width,
+                    height: ctx.message.video.height,
+                    mime_type: ctx.message.video.mime_type
+                };
                 break;
             case 'animation':
                 fileId = ctx.message.animation.file_id;
+                additionalData = {
+                    duration: ctx.message.animation.duration,
+                    width: ctx.message.animation.width,
+                    height: ctx.message.animation.height
+                };
                 break;
             case 'document':
                 fileId = ctx.message.document.file_id;
+                additionalData = {
+                    file_name: ctx.message.document.file_name,
+                    mime_type: ctx.message.document.mime_type,
+                    file_size: ctx.message.document.file_size
+                };
                 break;
             case 'sticker':
                 fileId = ctx.message.sticker.file_id;
+                additionalData = {
+                    width: ctx.message.sticker.width,
+                    height: ctx.message.sticker.height,
+                    is_animated: ctx.message.sticker.is_animated || false,
+                    emoji: ctx.message.sticker.emoji || ''
+                };
                 break;
             default:
                 return false; // Unsupported media type
         }
         
         try {
-            // Save to the bot-specific database
-            const dbName = `bot_${botId}_db`;
-            const db = await connectToMongoDB(dbName);
+            // Save to database with bot_id to make it bot-specific
+            const db = await ensureDatabaseInitialized();
             
-            await db.collection('replies').insertOne({
+            // Create a complete document with all necessary fields
+            const replyDocument = {
                 trigger_word: tempReplyWord.trim().toLowerCase(),
+                word: tempReplyWord.trim().toLowerCase(), // For backward compatibility
                 type: mediaType,
-                content: fileId,
+                file_id: fileId,
+                bot_id: botId, // Make it bot-specific
                 created_at: new Date(),
                 created_by: userId,
-                username: ctx.from.username || ''
-            });
+                username: ctx.from.username || '',
+                ...additionalData // Include any additional metadata
+            };
+            
+            // Use updateOne with upsert to avoid duplicates
+            await db.collection('replies').updateOne(
+                { 
+                    trigger_word: tempReplyWord.trim().toLowerCase(),
+                    bot_id: botId
+                },
+                { $set: replyDocument },
+                { upsert: true }
+            );
             
             // Send confirmation
             await ctx.reply(`✅ تم إضافة ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
@@ -2638,6 +2678,9 @@ async function handleMediaReply(ctx, mediaType) {
             // Reset state
             awaitingReplyResponse = false;
             tempReplyWord = '';
+            
+            // Log success for PM2 logs
+            console.log(`Successfully saved ${mediaType} reply for trigger word "${tempReplyWord}" for bot ${botId}`);
             
             return true; // Successfully handled
         } catch (error) {
@@ -2655,7 +2698,6 @@ async function handleMediaReply(ctx, mediaType) {
         return false; // Error occurred
     }
 }
-
 // Helper function to get Arabic names for media types
 function getMediaTypeInArabic(mediaType) {
     const mediaTypes = {
@@ -3125,27 +3167,15 @@ bot.on('video', async (ctx) => {
     }
 });
 
-// Animation (GIF) handler
+// Animation handler (GIFs)
 bot.on('animation', async (ctx) => {
     try {
-        // First check if this is a reply to a trigger word
+        // Check if this is a reply to a trigger word
         if (await handleMediaReply(ctx, 'animation')) {
             return; // Media was handled as a reply
         }
         
-        // If not a reply, continue with restriction check
-        const chatId = ctx.chat.id;
-        const isRestricted = gifRestrictionStatus.get(chatId);
-
-        if (isRestricted) {
-            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
-            
-            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
-                await ctx.deleteMessage();
-                await ctx.reply('❌ عذرًا، إرسال الصور المتحركة غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                return;
-            }
-        }
+        // Additional animation handling logic can go here
     } catch (error) {
         console.error('Error handling animation message:', error);
     }
@@ -3159,7 +3189,7 @@ bot.on('document', async (ctx) => {
             return; // Media was handled as a reply
         }
         
-        // Continue with any existing document handling logic...
+        // Additional document handling logic can go here
     } catch (error) {
         console.error('Error handling document message:', error);
     }
