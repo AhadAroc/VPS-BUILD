@@ -2848,26 +2848,36 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
                         case "photo":
                             if (reply.file_id) {
                                 await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                            } else {
+                                console.log('No valid photo file_id found in reply:', reply);
                             }
                             break;
                         case "animation":
                             if (reply.file_id) {
                                 await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                            } else {
+                                console.log('No valid animation file_id found in reply:', reply);
                             }
                             break;
                         case "video":
                             if (reply.file_id) {
                                 await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                            } else {
+                                console.log('No valid video file_id found in reply:', reply);
                             }
                             break;
                         case "sticker":
                             if (reply.file_id) {
                                 await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                            } else {
+                                console.log('No valid sticker file_id found in reply:', reply);
                             }
                             break;
                         case "document":
                             if (reply.file_id) {
                                 await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                            } else {
+                                console.log('No valid document file_id found in reply:', reply);
                             }
                             break;
                         default:
