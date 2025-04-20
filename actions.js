@@ -308,50 +308,39 @@ function setupMediaHandlers(bot) {
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    const userAnswer = ctx.message.text.trim().toLowerCase();
+    const userText = ctx.message.text.trim().toLowerCase();
 
-    // Check for active quiz
-    if (activeQuizzes.has(chatId)) {
-        await handleQuizAnswer(ctx, chatId, userId, userAnswer);
-        return;
-    }
+    console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
-    // Check for automatic replies
-    if (ctx.chat.type === 'private') {
-        const reply = await checkForAutomaticReply(ctx);
-        if (reply) {
-            await sendReply(ctx, reply);
-            return;
-        }
-    }
-
-    // Handle awaiting reply word
+    // Handle state-based operations first
     if (awaitingReplyWord) {
-        await handleAwaitingReplyWord(ctx);
+        tempReplyWord = userText;
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
         return;
     }
-
-    // Handle awaiting delete reply word
+    
+    if (awaitingReplyResponse) {
+        await handleAwaitingReplyResponse(ctx);
+        return;
+    }
+    
     if (awaitingDeleteReplyWord) {
         await handleAwaitingDeleteReplyWord(ctx);
         return;
     }
-
-    // Handle awaiting bot name
+    
     if (awaitingBotName) {
         await handleAwaitingBotName(ctx);
         return;
     }
 
-    // Handle awaiting reply response
-    if (awaitingReplyResponse) {
-        await handleAwaitingReplyResponse(ctx);
+    // Check for active quiz
+    if (activeQuizzes.has(chatId) && activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
+        await handleQuizAnswer(ctx, chatId, userId, userText);
         return;
     }
-
-    // If we reach here, it's an unhandled text message
-    await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
-}
 
     // Check for user state
     if (userStates.has(userId)) {
