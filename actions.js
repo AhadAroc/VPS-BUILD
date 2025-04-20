@@ -238,32 +238,40 @@ async function handleTextMessage(ctx) {
     }
 
     // Check for user state
-    // Check for user state
-if (userStates.has(userId)) {
-    const userState = userStates.get(userId);
-
-    if (userState.action === 'adding_reply') {
-        if (userState.step === 'awaiting_trigger') {
-            userState.triggerWord = userText;
-            userState.step = 'awaiting_response';
-            await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص أو وسائط):');
-            return;
-        } else if (userState.step === 'awaiting_response') {
-            // Set global flags so handleMediaMessage or handleAwaitingReplyResponse can work
-            awaitingReplyResponse = true;
-            tempReplyWord = userState.triggerWord;
-            tempBotId = userState.botId;
-
-            // Optional: let the user know
-            await ctx.reply(`✅ تم تسجيل الكلمة: "${tempReplyWord}".\nالآن أرسل الرد الذي تريد إضافته (نص أو وسائط):`);
-
-            // Clear user state — the media or text handler will finish the job
-            userStates.delete(userId);
-            return;
+    if (userStates.has(userId)) {
+        const userState = userStates.get(userId);
+        if (userState.action === 'adding_reply') {
+            if (userState.step === 'awaiting_trigger') {
+                userState.triggerWord = userText;
+                userState.step = 'awaiting_response';
+                await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
+                return;
+            } else if (userState.step === 'awaiting_response') {
+                try {
+                    const db = await ensureDatabaseInitialized(userState.botId);
+                    await db.collection('replies').insertOne({
+                        bot_id: userState.botId,
+                        trigger_word: userState.triggerWord,
+                        word: userState.triggerWord, // Add this for consistency
+                        type: 'text',
+                        text: ctx.message.text,
+                        reply_text: ctx.message.text, // Add this for backward compatibility
+                        created_at: new Date(),
+                        created_by: userId
+                    });
+                    
+                    await ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${ctx.message.text}`);
+                    userStates.delete(userId);
+                    return;
+                } catch (error) {
+                    console.error('Error saving reply:', error);
+                    await ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                    userStates.delete(userId);
+                    return;
+                }
+            }
         }
     }
-}
-
 
     // Check for automatic replies - this should work in both private and group chats
     const reply = await checkForAutomaticReply(ctx);
@@ -3501,63 +3509,58 @@ async function checkForAutomaticReply(ctx) {
     }
     function setupMediaHandlers(bot) {
         // Photo handler
-        bot.on('photo', async (ctx) => {
-            console.log('Received photo message');
-            if (awaitingReplyResponse && tempReplyWord) {
-                try {
-                    const photo = ctx.message.photo[ctx.message.photo.length - 1];
-                    const fileId = photo.file_id;
-                    const userId = ctx.from.id;
-                    const username = ctx.from.username || '';
-        
-                    console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
-        
-                    // Get file link from Telegram
-                    const fileLink = await ctx.telegram.getFileLink(fileId);
-                    console.log(`Got file link: ${fileLink}`);
-        
-                    // Generate a unique filename
-                    const fileName = `photo_${Date.now()}_${userId}.jpg`;
-                    console.log(`Generated filename: ${fileName}`);
-        
-                    // Save the file locally
-                    const savedFilePath = await saveFile(fileLink, fileName);
-                    console.log(`File saved locally at: ${savedFilePath}`);
-        
-                    // Save to database
-                    const db = await ensureDatabaseInitialized();
-                    await db.collection('replies').insertOne({
-                        user_id: userId,
-                        username: username,
-                        trigger_word: tempReplyWord.trim().toLowerCase(),
+        // Photo handler
+bot.on('photo', async (ctx) => {
+    console.log('Received photo message');
+    if (awaitingReplyResponse && tempReplyWord) {
+        try {
+            const photo = ctx.message.photo[ctx.message.photo.length - 1];
+            const fileId = photo.file_id;
+            const userId = ctx.from.id;
+            const botId = ctx.botInfo.id; // Get the current bot's ID
+            
+            console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
+            
+            // Get database connection
+            const db = await ensureDatabaseInitialized();
+            
+            // Save the photo reply to database
+            await db.collection('replies').updateOne(
+                { bot_id: botId, trigger_word: tempReplyWord.toLowerCase() },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        trigger_word: tempReplyWord.toLowerCase(), 
                         type: 'photo',
-                        file_id: fileId,
-                        file_path: savedFilePath,
-                        width: photo.width,
-                        height: photo.height,
-                        created_at: new Date()
-                    });
-        
-                    console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
-        
-                    await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
-        
-                    // Reset the awaiting state
-                    awaitingReplyResponse = false;
-                    tempReplyWord = '';
-        
-                } catch (error) {
-                    console.error('Error handling photo message:', error);
-                    await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
-                    
-                    // Reset the awaiting state
-                    awaitingReplyResponse = false;
-                    tempReplyWord = '';
-                }
-            } else {
-                console.log('Not awaiting a reply response or no temp word set np its not saved lol');
-            }
-        });
+                        content: fileId,
+                        file_id: fileId,  // For backward compatibility
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        created_by: userId,
+                        username: ctx.from.username || ''
+                    }
+                },
+                { upsert: true }
+            );
+            
+            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+        } catch (error) {
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        }
+    } else {
+        console.log('Not awaiting a reply response or no temp word set - not saved');
+    }
+});
     
         // Video handler
         bot.on('video', async (ctx) => {
