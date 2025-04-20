@@ -301,12 +301,9 @@ function setupMediaHandlers(bot) {
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleTextMessage(ctx) {
-    const text = ctx.message.text.trim().toLowerCase();
-    console.log('Received message:', text);
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
     const userText = ctx.message.text.trim().toLowerCase();
-
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
@@ -3609,15 +3606,50 @@ bot.on('text', async (ctx) => {
 // based on your existing code and requirements.
 
 async function checkForAutomaticReply(ctx) {
-    const text = ctx.message.text.trim().toLowerCase();
-    const db = await ensureDatabaseInitialized();
-    const reply = await db.collection('replies').findOne({
-        $or: [
-            { trigger_word: text },
-            { word: text }
-        ]
-    });
-    return reply;
+    const userText = ctx.message.text.trim().toLowerCase();
+    const userId = ctx.from.id;
+
+    try {
+        const db = await ensureDatabaseInitialized();
+        const reply = await db.collection('replies').findOne({
+            trigger_word: userText
+        });
+
+        if (reply) {
+            console.log('Found matching reply:', reply);
+
+            // Check the type of reply and send the appropriate response
+            if (reply.type === 'text') {
+                await ctx.reply(reply.reply_text);
+            } else if (reply.type === 'media') {
+                // Send the media file based on its type
+                switch (reply.media_type) {
+                    case 'photo':
+                        await ctx.replyWithPhoto({ source: reply.file_path });
+                        break;
+                    case 'video':
+                        await ctx.replyWithVideo({ source: reply.file_path });
+                        break;
+                    case 'animation':
+                        await ctx.replyWithAnimation({ source: reply.file_path });
+                        break;
+                    case 'document':
+                        await ctx.replyWithDocument({ source: reply.file_path });
+                        break;
+                    case 'sticker':
+                        await ctx.replyWithSticker({ source: reply.file_path });
+                        break;
+                    default:
+                        console.log('Unsupported media type:', reply.media_type);
+                        break;
+                }
+            }
+            return true;
+        }
+    } catch (error) {
+        console.error('Error checking for automatic reply:', error);
+    }
+    return false;
 }
 
 
@@ -4356,32 +4388,58 @@ async function getCustomBotName(chatId) {
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
-        switch (reply.type) {
-            case 'text':
-                await ctx.reply(reply.text || reply.reply_text);
-                break;
-            case 'photo':
-                await ctx.replyWithPhoto(reply.file_id);
-                break;
-            case 'video':
-                await ctx.replyWithVideo(reply.file_id);
-                break;
-            case 'animation':
-                await ctx.replyWithAnimation(reply.file_id);
-                break;
-            case 'document':
-                await ctx.replyWithDocument(reply.file_id);
-                break;
-            case 'sticker':
-                await ctx.replyWithSticker(reply.file_id);
-                break;
-            default:
-                console.log('Unknown reply type:', reply.type);
-                await ctx.reply('Sorry, I couldn\'t process this reply.');
+        if (!reply) return false;
+        
+        // Handle different reply structures
+        if (reply.reply_text) {
+            await ctx.reply(reply.reply_text);
+            return true;
+        } else if (reply.text) {
+            await ctx.reply(reply.text);
+            return true;
         }
+        
+        // If we have a type field, handle different media types
+        if (reply.type) {
+            switch (reply.type) {
+                case "text":
+                    await ctx.reply(reply.text);
+                    break;
+                case "photo":
+                    if (reply.file_id) {
+                        await ctx.replyWithPhoto(reply.file_id);
+                    }
+                    break;
+                case "animation":
+                    if (reply.file_id) {
+                        await ctx.replyWithAnimation(reply.file_id);
+                    }
+                    break;
+                case "video":
+                    if (reply.file_id) {
+                        await ctx.replyWithVideo(reply.file_id);
+                    }
+                    break;
+                case "sticker":
+                    if (reply.file_id) {
+                        await ctx.replyWithSticker(reply.file_id);
+                    }
+                    break;
+                case "document":
+                    if (reply.file_id) {
+                        await ctx.replyWithDocument(reply.file_id);
+                    }
+                    break;
+                default:
+                    return false;
+            }
+            return true;
+        }
+        
+        return false;
     } catch (error) {
         console.error('Error sending reply:', error);
-        await ctx.reply('An error occurred while sending the reply.');
+        return false;
     }
 }
 
