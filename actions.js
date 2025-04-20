@@ -2791,44 +2791,57 @@ if (reply) {
                     throw new Error('No valid photo file_id found in reply');
                 }
                 break;
+            // ✅ Add this case to handle 'media' replies
+            case "media":
+                if (!reply.media_type) {
+                    throw new Error('Missing media_type in media reply');
+                }
+        
+                switch (reply.media_type) {
+                    case "photo":
+                        await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "video":
+                        await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "animation":
+                        await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "document":
+                        await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    case "sticker":
+                        await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                        break;
+                    default:
+                        throw new Error(`Unsupported media_type: ${reply.media_type}`);
+                }
+                break;
             case "animation":
-                if (reply.file_id) {
-                    await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error('No valid animation file_id found in reply');
-                }
-                break;
             case "video":
-                if (reply.file_id) {
-                    await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error('No valid video file_id found in reply');
-                }
-                break;
             case "sticker":
-                if (reply.file_id) {
-                    await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error('No valid sticker file_id found in reply');
-                }
-                break;
             case "document":
                 if (reply.file_id) {
-                    await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    const method = {
+                        animation: ctx.replyWithAnimation,
+                        video: ctx.replyWithVideo,
+                        sticker: ctx.replyWithSticker,
+                        document: ctx.replyWithDocument
+                    }[reply.type];
+                    await method.call(ctx, reply.file_id, { reply_to_message_id: ctx.message.message_id });
                 } else {
-                    throw new Error('No valid document file_id found in reply');
+                    throw new Error(`No valid ${reply.type} file_id found in reply`);
                 }
                 break;
             default:
-                // If no type is specified but we have text, send it
-                if (reply.text) {
-                    await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                } else if (reply.reply_text) {
-                    await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+                // If nothing matched and we still have some text, send it
+                if (reply.text || reply.reply_text) {
+                    await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
                 } else {
                     throw new Error('No valid content found in reply');
                 }
         }
+        
 
     } catch (error) {
         console.error('Error handling reply:', error.message);
