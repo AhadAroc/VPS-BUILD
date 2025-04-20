@@ -52,30 +52,101 @@ if (!fs.existsSync(mediaDir)) {
 
 
 // Function to download and save file
+// Function to download and save file
 async function saveFile(fileLink, fileName) {
-    const filePath = path.join('/var/www/bot_media', fileName);
-    const writer = fs.createWriteStream(filePath);
-
     try {
+        console.log(`Attempting to save file from ${fileLink} as ${fileName}`);
+        
+        // Ensure the media directory exists
+        if (!fs.existsSync(mediaDir)) {
+            console.log(`Creating media directory: ${mediaDir}`);
+            fs.mkdirSync(mediaDir, { recursive: true });
+        }
+        
+        const filePath = path.join(mediaDir, fileName);
+        console.log(`Full file path: ${filePath}`);
+        
+        // Use axios to download the file
+        const axios = require('axios');
         const response = await axios({
             method: 'GET',
-            url: fileLink,
+            url: fileLink.toString(),
             responseType: 'stream'
         });
-
+        
+        // Create a write stream and pipe the response data to it
+        const writer = fs.createWriteStream(filePath);
         response.data.pipe(writer);
-
+        
+        // Return a promise that resolves when the file is fully written
         return new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
+            writer.on('finish', () => {
+                console.log(`File successfully saved to ${filePath}`);
+                resolve(filePath);
+            });
+            writer.on('error', (err) => {
+                console.error(`Error writing file to ${filePath}:`, err);
+                reject(err);
+            });
         });
     } catch (error) {
-        console.error('Error downloading file:', error);
+        console.error(`Error in saveFile function:`, error);
         throw error;
     }
 }
 
+// Add these event handlers to your bot setup
+function setupMediaHandlers(bot) {
+    // Photo handler
+    bot.on('photo', async (ctx) => {
+        console.log('Received photo message');
+        const handled = await handleMediaMessage(ctx, 'photo');
+        if (!handled) {
+            // If not handled as a reply, you can add default photo handling here
+            console.log('Photo not handled as a reply');
+        }
+    });
 
+    // Video handler
+    bot.on('video', async (ctx) => {
+        console.log('Received video message');
+        const handled = await handleMediaMessage(ctx, 'video');
+        if (!handled) {
+            // If not handled as a reply, you can add default video handling here
+            console.log('Video not handled as a reply');
+        }
+    });
+
+    // Animation/GIF handler
+    bot.on('animation', async (ctx) => {
+        console.log('Received animation message');
+        const handled = await handleMediaMessage(ctx, 'animation');
+        if (!handled) {
+            // If not handled as a reply, you can add default animation handling here
+            console.log('Animation not handled as a reply');
+        }
+    });
+
+    // Document handler
+    bot.on('document', async (ctx) => {
+        console.log('Received document message');
+        const handled = await handleMediaMessage(ctx, 'document');
+        if (!handled) {
+            // If not handled as a reply, you can add default document handling here
+            console.log('Document not handled as a reply');
+        }
+    });
+
+    // Sticker handler
+    bot.on('sticker', async (ctx) => {
+        console.log('Received sticker message');
+        const handled = await handleMediaMessage(ctx, 'sticker');
+        if (!handled) {
+            // If not handled as a reply, you can add default sticker handling here
+            console.log('Sticker not handled as a reply');
+        }
+    });
+}
 
     // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
@@ -610,7 +681,8 @@ function setupActions(bot) {
     // Use the stage middleware
     bot.use(stage.middleware());
 
-
+ // Set up media handlers
+ setupMediaHandlers(bot);
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
@@ -1041,9 +1113,11 @@ async function fixNullTriggerWords() {
 async function handleMediaMessage(ctx, mediaType) {
     try {
         if (!awaitingReplyResponse || !tempReplyWord) {
+            console.log('Not awaiting a reply response or no temp word set');
             return false; // Not awaiting a reply, so don't handle
         }
 
+        console.log(`Handling ${mediaType} message for trigger word: ${tempReplyWord}`);
         const userId = ctx.from.id;
         const username = ctx.from.username || '';
         let fileId, fileUrl;
@@ -1051,19 +1125,25 @@ async function handleMediaMessage(ctx, mediaType) {
         // Extract the file ID based on media type
         switch (mediaType) {
             case 'photo':
+                // Get the highest resolution photo
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                console.log(`Extracted photo file_id: ${fileId}`);
                 break;
             case 'video':
                 fileId = ctx.message.video.file_id;
+                console.log(`Extracted video file_id: ${fileId}`);
                 break;
             case 'animation':
                 fileId = ctx.message.animation.file_id;
+                console.log(`Extracted animation file_id: ${fileId}`);
                 break;
             case 'document':
                 fileId = ctx.message.document.file_id;
+                console.log(`Extracted document file_id: ${fileId}`);
                 break;
             case 'sticker':
                 fileId = ctx.message.sticker.file_id;
+                console.log(`Extracted sticker file_id: ${fileId}`);
                 break;
             default:
                 await ctx.reply('❌ نوع الوسائط غير مدعوم.');
@@ -1078,6 +1158,18 @@ async function handleMediaMessage(ctx, mediaType) {
         }
 
         try {
+            // Get the file link from Telegram
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            console.log(`Got file link: ${fileLink}`);
+            
+            // Generate a unique filename
+            const fileName = `${mediaType}_${Date.now()}_${userId}.${getFileExtension(mediaType)}`;
+            console.log(`Generated filename: ${fileName}`);
+            
+            // Save the file locally
+            const savedFilePath = await saveFile(fileLink, fileName);
+            console.log(`File saved locally at: ${savedFilePath}`);
+            
             // Save to database
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
@@ -1087,18 +1179,11 @@ async function handleMediaMessage(ctx, mediaType) {
                 reply_text: fileUrl,
                 media_type: mediaType,
                 file_id: fileId,
+                file_path: savedFilePath,
                 created_at: new Date()
             });
             
-            // Try to save the file locally if possible
-            try {
-                const fileLink = await ctx.telegram.getFileLink(fileId);
-                const fileName = `${mediaType}_${Date.now()}_${userId}.${getFileExtension(mediaType)}`;
-                await saveFile(fileLink, fileName);
-            } catch (saveError) {
-                console.error(`Error saving ${mediaType} file locally:`, saveError);
-                // Continue even if local save fails
-            }
+            console.log(`Saved ${mediaType} reply to database for trigger word: ${tempReplyWord}`);
             
             // Get Arabic media type name for the response
             const mediaTypeArabic = getMediaTypeInArabic(mediaType);
