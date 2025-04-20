@@ -835,23 +835,26 @@ function setupActions(bot) {
  setupMediaHandlers(bot);
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 
-// Photo handler
-// Photo handler
-// Photo handler
+
 // Photo handler
 bot.on('photo', async (ctx) => {
     console.log('Received photo message');
     const userId = ctx.from.id;
     const userState = userStates.get(userId);
 
+    console.log('User state:', userState); // Add this line for debugging
+
     if (userState && userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
         console.log('Processing photo as a reply');
         const triggerWord = userState.triggerWord;
         const botId = userState.botId;
 
+        console.log('Trigger word:', triggerWord); // Add this line for debugging
+        console.log('Bot ID:', botId); // Add this line for debugging
+
         if (!triggerWord) {
             console.error('Error: triggerWord is undefined');
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى بدء عملية إضافة الرد من جديد.');
             userStates.delete(userId);
             return;
         }
@@ -901,8 +904,7 @@ bot.on('photo', async (ctx) => {
         }
     } else {
         console.log('Not awaiting a reply response or no trigger word set');
-        // You might want to handle this case, perhaps by informing the user
-        // await ctx.reply('لم يتم طلب إضافة صورة كرد. يرجى استخدام الأمر الصحيح أولاً.');
+        await ctx.reply('لم يتم طلب إضافة صورة كرد. يرجى استخدام الأمر الصحيح أولاً.');
     }
 });
 
@@ -1744,21 +1746,32 @@ bot.action('add_reply', async (ctx) => {
     try {
         await ctx.answerCbQuery();
         
-        // Check if the user is a developer or has the necessary permissions
         const isDev = await isDeveloper(ctx, ctx.from.id);
         if (!isDev) {
             return ctx.reply('❌ هذا الأمر متاح فقط للمطورين.');
         }
 
-        // Prompt the user to enter the trigger word
-        await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
+        await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:', {
+            reply_markup: {
+                inline_keyboard: [[{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]]
+            }
+        });
         
-        // Use userStates to track the user's state
         userStates.set(ctx.from.id, {
             action: 'adding_reply',
             step: 'awaiting_trigger',
-            botId: ctx.botInfo.id // Store the bot ID
+            botId: ctx.botInfo.id,
+            timestamp: Date.now() // Add a timestamp
         });
+
+        // Set a timeout to clear the state after 5 minutes
+        setTimeout(() => {
+            if (userStates.get(ctx.from.id)?.action === 'adding_reply') {
+                userStates.delete(ctx.from.id);
+                ctx.reply('انتهت مهلة إضافة الرد. يرجى المحاولة مرة أخرى.');
+            }
+        }, 5 * 60 * 1000);
+
     } catch (error) {
         console.error('Error in add_reply action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة رد جديد.');
