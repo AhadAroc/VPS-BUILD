@@ -847,8 +847,15 @@ bot.on('photo', async (ctx) => {
         const tempReplyWord = userState.triggerWord;
         const botId = userState.botId;
 
+        if (!tempReplyWord) {
+            console.error('Error: tempReplyWord is undefined');
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+            userStates.delete(userId);
+            return;
+        }
+
         try {
-            const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest resolution photo
+            const photo = ctx.message.photo[ctx.message.photo.length - 1];
             const fileId = photo.file_id;
             const username = ctx.from.username || '';
 
