@@ -94,6 +94,106 @@ async function saveFile(fileLink, fileName) {
         throw error;
     }
 }
+// Consolidated media handler function
+async function handleMediaMessage(ctx, mediaType) {
+    try {
+        if (!awaitingReplyResponse || !tempReplyWord) {
+            console.log('Not awaiting a reply response or no temp word set');
+            return false; // Not awaiting a reply, so don't handle
+        }
+
+        console.log(`Handling ${mediaType} message for trigger word: ${tempReplyWord}`);
+        const userId = ctx.from.id;
+        const username = ctx.from.username || '';
+        let fileId, fileUrl;
+
+        // Extract the file ID based on media type
+        switch (mediaType) {
+            case 'photo':
+                // Get the highest resolution photo
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                console.log(`Extracted photo file_id: ${fileId}`);
+                break;
+            case 'video':
+                fileId = ctx.message.video.file_id;
+                console.log(`Extracted video file_id: ${fileId}`);
+                break;
+            case 'animation':
+                fileId = ctx.message.animation.file_id;
+                console.log(`Extracted animation file_id: ${fileId}`);
+                break;
+            case 'document':
+                fileId = ctx.message.document.file_id;
+                console.log(`Extracted document file_id: ${fileId}`);
+                break;
+            case 'sticker':
+                fileId = ctx.message.sticker.file_id;
+                console.log(`Extracted sticker file_id: ${fileId}`);
+                break;
+            default:
+                await ctx.reply('❌ نوع الوسائط غير مدعوم.');
+                return true;
+        }
+
+        // Create a URL if possible
+        if (ctx.chat.username) {
+            fileUrl = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
+        } else {
+            fileUrl = fileId;
+        }
+
+        try {
+            // Get the file link from Telegram
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            console.log(`Got file link: ${fileLink}`);
+            
+            // Generate a unique filename
+            const fileName = `${mediaType}_${Date.now()}_${userId}.${getFileExtension(mediaType)}`;
+            console.log(`Generated filename: ${fileName}`);
+            
+            // Save the file locally
+            const savedFilePath = await saveFile(fileLink, fileName);
+            console.log(`File saved locally at: ${savedFilePath}`);
+            
+            // Save to database
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                user_id: userId,
+                username: username,
+                trigger_word: tempReplyWord.trim(),
+                reply_text: fileUrl,
+                media_type: mediaType,
+                file_id: fileId,
+                file_path: savedFilePath,
+                created_at: new Date()
+            });
+            
+            console.log(`Saved ${mediaType} reply to database for trigger word: ${tempReplyWord}`);
+            
+            // Get Arabic media type name for the response
+            const mediaTypeArabic = getMediaTypeInArabic(mediaType);
+            await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: ${mediaTypeArabic}`);
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // Successfully handled
+        } catch (error) {
+            console.error(`❌ خطأ أثناء حفظ الرد (${mediaType}):`, error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // We handled it, even though there was an error
+        }
+    } catch (error) {
+        console.error(`Error in handleMediaMessage (${mediaType}):`, error);
+        return false; // Error occurred, didn't handle it
+    }
+}
 
 // Add these event handlers to your bot setup
 function setupMediaHandlers(bot) {
@@ -1109,106 +1209,6 @@ async function fixNullTriggerWords() {
     }
 }
 
-// Consolidated media handler function
-async function handleMediaMessage(ctx, mediaType) {
-    try {
-        if (!awaitingReplyResponse || !tempReplyWord) {
-            console.log('Not awaiting a reply response or no temp word set');
-            return false; // Not awaiting a reply, so don't handle
-        }
-
-        console.log(`Handling ${mediaType} message for trigger word: ${tempReplyWord}`);
-        const userId = ctx.from.id;
-        const username = ctx.from.username || '';
-        let fileId, fileUrl;
-
-        // Extract the file ID based on media type
-        switch (mediaType) {
-            case 'photo':
-                // Get the highest resolution photo
-                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                console.log(`Extracted photo file_id: ${fileId}`);
-                break;
-            case 'video':
-                fileId = ctx.message.video.file_id;
-                console.log(`Extracted video file_id: ${fileId}`);
-                break;
-            case 'animation':
-                fileId = ctx.message.animation.file_id;
-                console.log(`Extracted animation file_id: ${fileId}`);
-                break;
-            case 'document':
-                fileId = ctx.message.document.file_id;
-                console.log(`Extracted document file_id: ${fileId}`);
-                break;
-            case 'sticker':
-                fileId = ctx.message.sticker.file_id;
-                console.log(`Extracted sticker file_id: ${fileId}`);
-                break;
-            default:
-                await ctx.reply('❌ نوع الوسائط غير مدعوم.');
-                return true;
-        }
-
-        // Create a URL if possible
-        if (ctx.chat.username) {
-            fileUrl = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
-        } else {
-            fileUrl = fileId;
-        }
-
-        try {
-            // Get the file link from Telegram
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            console.log(`Got file link: ${fileLink}`);
-            
-            // Generate a unique filename
-            const fileName = `${mediaType}_${Date.now()}_${userId}.${getFileExtension(mediaType)}`;
-            console.log(`Generated filename: ${fileName}`);
-            
-            // Save the file locally
-            const savedFilePath = await saveFile(fileLink, fileName);
-            console.log(`File saved locally at: ${savedFilePath}`);
-            
-            // Save to database
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                user_id: userId,
-                username: username,
-                trigger_word: tempReplyWord.trim(),
-                reply_text: fileUrl,
-                media_type: mediaType,
-                file_id: fileId,
-                file_path: savedFilePath,
-                created_at: new Date()
-            });
-            
-            console.log(`Saved ${mediaType} reply to database for trigger word: ${tempReplyWord}`);
-            
-            // Get Arabic media type name for the response
-            const mediaTypeArabic = getMediaTypeInArabic(mediaType);
-            await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: ${mediaTypeArabic}`);
-            
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            
-            return true; // Successfully handled
-        } catch (error) {
-            console.error(`❌ خطأ أثناء حفظ الرد (${mediaType}):`, error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
-            
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            
-            return true; // We handled it, even though there was an error
-        }
-    } catch (error) {
-        console.error(`Error in handleMediaMessage (${mediaType}):`, error);
-        return false; // Error occurred, didn't handle it
-    }
-}
 
 // Helper function to get file extension based on media type
 function getFileExtension(mediaType) {
