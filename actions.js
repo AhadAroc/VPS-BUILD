@@ -308,39 +308,50 @@ function setupMediaHandlers(bot) {
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    const userText = ctx.message.text.trim().toLowerCase();
+    const userAnswer = ctx.message.text.trim().toLowerCase();
 
-    console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
+    // Check for active quiz
+    if (activeQuizzes.has(chatId)) {
+        await handleQuizAnswer(ctx, chatId, userId, userAnswer);
+        return;
+    }
 
-    // Handle state-based operations first
+    // Check for automatic replies
+    if (ctx.chat.type === 'private') {
+        const reply = await checkForAutomaticReply(ctx);
+        if (reply) {
+            await sendReply(ctx, reply);
+            return;
+        }
+    }
+
+    // Handle awaiting reply word
     if (awaitingReplyWord) {
-        tempReplyWord = userText;
-        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-        awaitingReplyWord = false;
-        awaitingReplyResponse = true;
+        await handleAwaitingReplyWord(ctx);
         return;
     }
-    
-    if (awaitingReplyResponse) {
-        await handleAwaitingReplyResponse(ctx);
-        return;
-    }
-    
+
+    // Handle awaiting delete reply word
     if (awaitingDeleteReplyWord) {
         await handleAwaitingDeleteReplyWord(ctx);
         return;
     }
-    
+
+    // Handle awaiting bot name
     if (awaitingBotName) {
         await handleAwaitingBotName(ctx);
         return;
     }
 
-    // Check for active quiz
-    if (activeQuizzes.has(chatId) && activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
-        await handleQuizAnswer(ctx, chatId, userId, userText);
+    // Handle awaiting reply response
+    if (awaitingReplyResponse) {
+        await handleAwaitingReplyResponse(ctx);
         return;
     }
+
+    // If we reach here, it's an unhandled text message
+    await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
+}
 
     // Check for user state
     if (userStates.has(userId)) {
@@ -2901,6 +2912,7 @@ if (reply) {
                     throw new Error('No valid content found in reply');
                 }
         }
+
     } catch (error) {
         console.error('Error handling reply:', error.message);
         console.error('Reply object:', JSON.stringify(reply, null, 2));
@@ -3636,54 +3648,31 @@ updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.l
 // based on your existing code and requirements.
 
 async function checkForAutomaticReply(ctx) {
-    const userText = ctx.message.text.trim().toLowerCase();
-    const userId = ctx.from.id;
+    const text = ctx.message.text.trim().toLowerCase();
+    const botId = ctx.botInfo.id;
 
     try {
         const db = await ensureDatabaseInitialized();
-        console.log(`Searching for reply with keyword: ${userText}`);
         
-        const reply = await db.collection('replies').findOne({
-            trigger_word: userText
+        // First, try to find a bot-specific reply
+        let reply = await db.collection('replies').findOne({
+            bot_id: botId,
+            trigger_word: text
         });
 
-        if (reply) {
-            console.log('Found matching reply:', reply);
-
-            // Check the type of reply and send the appropriate response
-            if (reply.type === 'text') {
-                await ctx.reply(reply.reply_text);
-            } else if (reply.type === 'media') {
-                // Send the media file based on its type
-                switch (reply.media_type) {
-                    case 'photo':
-                        await ctx.replyWithPhoto({ source: reply.file_path });
-                        break;
-                    case 'video':
-                        await ctx.replyWithVideo({ source: reply.file_path });
-                        break;
-                    case 'animation':
-                        await ctx.replyWithAnimation({ source: reply.file_path });
-                        break;
-                    case 'document':
-                        await ctx.replyWithDocument({ source: reply.file_path });
-                        break;
-                    case 'sticker':
-                        await ctx.replyWithSticker({ source: reply.file_path });
-                        break;
-                    default:
-                        console.log('Unsupported media type:', reply.media_type);
-                        break;
-                }
-            }
-            return true;
-        } else {
-            console.log('Reply search result: null');
+        // If no bot-specific reply is found, try to find a global reply
+        if (!reply) {
+            reply = await db.collection('replies').findOne({
+                trigger_word: text,
+                bot_id: { $exists: false }
+            });
         }
+
+        return reply;
     } catch (error) {
         console.error('Error checking for automatic reply:', error);
+        return null;
     }
-    return false;
 }
 
 
@@ -4422,58 +4411,32 @@ async function getCustomBotName(chatId) {
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
-        if (!reply) return false;
-        
-        // Handle different reply structures
-        if (reply.reply_text) {
-            await ctx.reply(reply.reply_text);
-            return true;
-        } else if (reply.text) {
-            await ctx.reply(reply.text);
-            return true;
+        switch (reply.type) {
+            case 'text':
+                await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+                break;
+            case 'photo':
+                await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                break;
+            case 'video':
+                await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                break;
+            case 'animation':
+                await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                break;
+            case 'document':
+                await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                break;
+            case 'sticker':
+                await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                break;
+            default:
+                console.error('Unknown reply type:', reply.type);
+                await ctx.reply('عذرًا، حدث خطأ في معالجة الرد.', { reply_to_message_id: ctx.message.message_id });
         }
-        
-        // If we have a type field, handle different media types
-        if (reply.type) {
-            switch (reply.type) {
-                case "text":
-                    await ctx.reply(reply.text);
-                    break;
-                case "photo":
-                    if (reply.file_id) {
-                        await ctx.replyWithPhoto(reply.file_id);
-                    }
-                    break;
-                case "animation":
-                    if (reply.file_id) {
-                        await ctx.replyWithAnimation(reply.file_id);
-                    }
-                    break;
-                case "video":
-                    if (reply.file_id) {
-                        await ctx.replyWithVideo(reply.file_id);
-                    }
-                    break;
-                case "sticker":
-                    if (reply.file_id) {
-                        await ctx.replyWithSticker(reply.file_id);
-                    }
-                    break;
-                case "document":
-                    if (reply.file_id) {
-                        await ctx.replyWithDocument(reply.file_id);
-                    }
-                    break;
-                default:
-                    return false;
-            }
-            return true;
-        }
-        
-        return false;
     } catch (error) {
         console.error('Error sending reply:', error);
-        return false;
+        await ctx.reply('عذرًا، حدث خطأ أثناء إرسال الرد.', { reply_to_message_id: ctx.message.message_id });
     }
 }
 
