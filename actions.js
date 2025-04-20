@@ -1,4 +1,4 @@
-//glock chigga 
+//glock chigga  
 let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
@@ -3102,42 +3102,49 @@ function getMediaTypeInArabic(mediaType) {
 
 // Clean up the duplicate handlers and use this single handler for each media type
 bot.on('photo', async (ctx) => {
-    try {
-        // First check if this is a reply to a trigger word
-        if (await handleMediaReply(ctx, 'photo')) {
-            return; // Media was handled as a reply
-        }
-        
-        // If not a reply, continue with restriction check
-        const chatId = ctx.chat.id;
-        const isRestricted = photoRestrictionStatus.get(chatId);
-
-        if (isRestricted) {
-            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+    const userId = ctx.from.id;
+    
+    // Check if we're awaiting a reply response
+    if (awaitingReplyResponse && tempReplyWord) {
+        try {
+            // Get the file ID of the largest photo (best quality)
+            const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+            const botId = ctx.botInfo.id;
             
-            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
-                await ctx.deleteMessage();
-                await ctx.reply('❌ عذرًا، إرسال الصور غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                return;
-            }
+            // Get database connection
+            const db = await ensureDatabaseInitialized();
+            
+            // Save the photo reply to database
+            await db.collection('replies').updateOne(
+                { bot_id: botId, trigger_word: tempReplyWord },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        trigger_word: tempReplyWord, 
+                        type: 'photo',
+                        content: fileId,
+                        file_id: fileId,  // For backward compatibility
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        created_by: userId,
+                        username: ctx.from.username || ''
+                    }
+                },
+                { upsert: true }
+            );
+            
+            // Confirm to the user
+            await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}"`);
+            
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        } catch (error) {
+            console.error('Error saving photo reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة. الرجاء المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
         }
-
-        // Track photos for other features
-        if (!photoMessages.has(chatId)) {
-            photoMessages.set(chatId, []);
-        }
-        photoMessages.get(chatId).push({
-            messageId: ctx.message.message_id,
-            timestamp: Date.now()
-        });
-
-        // Keep only the last 100 photos
-        const photos = photoMessages.get(chatId);
-        if (photos.length > 100) {
-            photos.shift();
-        }
-    } catch (error) {
-        console.error('Error handling photo message:', error);
     }
 });
 
@@ -3167,17 +3174,50 @@ bot.on('video', async (ctx) => {
     }
 });
 
-// Animation handler (GIFs)
+// Animation/GIF handler
 bot.on('animation', async (ctx) => {
-    try {
-        // Check if this is a reply to a trigger word
-        if (await handleMediaReply(ctx, 'animation')) {
-            return; // Media was handled as a reply
+    const userId = ctx.from.id;
+    
+    // Check if we're awaiting a reply response
+    if (awaitingReplyResponse && tempReplyWord) {
+        try {
+            const fileId = ctx.message.animation.file_id;
+            const botId = ctx.botInfo.id;
+            
+            // Get database connection
+            const db = await ensureDatabaseInitialized();
+            
+            // Save the animation reply to database
+            await db.collection('replies').updateOne(
+                { bot_id: botId, trigger_word: tempReplyWord },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        trigger_word: tempReplyWord, 
+                        type: 'animation',
+                        content: fileId,
+                        file_id: fileId,  // For backward compatibility
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        created_by: userId,
+                        username: ctx.from.username || ''
+                    }
+                },
+                { upsert: true }
+            );
+            
+            // Confirm to the user
+            await ctx.reply(`✅ تم حفظ المتحركة كرد للكلمة "${tempReplyWord}"`);
+            
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        } catch (error) {
+            console.error('Error saving animation reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ المتحركة. الرجاء المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
         }
-        
-        // Additional animation handling logic can go here
-    } catch (error) {
-        console.error('Error handling animation message:', error);
     }
 });
 
