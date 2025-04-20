@@ -238,40 +238,32 @@ async function handleTextMessage(ctx) {
     }
 
     // Check for user state
-    if (userStates.has(userId)) {
-        const userState = userStates.get(userId);
-        if (userState.action === 'adding_reply') {
-            if (userState.step === 'awaiting_trigger') {
-                userState.triggerWord = userText;
-                userState.step = 'awaiting_response';
-                await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
-                return;
-            } else if (userState.step === 'awaiting_response') {
-                try {
-                    const db = await ensureDatabaseInitialized(userState.botId);
-                    await db.collection('replies').insertOne({
-                        bot_id: userState.botId,
-                        trigger_word: userState.triggerWord,
-                        word: userState.triggerWord, // Add this for consistency
-                        type: 'text',
-                        text: ctx.message.text,
-                        reply_text: ctx.message.text, // Add this for backward compatibility
-                        created_at: new Date(),
-                        created_by: userId
-                    });
-                    
-                    await ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${userState.triggerWord}\nالرد: ${ctx.message.text}`);
-                    userStates.delete(userId);
-                    return;
-                } catch (error) {
-                    console.error('Error saving reply:', error);
-                    await ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                    userStates.delete(userId);
-                    return;
-                }
-            }
+    // Check for user state
+if (userStates.has(userId)) {
+    const userState = userStates.get(userId);
+
+    if (userState.action === 'adding_reply') {
+        if (userState.step === 'awaiting_trigger') {
+            userState.triggerWord = userText;
+            userState.step = 'awaiting_response';
+            await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة (نص أو وسائط):');
+            return;
+        } else if (userState.step === 'awaiting_response') {
+            // Set global flags so handleMediaMessage or handleAwaitingReplyResponse can work
+            awaitingReplyResponse = true;
+            tempReplyWord = userState.triggerWord;
+            tempBotId = userState.botId;
+
+            // Optional: let the user know
+            await ctx.reply(`✅ تم تسجيل الكلمة: "${tempReplyWord}".\nالآن أرسل الرد الذي تريد إضافته (نص أو وسائط):`);
+
+            // Clear user state — the media or text handler will finish the job
+            userStates.delete(userId);
+            return;
         }
     }
+}
+
 
     // Check for automatic replies - this should work in both private and group chats
     const reply = await checkForAutomaticReply(ctx);
