@@ -1,4 +1,4 @@
-//glock chigga  
+//glock chigga   
 let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
@@ -1040,9 +1040,6 @@ async function fixNullTriggerWords() {
 // Consolidated media handler function
 async function handleMediaMessage(ctx, mediaType) {
     try {
-        const userId = ctx.from.id;
-        const botId = ctx.botInfo.id;
-        
         // Check if we're awaiting a reply response
         if (!awaitingReplyResponse || !tempReplyWord) {
             return false; // Not handling this media as a reply
@@ -1050,7 +1047,9 @@ async function handleMediaMessage(ctx, mediaType) {
 
         console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
         
-        let fileId;
+        const userId = ctx.from.id;
+        const username = ctx.from.username || '';
+        let fileId, replyText;
         
         // Extract the appropriate file ID based on media type
         switch (mediaType) {
@@ -1070,56 +1069,58 @@ async function handleMediaMessage(ctx, mediaType) {
                 fileId = ctx.message.sticker.file_id;
                 break;
             default:
-                console.log(`Unsupported media type: ${mediaType}`);
-                return false;
+                return false; // Unsupported media type
+        }
+        
+        // If we're in a group with a username, create a direct link
+        if (ctx.chat.username) {
+            replyText = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
+        } else {
+            replyText = fileId;
         }
         
         try {
-            // Get database connection
+            // Save to database
             const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                user_id: userId,
+                username: username,
+                trigger_word: tempReplyWord.trim(),
+                reply_text: replyText,
+                media_type: mediaType,
+                file_id: fileId,
+                created_at: new Date()
+            });
             
-            // Save the media reply to database - using updateOne with upsert for consistency
-            await db.collection('replies').updateOne(
-                { bot_id: botId, trigger_word: tempReplyWord.trim().toLowerCase() },
-                { 
-                    $set: { 
-                        bot_id: botId,
-                        trigger_word: tempReplyWord.trim().toLowerCase(), 
-                        type: mediaType,
-                        content: fileId,
-                        file_id: fileId,  // For backward compatibility
-                        created_at: new Date(),
-                        updated_at: new Date(),
-                        created_by: userId,
-                        username: ctx.from.username || ''
-                    }
-                },
-                { upsert: true }
-            );
+            // Try to save the file locally if possible
+            try {
+                if (mediaType === 'photo' || mediaType === 'video' || mediaType === 'document') {
+                    const fileLink = await ctx.telegram.getFileLink(fileId);
+                    const fileName = `${mediaType}_${Date.now()}_${userId}.${mediaType === 'photo' ? 'jpg' : (mediaType === 'video' ? 'mp4' : 'file')}`;
+                    await saveFile(fileLink, fileName);
+                }
+            } catch (saveError) {
+                console.error('Error saving file locally:', saveError);
+                // Continue even if local save fails
+            }
             
-            // Confirm to the user
-            await ctx.reply(`✅ تم حفظ ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
-            
-            // Reset the state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            
-            return true; // Successfully handled
+            await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: ${getMediaTypeInArabic(mediaType)}`);
         } catch (error) {
-            console.error(`Error saving ${mediaType} reply:`, error);
-            await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)}. الرجاء المحاولة مرة أخرى.`);
-            
-            // Reset state even on error
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            
-            return true; // We still handled it, even though there was an error
+            console.error('❌ خطأ أثناء حفظ الرد:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
         }
+        
+        // Reset the state
+        awaitingReplyResponse = false;
+        tempReplyWord = '';
+        
+        return true; // Successfully handled
     } catch (error) {
-        console.error(`Error in handleMediaMessage for ${mediaType}:`, error);
+        console.error('Error in handleMediaMessage:', error);
         return false;
     }
 }
+
 
 // Add this to your initialization code
 async function initializeDatabase() {
@@ -3186,12 +3187,13 @@ function getMediaTypeInArabic(mediaType) {
 }
 
 // Clean up the duplicate handlers and use this single handler for each media type
+// Update your photo handler
 bot.on('photo', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         
-        // First check if this is a reply to a trigger word using the consolidated handler
+        // First check if this is a reply to a trigger word
         if (await handleMediaMessage(ctx, 'photo')) {
             return; // Media was handled as a reply, so exit
         }
@@ -3223,9 +3225,6 @@ bot.on('photo', async (ctx) => {
                 photos.shift();
             }
         }
-        
-        // Update last interaction for the user
-        updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
         
     } catch (error) {
         console.error('Error handling photo message:', error);
@@ -3260,48 +3259,29 @@ bot.on('video', async (ctx) => {
 
 // Animation/GIF handler
 bot.on('animation', async (ctx) => {
-    const userId = ctx.from.id;
-    
-    // Check if we're awaiting a reply response
-    if (awaitingReplyResponse && tempReplyWord) {
-        try {
-            const fileId = ctx.message.animation.file_id;
-            const botId = ctx.botInfo.id;
-            
-            // Get database connection
-            const db = await ensureDatabaseInitialized();
-            
-            // Save the animation reply to database
-            await db.collection('replies').updateOne(
-                { bot_id: botId, trigger_word: tempReplyWord },
-                { 
-                    $set: { 
-                        bot_id: botId,
-                        trigger_word: tempReplyWord, 
-                        type: 'animation',
-                        content: fileId,
-                        file_id: fileId,  // For backward compatibility
-                        created_at: new Date(),
-                        updated_at: new Date(),
-                        created_by: userId,
-                        username: ctx.from.username || ''
-                    }
-                },
-                { upsert: true }
-            );
-            
-            // Confirm to the user
-            await ctx.reply(`✅ تم حفظ المتحركة كرد للكلمة "${tempReplyWord}"`);
-            
-            // Reset the state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-        } catch (error) {
-            console.error('Error saving animation reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ المتحركة. الرجاء المحاولة مرة أخرى.');
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+    try {
+        const chatId = ctx.chat.id;
+        
+        // First check if this is a reply to a trigger word
+        if (await handleMediaMessage(ctx, 'animation')) {
+            return; // Media was handled as a reply, so exit
         }
+        
+        // Check for GIF restrictions in groups
+        if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') && gifRestrictionStatus.get(chatId)) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الصور المتحركة غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+        
+        // Additional GIF handling logic can go here
+        
+    } catch (error) {
+        console.error('Error handling GIF message:', error);
     }
 });
 
