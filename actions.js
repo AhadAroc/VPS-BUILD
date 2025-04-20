@@ -341,7 +341,9 @@ async function handleTextMessage(ctx) {
         const userState = userStates.get(userId);
         if (userState.action === 'adding_reply') {
             if (userState.step === 'awaiting_trigger') {
-                userState.triggerWord = userText;
+                userState.triggerWord = userText; // ✅ RIGHT
+            
+                
                 userState.step = 'awaiting_response';
                 await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
                 return;
