@@ -1036,6 +1036,91 @@ async function fixNullTriggerWords() {
         };
     }
 }
+
+// Consolidated media handler function
+async function handleMediaMessage(ctx, mediaType) {
+    try {
+        const userId = ctx.from.id;
+        const botId = ctx.botInfo.id;
+        
+        // Check if we're awaiting a reply response
+        if (!awaitingReplyResponse || !tempReplyWord) {
+            return false; // Not handling this media as a reply
+        }
+
+        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
+        
+        let fileId;
+        
+        // Extract the appropriate file ID based on media type
+        switch (mediaType) {
+            case 'photo':
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                break;
+            case 'video':
+                fileId = ctx.message.video.file_id;
+                break;
+            case 'animation':
+                fileId = ctx.message.animation.file_id;
+                break;
+            case 'document':
+                fileId = ctx.message.document.file_id;
+                break;
+            case 'sticker':
+                fileId = ctx.message.sticker.file_id;
+                break;
+            default:
+                console.log(`Unsupported media type: ${mediaType}`);
+                return false;
+        }
+        
+        try {
+            // Get database connection
+            const db = await ensureDatabaseInitialized();
+            
+            // Save the media reply to database - using updateOne with upsert for consistency
+            await db.collection('replies').updateOne(
+                { bot_id: botId, trigger_word: tempReplyWord.trim().toLowerCase() },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        trigger_word: tempReplyWord.trim().toLowerCase(), 
+                        type: mediaType,
+                        content: fileId,
+                        file_id: fileId,  // For backward compatibility
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        created_by: userId,
+                        username: ctx.from.username || ''
+                    }
+                },
+                { upsert: true }
+            );
+            
+            // Confirm to the user
+            await ctx.reply(`✅ تم حفظ ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // Successfully handled
+        } catch (error) {
+            console.error(`Error saving ${mediaType} reply:`, error);
+            await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)}. الرجاء المحاولة مرة أخرى.`);
+            
+            // Reset state even on error
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // We still handled it, even though there was an error
+        }
+    } catch (error) {
+        console.error(`Error in handleMediaMessage for ${mediaType}:`, error);
+        return false;
+    }
+}
+
 // Add this to your initialization code
 async function initializeDatabase() {
     try {
@@ -3102,49 +3187,48 @@ function getMediaTypeInArabic(mediaType) {
 
 // Clean up the duplicate handlers and use this single handler for each media type
 bot.on('photo', async (ctx) => {
-    const userId = ctx.from.id;
-    
-    // Check if we're awaiting a reply response
-    if (awaitingReplyResponse && tempReplyWord) {
-        try {
-            // Get the file ID of the largest photo (best quality)
-            const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-            const botId = ctx.botInfo.id;
-            
-            // Get database connection
-            const db = await ensureDatabaseInitialized();
-            
-            // Save the photo reply to database
-            await db.collection('replies').updateOne(
-                { bot_id: botId, trigger_word: tempReplyWord },
-                { 
-                    $set: { 
-                        bot_id: botId,
-                        trigger_word: tempReplyWord, 
-                        type: 'photo',
-                        content: fileId,
-                        file_id: fileId,  // For backward compatibility
-                        created_at: new Date(),
-                        updated_at: new Date(),
-                        created_by: userId,
-                        username: ctx.from.username || ''
-                    }
-                },
-                { upsert: true }
-            );
-            
-            // Confirm to the user
-            await ctx.reply(`✅ تم حفظ الصورة كرد للكلمة "${tempReplyWord}"`);
-            
-            // Reset the state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-        } catch (error) {
-            console.error('Error saving photo reply:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة. الرجاء المحاولة مرة أخرى.');
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        
+        // First check if this is a reply to a trigger word using the consolidated handler
+        if (await handleMediaMessage(ctx, 'photo')) {
+            return; // Media was handled as a reply, so exit
         }
+        
+        // Check for photo restrictions in groups
+        if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') && photoRestrictionStatus.get(chatId)) {
+            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+            
+            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
+                await ctx.deleteMessage();
+                await ctx.reply('❌ عذرًا، إرسال الصور غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
+                return;
+            }
+        }
+        
+        // Track photos in groups for moderation purposes
+        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+            if (!photoMessages.has(chatId)) {
+                photoMessages.set(chatId, []);
+            }
+            photoMessages.get(chatId).push({
+                messageId: ctx.message.message_id,
+                timestamp: Date.now()
+            });
+            
+            // Keep only the last 100 photos
+            const photos = photoMessages.get(chatId);
+            if (photos.length > 100) {
+                photos.shift();
+            }
+        }
+        
+        // Update last interaction for the user
+        updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
+        
+    } catch (error) {
+        console.error('Error handling photo message:', error);
     }
 });
 
@@ -3237,15 +3321,48 @@ bot.on('document', async (ctx) => {
 
 // Sticker handler
 bot.on('sticker', async (ctx) => {
-    try {
-        // Check if this is a reply to a trigger word
-        if (await handleMediaReply(ctx, 'sticker')) {
-            return; // Media was handled as a reply
+    const userId = ctx.from.id;
+    
+    // Check if we're awaiting a reply response
+    if (awaitingReplyResponse && tempReplyWord) {
+        try {
+            const fileId = ctx.message.sticker.file_id;
+            const botId = ctx.botInfo.id;
+            
+            // Get database connection
+            const db = await ensureDatabaseInitialized();
+            
+            // Save the sticker reply to database
+            await db.collection('replies').updateOne(
+                { bot_id: botId, trigger_word: tempReplyWord },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        trigger_word: tempReplyWord, 
+                        type: 'sticker',
+                        content: fileId,
+                        file_id: fileId,  // For backward compatibility
+                        created_at: new Date(),
+                        updated_at: new Date(),
+                        created_by: userId,
+                        username: ctx.from.username || ''
+                    }
+                },
+                { upsert: true }
+            );
+            
+            // Confirm to the user
+            await ctx.reply(`✅ تم حفظ الملصق كرد للكلمة "${tempReplyWord}"`);
+            
+            // Reset the state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        } catch (error) {
+            console.error('Error saving sticker reply:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الملصق. الرجاء المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
         }
-        
-        // Continue with any existing sticker handling logic...
-    } catch (error) {
-        console.error('Error handling sticker message:', error);
     }
 });
 
@@ -3380,7 +3497,7 @@ async function checkForAutomaticReply(ctx) {
     try {
         const db = await ensureDatabaseInitialized();
         const userText = ctx.message.text.trim().toLowerCase();
-        const botId = ctx.botInfo.id; // Get the current bot's ID
+        const botId = ctx.botInfo.id;
         
         console.log(`Searching for reply with keyword: ${userText} for bot: ${botId}`);
         
@@ -3398,6 +3515,21 @@ async function checkForAutomaticReply(ctx) {
                     { bot_id: { $exists: false }, trigger_word: userText }
                 ]
             });
+        }
+
+        // Normalize the reply structure
+        if (reply) {
+            // Ensure content field exists (backward compatibility)
+            if (!reply.content && reply.file_id) {
+                reply.content = reply.file_id;
+            } else if (!reply.content && reply.reply_text) {
+                reply.content = reply.reply_text;
+            }
+            
+            // Ensure type field exists
+            if (!reply.type) {
+                reply.type = reply.file_id ? 'unknown_media' : 'text';
+            }
         }
 
         console.log('Reply search result:', reply);
