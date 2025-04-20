@@ -252,7 +252,7 @@ function setupMediaHandlers(bot) {
                 tempReplyWord = '';
             }
         } else {
-            console.log('Not awaiting a reply response or no temp word set');
+            console.log('Not awaiting a reply response or no temp word set np  its not saved lol');
         }
     });
 
