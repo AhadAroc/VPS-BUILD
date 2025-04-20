@@ -3558,41 +3558,42 @@ bot.on('text', async (ctx) => {
         }
 
         // Check for automatic replies in private chats
-        if (ctx.chat.type === 'private') {
-            const reply = await checkForAutomaticReply(ctx);
-            if (reply) {
-                try {
-                    if (reply.type === 'text') {
-                        await ctx.reply(reply.content);
-                    } else if (reply.content) {
-                        switch (reply.type) {
-                            case 'photo':
-                                await ctx.replyWithPhoto(reply.content);
-                                break;
-                            case 'video':
-                                await ctx.replyWithVideo(reply.content);
-                                break;
-                            case 'animation':
-                                await ctx.replyWithAnimation(reply.content);
-                                break;
-                            case 'document':
-                                await ctx.replyWithDocument(reply.content);
-                                break;
-                            case 'sticker':
-                                await ctx.replyWithSticker(reply.content);
-                                break;
-                            default:
-                                console.log(`Unsupported reply type: ${reply.type}`);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error sending automatic reply:', error);
+        // Check for automatic replies in private chats
+if (ctx.chat.type === 'private') {
+    try {
+        const reply = await checkForAutomaticReply(ctx);
+        if (reply) {
+            if (reply.type === 'text') {
+                await ctx.reply(reply.content);
+            } else if (reply.content) {
+                switch (reply.type) {
+                    case 'photo':
+                        await ctx.replyWithPhoto(reply.content);
+                        break;
+                    case 'video':
+                        await ctx.replyWithVideo(reply.content);
+                        break;
+                    case 'animation':
+                        await ctx.replyWithAnimation(reply.content);
+                        break;
+                    case 'document':
+                        await ctx.replyWithDocument(reply.content);
+                        break;
+                    case 'sticker':
+                        await ctx.replyWithSticker(reply.content);
+                        break;
+                    default:
+                        console.log(`Unsupported reply type: ${reply.type}`);
                 }
             }
         }
+    } catch (error) {
+        console.error('Error sending automatic reply:', error);
+    }
+}
 
-        // Update last interaction for the user
-        updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
+// Update last interaction for the user
+updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
         
         // If in a group, update the group's active status
         if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
