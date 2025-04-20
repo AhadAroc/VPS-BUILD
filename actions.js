@@ -1499,6 +1499,13 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
+        // Ensure tempReplyWord is defined
+        if (!tempReplyWord) {
+            await ctx.reply('❌ الكلمة المفتاحية غير محددة. يرجى المحاولة مرة أخرى.');
+            awaitingReplyResponse = false;
+            return true;
+        }
+
         // Continue with the reply saving process
         let mediaType = 'text';
         let replyText = null;
