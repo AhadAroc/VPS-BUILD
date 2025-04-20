@@ -207,12 +207,12 @@ async function handleTextMessage(ctx) {
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
-    // Handle state-based operations first
-    if (awaitingReplyWord) {
+     // Handle state-based operations first
+     if (awaitingReplyWord) {
         tempReplyWord = userText;
         await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
         awaitingReplyWord = false;
-        awaitingReplyResponse = true;
+        awaitingReplyResponse = true; // Ensure this is set to true
         return;
     }
     
