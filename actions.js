@@ -2785,16 +2785,22 @@ async function handleMediaReply(ctx, mediaType) {
     }
 }
 // Helper function to get Arabic names for media types
+// Add this helper function
 function getMediaTypeInArabic(mediaType) {
-    const mediaTypes = {
-        'photo': 'الصورة',
-        'video': 'الفيديو',
-        'animation': 'الصورة المتحركة',
-        'document': 'المستند',
-        'sticker': 'الملصق'
-    };
-    
-    return mediaTypes[mediaType] || mediaType;
+    switch (mediaType) {
+        case 'photo':
+            return 'صورة';
+        case 'video':
+            return 'فيديو';
+        case 'animation':
+            return 'صورة متحركة';
+        case 'document':
+            return 'ملف';
+        case 'sticker':
+            return 'ملصق';
+        default:
+            return mediaType;
+    }
 }
 
     //this fucks how the bot starts
@@ -3258,17 +3264,13 @@ bot.on('video', async (ctx) => {
 });
 
 // Animation/GIF handler
+// Update the animation handler to also handle replies
 bot.on('animation', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
-        
-        // First check if this is a reply to a trigger word
-        if (await handleMediaMessage(ctx, 'animation')) {
-            return; // Media was handled as a reply, so exit
-        }
-        
-        // Check for GIF restrictions in groups
-        if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') && gifRestrictionStatus.get(chatId)) {
+        const isRestricted = gifRestrictionStatus.get(chatId);
+
+        if (isRestricted) {
             const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
             
             if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
@@ -3277,9 +3279,53 @@ bot.on('animation', async (ctx) => {
                 return;
             }
         }
-        
-        // Additional GIF handling logic can go here
-        
+
+        // Handle animation reply if awaiting response
+        if (awaitingReplyResponse && tempReplyWord) {
+            const userId = ctx.from.id;
+            const username = ctx.from.username || '';
+            let fileId = ctx.message.animation.file_id;
+            let replyText;
+
+            if (ctx.chat.username) {
+                replyText = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
+            } else {
+                replyText = fileId;
+            }
+
+            try {
+                // Save to database
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    user_id: userId,
+                    username: username,
+                    trigger_word: tempReplyWord.trim(),
+                    reply_text: replyText,
+                    media_type: 'animation',
+                    file_id: fileId,
+                    created_at: new Date()
+                });
+                
+                await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: صورة متحركة`);
+                
+                // Reset the awaiting state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+                
+                return;
+            } catch (error) {
+                console.error('❌ خطأ أثناء حفظ الرد:', error);
+                await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
+                
+                // Reset the awaiting state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+                
+                return;
+            }
+        }
+
+        // Continue with any existing GIF handling logic...
     } catch (error) {
         console.error('Error handling GIF message:', error);
     }
