@@ -193,7 +193,68 @@ async function handleMediaMessage(ctx, mediaType) {
         console.error(`Error in handleMediaMessage (${mediaType}):`, error);
         return false; // Error occurred, didn't handle it
     }
-
+}
+//ignore this becuase i am lazzy to remove it 
+// Add these event handlers to your bot setup
+function setupMediaHandlers(bot) {
+    // Photo handler
+    bot.on('phosssto', async (ctx) => {
+        console.log('Received photo message');
+        if (awaitingReplyResponse && tempReplyWord) {
+            try {
+                const photo = ctx.message.photo[ctx.message.photo.length - 1];
+                const fileId = photo.file_id;
+                const userId = ctx.from.id;
+                const username = ctx.from.username || '';
+    
+                console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
+    
+                // Get file link from Telegram
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                console.log(`Got file link: ${fileLink}`);
+    
+                // Generate a unique filename
+                const fileName = `photo_${Date.now()}_${userId}.jpg`;
+                console.log(`Generated filename: ${fileName}`);
+    
+                // Save the file locally
+                const savedFilePath = await saveFile(fileLink, fileName);
+                console.log(`File saved locally at: ${savedFilePath}`);
+    
+                // Save to database
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    user_id: userId,
+                    username: username,
+                    trigger_word: tempReplyWord.trim().toLowerCase(),
+                    type: 'photo',
+                    file_id: fileId,
+                    file_path: savedFilePath,
+                    width: photo.width,
+                    height: photo.height,
+                    created_at: new Date()
+                });
+    
+                console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
+    
+                await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+    
+                // Reset the awaiting state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+    
+            } catch (error) {
+                console.error('Error handling photo message:', error);
+                await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+                
+                // Reset the awaiting state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+            }
+        } else {
+            console.log('Not awaiting a reply response or no temp word set np');
+        }
+    });
 
     // Video handler
     bot.on('video', async (ctx) => {
@@ -3272,7 +3333,64 @@ bot.on('animation', async (ctx) => {
         console.error('Error handling GIF message:', error);
     }
 });
+// Photo handler
+bot.on('photo', async (ctx) => {
+    console.log('Received photo message');
+    if (awaitingReplyResponse && tempReplyWord) {
+        try {
+            const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest resolution photo
+            const fileId = photo.file_id;
+            const userId = ctx.from.id;
+            const username = ctx.from.username || '';
 
+            console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
+
+            // Get file link from Telegram
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            console.log(`Got file link: ${fileLink}`);
+
+            // Generate a unique filename
+            const fileName = `photo_${Date.now()}_${userId}.jpg`;
+            console.log(`Generated filename: ${fileName}`);
+
+            // Save the file locally
+            const savedFilePath = await saveFile(fileLink, fileName);
+            console.log(`File saved locally at: ${savedFilePath}`);
+
+            // Save to database
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                user_id: userId,
+                username: username,
+                trigger_word: tempReplyWord.trim().toLowerCase(),
+                type: 'photo',
+                file_id: fileId,
+                file_path: savedFilePath,
+                width: photo.width,
+                height: photo.height,
+                created_at: new Date()
+            });
+
+            console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
+
+            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+
+        } catch (error) {
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        }
+    } else {
+        console.log('Not awaiting a reply response or no temp word set');
+    }
+});
 // Document handler
 bot.on('document', async (ctx) => {
     try {
