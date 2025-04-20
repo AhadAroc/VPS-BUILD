@@ -2588,32 +2588,52 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
     if (!state || state.step !== 'awaiting_response') return;
 
     const db = await ensureDatabaseInitialized();
-    const fileObj = ctx.message.photo?.at(-1) ||
-                    ctx.message.video ||
-                    ctx.message.document ||
-                    ctx.message.animation ||
-                    ctx.message.sticker;
 
-    const fileId = fileObj.file_id;
+    let mediaType = 'unknown';
+    let fileId;
+    let extension = 'bin';
+
+    if (ctx.message.photo) {
+        mediaType = 'photo';
+        fileId = ctx.message.photo.at(-1).file_id;
+        extension = 'jpg';
+    } else if (ctx.message.video) {
+        mediaType = 'video';
+        fileId = ctx.message.video.file_id;
+        extension = 'mp4';
+    } else if (ctx.message.document) {
+        mediaType = 'document';
+        fileId = ctx.message.document.file_id;
+        extension = ctx.message.document.file_name?.split('.').pop() || 'file';
+    } else if (ctx.message.animation) {
+        mediaType = 'animation';
+        fileId = ctx.message.animation.file_id;
+        extension = 'mp4';
+    } else if (ctx.message.sticker) {
+        mediaType = 'sticker';
+        fileId = ctx.message.sticker.file_id;
+        extension = 'webp';
+    }
+
     const fileLink = await ctx.telegram.getFileLink(fileId);
-    const fileName = `${Date.now()}_${userId}.jpg`; // dynamic extension based on type if needed
-
+    const fileName = `${mediaType}_${Date.now()}_${userId}.${extension}`;
     const savedFilePath = await saveFile(fileLink, fileName);
 
     await db.collection('replies').insertOne({
         bot_id: state.botId,
         trigger_word: state.triggerWord,
         type: 'media',
+        media_type: mediaType,
         file_id: fileId,
-        media_type: fileObj.mime_type || 'unknown',
         file_path: savedFilePath,
         created_by: userId,
         created_at: new Date()
     });
 
-    await ctx.reply(`✅ تم حفظ الرد الوسائطي للكلمة "${state.triggerWord}"`);
+    await ctx.reply(`✅ تم حفظ الرد (${mediaType}) للكلمة "${state.triggerWord}"`);
     pendingReplies.delete(userId);
 });
+
 
 
 // Register the text handler
