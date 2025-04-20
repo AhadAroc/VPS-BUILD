@@ -58,6 +58,7 @@ async function saveFile(fileLink, fileName) {
         console.log(`Attempting to save file from ${fileLink} as ${fileName}`);
         
         // Ensure the media directory exists
+        const mediaDir = path.join(__dirname, 'media');
         if (!fs.existsSync(mediaDir)) {
             console.log(`Creating media directory: ${mediaDir}`);
             fs.mkdirSync(mediaDir, { recursive: true });
@@ -67,7 +68,6 @@ async function saveFile(fileLink, fileName) {
         console.log(`Full file path: ${filePath}`);
         
         // Use axios to download the file
-        const axios = require('axios');
         const response = await axios({
             method: 'GET',
             url: fileLink.toString(),
@@ -833,6 +833,67 @@ function setupActions(bot) {
  // Set up media handlers
  setupMediaHandlers(bot);
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
+
+// Photo handler
+bot.on('photo', async (ctx) => {
+    console.log('Received photo message');
+    if (awaitingReplyResponse && tempReplyWord) {
+        try {
+            const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest resolution photo
+            const fileId = photo.file_id;
+            const userId = ctx.from.id;
+            const username = ctx.from.username || '';
+
+            console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
+
+            // Get file link from Telegram
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            console.log(`Got file link: ${fileLink}`);
+
+            // Generate a unique filename
+            const fileName = `photo_${Date.now()}_${userId}.jpg`;
+            console.log(`Generated filename: ${fileName}`);
+
+            // Save the file locally
+            const savedFilePath = await saveFile(fileLink, fileName);
+            console.log(`File saved locally at: ${savedFilePath}`);
+
+            // Save to database
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                user_id: userId,
+                username: username,
+                trigger_word: tempReplyWord.trim().toLowerCase(),
+                type: 'photo',
+                file_id: fileId,
+                file_path: savedFilePath,
+                width: photo.width,
+                height: photo.height,
+                created_at: new Date()
+            });
+
+            console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
+
+            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+
+        } catch (error) {
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+        }
+    } else {
+        console.log('Not awaiting a reply response or no temp word set');
+    }
+});
+
+
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
 // Add these action handlers for timer settings
@@ -3333,64 +3394,7 @@ bot.on('animation', async (ctx) => {
         console.error('Error handling GIF message:', error);
     }
 });
-// Photo handler
-bot.on('photo', async (ctx) => {
-    console.log('Received photo message');
-    if (awaitingReplyResponse && tempReplyWord) {
-        try {
-            const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest resolution photo
-            const fileId = photo.file_id;
-            const userId = ctx.from.id;
-            const username = ctx.from.username || '';
 
-            console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
-
-            // Get file link from Telegram
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            console.log(`Got file link: ${fileLink}`);
-
-            // Generate a unique filename
-            const fileName = `photo_${Date.now()}_${userId}.jpg`;
-            console.log(`Generated filename: ${fileName}`);
-
-            // Save the file locally
-            const savedFilePath = await saveFile(fileLink, fileName);
-            console.log(`File saved locally at: ${savedFilePath}`);
-
-            // Save to database
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                user_id: userId,
-                username: username,
-                trigger_word: tempReplyWord.trim().toLowerCase(),
-                type: 'photo',
-                file_id: fileId,
-                file_path: savedFilePath,
-                width: photo.width,
-                height: photo.height,
-                created_at: new Date()
-            });
-
-            console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
-
-            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
-
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-
-        } catch (error) {
-            console.error('Error handling photo message:', error);
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
-            
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-        }
-    } else {
-        console.log('Not awaiting a reply response or no temp word set');
-    }
-});
 // Document handler
 bot.on('document', async (ctx) => {
     try {
