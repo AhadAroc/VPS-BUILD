@@ -341,9 +341,7 @@ async function handleTextMessage(ctx) {
         const userState = userStates.get(userId);
         if (userState.action === 'adding_reply') {
             if (userState.step === 'awaiting_trigger') {
-                userState.triggerWord = userText; // ✅ RIGHT
-            
-                
+                userState.triggerWord = userText; // ✅ MUST BE triggerWord
                 userState.step = 'awaiting_response';
                 await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
                 return;
@@ -844,19 +842,16 @@ bot.on('photo', async (ctx) => {
     const userId = ctx.from.id;
     const userState = userStates.get(userId);
 
-    console.log('User state:', userState); // Add this line for debugging
+    console.log('User state:', userState); // Debug
 
+    // 🔐 Validate user state
     if (userState && userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
-        console.log('Processing photo as a reply');
-        const triggerWord = userState.triggerWord;
+        const triggerWord = userState.triggerWord; // ✅ CORRECT key
         const botId = userState.botId;
 
-        console.log('Trigger word:', triggerWord); // Add this line for debugging
-        console.log('Bot ID:', botId); // Add this line for debugging
-
         if (!triggerWord) {
-            console.error('Error: triggerWord is undefined');
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى بدء عملية إضافة الرد من جديد.');
+            console.error('❌ triggerWord is missing in user state');
+            await ctx.reply('❌ حدث خطأ: لم يتم تحديد الكلمة المفتاحية. أعد المحاولة.');
             userStates.delete(userId);
             return;
         }
@@ -866,49 +861,40 @@ bot.on('photo', async (ctx) => {
             const fileId = photo.file_id;
             const username = ctx.from.username || '';
 
-            console.log(`Processing photo as a reply for trigger word: ${triggerWord}`);
-
-            // Get file link from Telegram
             const fileLink = await ctx.telegram.getFileLink(fileId);
-            console.log(`Got file link: ${fileLink}`);
-
-            // Generate a unique filename
             const fileName = `photo_${Date.now()}_${userId}.jpg`;
-            console.log(`Generated filename: ${fileName}`);
 
-            // Save to database
+            const savedFilePath = await saveFile(fileLink, fileName);
+
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
                 user_id: userId,
-                username: username,
+                username,
                 trigger_word: triggerWord.trim().toLowerCase(),
                 type: 'photo',
                 file_id: fileId,
+                file_path: savedFilePath,
                 width: photo.width,
                 height: photo.height,
                 created_at: new Date(),
                 bot_id: botId
             });
 
-            console.log(`Saved photo reply to database for trigger word: ${triggerWord}`);
-
-            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${triggerWord}" بنجاح.`);
-
-            // Reset the user state
+            await ctx.reply(`✅ تم حفظ الصورة بنجاح للكلمة "${triggerWord}"`);
             userStates.delete(userId);
 
         } catch (error) {
-            console.error('Error handling photo message:', error);
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
-            
-            // Reset the user state
+            console.error('❌ Error saving photo:', error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة.');
             userStates.delete(userId);
         }
+
     } else {
-        console.log('Not awaiting a reply response or no trigger word set');
-        await ctx.reply('لم يتم طلب إضافة صورة كرد. يرجى استخدام الأمر الصحيح أولاً.');
+        console.log('📭 No active add-reply session');
+        await ctx.reply('❌ لا يوجد جلسة إضافة رد نشطة. أرسل "إضافة رد" أولاً.');
     }
 });
+
 
 
 // Add this new action handler
