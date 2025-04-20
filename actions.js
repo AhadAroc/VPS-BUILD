@@ -836,16 +836,20 @@ function setupActions(bot) {
 
 // Photo handler
 // Photo handler
+// Photo handler
 bot.on('photo', async (ctx) => {
     console.log('Received photo message');
-    console.log('awaitingReplyResponse:', awaitingReplyResponse);
-    console.log('tempReplyWord:', tempReplyWord);
+    const userId = ctx.from.id;
+    const userState = userStates.get(userId);
 
-    if (awaitingReplyResponse && tempReplyWord) {
+    if (userState && userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
+        console.log('Processing photo as a reply');
+        const tempReplyWord = userState.triggerWord;
+        const botId = userState.botId;
+
         try {
             const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest resolution photo
             const fileId = photo.file_id;
-            const userId = ctx.from.id;
             const username = ctx.from.username || '';
 
             console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
@@ -858,10 +862,6 @@ bot.on('photo', async (ctx) => {
             const fileName = `photo_${Date.now()}_${userId}.jpg`;
             console.log(`Generated filename: ${fileName}`);
 
-            // Save the file locally
-            const savedFilePath = await saveFile(fileLink, fileName);
-            console.log(`File saved locally at: ${savedFilePath}`);
-
             // Save to database
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
@@ -870,27 +870,25 @@ bot.on('photo', async (ctx) => {
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: 'photo',
                 file_id: fileId,
-                file_path: savedFilePath,
                 width: photo.width,
                 height: photo.height,
-                created_at: new Date()
+                created_at: new Date(),
+                bot_id: botId
             });
 
             console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
 
             await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
 
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+            // Reset the user state
+            userStates.delete(userId);
 
         } catch (error) {
             console.error('Error handling photo message:', error);
             await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
             
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+            // Reset the user state
+            userStates.delete(userId);
         }
     } else {
         console.log('Not awaiting a reply response or no temp word set');
