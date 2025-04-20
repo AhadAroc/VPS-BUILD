@@ -100,7 +100,7 @@ async function handleMediaMessage(ctx, mediaType) {
     try {
         if (!awaitingReplyResponse || !tempReplyWord) {
             console.log('Not awaiting a reply response or no temp word set');
-            return false; // Not awaiting a reply, so don't handle
+            return false;
         }
 
         console.log(`Handling ${mediaType} message for trigger word: ${tempReplyWord}`);
@@ -158,16 +158,20 @@ async function handleMediaMessage(ctx, mediaType) {
             
             // Save to database
             const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
+            const replyData = {
                 user_id: userId,
                 username: username,
                 trigger_word: tempReplyWord.trim(),
-                reply_text: fileUrl,
+                type: 'media',
                 media_type: mediaType,
                 file_id: fileId,
                 file_path: savedFilePath,
                 created_at: new Date()
-            });
+            };
+            
+            console.log('Saving reply data:', JSON.stringify(replyData, null, 2));
+            
+            await db.collection('replies').insertOne(replyData);
             
             console.log(`Saved ${mediaType} reply to database for trigger word: ${tempReplyWord}`);
             
