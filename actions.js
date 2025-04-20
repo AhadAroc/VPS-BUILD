@@ -2772,6 +2772,9 @@ bot.on('left_chat_member', (ctx) => {
             console.error('Error in text handler:', error);
         }
     });
+
+
+
 // Updated handleMediaReply function to check both global and user-specific states
 // Consolidated media handler function
 // Consolidated media reply handler
@@ -2781,8 +2784,12 @@ async function handleMediaReply(ctx, mediaType) {
         const userId = ctx.from.id;
         const botId = ctx.botInfo.id;
         
+        console.log(`Received ${mediaType} message`);
+        console.log(`awaitingReplyResponse: ${awaitingReplyResponse}, tempReplyWord: ${tempReplyWord}`);
+
         // Check if we're awaiting a reply response
         if (!awaitingReplyResponse || !tempReplyWord) {
+            console.log(`Not awaiting a reply response or no temp word set`);
             return false; // Not handling this media as a reply
         }
 
@@ -2834,6 +2841,7 @@ async function handleMediaReply(ctx, mediaType) {
                 };
                 break;
             default:
+                console.log(`Unsupported media type: ${mediaType}`);
                 return false; // Unsupported media type
         }
         
@@ -2871,7 +2879,6 @@ async function handleMediaReply(ctx, mediaType) {
             awaitingReplyResponse = false;
             tempReplyWord = '';
             
-            // Log success for PM2 logs
             console.log(`Successfully saved ${mediaType} reply for trigger word "${tempReplyWord}" for bot ${botId}`);
             
             return true; // Successfully handled
