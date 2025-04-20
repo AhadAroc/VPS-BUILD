@@ -3300,13 +3300,14 @@ function getMediaTypeInArabic(mediaType) {
 
 // Clean up the duplicate handlers and use this single handler for each media type
 // Update your photo handler
+// Update your photo handler
 bot.on('photo', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         
         // First check if this is a reply to a trigger word
-        if (await handleMediaMessage(ctx, 'photo')) {
+        if (await handleMediaReply(ctx, 'photo')) {
             return; // Media was handled as a reply, so exit
         }
         
