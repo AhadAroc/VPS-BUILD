@@ -835,8 +835,12 @@ function setupActions(bot) {
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 
 // Photo handler
+// Photo handler
 bot.on('photo', async (ctx) => {
     console.log('Received photo message');
+    console.log('awaitingReplyResponse:', awaitingReplyResponse);
+    console.log('tempReplyWord:', tempReplyWord);
+
     if (awaitingReplyResponse && tempReplyWord) {
         try {
             const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest resolution photo
@@ -890,6 +894,8 @@ bot.on('photo', async (ctx) => {
         }
     } else {
         console.log('Not awaiting a reply response or no temp word set');
+        // You might want to handle this case, perhaps by informing the user
+        // await ctx.reply('لم يتم طلب إضافة صورة كرد. يرجى استخدام الأمر الصحيح أولاً.');
     }
 });
 
