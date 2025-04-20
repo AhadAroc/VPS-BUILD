@@ -98,42 +98,105 @@ async function saveFile(fileLink, fileName) {
 // Consolidated media handler function
 async function handleMediaMessage(ctx, mediaType) {
     try {
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-        const messageText = ctx.message.caption ? ctx.message.caption.toLowerCase() : '';
-
-        const db = await ensureDatabaseInitialized();
-        const reply = await db.collection('replies').findOne({
-            trigger_word: messageText,
-            type: 'media',
-            media_type: mediaType
-        });
-
-        if (reply) {
-            switch (mediaType) {
-                case 'photo':
-                    await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                    break;
-                case 'video':
-                    await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                    break;
-                case 'document':
-                    await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                    break;
-                case 'animation':
-                    await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                    break;
-                case 'sticker':
-                    await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                    break;
-            }
-            return true;
+        if (!awaitingReplyResponse || !tempReplyWord) {
+            console.log('Not awaiting a reply response or no temp word set');
+            return false;
         }
 
-        return false;
+        console.log(`Handling ${mediaType} message for trigger word: ${tempReplyWord}`);
+        const userId = ctx.from.id;
+        const username = ctx.from.username || '';
+        let fileId, fileUrl;
+
+        // Extract the file ID based on media type
+        switch (mediaType) {
+            case 'photo':
+                // Get the highest resolution photo
+                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                console.log(`Extracted photo file_id: ${fileId}`);
+                break;
+            case 'video':
+                fileId = ctx.message.video.file_id;
+                console.log(`Extracted video file_id: ${fileId}`);
+                break;
+            case 'animation':
+                fileId = ctx.message.animation.file_id;
+                console.log(`Extracted animation file_id: ${fileId}`);
+                break;
+            case 'document':
+                fileId = ctx.message.document.file_id;
+                console.log(`Extracted document file_id: ${fileId}`);
+                break;
+            case 'sticker':
+                fileId = ctx.message.sticker.file_id;
+                console.log(`Extracted sticker file_id: ${fileId}`);
+                break;
+            default:
+                await ctx.reply('❌ نوع الوسائط غير مدعوم.');
+                return true;
+        }
+
+        // Create a URL if possible
+        if (ctx.chat.username) {
+            fileUrl = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
+        } else {
+            fileUrl = fileId;
+        }
+
+        try {
+            // Get the file link from Telegram
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            console.log(`Got file link: ${fileLink}`);
+            
+            // Generate a unique filename
+            const fileName = `${mediaType}_${Date.now()}_${userId}.${getFileExtension(mediaType)}`;
+            console.log(`Generated filename: ${fileName}`);
+            
+            // Save the file locally
+            const savedFilePath = await saveFile(fileLink, fileName);
+            console.log(`File saved locally at: ${savedFilePath}`);
+            
+            // Save to database
+            const db = await ensureDatabaseInitialized();
+            const replyData = {
+                user_id: userId,
+                username: username,
+                trigger_word: tempReplyWord.trim(),
+                type: 'media',
+                media_type: mediaType,
+                file_id: fileId,
+                file_path: savedFilePath,
+                created_at: new Date()
+            };
+            
+            console.log('Saving reply data:', JSON.stringify(replyData, null, 2));
+            
+            await db.collection('replies').insertOne(replyData);
+            
+            console.log(`Saved ${mediaType} reply to database for trigger word: ${tempReplyWord}`);
+            
+            // Get Arabic media type name for the response
+            const mediaTypeArabic = getMediaTypeInArabic(mediaType);
+            await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: ${mediaTypeArabic}`);
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // Successfully handled
+        } catch (error) {
+            console.error(`❌ خطأ أثناء حفظ الرد (${mediaType}):`, error);
+            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // We handled it, even though there was an error
+        }
     } catch (error) {
         console.error(`Error in handleMediaMessage (${mediaType}):`, error);
-        return false;
+        return false; // Error occurred, didn't handle it
     }
 }
 
@@ -2533,35 +2596,46 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
 
     let mediaType = 'unknown';
     let fileId;
+    let extension = 'bin';
 
     if (ctx.message.photo) {
         mediaType = 'photo';
         fileId = ctx.message.photo.at(-1).file_id;
+        extension = 'jpg';
     } else if (ctx.message.video) {
         mediaType = 'video';
         fileId = ctx.message.video.file_id;
+        extension = 'mp4';
     } else if (ctx.message.document) {
         mediaType = 'document';
         fileId = ctx.message.document.file_id;
+        extension = ctx.message.document.file_name?.split('.').pop() || 'file';
     } else if (ctx.message.animation) {
         mediaType = 'animation';
         fileId = ctx.message.animation.file_id;
+        extension = 'mp4';
     } else if (ctx.message.sticker) {
         mediaType = 'sticker';
         fileId = ctx.message.sticker.file_id;
+        extension = 'webp';
     }
+
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+    const fileName = `${mediaType}_${Date.now()}_${userId}.${extension}`;
+    const savedFilePath = await saveFile(fileLink, fileName);
 
     await db.collection('replies').insertOne({
         bot_id: state.botId,
-        trigger_word: state.triggerWord.toLowerCase(),
+        trigger_word: state.triggerWord,
         type: 'media',
         media_type: mediaType,
         file_id: fileId,
+        file_path: savedFilePath,
         created_by: userId,
         created_at: new Date()
     });
 
-    await ctx.reply(`✅ تم حفظ الرد (${getMediaTypeInArabic(mediaType)}) للكلمة "${state.triggerWord}"`);
+    await ctx.reply(`✅ تم حفظ الرد (${mediaType}) للكلمة "${state.triggerWord}"`);
     pendingReplies.delete(userId);
 });
 
@@ -2772,55 +2846,69 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
                     }
                     
                     // Handle typed replies
-                    switch (reply.type) {
-                        case "text":
-                            await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                            break;
-                        case "photo":
-                            if (reply.file_id) {
-                                await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            } else {
-                                console.log('No valid photo file_id found in reply:', reply);
-                            }
-                            break;
-                        case "animation":
-                            if (reply.file_id) {
-                                await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            } else {
-                                console.log('No valid animation file_id found in reply:', reply);
-                            }
-                            break;
-                        case "video":
-                            if (reply.file_id) {
-                                await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            } else {
-                                console.log('No valid video file_id found in reply:', reply);
-                            }
-                            break;
-                        case "sticker":
-                            if (reply.file_id) {
-                                await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            } else {
-                                console.log('No valid sticker file_id found in reply:', reply);
-                            }
-                            break;
-                        case "document":
-                            if (reply.file_id) {
-                                await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                            } else {
-                                console.log('No valid document file_id found in reply:', reply);
-                            }
-                            break;
-                        default:
-                            // If no type is specified but we have text, send it
-                            if (reply.text) {
-                                await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
-                            } else if (reply.reply_text) {
-                                await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                            } else {
-                                console.log('No valid content found in reply:', reply);
-                            }
-                    }
+if (reply) {
+    try {
+        switch (reply.type) {
+            case "text":
+                if (reply.text || reply.reply_text) {
+                    await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid text content found in reply');
+                }
+                break;
+            case "photo":
+                if (reply.file_id) {
+                    await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid photo file_id found in reply');
+                }
+                break;
+            case "animation":
+                if (reply.file_id) {
+                    await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid animation file_id found in reply');
+                }
+                break;
+            case "video":
+                if (reply.file_id) {
+                    await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid video file_id found in reply');
+                }
+                break;
+            case "sticker":
+                if (reply.file_id) {
+                    await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid sticker file_id found in reply');
+                }
+                break;
+            case "document":
+                if (reply.file_id) {
+                    await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid document file_id found in reply');
+                }
+                break;
+            default:
+                // If no type is specified but we have text, send it
+                if (reply.text) {
+                    await ctx.reply(reply.text, { reply_to_message_id: ctx.message.message_id });
+                } else if (reply.reply_text) {
+                    await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+                } else {
+                    throw new Error('No valid content found in reply');
+                }
+        }
+    } catch (error) {
+        console.error('Error handling reply:', error.message);
+        console.error('Reply object:', JSON.stringify(reply, null, 2));
+        await ctx.reply('عذرًا، حدث خطأ أثناء معالجة الرد. يرجى المحاولة مرة أخرى أو الاتصال بمسؤول النظام.');
+    }
+} else {
+    console.log('No reply found for the given trigger');
+}
                     return;
                 }
             } catch (error) {
