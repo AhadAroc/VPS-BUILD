@@ -1040,18 +1040,15 @@ async function fixNullTriggerWords() {
 // Consolidated media handler function
 async function handleMediaMessage(ctx, mediaType) {
     try {
-        // Check if we're awaiting a reply response
         if (!awaitingReplyResponse || !tempReplyWord) {
-            return false; // Not handling this media as a reply
+            return false; // Not awaiting a reply, so don't handle
         }
 
-        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
-        
         const userId = ctx.from.id;
         const username = ctx.from.username || '';
-        let fileId, replyText;
-        
-        // Extract the appropriate file ID based on media type
+        let fileId, fileUrl;
+
+        // Extract the file ID based on media type
         switch (mediaType) {
             case 'photo':
                 fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
@@ -1069,16 +1066,17 @@ async function handleMediaMessage(ctx, mediaType) {
                 fileId = ctx.message.sticker.file_id;
                 break;
             default:
-                return false; // Unsupported media type
+                await ctx.reply('❌ نوع الوسائط غير مدعوم.');
+                return true;
         }
-        
-        // If we're in a group with a username, create a direct link
+
+        // Create a URL if possible
         if (ctx.chat.username) {
-            replyText = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
+            fileUrl = `https://t.me/${ctx.chat.username}/${ctx.message.message_id}`;
         } else {
-            replyText = fileId;
+            fileUrl = fileId;
         }
-        
+
         try {
             // Save to database
             const db = await ensureDatabaseInitialized();
@@ -1086,7 +1084,7 @@ async function handleMediaMessage(ctx, mediaType) {
                 user_id: userId,
                 username: username,
                 trigger_word: tempReplyWord.trim(),
-                reply_text: replyText,
+                reply_text: fileUrl,
                 media_type: mediaType,
                 file_id: fileId,
                 created_at: new Date()
@@ -1094,33 +1092,56 @@ async function handleMediaMessage(ctx, mediaType) {
             
             // Try to save the file locally if possible
             try {
-                if (mediaType === 'photo' || mediaType === 'video' || mediaType === 'document') {
-                    const fileLink = await ctx.telegram.getFileLink(fileId);
-                    const fileName = `${mediaType}_${Date.now()}_${userId}.${mediaType === 'photo' ? 'jpg' : (mediaType === 'video' ? 'mp4' : 'file')}`;
-                    await saveFile(fileLink, fileName);
-                }
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                const fileName = `${mediaType}_${Date.now()}_${userId}.${getFileExtension(mediaType)}`;
+                await saveFile(fileLink, fileName);
             } catch (saveError) {
-                console.error('Error saving file locally:', saveError);
+                console.error(`Error saving ${mediaType} file locally:`, saveError);
                 // Continue even if local save fails
             }
             
-            await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: ${getMediaTypeInArabic(mediaType)}`);
+            // Get Arabic media type name for the response
+            const mediaTypeArabic = getMediaTypeInArabic(mediaType);
+            await ctx.reply(`✅ تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nنوع الرد: ${mediaTypeArabic}`);
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // Successfully handled
         } catch (error) {
-            console.error('❌ خطأ أثناء حفظ الرد:', error);
+            console.error(`❌ خطأ أثناء حفظ الرد (${mediaType}):`, error);
             await ctx.reply('❌ حدث خطأ أثناء حفظ الرد.');
+            
+            // Reset the awaiting state
+            awaitingReplyResponse = false;
+            tempReplyWord = '';
+            
+            return true; // We handled it, even though there was an error
         }
-        
-        // Reset the state
-        awaitingReplyResponse = false;
-        tempReplyWord = '';
-        
-        return true; // Successfully handled
     } catch (error) {
-        console.error('Error in handleMediaMessage:', error);
-        return false;
+        console.error(`Error in handleMediaMessage (${mediaType}):`, error);
+        return false; // Error occurred, didn't handle it
     }
 }
 
+// Helper function to get file extension based on media type
+function getFileExtension(mediaType) {
+    switch (mediaType) {
+        case 'photo':
+            return 'jpg';
+        case 'video':
+            return 'mp4';
+        case 'animation':
+            return 'mp4';
+        case 'document':
+            return 'file';
+        case 'sticker':
+            return 'webp';
+        default:
+            return 'bin';
+    }
+}
 
 // Add this to your initialization code
 async function initializeDatabase() {
