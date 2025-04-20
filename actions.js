@@ -2636,6 +2636,7 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
 
 
 
+
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     // Register the text handler
@@ -2651,7 +2652,9 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
             await ctx.reply(`تم استلام الكلمة "${text}". الآن أرسل الرد (نص أو وسائط):`);
             return;
         }
-
+        const db = await ensureDatabaseInitialized();
+        const trigger = text.toLowerCase();
+        const reply = await db.collection('replies').findOne({ trigger_word: trigger });
         if (userState.step === 'awaiting_response') {
             const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
