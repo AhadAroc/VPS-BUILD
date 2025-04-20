@@ -184,8 +184,11 @@ async function handleMediaMessage(ctx, mediaType) {
                 media_type: mediaType,
                 file_id: fileId,
                 file_path: savedFilePath,
-                created_at: new Date()
-            };
+                created_at: new Date(),
+                bot_id: ctx.botInfo.id // 🔥 add this!
+              };
+              await db.collection('replies').insertOne(replyData);
+              
             
             console.log('Saving reply data:', JSON.stringify(replyData, null, 2));
             
