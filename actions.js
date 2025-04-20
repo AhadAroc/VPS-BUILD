@@ -2620,6 +2620,34 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
     // For the text handler that's causing errors, update it to:
     // Register the text handler
     bot.on('text', async (ctx) => {
+        const userId = ctx.from.id;
+    const userState = pendingReplies.get(userId);
+    const text = ctx.message.text?.trim();
+
+    if (userState) {
+        if (userState.step === 'awaiting_trigger') {
+            userState.triggerWord = text;
+            userState.step = 'awaiting_response';
+            await ctx.reply(`تم استلام الكلمة "${text}". الآن أرسل الرد (نص أو وسائط):`);
+            return;
+        }
+
+        if (userState.step === 'awaiting_response') {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('replies').insertOne({
+                bot_id: userState.botId,
+                trigger_word: userState.triggerWord,
+                type: 'text',
+                text: text,
+                created_by: userId,
+                created_at: new Date()
+            });
+
+            await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${userState.triggerWord}"`);
+            pendingReplies.delete(userId);
+            return;
+        }
+    }
         try {
             console.log('Received message:', ctx.message.text);
             
