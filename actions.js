@@ -4230,34 +4230,39 @@ async function getCustomBotName(chatId) {
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
-        switch (reply.type) {
-            case 'text':
-                await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case 'photo':
-                await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case 'video':
-                await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case 'animation':
-                await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case 'document':
-                await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            case 'sticker':
-                await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                break;
-            default:
-                console.error('Unknown reply type:', reply.type);
-                await ctx.reply('عذرًا، حدث خطأ في معالجة الرد.', { reply_to_message_id: ctx.message.message_id });
+        if (reply.type === 'text') {
+            await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+        } else if (reply.type === 'media') {
+            switch (reply.media_type) {
+                case 'photo':
+                    await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case 'video':
+                    await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case 'animation':
+                    await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case 'document':
+                    await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                case 'sticker':
+                    await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+                    break;
+                default:
+                    console.error('Unknown media type:', reply.media_type);
+                    await ctx.reply('❌ نوع وسائط غير مدعوم.', { reply_to_message_id: ctx.message.message_id });
+            }
+        } else {
+            console.error('Unknown reply type:', reply.type);
+            await ctx.reply('❌ نوع الرد غير معروف.', { reply_to_message_id: ctx.message.message_id });
         }
     } catch (error) {
         console.error('Error sending reply:', error);
-        await ctx.reply('عذرًا، حدث خطأ أثناء إرسال الرد.', { reply_to_message_id: ctx.message.message_id });
+        await ctx.reply('❌ حدث خطأ أثناء إرسال الرد.', { reply_to_message_id: ctx.message.message_id });
     }
 }
+
 
 bot.action('check_subscription', forceCheckSubscription);
 
