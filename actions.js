@@ -200,60 +200,59 @@ function setupMediaHandlers(bot) {
     // Photo handler
     bot.on('photo', async (ctx) => {
         console.log('Received photo message');
-        try {
-            if (!awaitingReplyResponse || !tempReplyWord) {
-                console.log('Not awaiting a reply response or no temp word set');
-                return;
+        if (awaitingReplyResponse && tempReplyWord) {
+            try {
+                const photo = ctx.message.photo[ctx.message.photo.length - 1];
+                const fileId = photo.file_id;
+                const userId = ctx.from.id;
+                const username = ctx.from.username || '';
+    
+                console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
+    
+                // Get file link from Telegram
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                console.log(`Got file link: ${fileLink}`);
+    
+                // Generate a unique filename
+                const fileName = `photo_${Date.now()}_${userId}.jpg`;
+                console.log(`Generated filename: ${fileName}`);
+    
+                // Save the file locally
+                const savedFilePath = await saveFile(fileLink, fileName);
+                console.log(`File saved locally at: ${savedFilePath}`);
+    
+                // Save to database
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').insertOne({
+                    user_id: userId,
+                    username: username,
+                    trigger_word: tempReplyWord.trim().toLowerCase(),
+                    type: 'photo',
+                    file_id: fileId,
+                    file_path: savedFilePath,
+                    width: photo.width,
+                    height: photo.height,
+                    created_at: new Date()
+                });
+    
+                console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
+    
+                await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+    
+                // Reset the awaiting state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
+    
+            } catch (error) {
+                console.error('Error handling photo message:', error);
+                await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
+                
+                // Reset the awaiting state
+                awaitingReplyResponse = false;
+                tempReplyWord = '';
             }
-    
-            const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Get the highest quality photo
-            const fileId = photo.file_id;
-            const userId = ctx.from.id;
-            const username = ctx.from.username || '';
-    
-            console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
-    
-            // Get file link from Telegram
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            console.log(`Got file link: ${fileLink}`);
-    
-            // Generate a unique filename
-            const fileName = `photo_${Date.now()}_${userId}.jpg`;
-            console.log(`Generated filename: ${fileName}`);
-    
-            // Save the file locally
-            const savedFilePath = await saveFile(fileLink, fileName);
-            console.log(`File saved locally at: ${savedFilePath}`);
-    
-            // Save to database
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                user_id: userId,
-                username: username,
-                trigger_word: tempReplyWord.trim().toLowerCase(),
-                type: 'photo',
-                file_id: fileId,
-                file_path: savedFilePath,
-                width: photo.width,
-                height: photo.height,
-                created_at: new Date()
-            });
-    
-            console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
-    
-            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
-    
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-    
-        } catch (error) {
-            console.error('Error handling photo message:', error);
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
-            
-            // Reset the awaiting state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
+        } else {
+            console.log('Not awaiting a reply response or no temp word set');
         }
     });
 
@@ -2826,127 +2825,8 @@ bot.on('left_chat_member', (ctx) => {
 
 
 // Updated handleMediaReply function to check both global and user-specific states
-// Consolidated media handler function
-// Consolidated media reply handler
-// Improved consolidated media reply handler
-async function handleMediaReply(ctx, mediaType) {
-    try {
-        const userId = ctx.from.id;
-        const botId = ctx.botInfo.id;
-        
-        console.log(`Received ${mediaType} message`);
-        console.log(`awaitingReplyResponse: ${awaitingReplyResponse}, tempReplyWord: ${tempReplyWord}`);
 
-        // Check if we're awaiting a reply response
-        if (!awaitingReplyResponse || !tempReplyWord) {
-            console.log(`Not awaiting a reply response or no temp word set`);
-            return false; // Not handling this media as a reply
-        }
 
-        console.log(`Processing ${mediaType} as a reply for trigger word: ${tempReplyWord}`);
-        
-        let fileId, additionalData = {};
-        
-        // Extract the appropriate file ID and any additional metadata based on media type
-        switch (mediaType) {
-            case 'photo':
-                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                additionalData = {
-                    width: ctx.message.photo[ctx.message.photo.length - 1].width,
-                    height: ctx.message.photo[ctx.message.photo.length - 1].height
-                };
-                break;
-            case 'video':
-                fileId = ctx.message.video.file_id;
-                additionalData = {
-                    duration: ctx.message.video.duration,
-                    width: ctx.message.video.width,
-                    height: ctx.message.video.height,
-                    mime_type: ctx.message.video.mime_type
-                };
-                break;
-            case 'animation':
-                fileId = ctx.message.animation.file_id;
-                additionalData = {
-                    duration: ctx.message.animation.duration,
-                    width: ctx.message.animation.width,
-                    height: ctx.message.animation.height
-                };
-                break;
-            case 'document':
-                fileId = ctx.message.document.file_id;
-                additionalData = {
-                    file_name: ctx.message.document.file_name,
-                    mime_type: ctx.message.document.mime_type,
-                    file_size: ctx.message.document.file_size
-                };
-                break;
-            case 'sticker':
-                fileId = ctx.message.sticker.file_id;
-                additionalData = {
-                    width: ctx.message.sticker.width,
-                    height: ctx.message.sticker.height,
-                    is_animated: ctx.message.sticker.is_animated || false,
-                    emoji: ctx.message.sticker.emoji || ''
-                };
-                break;
-            default:
-                console.log(`Unsupported media type: ${mediaType}`);
-                return false; // Unsupported media type
-        }
-        
-        try {
-            // Save to database with bot_id to make it bot-specific
-            const db = await ensureDatabaseInitialized();
-            
-            // Create a complete document with all necessary fields
-            const replyDocument = {
-                trigger_word: tempReplyWord.trim().toLowerCase(),
-                word: tempReplyWord.trim().toLowerCase(), // For backward compatibility
-                type: mediaType,
-                file_id: fileId,
-                bot_id: botId, // Make it bot-specific
-                created_at: new Date(),
-                created_by: userId,
-                username: ctx.from.username || '',
-                ...additionalData // Include any additional metadata
-            };
-            
-            // Use updateOne with upsert to avoid duplicates
-            await db.collection('replies').updateOne(
-                { 
-                    trigger_word: tempReplyWord.trim().toLowerCase(),
-                    bot_id: botId
-                },
-                { $set: replyDocument },
-                { upsert: true }
-            );
-            
-            // Send confirmation
-            await ctx.reply(`✅ تم إضافة ${getMediaTypeInArabic(mediaType)} كرد للكلمة "${tempReplyWord}" بنجاح.`);
-            
-            // Reset state
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            
-            console.log(`Successfully saved ${mediaType} reply for trigger word "${tempReplyWord}" for bot ${botId}`);
-            
-            return true; // Successfully handled
-        } catch (error) {
-            console.error(`Error saving ${mediaType} reply:`, error);
-            await ctx.reply(`❌ حدث خطأ أثناء حفظ ${getMediaTypeInArabic(mediaType)} كرد. يرجى المحاولة مرة أخرى.`);
-            
-            // Reset state even on error
-            awaitingReplyResponse = false;
-            tempReplyWord = '';
-            
-            return true; // We still handled it, even though there was an error
-        }
-    } catch (error) {
-        console.error(`Error in handleMediaReply for ${mediaType}:`, error);
-        return false; // Error occurred
-    }
-}
 // Helper function to get Arabic names for media types
 // Add this helper function
 function getMediaTypeInArabic(mediaType) {
@@ -3358,48 +3238,7 @@ function getMediaTypeInArabic(mediaType) {
 // Clean up the duplicate handlers and use this single handler for each media type
 // Update your photo handler
 // Update your photo handler
-bot.on('photo', async (ctx) => {
-    try {
-        const chatId = ctx.chat.id;
-        const userId = ctx.from.id;
-        
-        // First check if this is a reply to a trigger word
-        if (await handleMediaReply(ctx, 'photo')) {
-            return; // Media was handled as a reply, so exit
-        }
-        
-        // Check for photo restrictions in groups
-        if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') && photoRestrictionStatus.get(chatId)) {
-            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
-            
-            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
-                await ctx.deleteMessage();
-                await ctx.reply('❌ عذرًا، إرسال الصور غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                return;
-            }
-        }
-        
-        // Track photos in groups for moderation purposes
-        if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-            if (!photoMessages.has(chatId)) {
-                photoMessages.set(chatId, []);
-            }
-            photoMessages.get(chatId).push({
-                messageId: ctx.message.message_id,
-                timestamp: Date.now()
-            });
-            
-            // Keep only the last 100 photos
-            const photos = photoMessages.get(chatId);
-            if (photos.length > 100) {
-                photos.shift();
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error handling photo message:', error);
-    }
-});
+
 
 // Video handler
 bot.on('video', async (ctx) => {
