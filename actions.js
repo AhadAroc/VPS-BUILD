@@ -4,6 +4,7 @@ let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
 const userStates = new Map();
+const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 
 
 // Make sure this is at the top of your file
@@ -341,7 +342,7 @@ async function handleTextMessage(ctx) {
         const userState = userStates.get(userId);
         if (userState.action === 'adding_reply') {
             if (userState.step === 'awaiting_trigger') {
-                userState.triggerWord = userText; // ✅ MUST BE triggerWord
+                userState.triggerWord = userText; // ✅ correct
                 userState.step = 'awaiting_response';
                 await ctx.reply('الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:');
                 return;
@@ -837,63 +838,6 @@ function setupActions(bot) {
 
 
 // Photo handler
-bot.on('photo', async (ctx) => {
-    console.log('Received photo message');
-    const userId = ctx.from.id;
-    const userState = userStates.get(userId);
-
-    console.log('User state:', userState); // Debug
-
-    // 🔐 Validate user state
-    if (userState && userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
-        const triggerWord = userState.triggerWord; // ✅ CORRECT key
-        const botId = userState.botId;
-
-        if (!triggerWord) {
-            console.error('❌ triggerWord is missing in user state');
-            await ctx.reply('❌ حدث خطأ: لم يتم تحديد الكلمة المفتاحية. أعد المحاولة.');
-            userStates.delete(userId);
-            return;
-        }
-
-        try {
-            const photo = ctx.message.photo[ctx.message.photo.length - 1];
-            const fileId = photo.file_id;
-            const username = ctx.from.username || '';
-
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            const fileName = `photo_${Date.now()}_${userId}.jpg`;
-
-            const savedFilePath = await saveFile(fileLink, fileName);
-
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                user_id: userId,
-                username,
-                trigger_word: triggerWord.trim().toLowerCase(),
-                type: 'photo',
-                file_id: fileId,
-                file_path: savedFilePath,
-                width: photo.width,
-                height: photo.height,
-                created_at: new Date(),
-                bot_id: botId
-            });
-
-            await ctx.reply(`✅ تم حفظ الصورة بنجاح للكلمة "${triggerWord}"`);
-            userStates.delete(userId);
-
-        } catch (error) {
-            console.error('❌ Error saving photo:', error);
-            await ctx.reply('❌ حدث خطأ أثناء حفظ الصورة.');
-            userStates.delete(userId);
-        }
-
-    } else {
-        console.log('📭 No active add-reply session');
-        await ctx.reply('❌ لا يوجد جلسة إضافة رد نشطة. أرسل "إضافة رد" أولاً.');
-    }
-});
 
 
 
@@ -1731,40 +1675,13 @@ async function listAllReplies(ctx, botId) {
 }
 // Add this action handler for adding a new reply
 bot.action('add_reply', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        
-        const isDev = await isDeveloper(ctx, ctx.from.id);
-        if (!isDev) {
-            return ctx.reply('❌ هذا الأمر متاح فقط للمطورين.');
-        }
+    const userId = ctx.from.id;
+    const botId = ctx.botInfo.id;
 
-        await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:', {
-            reply_markup: {
-                inline_keyboard: [[{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]]
-            }
-        });
-        
-        userStates.set(ctx.from.id, {
-            action: 'adding_reply',
-            step: 'awaiting_trigger',
-            botId: ctx.botInfo.id,
-            timestamp: Date.now() // Add a timestamp
-        });
-
-        // Set a timeout to clear the state after 5 minutes
-        setTimeout(() => {
-            if (userStates.get(ctx.from.id)?.action === 'adding_reply') {
-                userStates.delete(ctx.from.id);
-                ctx.reply('انتهت مهلة إضافة الرد. يرجى المحاولة مرة أخرى.');
-            }
-        }, 5 * 60 * 1000);
-
-    } catch (error) {
-        console.error('Error in add_reply action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة رد جديد.');
-    }
+    pendingReplies.set(userId, { step: 'awaiting_trigger', botId });
+    await ctx.reply('أرسل الكلمة التي تريد إضافة رد لها:');
 });
+
 // Add this to your callback query handler
 // Add this to your callback query handler
 bot.action('list_replies', async (ctx) => {
@@ -2664,6 +2581,39 @@ bot.on('left_chat_member', (ctx) => {
         markGroupAsInactive(ctx.chat.id);
     }
 });    
+bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
+    const userId = ctx.from.id;
+    const state = pendingReplies.get(userId);
+
+    if (!state || state.step !== 'awaiting_response') return;
+
+    const db = await ensureDatabaseInitialized();
+    const fileObj = ctx.message.photo?.at(-1) ||
+                    ctx.message.video ||
+                    ctx.message.document ||
+                    ctx.message.animation ||
+                    ctx.message.sticker;
+
+    const fileId = fileObj.file_id;
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+    const fileName = `${Date.now()}_${userId}.jpg`; // dynamic extension based on type if needed
+
+    const savedFilePath = await saveFile(fileLink, fileName);
+
+    await db.collection('replies').insertOne({
+        bot_id: state.botId,
+        trigger_word: state.triggerWord,
+        type: 'media',
+        file_id: fileId,
+        media_type: fileObj.mime_type || 'unknown',
+        file_path: savedFilePath,
+        created_by: userId,
+        created_at: new Date()
+    });
+
+    await ctx.reply(`✅ تم حفظ الرد الوسائطي للكلمة "${state.triggerWord}"`);
+    pendingReplies.delete(userId);
+});
 
 
 // Register the text handler
