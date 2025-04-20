@@ -111,29 +111,47 @@ async function handleMediaMessage(ctx, mediaType) {
         // Extract the file ID based on media type
         switch (mediaType) {
             case 'photo':
-                // Get the highest resolution photo
-                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                console.log(`Extracted photo file_id: ${fileId}`);
+                if (ctx.message.photo && ctx.message.photo.length > 0) {
+                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                    console.log(`Extracted photo file_id: ${fileId}`);
+                } else {
+                    throw new Error('Invalid photo message structure');
+                }
                 break;
             case 'video':
-                fileId = ctx.message.video.file_id;
-                console.log(`Extracted video file_id: ${fileId}`);
+                if (ctx.message.video) {
+                    fileId = ctx.message.video.file_id;
+                    console.log(`Extracted video file_id: ${fileId}`);
+                } else {
+                    throw new Error('Invalid video message structure');
+                }
                 break;
             case 'animation':
-                fileId = ctx.message.animation.file_id;
-                console.log(`Extracted animation file_id: ${fileId}`);
+                if (ctx.message.animation) {
+                    fileId = ctx.message.animation.file_id;
+                    console.log(`Extracted animation file_id: ${fileId}`);
+                } else {
+                    throw new Error('Invalid animation message structure');
+                }
                 break;
             case 'document':
-                fileId = ctx.message.document.file_id;
-                console.log(`Extracted document file_id: ${fileId}`);
+                if (ctx.message.document) {
+                    fileId = ctx.message.document.file_id;
+                    console.log(`Extracted document file_id: ${fileId}`);
+                } else {
+                    throw new Error('Invalid document message structure');
+                }
                 break;
             case 'sticker':
-                fileId = ctx.message.sticker.file_id;
-                console.log(`Extracted sticker file_id: ${fileId}`);
+                if (ctx.message.sticker) {
+                    fileId = ctx.message.sticker.file_id;
+                    console.log(`Extracted sticker file_id: ${fileId}`);
+                } else {
+                    throw new Error('Invalid sticker message structure');
+                }
                 break;
             default:
-                await ctx.reply('❌ نوع الوسائط غير مدعوم.');
-                return true;
+                throw new Error('Unsupported media type');
         }
 
         // Create a URL if possible
@@ -3281,22 +3299,48 @@ async function handleMediaReply(ctx, mediaType) {
         // Extract the appropriate file ID based on media type
         switch (mediaType) {
             case 'photo':
-                fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                if (ctx.message.photo && ctx.message.photo.length > 0) {
+                    fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                } else {
+                    console.error('Invalid photo message structure:', ctx.message);
+                    return false;
+                }
                 break;
             case 'video':
-                fileId = ctx.message.video.file_id;
+                if (ctx.message.video) {
+                    fileId = ctx.message.video.file_id;
+                } else {
+                    console.error('Invalid video message structure:', ctx.message);
+                    return false;
+                }
                 break;
             case 'animation':
-                fileId = ctx.message.animation.file_id;
+                if (ctx.message.animation) {
+                    fileId = ctx.message.animation.file_id;
+                } else {
+                    console.error('Invalid animation message structure:', ctx.message);
+                    return false;
+                }
                 break;
             case 'document':
-                fileId = ctx.message.document.file_id;
+                if (ctx.message.document) {
+                    fileId = ctx.message.document.file_id;
+                } else {
+                    console.error('Invalid document message structure:', ctx.message);
+                    return false;
+                }
                 break;
             case 'sticker':
-                fileId = ctx.message.sticker.file_id;
+                if (ctx.message.sticker) {
+                    fileId = ctx.message.sticker.file_id;
+                } else {
+                    console.error('Invalid sticker message structure:', ctx.message);
+                    return false;
+                }
                 break;
             default:
-                return false; // Unsupported media type
+                console.error('Unsupported media type:', mediaType);
+                return false;
         }
         
         try {
@@ -3589,31 +3633,34 @@ bot.on('text', async (ctx) => {
 
         // Check for automatic replies in private chats
         // Check for automatic replies in private chats
-if (ctx.chat.type === 'private') {
-    try {
-        const reply = await checkForAutomaticReply(ctx);
-        if (reply) {
-            if (reply.type === 'text') {
-                await ctx.reply(reply.content);
-            } else if (reply.content) {
-                switch (reply.type) {
-                    case 'photo':
-                        await ctx.replyWithPhoto(reply.content);
-                        break;
-                    case 'video':
-                        await ctx.replyWithVideo(reply.content);
-                        break;
-                    case 'animation':
-                        await ctx.replyWithAnimation(reply.content);
-                        break;
-                    case 'document':
-                        await ctx.replyWithDocument(reply.content);
-                        break;
-                    case 'sticker':
-                        await ctx.replyWithSticker(reply.content);
-                        break;
-                    default:
-                        console.log(`Unsupported reply type: ${reply.type}`);
+        if (ctx.chat.type === 'private') {
+            try {
+                const reply = await checkForAutomaticReply(ctx);
+                if (reply) {
+                    console.log('Automatic reply found:', reply); // Log the reply object for debugging
+        
+                    if (reply.type === 'text' && reply.content) {
+                        await ctx.reply(reply.content);
+                    } else if (reply.content) {
+                        switch (reply.type) {
+                            case 'photo':
+                                await ctx.replyWithPhoto(reply.content);
+                                break;
+                            case 'video':
+                                await ctx.replyWithVideo(reply.content);
+                                break;
+                            case 'animation':
+                                await ctx.replyWithAnimation(reply.content);
+                                break;
+                            case 'document':
+                                await ctx.replyWithDocument(reply.content);
+                                break;
+                            case 'sticker':
+                                await ctx.replyWithSticker(reply.content);
+                                break;
+                            default:
+                                console.log(`Unsupported reply type: ${reply.type}`);
+                                await ctx.reply('عذرًا، حدث خطأ في معالجة الرد التلقائي.');
                 }
             }
         }
