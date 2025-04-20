@@ -239,7 +239,7 @@ async function showHelp(ctx) {
 
 *السؤال الخامس : البوت بيه غلط ومدا يشتغل شنو الحل ؟*
 • يرجى تبليغ مطور السورس في رابط قناة السورس و ان شاء الله تنحل 🥲
-@lorsiv
+@Lorisiv
         `;
 
         await ctx.replyWithMarkdown(helpText, { disable_web_page_preview: true });
@@ -580,20 +580,7 @@ bot.use(documentRestrictionMiddleware);
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
 });
-bot.on(['photo', 'document', 'sticker'], (ctx) => {
-    const chatId = ctx.chat.id;
-    const messageId = ctx.message.message_id;
-    const timestamp = Date.now();
 
-    if (ctx.message.photo || 
-        (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('image/')) ||
-        (ctx.message.sticker && !ctx.message.sticker.is_animated)) {
-        
-        let photos = photoMessages.get(chatId) || [];
-        photos.push({ messageId, timestamp });
-        photoMessages.set(chatId, photos);
-    }
-});
 // Add this near your other command handlers
 bot.command('stop', async (ctx) => {
     const chatId = ctx.chat.id;
@@ -1997,5 +1984,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,promoteUser };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed };
 
