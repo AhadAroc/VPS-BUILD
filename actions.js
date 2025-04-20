@@ -3612,6 +3612,8 @@ async function checkForAutomaticReply(ctx) {
 
     try {
         const db = await ensureDatabaseInitialized();
+        console.log(`Searching for reply with keyword: ${userText}`);
+        
         const reply = await db.collection('replies').findOne({
             trigger_word: userText
         });
@@ -3646,6 +3648,8 @@ async function checkForAutomaticReply(ctx) {
                 }
             }
             return true;
+        } else {
+            console.log('Reply search result: null');
         }
     } catch (error) {
         console.error('Error checking for automatic reply:', error);
