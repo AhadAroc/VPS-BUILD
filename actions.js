@@ -838,6 +838,7 @@ function setupActions(bot) {
 // Photo handler
 // Photo handler
 // Photo handler
+// Photo handler
 bot.on('photo', async (ctx) => {
     console.log('Received photo message');
     const userId = ctx.from.id;
@@ -845,11 +846,11 @@ bot.on('photo', async (ctx) => {
 
     if (userState && userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
         console.log('Processing photo as a reply');
-        const tempReplyWord = userState.triggerWord;
+        const triggerWord = userState.triggerWord;
         const botId = userState.botId;
 
-        if (!tempReplyWord) {
-            console.error('Error: tempReplyWord is undefined');
+        if (!triggerWord) {
+            console.error('Error: triggerWord is undefined');
             await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.');
             userStates.delete(userId);
             return;
@@ -860,7 +861,7 @@ bot.on('photo', async (ctx) => {
             const fileId = photo.file_id;
             const username = ctx.from.username || '';
 
-            console.log(`Processing photo as a reply for trigger word: ${tempReplyWord}`);
+            console.log(`Processing photo as a reply for trigger word: ${triggerWord}`);
 
             // Get file link from Telegram
             const fileLink = await ctx.telegram.getFileLink(fileId);
@@ -875,7 +876,7 @@ bot.on('photo', async (ctx) => {
             await db.collection('replies').insertOne({
                 user_id: userId,
                 username: username,
-                trigger_word: tempReplyWord.trim().toLowerCase(),
+                trigger_word: triggerWord.trim().toLowerCase(),
                 type: 'photo',
                 file_id: fileId,
                 width: photo.width,
@@ -884,9 +885,9 @@ bot.on('photo', async (ctx) => {
                 bot_id: botId
             });
 
-            console.log(`Saved photo reply to database for trigger word: ${tempReplyWord}`);
+            console.log(`Saved photo reply to database for trigger word: ${triggerWord}`);
 
-            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${tempReplyWord}" بنجاح.`);
+            await ctx.reply(`✅ تم إضافة الصورة كرد للكلمة "${triggerWord}" بنجاح.`);
 
             // Reset the user state
             userStates.delete(userId);
@@ -899,7 +900,7 @@ bot.on('photo', async (ctx) => {
             userStates.delete(userId);
         }
     } else {
-        console.log('Not awaiting a reply response or no temp word set');
+        console.log('Not awaiting a reply response or no trigger word set');
         // You might want to handle this case, perhaps by informing the user
         // await ctx.reply('لم يتم طلب إضافة صورة كرد. يرجى استخدام الأمر الصحيح أولاً.');
     }
