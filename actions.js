@@ -56,48 +56,30 @@ if (!fs.existsSync(mediaDir)) {
 async function handleBroadcast(ctx) {
     if (await isDeveloper(ctx, ctx.from.id)) {
         let message = ctx.message;
-        if (!message || !message.text.startsWith('اذاعة')) {
-            return ctx.reply('الرجاء استخدام الأمر "اذاعة" متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
-        }
+        let mediaInfo = null;
 
-        let content;
-        let mediaType;
-        let caption;
-
-        if (message.text !== 'اذاعة' && !message.reply_to_message) {
-            content = message.text.slice('اذاعة'.length).trim();
-            mediaType = 'text';
-        } else if (message.reply_to_message) {
-            const replyMessage = message.reply_to_message;
-            if (replyMessage.text) {
-                content = replyMessage.text;
-                mediaType = 'text';
-            } else if (replyMessage.photo) {
-                content = replyMessage.photo[replyMessage.photo.length - 1].file_id;
-                mediaType = 'photo';
-                caption = replyMessage.caption;
-            } else if (replyMessage.video) {
-                if (replyMessage.video.file_size > 10 * 1024 * 1024) {
-                    return ctx.reply('عذرًا، حجم الفيديو يجب أن لا يتجاوز 10 ميجابايت.');
-                }
-                content = replyMessage.video.file_id;
-                mediaType = 'video';
-                caption = replyMessage.caption;
-            } else if (replyMessage.document) {
-                content = replyMessage.document.file_id;
-                mediaType = 'document';
-                caption = replyMessage.caption;
-            } else {
-                return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
-            }
-        } else {
+        if (!message) {
             return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر "اذاعة".');
         }
+
+        // Check for media types
+        if (message.photo) {
+            mediaInfo = { type: 'photo', fileId: message.photo[message.photo.length - 1].file_id };
+        } else if (message.video) {
+            mediaInfo = { type: 'video', fileId: message.video.file_id };
+        } else if (message.document) {
+            mediaInfo = { type: 'document', fileId: message.document.file_id };
+        } else if (message.audio) {
+            mediaInfo = { type: 'audio', fileId: message.audio.file_id };
+        } else if (message.voice) {
+            mediaInfo = { type: 'voice', fileId: message.voice.file_id };
+        }
+
+        const caption = message.caption || '';
 
         try {
             const db = await ensureDatabaseInitialized();
             const activeGroupsFromDB = await db.collection('groups').find({ is_active: true }).toArray();
-            console.log('Active groups from DB:', activeGroupsFromDB);
 
             if (activeGroupsFromDB.length === 0) {
                 return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
@@ -108,25 +90,32 @@ async function handleBroadcast(ctx) {
 
             for (const group of activeGroupsFromDB) {
                 try {
-                    console.log(`Attempting to send broadcast to group: ${group.group_id} (${group.title})`);
-                    switch (mediaType) {
-                        case 'text':
-                            await ctx.telegram.sendMessage(group.group_id, content);
-                            break;
-                        case 'photo':
-                            await ctx.telegram.sendPhoto(group.group_id, content, { caption });
-                            break;
-                        case 'video':
-                            await ctx.telegram.sendVideo(group.group_id, content, { caption });
-                            break;
-                        case 'document':
-                            await ctx.telegram.sendDocument(group.group_id, content, { caption });
-                            break;
+                    if (mediaInfo) {
+                        // Send media based on type
+                        switch (mediaInfo.type) {
+                            case 'photo':
+                                await ctx.telegram.sendPhoto(group.group_id, mediaInfo.fileId, { caption });
+                                break;
+                            case 'video':
+                                await ctx.telegram.sendVideo(group.group_id, mediaInfo.fileId, { caption });
+                                break;
+                            case 'document':
+                                await ctx.telegram.sendDocument(group.group_id, mediaInfo.fileId, { caption });
+                                break;
+                            case 'audio':
+                                await ctx.telegram.sendAudio(group.group_id, mediaInfo.fileId, { caption });
+                                break;
+                            case 'voice':
+                                await ctx.telegram.sendVoice(group.group_id, mediaInfo.fileId, { caption });
+                                break;
+                        }
+                    } else {
+                        // Send text message
+                        await ctx.telegram.sendMessage(group.group_id, message.text);
                     }
                     successCount++;
-                    console.log(`Successfully sent broadcast to group: ${group.group_id} (${group.title})`);
                 } catch (error) {
-                    console.error(`Failed to send broadcast to group ${group.group_id} (${group.title}):`, error);
+                    console.error(`Failed to send broadcast to group ${group.group_id}:`, error);
                     failCount++;
 
                     if (error.description === 'Forbidden: bot was kicked from the group chat') {
@@ -2598,7 +2587,9 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     const state = pendingReplies.get(userId);
 
     if (!state || state.step !== 'awaiting_response') return;
-
+    if (ctx.message.caption && ctx.message.caption.startsWith('اذاعة')) {
+        handleBroadcast(ctx);
+    }
     const db = await ensureDatabaseInitialized();
 
     let mediaType = 'unknown';
