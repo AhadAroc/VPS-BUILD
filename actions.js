@@ -114,6 +114,7 @@ async function handleBroadcast(ctx) {
         let content;
         let mediaType;
         let caption;
+        let mediaFile;
 
         if (message.text !== 'اذاعة' && !message.reply_to_message) {
             content = message.text.slice('اذاعة'.length).trim();
@@ -124,20 +125,26 @@ async function handleBroadcast(ctx) {
                 content = replyMessage.text;
                 mediaType = 'text';
             } else if (replyMessage.photo) {
-                content = replyMessage.photo[replyMessage.photo.length - 1].file_id;
+                const fileId = replyMessage.photo[replyMessage.photo.length - 1].file_id;
                 mediaType = 'photo';
                 caption = replyMessage.caption;
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaFile = await saveFile(fileLink, `photo_${Date.now()}.jpg`);
             } else if (replyMessage.video) {
                 if (replyMessage.video.file_size > 10 * 1024 * 1024) {
                     return ctx.reply('عذرًا، حجم الفيديو يجب أن لا يتجاوز 10 ميجابايت.');
                 }
-                content = replyMessage.video.file_id;
+                const fileId = replyMessage.video.file_id;
                 mediaType = 'video';
                 caption = replyMessage.caption;
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaFile = await saveFile(fileLink, `video_${Date.now()}.mp4`);
             } else if (replyMessage.document) {
-                content = replyMessage.document.file_id;
+                const fileId = replyMessage.document.file_id;
                 mediaType = 'document';
                 caption = replyMessage.caption;
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                mediaFile = await saveFile(fileLink, `document_${Date.now()}_${replyMessage.document.file_name}`);
             } else {
                 return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
             }
@@ -165,13 +172,13 @@ async function handleBroadcast(ctx) {
                             await ctx.telegram.sendMessage(group.group_id, content);
                             break;
                         case 'photo':
-                            await ctx.telegram.sendPhoto(group.group_id, content, { caption });
+                            await ctx.telegram.sendPhoto(group.group_id, { source: mediaFile.filePath }, { caption });
                             break;
                         case 'video':
-                            await ctx.telegram.sendVideo(group.group_id, content, { caption });
+                            await ctx.telegram.sendVideo(group.group_id, { source: mediaFile.filePath }, { caption });
                             break;
                         case 'document':
-                            await ctx.telegram.sendDocument(group.group_id, content, { caption });
+                            await ctx.telegram.sendDocument(group.group_id, { source: mediaFile.filePath }, { caption });
                             break;
                     }
                     successCount++;
@@ -184,6 +191,11 @@ async function handleBroadcast(ctx) {
                         await markGroupAsInactive(group.group_id);
                     }
                 }
+            }
+
+            // Clean up the downloaded file after broadcasting
+            if (mediaFile) {
+                fs.unlinkSync(mediaFile.filePath);
             }
 
             ctx.reply(`تم إرسال الإذاعة!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
