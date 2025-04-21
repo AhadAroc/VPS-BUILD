@@ -97,6 +97,7 @@ async function handleBroadcast(ctx) {
         try {
             const db = await ensureDatabaseInitialized();
             const activeGroupsFromDB = await db.collection('groups').find({ is_active: true }).toArray();
+            console.log('Active groups from DB:', activeGroupsFromDB);
 
             if (activeGroupsFromDB.length === 0) {
                 return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
@@ -107,6 +108,7 @@ async function handleBroadcast(ctx) {
 
             for (const group of activeGroupsFromDB) {
                 try {
+                    console.log(`Attempting to send broadcast to group: ${group.group_id} (${group.title})`);
                     switch (mediaType) {
                         case 'text':
                             await ctx.telegram.sendMessage(group.group_id, content);
@@ -122,6 +124,7 @@ async function handleBroadcast(ctx) {
                             break;
                     }
                     successCount++;
+                    console.log(`Successfully sent broadcast to group: ${group.group_id} (${group.title})`);
                 } catch (error) {
                     console.error(`Failed to send broadcast to group ${group.group_id} (${group.title}):`, error);
                     failCount++;
