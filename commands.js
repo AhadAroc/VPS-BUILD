@@ -367,6 +367,49 @@ async function getQuestionsForDifficulty(difficulty) {
     }
 }
 
+async function checkUserRank(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        let rank = 'عضو عادي'; // Default rank
+
+        // Check if user is the owner
+        if (ctx.from.username === 'Lorisiv') {
+            rank = 'المطور الأساسي';
+        } else {
+            // Check if user is an admin or owner of the group
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            if (isAdmin) {
+                const chatMember = await ctx.telegram.getChatMember(chatId, userId);
+                rank = chatMember.status === 'creator' ? 'المالك' : 'مشرف';
+            } else {
+                // Check if user is a developer
+                const isDev = await isDeveloper(ctx, userId);
+                if (isDev) {
+                    rank = 'مطور';
+                } else {
+                    // Check if user is a secondary developer
+                    const isSecDev = await isSecondaryDeveloper(ctx, userId);
+                    if (isSecDev) {
+                        rank = 'مطور ثانوي';
+                    } else {
+                        // Check if user is VIP
+                        const isVipUser = await isVIP(ctx, userId);
+                        if (isVipUser) {
+                            rank = 'امن مسابقات';
+                        }
+                    }
+                }
+            }
+        }
+
+        // Send the rank information
+        await ctx.replyWithHTML(`<b>رتبتك:</b> ${rank}`);
+    } catch (error) {
+        console.error('Error in checkUserRank:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
+    }
+}
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates } = require('./actions'); // these were up there
@@ -557,7 +600,8 @@ bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساس
 
 bot.command('منع_مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
 bot.command('تفعيل_مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
-
+bot.command('رتبتي', checkUserRank);
+    bot.hears('رتبتي', checkUserRank);
 // Also add handlers for text commands without the underscore
 bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
 bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
