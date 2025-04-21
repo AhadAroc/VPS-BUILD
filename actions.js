@@ -4301,22 +4301,53 @@ async function getDetailedActiveGroups(ctx) {
         let message = '📋 قائمة المجموعات النشطة:\n\n';
         for (const group of activeGroups) {
             try {
+                const chatInfo = await ctx.telegram.getChat(group.chat_id);
+                const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id);
+                let inviteLink = 'غير متاح';
+                try {
+                    inviteLink = await ctx.telegram.exportChatInviteLink(group.chat_id);
+                } catch (error) {
+                    console.log(`Couldn't get invite link for group ${group.chat_id}: ${error.message}`);
+                }
+
                 message += `━━━━━━━━━━━━━━━\n`;
                 message += `📊 معلومات المجموعة:\n`;
-                message += `🏷 الاسم: ${group.chat_title || 'N/A'}\n`;
-                message += `🔗 الرابط: ${group.invite_link || 'غير متاح'}\n`;
+                message += `🏷 الاسم: ${chatInfo.title}\n`;
+                message += `🔗 الرابط: ${inviteLink}\n`;
                 message += `🆔 الايدي: \`${group.chat_id}\`\n`;
-                message += `👥 الأعضاء: ${group.member_count || 'N/A'}\n`;
+                message += `👥 الأعضاء: ${memberCount}\n`;
+                message += `🔒 النوع: ${chatInfo.type === 'supergroup' ? (chatInfo.username ? 'عامة' : 'خاصة') : chatInfo.type}\n`;
                 message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n`;
                 message += `📅 تاريخ الإضافة: ${new Date(group.added_at).toLocaleString('ar-EG')}\n\n`;
 
+                // Information about who added the bot
                 if (group.added_by) {
                     const adderInfo = await ctx.telegram.getChat(group.added_by).catch(() => null);
                     if (adderInfo) {
                         message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
                         message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
-                        message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
+                        message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n\n`;
                     }
+                }
+
+                // Group owner information
+                const groupOwner = await ctx.telegram.getChatOwner(group.chat_id).catch(() => null);
+                if (groupOwner) {
+                    message += `👑 مالك المجموعة:\n`;
+                    message += `🏷 الاسم: ${groupOwner.user.first_name} ${groupOwner.user.last_name || ''}\n`;
+                    message += `🆔 المعرف: @${groupOwner.user.username || 'N/A'}\n\n`;
+                }
+
+                // Group admins information
+                const groupAdmins = await ctx.telegram.getChatAdministrators(group.chat_id);
+                if (groupAdmins.length > 0) {
+                    message += `👮 المشرفون:\n`;
+                    for (const admin of groupAdmins) {
+                        if (admin.status !== 'creator') { // Skip the owner as we've already listed them
+                            message += `🏷 ${admin.user.first_name} ${admin.user.last_name || ''} (@${admin.user.username || 'N/A'})\n`;
+                        }
+                    }
+                    message += `\n`;
                 }
 
                 message += `\n`;
