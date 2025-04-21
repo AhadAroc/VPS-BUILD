@@ -396,7 +396,7 @@ async function checkUserRank(ctx) {
                         // Check if user is VIP
                         const isVipUser = await isVIP(ctx, userId);
                         if (isVipUser) {
-                            rank = 'امن مسابقات';
+                            rank = 'امن مسابقا ت';
                         }
                     }
                 }
@@ -1455,7 +1455,7 @@ async function listVIPUsers(ctx) {
                     });
                     break;
                 case 'vip_users':
-                    successMessage = `✅ تم إزالة رتبة المميز (VIP) من المستخدم ${userMention}.`;
+                    successMessage = `✅ تم إزالة رتبة امن المسابقات (VIP) من المستخدم ${userMention}.`;
                     // Reset user permissions to default
                     await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
                         can_send_messages: true,
@@ -2022,4 +2022,3 @@ bot.start(async (ctx) => {
 
 
 module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed };
-
