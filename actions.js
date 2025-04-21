@@ -932,24 +932,48 @@ function shuffleArray(array) {
     // Create a separate function to handle the broadcast logic
     async function handleBroadcast(ctx) {
         if (await isDeveloper(ctx, ctx.from.id)) {
-            let message;
-            if (ctx.match) {
-                message = ctx.match[1];
+            let message = ctx.message;
+            if (!message || !message.text.startsWith('/اذاعة')) {
+                return ctx.reply('الرجاء استخدام الأمر /broadcast متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
+            }
+    
+            let content;
+            let mediaType;
+            let caption;
+    
+            if (message.text !== '/اذاعة' && !message.reply_to_message) {
+                content = message.text.slice('/اذاعة'.length).trim();
+                mediaType = 'text';
+            } else if (message.reply_to_message) {
+                const replyMessage = message.reply_to_message;
+                if (replyMessage.text) {
+                    content = replyMessage.text;
+                    mediaType = 'text';
+                } else if (replyMessage.photo) {
+                    content = replyMessage.photo[replyMessage.photo.length - 1].file_id;
+                    mediaType = 'photo';
+                    caption = replyMessage.caption;
+                } else if (replyMessage.video) {
+                    if (replyMessage.video.file_size > 10 * 1024 * 1024) {
+                        return ctx.reply('عذرًا، حجم الفيديو يجب أن لا يتجاوز 10 ميجابايت.');
+                    }
+                    content = replyMessage.video.file_id;
+                    mediaType = 'video';
+                    caption = replyMessage.caption;
+                } else if (replyMessage.document) {
+                    content = replyMessage.document.file_id;
+                    mediaType = 'document';
+                    caption = replyMessage.caption;
+                } else {
+                    return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
+                }
             } else {
-                message = ctx.message.text.split(' ').slice(1).join(' ');
+                return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر /اذاعة.');
             }
-    
-            if (!message) {
-                return ctx.reply('الرجاء إدخال رسالة للإذاعة بعد الأمر. مثال:\nاذاعة مرحبا بالجميع!');
-            }
-    
-            console.log(`Broadcasting message: "${message}"`);
     
             try {
                 const db = await ensureDatabaseInitialized();
                 const activeGroupsFromDB = await db.collection('groups').find({ is_active: true }).toArray();
-    
-                console.log(`Number of active groups from DB: ${activeGroupsFromDB.length}`);
     
                 if (activeGroupsFromDB.length === 0) {
                     return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
@@ -960,15 +984,25 @@ function shuffleArray(array) {
     
                 for (const group of activeGroupsFromDB) {
                     try {
-                        console.log(`Attempting to send to group: ${group.title} (${group.group_id})`);
-                        await ctx.telegram.sendMessage(group.group_id, message);
-                        console.log(`Successfully sent to group: ${group.title} (${group.group_id})`);
+                        switch (mediaType) {
+                            case 'text':
+                                await ctx.telegram.sendMessage(group.group_id, content);
+                                break;
+                            case 'photo':
+                                await ctx.telegram.sendPhoto(group.group_id, content, { caption });
+                                break;
+                            case 'video':
+                                await ctx.telegram.sendVideo(group.group_id, content, { caption });
+                                break;
+                            case 'document':
+                                await ctx.telegram.sendDocument(group.group_id, content, { caption });
+                                break;
+                        }
                         successCount++;
                     } catch (error) {
                         console.error(`Failed to send broadcast to group ${group.group_id} (${group.title}):`, error);
                         failCount++;
     
-                        // If the bot was kicked from the group, mark it as inactive
                         if (error.description === 'Forbidden: bot was kicked from the group chat') {
                             await markGroupAsInactive(group.group_id);
                         }
@@ -984,6 +1018,8 @@ function shuffleArray(array) {
             ctx.reply('عذراً، هذا الأمر للمطورين فقط');
         }
     }
+    
+    
     async function populateActiveGroups(bot) {
         console.log('Populating active groups...');
         const chats = await bot.telegram.getMyCommands();
@@ -2059,14 +2095,26 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
         }
     });
 });
-    bot.action('dev_broadcast', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery();
-            ctx.reply('لإرسال رسالة إذاعة، استخدم الأمر التالي:\n/اذاعة [الرسالة]\n\nمثال:\nاذاعة مرحبا بالجميع!');
-        } else {
-            ctx.answerCbQuery('عذراً، هذا الأمر للمطورين فقط', { show_alert: true });
-        }
-    });
+bot.action('dev_broadcast', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        await ctx.editMessageText(
+            'لإرسال إذاعة، استخدم الأمر /broadcast متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.\n\n' +
+            'مثال:\n/broadcast مرحبًا بالجميع!\n\n' +
+            'يمكنك أيضًا إعادة توجيه رسالة مع الأمر /broadcast لإرسالها كإذاعة.\n\n' +
+            'ملاحظة: حجم الفيديوهات يجب أن لا يتجاوز 10 ميجابايت.',
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
+                    ]
+                }
+            }
+        );
+    } else {
+        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
         try {
             const botId = parseInt(ctx.match[1]);
