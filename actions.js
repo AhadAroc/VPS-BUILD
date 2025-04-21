@@ -3073,7 +3073,7 @@ function getMediaTypeInArabic(mediaType) {
         }
 
         // If we reach here, it's an unsupported message type
-        await ctx.reply('عاشوا 👍');
+        await ctx.reply('');
 
     } catch (error) {
         console.error('Error in message handler:', error);
