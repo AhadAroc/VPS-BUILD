@@ -833,9 +833,10 @@ async function showDevPanel(ctx) {
                 [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
                 [{ text: 'المطورين', callback_data: 'dev_developers' }],
                 [{ text: 'قريبا', callback_data: 'dev_welcome' }],
-                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                 [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                
+                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+              
+            ]
         };
 
         await loadActiveGroupsFromDatabase();
