@@ -833,17 +833,24 @@ async function showDevPanel(ctx) {
                 [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
                 [{ text: 'المطورين', callback_data: 'dev_developers' }],
                 [{ text: 'قريبا', callback_data: 'dev_welcome' }],
+                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                 [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
-                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-              
             ]
         };
 
         await loadActiveGroupsFromDatabase();
         
         if (ctx.callbackQuery) {
-            await ctx.editMessageText(message, { reply_markup: keyboard });
+            const msg = ctx.callbackQuery.message;
+            if (msg.caption) {
+                // If the message has a caption (e.g., it's a photo), edit the caption
+                await ctx.editMessageCaption(message, { reply_markup: keyboard });
+            } else {
+                // If it's a text message, edit the text
+                await ctx.editMessageText(message, { reply_markup: keyboard });
+            }
         } else {
+            // If it's a new command, just send a new message
             await ctx.reply(message, { reply_markup: keyboard });
         }
     } catch (error) {
