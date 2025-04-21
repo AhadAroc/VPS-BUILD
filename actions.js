@@ -56,16 +56,16 @@ if (!fs.existsSync(mediaDir)) {
 async function handleBroadcast(ctx) {
     if (await isDeveloper(ctx, ctx.from.id)) {
         let message = ctx.message;
-        if (!message || !message.text.startsWith('/اذاعة')) {
-            return ctx.reply('الرجاء استخدام الأمر /اذاعة متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
+        if (!message || !message.text.startsWith('اذاعة')) {
+            return ctx.reply('الرجاء استخدام الأمر "اذاعة" متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
         }
 
         let content;
         let mediaType;
         let caption;
 
-        if (message.text !== '/اذاعة' && !message.reply_to_message) {
-            content = message.text.slice('/اذاعة'.length).trim();
+        if (message.text !== 'اذاعة' && !message.reply_to_message) {
+            content = message.text.slice('اذاعة'.length).trim();
             mediaType = 'text';
         } else if (message.reply_to_message) {
             const replyMessage = message.reply_to_message;
@@ -91,7 +91,7 @@ async function handleBroadcast(ctx) {
                 return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
             }
         } else {
-            return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر /اذاعة.');
+            return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر "اذاعة".');
         }
 
         try {
