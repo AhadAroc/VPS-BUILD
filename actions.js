@@ -4151,11 +4151,12 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 return ctx.answerCbQuery('❌ هذا الأمر مخصص للمالك والمطورين الأساسيين فقط.', { show_alert: true });
             }
     
+            // Show loading message
+            await ctx.answerCbQuery('جاري جلب معلومات المجموعات النشطة...');
+            await ctx.editMessageText('جاري جلب المعلومات، يرجى الانتظار...');
+    
             // Fetch active groups with detailed information
             const activeGroupsList = await getDetailedActiveGroups(ctx);
-    
-            // Clear the loading state
-            await ctx.answerCbQuery();
     
             // Prepare the reply markup
             const replyMarkup = {
@@ -4191,10 +4192,13 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         } catch (error) {
             console.error('Error showing active groups:', error);
             await ctx.answerCbQuery('حدث خطأ أثناء عرض المجموعات النشطة.');
-            await ctx.reply('❌ حدث خطأ أثناء عرض المجموعات النشطة. الرجاء المحاولة مرة أخرى لاحقًا.');
+            await ctx.editMessageText('❌ حدث خطأ أثناء عرض المجموعات النشطة. الرجاء المحاولة مرة أخرى لاحقًا.', {
+                reply_markup: {
+                    inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]]
+                }
+            });
         }
     });
-
 
 
     // ✅ Back to the main menu in the same message
@@ -4260,7 +4264,7 @@ async function getDetailedActiveGroups(ctx) {
         const db = await ensureDatabaseInitialized();
         const activeGroups = await db.collection('active_groups')
             .find()
-            .sort({ last_activity: -1 }) // Sort by most recent activity
+            .sort({ last_activity: -1 })
             .toArray();
 
         if (activeGroups.length === 0) {
@@ -4270,22 +4274,29 @@ async function getDetailedActiveGroups(ctx) {
         let message = '📋 قائمة المجموعات النشطة:\n\n';
         for (const group of activeGroups) {
             try {
-                const chatInfo = await ctx.telegram.getChat(group.chat_id);
-                const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id);
+                const chatInfo = await ctx.telegram.getChat(group.chat_id).catch(() => null);
+                if (!chatInfo) {
+                    console.log(`Unable to fetch info for group ${group.chat_id}. Bot might have been removed.`);
+                    continue; // Skip this group and move to the next one
+                }
+
+                const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id).catch(() => 'N/A');
                 
                 message += `━━━━━━━━━━━━━━━\n`;
                 message += `📊 معلومات المجموعة:\n`;
-                message += `🏷 الاسم: ${chatInfo.title}\n`;
+                message += `🏷 الاسم: ${chatInfo.title || 'N/A'}\n`;
                 message += `🆔 الايدي: \`${group.chat_id}\`\n`;
                 message += `👥 الأعضاء: ${memberCount}\n`;
                 message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n\n`;
 
                 if (group.added_by) {
-                    const adderInfo = await ctx.telegram.getChat(group.added_by);
-                    message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
-                    message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
-                    message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
-                    message += `📅 تاريخ الإضافة: ${new Date(group.added_at).toLocaleString('ar-EG')}\n`;
+                    const adderInfo = await ctx.telegram.getChat(group.added_by).catch(() => null);
+                    if (adderInfo) {
+                        message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
+                        message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
+                        message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
+                        message += `📅 تاريخ الإضافة: ${new Date(group.added_at).toLocaleString('ar-EG')}\n`;
+                    }
                 }
 
                 message += `\n`;
