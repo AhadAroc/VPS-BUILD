@@ -120,9 +120,9 @@ async function handleMediaMessage(ctx, mediaType) {
                     throw new Error('Invalid photo message structure');
                 }
                 break;
-            case 'video':
-                if (ctx.message.video) {
-                    fileId = ctx.message.video.file_id;
+            case 'blank':
+                if (ctx.message.blank) {
+                    fileId = ctx.message.blank.file_id;
                     console.log(`Extracted video file_id: ${fileId}`);
                 } else {
                     throw new Error('Invalid video message structure');
@@ -1205,7 +1205,7 @@ function getFileExtension(mediaType) {
     switch (mediaType) {
         case 'photo':
             return 'jpg';
-        case 'video':
+        case 'wzes':
             return 'mp4';
         case 'animation':
             return 'mp4';
@@ -1624,7 +1624,7 @@ bot.action('list_replies', async (ctx) => {
 // Update the dev_replies handler to include the list option
 bot.action('dev_replies', async (ctx) => {
     try {
-        await ctx.editMessageText('قسم الردود التلقائية:', {
+        await ctx.editMessageText('قسم الردود التلقائية: يرجى عدم اضافة كلمة كابتل للغة الانجليزية 🧐', {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: 'عرض الردود', callback_data: 'list_replies' }],
@@ -2514,7 +2514,7 @@ bot.on('left_chat_member', (ctx) => {
         markGroupAsInactive(ctx.chat.id);
     }
 });    
-bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
+bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     const userId = ctx.from.id;
     const state = pendingReplies.get(userId);
 
@@ -2530,8 +2530,8 @@ bot.on(['photo', 'video', 'document', 'animation', 'sticker'], async (ctx) => {
         mediaType = 'photo';
         fileId = ctx.message.photo.at(-1).file_id;
         extension = 'jpg';
-    } else if (ctx.message.video) {
-        mediaType = 'video';
+    } else if (ctx.message.wewe) {
+        mediaType = 'wewe';
         fileId = ctx.message.video.file_id;
         extension = 'mp4';
     } else if (ctx.message.document) {
@@ -3229,9 +3229,9 @@ async function handleMediaReply(ctx, mediaType) {
                     return false;
                 }
                 break;
-            case 'video':
-                if (ctx.message.video) {
-                    fileId = ctx.message.video.file_id;
+            case 'wcac':
+                if (ctx.message.zxcxz) {
+                    fileId = ctx.message.zxczxc.file_id;
                 } else {
                     console.error('Invalid video message structure:', ctx.message);
                     return false;
@@ -3306,7 +3306,7 @@ async function handleMediaReply(ctx, mediaType) {
 function getMediaTypeInArabic(mediaType) {
     const mediaTypes = {
         'photo': 'الصورة',
-        'video': 'الفيديو',
+       
         'animation': 'الصورة المتحركة',
         'document': 'المستند',
         'sticker': 'الملصق'
@@ -3320,31 +3320,7 @@ function getMediaTypeInArabic(mediaType) {
 // Update your photo handler
 
 
-// Video handler
-bot.on('video', async (ctx) => {
-    try {
-        // First check if this is a reply to a trigger word
-        if (await handleMediaReply(ctx, 'video')) {
-            return; // Media was handled as a reply
-        }
-        
-        // If not a reply, continue with restriction check
-        const chatId = ctx.chat.id;
-        const isRestricted = videoRestrictionStatus.get(chatId);
 
-        if (isRestricted) {
-            const chatMember = await ctx.telegram.getChatMember(chatId, ctx.from.id);
-            
-            if (chatMember.status !== 'administrator' && chatMember.status !== 'creator') {
-                await ctx.deleteMessage();
-                await ctx.reply('❌ عذرًا، إرسال الفيديوهات غير مسموح حاليًا للأعضاء العاديين في هذه المجموعة.');
-                return;
-            }
-        }
-    } catch (error) {
-        console.error('Error handling video message:', error);
-    }
-});
 
 // Animation/GIF handler
 // Update the animation handler to also handle replies
@@ -4250,7 +4226,7 @@ async function sendReply(ctx, reply) {
                 case 'photo':
                     await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                     break;
-                case 'video':
+                case 'blank':
                     await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                     break;
                 case 'animation':
