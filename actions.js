@@ -4275,6 +4275,7 @@ async function getDetailedActiveGroups(ctx) {
                 message += `━━━━━━━━━━━━━━━\n`;
                 message += `📊 معلومات المجموعة:\n`;
                 message += `🏷 الاسم: ${group.chat_title || 'N/A'}\n`;
+                message += `🔗 الرابط: ${group.invite_link || 'غير متاح'}\n`;
                 message += `🆔 الايدي: \`${group.chat_id}\`\n`;
                 message += `👥 الأعضاء: ${group.member_count || 'N/A'}\n`;
                 message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n`;
@@ -4309,6 +4310,13 @@ async function updateGroupInfo(ctx) {
             const chatId = ctx.chat.id;
             const chatTitle = ctx.chat.title;
             const memberCount = await ctx.telegram.getChatMembersCount(chatId);
+            let inviteLink = null;
+
+            try {
+                inviteLink = await ctx.telegram.exportChatInviteLink(chatId);
+            } catch (error) {
+                console.log(`Couldn't get invite link for group ${chatId}: ${error.message}`);
+            }
 
             await db.collection('active_groups').updateOne(
                 { chat_id: chatId },
@@ -4316,7 +4324,8 @@ async function updateGroupInfo(ctx) {
                     $set: {
                         chat_title: chatTitle,
                         member_count: memberCount,
-                        last_activity: new Date()
+                        last_activity: new Date(),
+                        invite_link: inviteLink
                     },
                     $setOnInsert: {
                         added_at: new Date(),
