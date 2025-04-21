@@ -525,7 +525,14 @@ bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
 // Additional handler for flexibility
 bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
+// Add these lines to your existing command handlers
+bot.command('ترقية_مطور', async (ctx) => {
+    await promoteUser(ctx, 'مطور');
+});
 
+bot.hears(/^ترقية مطور/, async (ctx) => {
+    await promoteUser(ctx, 'مطور');
+});
 // Handle "نكتة" text command
 bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
