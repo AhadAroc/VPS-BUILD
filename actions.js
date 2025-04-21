@@ -4129,8 +4129,12 @@ bot.action('remove_custom_chat_name', async (ctx) => {
     
     bot.action('show_active_groups', async (ctx) => {
         try {
-            if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-                return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+            const userId = ctx.from.id;
+            const isOwner = ctx.from.username === ''; // Replace with the actual owner's username
+            const isPrimaryDev = await isDeveloper(ctx, userId);
+    
+            if (!isOwner && !isPrimaryDev) {
+                return ctx.answerCbQuery('❌ هذا الأمر مخصص للمالك والمطورين الأساسيين فقط.', { show_alert: true });
             }
     
             // Fetch active groups
