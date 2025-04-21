@@ -4130,7 +4130,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
     bot.action('show_active_groups', async (ctx) => {
         try {
             const userId = ctx.from.id;
-            const isOwner = ctx.from.username === ''; // Replace with the actual owner's username
+            const isOwner = ctx.from.username === 'Lorisiv'; // Replace with the actual owner's username
             const isPrimaryDev = await isDeveloper(ctx, userId);
     
             if (!isOwner && !isPrimaryDev) {
@@ -4143,17 +4143,26 @@ bot.action('remove_custom_chat_name', async (ctx) => {
             // Clear the loading state
             await ctx.answerCbQuery();
     
-            // Edit the message with the list of active groups
-            await ctx.editMessageCaption(activeGroupsList, {
+            // Prepare the reply markup
+            const replyMarkup = {
+                inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]]
+            };
+    
+            // Always edit the message text
+            await ctx.editMessageText(activeGroupsList, {
                 parse_mode: 'Markdown',
                 disable_web_page_preview: true,
-                reply_markup: {
-                    inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back' }]]
-                }
+                reply_markup: replyMarkup
             });
         } catch (error) {
             console.error('Error showing active groups:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء عرض المجموعات النشطة.');
+            // If editing fails, send a new message
+            await ctx.answerCbQuery('حدث خطأ أثناء تحديث الرسالة. سيتم إرسال رسالة جديدة.');
+            await ctx.reply(activeGroupsList, {
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+                reply_markup: replyMarkup
+            });
         }
     });
 
@@ -4196,13 +4205,25 @@ bot.action('remove_custom_chat_name', async (ctx) => {
 
 
 // ✅ Show list of active groups
-function getActiveGroups() {
-    if (activeGroups.size === 0) return '❌ لا توجد مجموعات نشطة.';
-    let message = '🚀 قائمة المجموعات النشطة:\n\n';
-    activeGroups.forEach((group) => {
-        message += `🔹 ${group.title}\n`;
-    });
-    return message;
+async function getActiveGroups(ctx) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const activeGroups = await db.collection('active_groups').find().toArray();
+
+        if (activeGroups.length === 0) {
+            return '❌ لا توجد مجموعات نشطة.';
+        }
+
+        let message = '📋 قائمة المجموعات النشطة:\n\n';
+        activeGroups.forEach((group, index) => {
+            message += `${index + 1}. ${group.chat_title} (ID: ${group.chat_id})\n`;
+        });
+
+        return message;
+    } catch (error) {
+        console.error('Error fetching active groups:', error);
+        return '❌ حدث خطأ أثناء جلب قائمة المجموعات النشطة.';
+    }
 }
 
 
