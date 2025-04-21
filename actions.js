@@ -4156,15 +4156,44 @@ bot.action('remove_custom_chat_name', async (ctx) => {
             await ctx.answerCbQuery('جاري جلب معلومات المجموعات النشطة...');
             await ctx.editMessageText('جاري جلب المعلومات، يرجى الانتظار...');
     
-            const activeGroupsList = await getDetailedActiveGroups(ctx);
+            const db = await ensureDatabaseInitialized();
+            const activeGroups = await db.collection('active_groups').find().toArray();
+    
+            let message = '📋 قائمة المجموعات النشطة:\n\n';
+    
+            for (const group of activeGroups) {
+                try {
+                    const chatInfo = await ctx.telegram.getChat(group.chat_id);
+                    const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id);
+                    let inviteLink = 'غير متاح';
+                    try {
+                        inviteLink = await ctx.telegram.exportChatInviteLink(group.chat_id);
+                    } catch (error) {
+                        console.log(`Couldn't get invite link for group ${group.chat_id}: ${error.message}`);
+                    }
+    
+                    message += `━━━━━━━━━━━━━━━\n`;
+                    message += `📊 معلومات المجموعة:\n`;
+                    message += `🏷 الاسم: ${chatInfo.title}\n`;
+                    message += `🔗 الرابط: ${inviteLink}\n`;
+                    message += `🆔 الايدي: \`${group.chat_id}\`\n`;
+                    message += `👥 الأعضاء: ${memberCount}\n`;
+                    message += `🔒 النوع: ${chatInfo.type === 'supergroup' ? (chatInfo.username ? 'عامة' : 'خاصة') : chatInfo.type}\n`;
+                    message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n\n`;
+    
+                } catch (error) {
+                    console.error(`Error fetching details for group ${group.chat_id}:`, error);
+                    message += `❌ تعذر جلب معلومات المجموعة ${group.chat_id}\n\n`;
+                }
+            }
     
             const replyMarkup = {
                 inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]]
             };
     
             const maxLength = 4096;
-            if (activeGroupsList.length > maxLength) {
-                const chunks = activeGroupsList.match(new RegExp(`.{1,${maxLength}}`, 'g'));
+            if (message.length > maxLength) {
+                const chunks = message.match(new RegExp(`.{1,${maxLength}}`, 'g'));
                 for (let i = 0; i < chunks.length; i++) {
                     if (i === 0) {
                         await ctx.editMessageText(chunks[i], {
@@ -4181,7 +4210,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                     }
                 }
             } else {
-                await ctx.editMessageText(activeGroupsList, {
+                await ctx.editMessageText(message, {
                     parse_mode: 'Markdown',
                     disable_web_page_preview: true,
                     reply_markup: replyMarkup
