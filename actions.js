@@ -52,87 +52,7 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-// Create a separate function to handle the broadcast logic
-async function handleBroadcast(ctx) {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        let message = ctx.message;
-        let mediaInfo = null;
 
-        if (!message) {
-            return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر "اذاعة".');
-        }
-
-        // Check for media types
-        if (message.photo) {
-            mediaInfo = { type: 'photo', fileId: message.photo[message.photo.length - 1].file_id };
-        } else if (message.video) {
-            mediaInfo = { type: 'video', fileId: message.video.file_id };
-        } else if (message.document) {
-            mediaInfo = { type: 'document', fileId: message.document.file_id };
-        } else if (message.audio) {
-            mediaInfo = { type: 'audio', fileId: message.audio.file_id };
-        } else if (message.voice) {
-            mediaInfo = { type: 'voice', fileId: message.voice.file_id };
-        }
-
-        const caption = message.caption || '';
-
-        try {
-            const db = await ensureDatabaseInitialized();
-            const activeGroupsFromDB = await db.collection('groups').find({ is_active: true }).toArray();
-
-            if (activeGroupsFromDB.length === 0) {
-                return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
-            }
-
-            let successCount = 0;
-            let failCount = 0;
-
-            for (const group of activeGroupsFromDB) {
-                try {
-                    if (mediaInfo) {
-                        // Send media based on type
-                        switch (mediaInfo.type) {
-                            case 'photo':
-                                await ctx.telegram.sendPhoto(group.group_id, mediaInfo.fileId, { caption });
-                                break;
-                            case 'video':
-                                await ctx.telegram.sendVideo(group.group_id, mediaInfo.fileId, { caption });
-                                break;
-                            case 'document':
-                                await ctx.telegram.sendDocument(group.group_id, mediaInfo.fileId, { caption });
-                                break;
-                            case 'audio':
-                                await ctx.telegram.sendAudio(group.group_id, mediaInfo.fileId, { caption });
-                                break;
-                            case 'voice':
-                                await ctx.telegram.sendVoice(group.group_id, mediaInfo.fileId, { caption });
-                                break;
-                        }
-                    } else {
-                        // Send text message
-                        await ctx.telegram.sendMessage(group.group_id, message.text);
-                    }
-                    successCount++;
-                } catch (error) {
-                    console.error(`Failed to send broadcast to group ${group.group_id}:`, error);
-                    failCount++;
-
-                    if (error.description === 'Forbidden: bot was kicked from the group chat') {
-                        await markGroupAsInactive(group.group_id);
-                    }
-                }
-            }
-
-            ctx.reply(`تم إرسال الإذاعة!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
-        } catch (error) {
-            console.error('Error in handleBroadcast:', error);
-            ctx.reply('حدث خطأ أثناء محاولة إرسال الإذاعة. يرجى المحاولة مرة أخرى لاحقًا.');
-        }
-    } else {
-        ctx.reply('عذراً، هذا الأمر للمطورين فقط');
-    }
-}
 // Function to download and save file
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
@@ -146,7 +66,13 @@ async function saveFile(fileLink, fileName) {
             fs.mkdirSync(mediaDir, { recursive: true });
         }
         
-        const filePath = path.join(mediaDir, fileName);
+        // Generate a unique filename with timestamp while keeping the original extension
+        const timestamp = Date.now();
+        const fileExtension = path.extname(fileName);
+        const fileNameWithoutExt = path.basename(fileName, fileExtension);
+        const newFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
+        
+        const filePath = path.join(mediaDir, newFileName);
         console.log(`Full file path: ${filePath}`);
         
         // Use axios to download the file
@@ -164,7 +90,7 @@ async function saveFile(fileLink, fileName) {
         return new Promise((resolve, reject) => {
             writer.on('finish', () => {
                 console.log(`File successfully saved to ${filePath}`);
-                resolve(filePath);
+                resolve({ filePath, fileName: newFileName });
             });
             writer.on('error', (err) => {
                 console.error(`Error writing file to ${filePath}:`, err);
@@ -177,7 +103,98 @@ async function saveFile(fileLink, fileName) {
     }
 }
 
+// Create a separate function to handle the broadcast logic
+async function handleBroadcast(ctx) {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        let message = ctx.message;
+        if (!message || !message.text.startsWith('اذاعة')) {
+            return ctx.reply('الرجاء استخدام الأمر "اذاعة" متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
+        }
 
+        let content;
+        let mediaType;
+        let caption;
+
+        if (message.text !== 'اذاعة' && !message.reply_to_message) {
+            content = message.text.slice('اذاعة'.length).trim();
+            mediaType = 'text';
+        } else if (message.reply_to_message) {
+            const replyMessage = message.reply_to_message;
+            if (replyMessage.text) {
+                content = replyMessage.text;
+                mediaType = 'text';
+            } else if (replyMessage.photo) {
+                content = replyMessage.photo[replyMessage.photo.length - 1].file_id;
+                mediaType = 'photo';
+                caption = replyMessage.caption;
+            } else if (replyMessage.video) {
+                if (replyMessage.video.file_size > 10 * 1024 * 1024) {
+                    return ctx.reply('عذرًا، حجم الفيديو يجب أن لا يتجاوز 10 ميجابايت.');
+                }
+                content = replyMessage.video.file_id;
+                mediaType = 'video';
+                caption = replyMessage.caption;
+            } else if (replyMessage.document) {
+                content = replyMessage.document.file_id;
+                mediaType = 'document';
+                caption = replyMessage.caption;
+            } else {
+                return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
+            }
+        } else {
+            return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر "اذاعة".');
+        }
+
+        try {
+            const db = await ensureDatabaseInitialized();
+            const activeGroupsFromDB = await db.collection('groups').find({ is_active: true }).toArray();
+            console.log('Active groups from DB:', activeGroupsFromDB);
+
+            if (activeGroupsFromDB.length === 0) {
+                return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
+            }
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const group of activeGroupsFromDB) {
+                try {
+                    console.log(`Attempting to send broadcast to group: ${group.group_id} (${group.title})`);
+                    switch (mediaType) {
+                        case 'text':
+                            await ctx.telegram.sendMessage(group.group_id, content);
+                            break;
+                        case 'photo':
+                            await ctx.telegram.sendPhoto(group.group_id, content, { caption });
+                            break;
+                        case 'video':
+                            await ctx.telegram.sendVideo(group.group_id, content, { caption });
+                            break;
+                        case 'document':
+                            await ctx.telegram.sendDocument(group.group_id, content, { caption });
+                            break;
+                    }
+                    successCount++;
+                    console.log(`Successfully sent broadcast to group: ${group.group_id} (${group.title})`);
+                } catch (error) {
+                    console.error(`Failed to send broadcast to group ${group.group_id} (${group.title}):`, error);
+                    failCount++;
+
+                    if (error.description === 'Forbidden: bot was kicked from the group chat') {
+                        await markGroupAsInactive(group.group_id);
+                    }
+                }
+            }
+
+            ctx.reply(`تم إرسال الإذاعة!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
+        } catch (error) {
+            console.error('Error in handleBroadcast:', error);
+            ctx.reply('حدث خطأ أثناء محاولة إرسال الإذاعة. يرجى المحاولة مرة أخرى لاحقًا.');
+        }
+    } else {
+        ctx.reply('عذراً، هذا الأمر للمطورين فقط');
+    }
+}
 // Consolidated media handler function
 async function handleMediaMessage(ctx, mediaType) {
     try {
@@ -2587,9 +2604,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     const state = pendingReplies.get(userId);
 
     if (!state || state.step !== 'awaiting_response') return;
-    if (ctx.message.caption && ctx.message.caption.startsWith('اذاعة')) {
-        handleBroadcast(ctx);
-    }
+
     const db = await ensureDatabaseInitialized();
 
     let mediaType = 'unknown';
