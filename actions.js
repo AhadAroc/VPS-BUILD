@@ -944,29 +944,42 @@ function shuffleArray(array) {
             }
     
             console.log(`Broadcasting message: "${message}"`);
-            console.log(`Number of active groups: ${activeGroups.size}`);
-            console.log('Active groups:', Array.from(activeGroups.entries()));
     
-            if (activeGroups.size === 0) {
-                return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
-            }
+            try {
+                const db = await ensureDatabaseInitialized();
+                const activeGroupsFromDB = await db.collection('groups').find({ is_active: true }).toArray();
     
-            let successCount = 0;
-            let failCount = 0;
+                console.log(`Number of active groups from DB: ${activeGroupsFromDB.length}`);
     
-            for (const [groupId, groupInfo] of activeGroups) {
-                try {
-                    console.log(`Attempting to send to group: ${groupInfo.title} (${groupId})`);
-                    await ctx.telegram.sendMessage(groupId, message);
-                    console.log(`Successfully sent to group: ${groupInfo.title} (${groupId})`);
-                    successCount++;
-                } catch (error) {
-                    console.error(`Failed to send broadcast to group ${groupId} (${groupInfo.title}):`, error);
-                    failCount++;
+                if (activeGroupsFromDB.length === 0) {
+                    return ctx.reply('لا توجد مجموعات نشطة لإرسال الإذاعة إليها.');
                 }
-            }
     
-            ctx.reply(`تم إرسال الإذاعة!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
+                let successCount = 0;
+                let failCount = 0;
+    
+                for (const group of activeGroupsFromDB) {
+                    try {
+                        console.log(`Attempting to send to group: ${group.title} (${group.group_id})`);
+                        await ctx.telegram.sendMessage(group.group_id, message);
+                        console.log(`Successfully sent to group: ${group.title} (${group.group_id})`);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Failed to send broadcast to group ${group.group_id} (${group.title}):`, error);
+                        failCount++;
+    
+                        // If the bot was kicked from the group, mark it as inactive
+                        if (error.description === 'Forbidden: bot was kicked from the group chat') {
+                            await markGroupAsInactive(group.group_id);
+                        }
+                    }
+                }
+    
+                ctx.reply(`تم إرسال الإذاعة!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
+            } catch (error) {
+                console.error('Error in handleBroadcast:', error);
+                ctx.reply('حدث خطأ أثناء محاولة إرسال الإذاعة. يرجى المحاولة مرة أخرى لاحقًا.');
+            }
         } else {
             ctx.reply('عذراً، هذا الأمر للمطورين فقط');
         }
