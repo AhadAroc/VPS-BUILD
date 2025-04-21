@@ -2919,6 +2919,8 @@ function getMediaTypeInArabic(mediaType) {
      // Replace the problematic message handler with this one
      
     bot.on('message', async (ctx, next) => {
+        await updateGroupInfo(ctx);
+    next();
     try {
         console.log('Received message:', ctx.message);
 
@@ -4151,20 +4153,16 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 return ctx.answerCbQuery('❌ هذا الأمر مخصص للمالك والمطورين الأساسيين فقط.', { show_alert: true });
             }
     
-            // Show loading message
             await ctx.answerCbQuery('جاري جلب معلومات المجموعات النشطة...');
             await ctx.editMessageText('جاري جلب المعلومات، يرجى الانتظار...');
     
-            // Fetch active groups with detailed information
             const activeGroupsList = await getDetailedActiveGroups(ctx);
     
-            // Prepare the reply markup
             const replyMarkup = {
                 inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]]
             };
     
-            // Split the message if it's too long
-            const maxLength = 4096; // Telegram's max message length
+            const maxLength = 4096;
             if (activeGroupsList.length > maxLength) {
                 const chunks = activeGroupsList.match(new RegExp(`.{1,${maxLength}}`, 'g'));
                 for (let i = 0; i < chunks.length; i++) {
@@ -4274,20 +4272,13 @@ async function getDetailedActiveGroups(ctx) {
         let message = '📋 قائمة المجموعات النشطة:\n\n';
         for (const group of activeGroups) {
             try {
-                const chatInfo = await ctx.telegram.getChat(group.chat_id).catch(() => null);
-                if (!chatInfo) {
-                    console.log(`Unable to fetch info for group ${group.chat_id}. Bot might have been removed.`);
-                    continue; // Skip this group and move to the next one
-                }
-
-                const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id).catch(() => 'N/A');
-                
                 message += `━━━━━━━━━━━━━━━\n`;
                 message += `📊 معلومات المجموعة:\n`;
-                message += `🏷 الاسم: ${chatInfo.title || 'N/A'}\n`;
+                message += `🏷 الاسم: ${group.chat_title || 'N/A'}\n`;
                 message += `🆔 الايدي: \`${group.chat_id}\`\n`;
-                message += `👥 الأعضاء: ${memberCount}\n`;
-                message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n\n`;
+                message += `👥 الأعضاء: ${group.member_count || 'N/A'}\n`;
+                message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n`;
+                message += `📅 تاريخ الإضافة: ${new Date(group.added_at).toLocaleString('ar-EG')}\n\n`;
 
                 if (group.added_by) {
                     const adderInfo = await ctx.telegram.getChat(group.added_by).catch(() => null);
@@ -4295,7 +4286,6 @@ async function getDetailedActiveGroups(ctx) {
                         message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
                         message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
                         message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
-                        message += `📅 تاريخ الإضافة: ${new Date(group.added_at).toLocaleString('ar-EG')}\n`;
                     }
                 }
 
@@ -4310,6 +4300,36 @@ async function getDetailedActiveGroups(ctx) {
     } catch (error) {
         console.error('Error fetching detailed active groups:', error);
         return '❌ حدث خطأ أثناء جلب معلومات المجموعات النشطة.';
+    }
+}
+async function updateGroupInfo(ctx) {
+    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+        try {
+            const db = await ensureDatabaseInitialized();
+            const chatId = ctx.chat.id;
+            const chatTitle = ctx.chat.title;
+            const memberCount = await ctx.telegram.getChatMembersCount(chatId);
+
+            await db.collection('active_groups').updateOne(
+                { chat_id: chatId },
+                {
+                    $set: {
+                        chat_title: chatTitle,
+                        member_count: memberCount,
+                        last_activity: new Date()
+                    },
+                    $setOnInsert: {
+                        added_at: new Date(),
+                        added_by: ctx.from.id
+                    }
+                },
+                { upsert: true }
+            );
+
+            console.log(`Updated group info for ${chatTitle} (${chatId})`);
+        } catch (error) {
+            console.error('Error updating group info:', error);
+        }
     }
 }
 // Add this function to get the custom bot name for a chat
