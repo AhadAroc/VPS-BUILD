@@ -151,7 +151,7 @@ async function handleBroadcast(ctx) {
         let content;
         let mediaType;
         let caption;
-        let mediaFile;
+        let fileId;
 
         if (message.text !== 'اذاعة' && !message.reply_to_message) {
             content = message.text.slice('اذاعة'.length).trim();
@@ -162,13 +162,18 @@ async function handleBroadcast(ctx) {
                 content = replyMessage.text;
                 mediaType = 'text';
             } else {
-                try {
-                    mediaFile = await downloadMedia(ctx, replyMessage);
-                    mediaType = mediaFile.mimeType.split('/')[0];
-                    caption = replyMessage.caption;
-                } catch (error) {
-                    console.error('Error downloading media:', error);
-                    return ctx.reply('حدث خطأ أثناء تحميل الوسائط. يرجى المحاولة مرة أخرى.');
+                caption = replyMessage.caption;
+                if (replyMessage.photo) {
+                    mediaType = 'photo';
+                    fileId = replyMessage.photo[replyMessage.photo.length - 1].file_id;
+                } else if (replyMessage.video) {
+                    mediaType = 'video';
+                    fileId = replyMessage.video.file_id;
+                } else if (replyMessage.document) {
+                    mediaType = 'document';
+                    fileId = replyMessage.document.file_id;
+                } else {
+                    return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
                 }
             }
         } else {
@@ -194,14 +199,14 @@ async function handleBroadcast(ctx) {
                         case 'text':
                             await ctx.telegram.sendMessage(group.group_id, content);
                             break;
-                        case 'image':
-                            await ctx.telegram.sendPhoto(group.group_id, { source: mediaFile.filePath }, { caption });
+                        case 'photo':
+                            await ctx.telegram.sendPhoto(group.group_id, fileId, { caption });
                             break;
                         case 'video':
-                            await ctx.telegram.sendVideo(group.group_id, { source: mediaFile.filePath }, { caption });
+                            await ctx.telegram.sendVideo(group.group_id, fileId, { caption });
                             break;
-                        case 'application':
-                            await ctx.telegram.sendDocument(group.group_id, { source: mediaFile.filePath }, { caption });
+                        case 'document':
+                            await ctx.telegram.sendDocument(group.group_id, fileId, { caption });
                             break;
                     }
                     successCount++;
@@ -214,11 +219,6 @@ async function handleBroadcast(ctx) {
                         await markGroupAsInactive(group.group_id);
                     }
                 }
-            }
-
-            // Clean up the downloaded file after broadcasting
-            if (mediaFile) {
-                fs.unlinkSync(mediaFile.filePath);
             }
 
             ctx.reply(`تم إرسال الإذاعة!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
