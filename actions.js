@@ -32,6 +32,7 @@ const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
+const { updateActiveGroup } = require('./database');
 // Quiz state constants
 const QUIZ_STATE = {
     INACTIVE: 0,
@@ -773,7 +774,13 @@ function setupActions(bot) {
 // Photo handler
 
 
-
+bot.on('new_chat_members', async (ctx) => {
+    const newMembers = ctx.message.new_chat_members;
+    if (newMembers.some(member => member.id === ctx.botInfo.id)) {
+        // Bot was added to a new group
+        await updateActiveGroup(ctx.chat.id, ctx.chat.title, ctx.from.id);
+    }
+});
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
 // Add these action handlers for timer settings
@@ -4251,7 +4258,10 @@ async function getActiveGroups(ctx) {
 async function getDetailedActiveGroups(ctx) {
     try {
         const db = await ensureDatabaseInitialized();
-        const activeGroups = await db.collection('active_groups').find().toArray();
+        const activeGroups = await db.collection('active_groups')
+            .find()
+            .sort({ last_activity: -1 }) // Sort by most recent activity
+            .toArray();
 
         if (activeGroups.length === 0) {
             return '❌ لا توجد مجموعات نشطة.';
@@ -4259,25 +4269,30 @@ async function getDetailedActiveGroups(ctx) {
 
         let message = '📋 قائمة المجموعات النشطة:\n\n';
         for (const group of activeGroups) {
-            const chatInfo = await ctx.telegram.getChat(group.chat_id);
-            const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id);
-            
-            message += `━━━━━━━━━━━━━━━\n`;
-            message += `📊 معلومات المجموعة:\n`;
-            message += `🏷 الاسم: ${chatInfo.title}\n`;
-            message += `🆔 الايدي: \`${group.chat_id}\`\n`;
-            message += `👥 الأعضاء: ${memberCount}\n\n`;
+            try {
+                const chatInfo = await ctx.telegram.getChat(group.chat_id);
+                const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id);
+                
+                message += `━━━━━━━━━━━━━━━\n`;
+                message += `📊 معلومات المجموعة:\n`;
+                message += `🏷 الاسم: ${chatInfo.title}\n`;
+                message += `🆔 الايدي: \`${group.chat_id}\`\n`;
+                message += `👥 الأعضاء: ${memberCount}\n`;
+                message += `📅 آخر نشاط: ${new Date(group.last_activity).toLocaleString('ar-EG')}\n\n`;
 
-            // Add information about the person who added the bot (if available)
-            if (group.added_by) {
-                const adderInfo = await ctx.telegram.getChat(group.added_by);
-                message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
-                message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
-                message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
-                message += `📅 التاريخ: ${new Date(group.added_at).toLocaleString('ar-EG')}\n`;
+                if (group.added_by) {
+                    const adderInfo = await ctx.telegram.getChat(group.added_by);
+                    message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
+                    message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
+                    message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
+                    message += `📅 تاريخ الإضافة: ${new Date(group.added_at).toLocaleString('ar-EG')}\n`;
+                }
+
+                message += `\n`;
+            } catch (error) {
+                console.error(`Error fetching details for group ${group.chat_id}:`, error);
+                message += `❌ تعذر جلب معلومات المجموعة ${group.chat_id}\n\n`;
             }
-
-            message += `\n`;
         }
 
         return message;
