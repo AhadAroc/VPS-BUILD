@@ -527,7 +527,7 @@ bot.command('تنزيل_مميز', demoteUser);
 
 // Add hears handlers for promoting and demoting VIP users
 bot.hears(/^رفع امن مسابقات/, (ctx) => promoteUser(ctx, 'مميز'));
-bot.hears(/^تنزيل رفع امن مسابقات/, demoteUser);
+bot.hears(/^تنزيل امن مسابقات/, demoteUser);
 
 bot.command('معرفي', (ctx) => showUserId(ctx));
 
