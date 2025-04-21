@@ -57,7 +57,7 @@ async function handleBroadcast(ctx) {
     if (await isDeveloper(ctx, ctx.from.id)) {
         let message = ctx.message;
         if (!message || !message.text.startsWith('/اذاعة')) {
-            return ctx.reply('الرجاء استخدام الأمر /broadcast متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
+            return ctx.reply('الرجاء استخدام الأمر /اذاعة متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.');
         }
 
         let content;
@@ -2099,9 +2099,9 @@ bot.action('dev_broadcast', async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery();
         await ctx.editMessageText(
-            'لإرسال إذاعة، استخدم الأمر /broadcast متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.\n\n' +
-            'مثال:\n/broadcast مرحبًا بالجميع!\n\n' +
-            'يمكنك أيضًا إعادة توجيه رسالة مع الأمر /broadcast لإرسالها كإذاعة.\n\n' +
+            'لإرسال إذاعة، استخدم الأمر /اذاعة متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.\n\n' +
+            'مثال:\n/اذاعة مرحبًا بالجميع!\n\n' +
+            'يمكنك أيضًا إعادة توجيه رسالة مع الأمر /اذاعة لإرسالها كإذاعة.\n\n' +
             'ملاحظة: حجم الفيديوهات يجب أن لا يتجاوز 10 ميجابايت.',
             {
                 reply_markup: {
