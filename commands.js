@@ -59,20 +59,19 @@ async function isVIP(ctx, userId) {
 
 // Add this middleware function
 async function photoRestrictionMiddleware(ctx, next) {
-    if (ctx.message && (ctx.message.photo || (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('image/')))) {
+    if (ctx.message && ctx.message.photo) {
         const chatId = ctx.chat.id;
         if (photoRestrictionStatus.get(chatId)) {
             const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
+            const isVipUser = await isVIP(ctx, ctx.from.id);
+            if (!isAdmin && !isVipUser) {
                 try {
-                    // Delete the message
                     await ctx.deleteMessage();
-                    // Send a warning message
                     await ctx.reply('❌ عذرًا، تم تعطيل إرسال الصور للأعضاء العاديين في هذه المجموعة.');
                 } catch (error) {
                     console.error('Error in photoRestrictionMiddleware:', error);
                 }
-                return; // Stop further processing
+                return;
             }
         }
     }
@@ -88,26 +87,19 @@ function trackUser(ctx) {
 }
 
 async function linkRestrictionMiddleware(ctx, next) {
-    if (ctx.message && ctx.message.text && !ctx.from?.is_bot) {
+    if (ctx.message && ctx.message.entities && ctx.message.entities.some(e => e.type === 'url')) {
         const chatId = ctx.chat.id;
-
         if (linkRestrictionStatus.get(chatId)) {
             const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-
-            if (!isAdmin) {
-                const urlRegex = /(https?:\/\/)?[^\s]+\.[a-z]{2,}/i;
-
-                if (urlRegex.test(ctx.message.text)) {
-                    try {
-                        await ctx.deleteMessage();
-                        await ctx.reply('❌ تم حذف الرسالة لأنها تحتوي على رابط.', {
-                            reply_to_message_id: ctx.message.message_id
-                        });
-                    } catch (error) {
-                        console.error('Error deleting message with link:', error);
-                    }
-                    return;
+            const isVipUser = await isVIP(ctx, ctx.from.id);
+            if (!isAdmin && !isVipUser) {
+                try {
+                    await ctx.deleteMessage();
+                    await ctx.reply('❌ عذرًا، تم منع مشاركة الروابط للأعضاء العاديين في هذه المجموعة.');
+                } catch (error) {
+                    console.error('Error in linkRestrictionMiddleware:', error);
                 }
+                return;
             }
         }
     }
@@ -118,7 +110,8 @@ async function videoRestrictionMiddleware(ctx, next) {
         const chatId = ctx.chat.id;
         if (videoRestrictionStatus.get(chatId)) {
             const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
+            const isVipUser = await isVIP(ctx, ctx.from.id);
+            if (!isAdmin && !isVipUser) {
                 try {
                     await ctx.deleteMessage();
                     await ctx.reply('❌ عذرًا، تم تعطيل إرسال الفيديوهات للأعضاء العاديين في هذه المجموعة.');
@@ -884,7 +877,7 @@ async function listVIPUsers(ctx) {
     
             const chatId = ctx.chat.id;
             photoRestrictionStatus.set(chatId, true);
-            ctx.reply('✅ تم تعطيل مشاركة الصور للأعضاء العاديين. فقط المشرفين يمكنهم إرسال الصور الآن.');
+            ctx.reply('✅ تم تعطيل مشاركة الصور للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الصور الآن.');
         } catch (error) {
             console.error('Error in disablePhotoSharing:', error);
             ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الصور.');
@@ -912,7 +905,7 @@ async function listVIPUsers(ctx) {
     
             const chatId = ctx.chat.id;
             videoRestrictionStatus.set(chatId, true);
-            ctx.reply('✅ تم تعطيل مشاركة الفيديوهات للأعضاء العاديين. فقط المشرفين يمكنهم إرسال الفيديوهات الآن.');
+            ctx.reply('✅ تم تعطيل مشاركة الفيديوهات للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الفيديوهات الآن.');
         } catch (error) {
             console.error('Error in disableVideoSharing:', error);
             ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الفيديوهات.');
@@ -1069,7 +1062,7 @@ async function listVIPUsers(ctx) {
             linkRestrictionStatus.set(chatId, true);
     
             console.log(`✅ روابط مُنعَت في ${chatId} بواسطة ${ctx.from.id}`);
-            return ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة. سيتم حذف أي روابط يتم إرسالها.');
+            return ctx.reply('✅ تم منع مشاركة الروابط للأعضاء العاديين في المجموعة. سيتم حذف أي روابط يتم إرسالها من قبل الأعضاء العاديين. المشرفون والأعضاء المميزون (VIP) يمكنهم مشاركة الروابط.');
         } catch (error) {
             console.error('Error in disableLinkSharing:', error);
             return ctx.reply('❌ حدث خطأ أثناء محاولة منع مشاركة الروابط.');
@@ -1277,7 +1270,7 @@ async function listVIPUsers(ctx) {
                 case 'مميز':
                 case 'vip':
                     collection = 'vip_users';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مميز (VIP).`;
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى من مسابقات (VIP).`;
                     break;
                 case 'ادمن':
                 case 'admin':
@@ -1739,7 +1732,7 @@ async function disableVideoSharing(ctx) {
 
         const chatId = ctx.chat.id;
         videoRestrictionStatus.set(chatId, true);
-        ctx.reply('✅ تم تعطيل مشاركة الفيديوهات للأعضاء العاديين. فقط المشرفين يمكنهم إرسال الفيديوهات الآن.');
+        ctx.reply('✅ تم تعطيل مشاركة الفيديوهات للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الفيديوهات الآن.');
     } catch (error) {
         console.error('Error in disableVideoSharing:', error);
         ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الفيديوهات.');
