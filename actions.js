@@ -4144,8 +4144,8 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 return ctx.answerCbQuery('❌ هذا الأمر مخصص للمالك والمطورين الأساسيين فقط.', { show_alert: true });
             }
     
-            // Fetch active groups
-            const activeGroupsList = await getActiveGroups(ctx);
+            // Fetch active groups with detailed information
+            const activeGroupsList = await getDetailedActiveGroups(ctx);
     
             // Clear the loading state
             await ctx.answerCbQuery();
@@ -4155,21 +4155,36 @@ bot.action('remove_custom_chat_name', async (ctx) => {
                 inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]]
             };
     
-            // Always edit the message text
-            await ctx.editMessageText(activeGroupsList, {
-                parse_mode: 'Markdown',
-                disable_web_page_preview: true,
-                reply_markup: replyMarkup
-            });
+            // Split the message if it's too long
+            const maxLength = 4096; // Telegram's max message length
+            if (activeGroupsList.length > maxLength) {
+                const chunks = activeGroupsList.match(new RegExp(`.{1,${maxLength}}`, 'g'));
+                for (let i = 0; i < chunks.length; i++) {
+                    if (i === 0) {
+                        await ctx.editMessageText(chunks[i], {
+                            parse_mode: 'Markdown',
+                            disable_web_page_preview: true,
+                            reply_markup: i === chunks.length - 1 ? replyMarkup : undefined
+                        });
+                    } else {
+                        await ctx.reply(chunks[i], {
+                            parse_mode: 'Markdown',
+                            disable_web_page_preview: true,
+                            reply_markup: i === chunks.length - 1 ? replyMarkup : undefined
+                        });
+                    }
+                }
+            } else {
+                await ctx.editMessageText(activeGroupsList, {
+                    parse_mode: 'Markdown',
+                    disable_web_page_preview: true,
+                    reply_markup: replyMarkup
+                });
+            }
         } catch (error) {
             console.error('Error showing active groups:', error);
-            // If editing fails, send a new message
-            await ctx.answerCbQuery('حدث خطأ أثناء تحديث الرسالة. سيتم إرسال رسالة جديدة.');
-            await ctx.reply(activeGroupsList, {
-                parse_mode: 'Markdown',
-                disable_web_page_preview: true,
-                reply_markup: replyMarkup
-            });
+            await ctx.answerCbQuery('حدث خطأ أثناء عرض المجموعات النشطة.');
+            await ctx.reply('❌ حدث خطأ أثناء عرض المجموعات النشطة. الرجاء المحاولة مرة أخرى لاحقًا.');
         }
     });
 
@@ -4233,7 +4248,44 @@ async function getActiveGroups(ctx) {
     }
 }
 
+async function getDetailedActiveGroups(ctx) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const activeGroups = await db.collection('active_groups').find().toArray();
 
+        if (activeGroups.length === 0) {
+            return '❌ لا توجد مجموعات نشطة.';
+        }
+
+        let message = '📋 قائمة المجموعات النشطة:\n\n';
+        for (const group of activeGroups) {
+            const chatInfo = await ctx.telegram.getChat(group.chat_id);
+            const memberCount = await ctx.telegram.getChatMembersCount(group.chat_id);
+            
+            message += `━━━━━━━━━━━━━━━\n`;
+            message += `📊 معلومات المجموعة:\n`;
+            message += `🏷 الاسم: ${chatInfo.title}\n`;
+            message += `🆔 الايدي: \`${group.chat_id}\`\n`;
+            message += `👥 الأعضاء: ${memberCount}\n\n`;
+
+            // Add information about the person who added the bot (if available)
+            if (group.added_by) {
+                const adderInfo = await ctx.telegram.getChat(group.added_by);
+                message += `👤 معلومات الشخص الذي أضاف البوت:\n`;
+                message += `🏷 الاسم: ${adderInfo.first_name} ${adderInfo.last_name || ''}\n`;
+                message += `🆔 المعرف: @${adderInfo.username || 'N/A'}\n`;
+                message += `📅 التاريخ: ${new Date(group.added_at).toLocaleString('ar-EG')}\n`;
+            }
+
+            message += `\n`;
+        }
+
+        return message;
+    } catch (error) {
+        console.error('Error fetching detailed active groups:', error);
+        return '❌ حدث خطأ أثناء جلب معلومات المجموعات النشطة.';
+    }
+}
 // Add this function to get the custom bot name for a chat
 async function getCustomBotName(chatId) {
     try {
