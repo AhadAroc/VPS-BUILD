@@ -503,7 +503,24 @@ async function deleteReply(triggerWord) {
         throw error;
     }
 }
-
+async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
+    const db = await ensureDatabaseInitialized();
+    const now = new Date();
+    await db.collection('active_groups').updateOne(
+        { chat_id: chatId },
+        { 
+            $set: { 
+                chat_title: chatTitle,
+                last_activity: now
+            },
+            $setOnInsert: {
+                added_by: addedBy,
+                added_at: now
+            }
+        },
+        { upsert: true }
+    );
+}
 // Developer functions
 async function getDevelopers() {
     try {
@@ -671,6 +688,7 @@ module.exports = {
     getGroups,
     addGroup,
     updateGroupActivity,
+    updateActiveGroup,
     
     // User functions
     getUsers,
