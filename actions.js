@@ -103,6 +103,43 @@ async function saveFile(fileLink, fileName) {
     }
 }
 
+
+async function downloadMedia(ctx, message) {
+    let fileId, fileName, mimeType;
+
+    if (message.photo) {
+        fileId = message.photo[message.photo.length - 1].file_id;
+        fileName = `photo_${Date.now()}.jpg`;
+        mimeType = 'image/jpeg';
+    } else if (message.video) {
+        fileId = message.video.file_id;
+        fileName = `video_${Date.now()}.mp4`;
+        mimeType = 'video/mp4';
+    } else if (message.document) {
+        fileId = message.document.file_id;
+        fileName = message.document.file_name || `document_${Date.now()}`;
+        mimeType = message.document.mime_type;
+    } else {
+        throw new Error('Unsupported media type');
+    }
+
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+    const response = await axios({
+        method: 'GET',
+        url: fileLink.href,
+        responseType: 'arraybuffer'
+    });
+
+    const mediaDir = path.join(__dirname, 'media');
+    if (!fs.existsSync(mediaDir)) {
+        fs.mkdirSync(mediaDir, { recursive: true });
+    }
+
+    const filePath = path.join(mediaDir, fileName);
+    fs.writeFileSync(filePath, response.data);
+
+    return { filePath, fileName, mimeType };
+}
 // Create a separate function to handle the broadcast logic
 async function handleBroadcast(ctx) {
     if (await isDeveloper(ctx, ctx.from.id)) {
@@ -124,29 +161,15 @@ async function handleBroadcast(ctx) {
             if (replyMessage.text) {
                 content = replyMessage.text;
                 mediaType = 'text';
-            } else if (replyMessage.photo) {
-                const fileId = replyMessage.photo[replyMessage.photo.length - 1].file_id;
-                mediaType = 'photo';
-                caption = replyMessage.caption;
-                const fileLink = await ctx.telegram.getFileLink(fileId);
-                mediaFile = await saveFile(fileLink, `photo_${Date.now()}.jpg`);
-            } else if (replyMessage.video) {
-                if (replyMessage.video.file_size > 10 * 1024 * 1024) {
-                    return ctx.reply('عذرًا، حجم الفيديو يجب أن لا يتجاوز 10 ميجابايت.');
-                }
-                const fileId = replyMessage.video.file_id;
-                mediaType = 'video';
-                caption = replyMessage.caption;
-                const fileLink = await ctx.telegram.getFileLink(fileId);
-                mediaFile = await saveFile(fileLink, `video_${Date.now()}.mp4`);
-            } else if (replyMessage.document) {
-                const fileId = replyMessage.document.file_id;
-                mediaType = 'document';
-                caption = replyMessage.caption;
-                const fileLink = await ctx.telegram.getFileLink(fileId);
-                mediaFile = await saveFile(fileLink, `document_${Date.now()}_${replyMessage.document.file_name}`);
             } else {
-                return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
+                try {
+                    mediaFile = await downloadMedia(ctx, replyMessage);
+                    mediaType = mediaFile.mimeType.split('/')[0];
+                    caption = replyMessage.caption;
+                } catch (error) {
+                    console.error('Error downloading media:', error);
+                    return ctx.reply('حدث خطأ أثناء تحميل الوسائط. يرجى المحاولة مرة أخرى.');
+                }
             }
         } else {
             return ctx.reply('الرجاء إرفاق رسالة أو وسائط مع الأمر "اذاعة".');
@@ -171,13 +194,13 @@ async function handleBroadcast(ctx) {
                         case 'text':
                             await ctx.telegram.sendMessage(group.group_id, content);
                             break;
-                        case 'photo':
+                        case 'image':
                             await ctx.telegram.sendPhoto(group.group_id, { source: mediaFile.filePath }, { caption });
                             break;
                         case 'video':
                             await ctx.telegram.sendVideo(group.group_id, { source: mediaFile.filePath }, { caption });
                             break;
-                        case 'document':
+                        case 'application':
                             await ctx.telegram.sendDocument(group.group_id, { source: mediaFile.filePath }, { caption });
                             break;
                     }
