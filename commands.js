@@ -20,6 +20,8 @@ let photoMessages = new Map(); // chatId -> Set of message IDs
 const database = require('./database');
 const { isDeveloper } = require('./middlewares');
 const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
+// Map to track which handler is active for each chat
+const activeHandlerState = new Map();
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
