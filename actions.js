@@ -799,7 +799,7 @@ function setupActions(bot) {
     bot.use(stage.middleware());
 
  // Set up media handlers
- setupMediaHandlers(bot);
+ (bot);
     const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 
 
