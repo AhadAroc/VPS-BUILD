@@ -544,6 +544,19 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
+// Command to toggle the active handler
+bot.command('toggle_handler', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const currentHandler = activeHandlerState.get(chatId) || 'default';
+
+    if (currentHandler === 'reply') {
+        activeHandlerState.set(chatId, 'broadcast');
+        await ctx.reply('📢 تم تفعيل وضع الإذاعة. سيتم بث الصور الآن.');
+    } else {
+        activeHandlerState.set(chatId, 'reply');
+        await ctx.reply('💬 تم تفعيل وضع الرد. سيتم حفظ الصور كأجوبة.');
+    }
+});
 bot.command('broadcast', async (ctx) => {
     const chatId = ctx.chat.id;
     const isBroadcasting = chatBroadcastStates.get(chatId) || false;
