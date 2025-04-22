@@ -105,7 +105,35 @@ async function saveFile(fileLink, fileName) {
 
 
 
+async function broadcastMessage(ctx, mediaType, mediaId, caption) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
+        for (const group of groups) {
+            try {
+                if (mediaType && mediaId) {
+                    // Send media with caption
+                    await ctx.telegram.sendMediaGroup(group.group_id, [{
+                        type: mediaType,
+                        media: mediaId,
+                        caption: caption || ''
+                    }]);
+                } else if (caption) {
+                    // Send caption only
+                    await ctx.telegram.sendMessage(group.group_id, caption);
+                }
+            } catch (error) {
+                console.error(`Error sending message to group ${group.group_id}:`, error);
+            }
+        }
+
+        await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات النشطة.');
+    } catch (error) {
+        console.error('Error in broadcastMessage:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
+    }
+}
 // Consolidated media handler function
 async function handleMediaMessage(ctx, mediaType) {
     try {
@@ -232,94 +260,10 @@ async function handleMediaMessage(ctx, mediaType) {
     }
 }
 
-function setupMediaHandlers(bot) {
-    
-}
-
    
 
 
-// Helper function to determine media type and extract relevant information
-function getMediaInfo(message) {
-    if (message.photo) {
-        return {
-            type: 'photo',
-            file: message.photo[message.photo.length - 1],
-            caption: message.caption || ''
-        };
-    } else if (message.video) {
-        return {
-            type: 'video',
-            file: message.video,
-            caption: message.caption || ''
-        };
-    } else if (message.document) {
-        return {
-            type: 'document',
-            file: message.document,
-            caption: message.caption || ''
-        };
-    } else if (message.audio) {
-        return {
-            type: 'audio',
-            file: message.audio,
-            caption: message.caption || ''
-        };
-    } else if (message.text) {
-        return {
-            type: 'text',
-            text: message.text
-        };
-    }
-    return null;
-}
 
-async function handleBroadcast(ctx) {
-    console.log('🔊 Broadcast Triggered');
-    console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
-
-    const mediaInfo = getMediaInfo(ctx.message);
-    if (!mediaInfo) {
-        return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
-    }
-
-    let caption = mediaInfo.caption || mediaInfo.text || '';
-    caption = caption.replace(/^\/اذاعة\s*/i, '').trim();
-
-    const db = await ensureDatabaseInitialized();
-    const activeGroups = await db.collection('active_groups').find().toArray();
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const group of activeGroups) {
-        try {
-            switch (mediaInfo.type) {
-                case 'text':
-                    await ctx.telegram.sendMessage(group.chat_id, caption);
-                    break;
-                case 'photo':
-                    await ctx.telegram.sendPhoto(group.chat_id, mediaInfo.file.file_id, { caption });
-                    break;
-                case 'video':
-                    await ctx.telegram.sendVideo(group.chat_id, mediaInfo.file.file_id, { caption });
-                    break;
-                case 'document':
-                    await ctx.telegram.sendDocument(group.chat_id, mediaInfo.file.file_id, { caption });
-                    break;
-                case 'audio':
-                    await ctx.telegram.sendAudio(group.chat_id, mediaInfo.file.file_id, { caption });
-                    break;
-            }
-            successCount++;
-        } catch (err) {
-            console.error(`❌ Failed to send to group ${group.chat_id}:`, err);
-            failCount++;
-        }
-    }
-
-    ctx.reply(`📣 تم إرسال الإذاعة بنجاح إلى ${successCount} مجموعة.\n❌ فشل الإرسال إلى ${failCount} مجموعة.`);
-}
 // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleTextMessage(ctx) {
@@ -2095,41 +2039,15 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
         }
     });
 });
+// Handle the "الإذاعة" button press
 bot.action('dev_broadcast', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
+    try {
         await ctx.answerCbQuery();
-        await ctx.editMessageText(
-            'لإرسال إذاعة، استخدم الأمر /اذاعة متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.\n\n' +
-            'أمثلة:\n' +
-            '1. لإرسال نص: /اذاعة مرحبًا بالجميع!\n' +
-            '2. لإرسال صورة: أرسل الصورة وأضف تعليقًا يبدأ بـ /اذاعة\n' +
-            '3. لإرسال فيديو أو ملف: أرسل الوسائط وأضف تعليقًا يبدأ بـ /اذاعة\n\n' +
-            'يمكنك أيضًا إعادة توجيه رسالة مع الأمر /اذاعة لإرسالها كإذاعة.\n\n' +
-            'ملاحظة: حجم الفيديوهات يجب أن لا يتجاوز 10 ميجابايت.',
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
-                    ]
-                }
-            }
-        );
-
-        // Set up a listener for the next message
-        bot.use(async (ctx, next) => {
-            if (ctx.message && ctx.from.id === ctx.from.id) {
-                const isCommand = ctx.message.text && ctx.message.text.startsWith('/اذاعة');
-                const hasCaption = ctx.message.caption && ctx.message.caption.startsWith('/اذاعة');
-
-                if (isCommand || hasCaption) {
-                    await handleBroadcast(ctx);
-                    return;
-                }
-            }
-            return next();
-        });
-    } else {
-        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        awaitingBroadcastPhoto = true; // Set the flag to true
+        await ctx.reply('📸 الرجاء إرسال الصورة التي تريد إذاعتها.');
+    } catch (error) {
+        console.error('Error handling broadcast action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة بدء الإذاعة.');
     }
 });
 
@@ -4591,4 +4509,4 @@ bot.action('check_subscription', forceCheckSubscription);
 }
 
 module.exports = { setupActions,
-    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates,forceCheckSubscription,confirmSubscription,handleBroadcast, };
+    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates,forceCheckSubscription,confirmSubscription, };
