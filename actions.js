@@ -239,7 +239,79 @@ function setupMediaHandlers(bot) {
    
 
 
+async function handleBroadcast(ctx) {
+    console.log('🔊 Broadcast Triggered');
+    console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
 
+    const message = ctx.message;
+    let mediaFile = null;
+    let mediaType = null;
+    let caption = '';
+
+    if (message.photo) {
+        mediaFile = message.photo[message.photo.length - 1];
+        mediaType = 'photo';
+        caption = message.caption || '';
+    } else if (message.video) {
+        mediaFile = message.video;
+        mediaType = 'video';
+        caption = message.caption || '';
+    } else if (message.document) {
+        mediaFile = message.document;
+        mediaType = 'document';
+        caption = message.caption || '';
+    } else if (message.audio) {
+        mediaFile = message.audio;
+        mediaType = 'audio';
+        caption = message.caption || '';
+    } else if (message.text) {
+        mediaType = 'text';
+        caption = message.text;
+    } else {
+        return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
+    }
+
+    caption = caption.replace(/^\/اذاعة\s*/i, '').trim();
+
+    let fileId = null;
+    if (mediaFile) {
+        fileId = mediaFile.file_id;
+    }
+
+    const db = await ensureDatabaseInitialized();
+    const activeGroups = await db.collection('active_groups').find().toArray();
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const group of activeGroups) {
+        try {
+            switch (mediaType) {
+                case 'text':
+                    await ctx.telegram.sendMessage(group.chat_id, caption);
+                    break;
+                case 'photo':
+                    await ctx.telegram.sendPhoto(group.chat_id, fileId, { caption });
+                    break;
+                case 'video':
+                    await ctx.telegram.sendVideo(group.chat_id, fileId, { caption });
+                    break;
+                case 'document':
+                    await ctx.telegram.sendDocument(group.chat_id, fileId, { caption });
+                    break;
+                case 'audio':
+                    await ctx.telegram.sendAudio(group.chat_id, fileId, { caption });
+                    break;
+            }
+            successCount++;
+        } catch (err) {
+            console.error(`❌ Failed to send to group ${group.chat_id}:`, err);
+            failCount++;
+        }
+    }
+
+    ctx.reply(`📣 تم إرسال الإذاعة بنجاح إلى ${successCount} مجموعة.\n❌ فشل الإرسال إلى ${failCount} مجموعة.`);
+}
 // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleTextMessage(ctx) {
@@ -2053,79 +2125,7 @@ bot.action('dev_broadcast', async (ctx) => {
     }
 });
 
-async function handleBroadcast(ctx) {
-    console.log('🔊 Broadcast Triggered');
-    console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
 
-    const message = ctx.message;
-    let mediaFile = null;
-    let mediaType = null;
-    let caption = '';
-
-    if (message.photo) {
-        mediaFile = message.photo[message.photo.length - 1];
-        mediaType = 'photo';
-        caption = message.caption || '';
-    } else if (message.video) {
-        mediaFile = message.video;
-        mediaType = 'video';
-        caption = message.caption || '';
-    } else if (message.document) {
-        mediaFile = message.document;
-        mediaType = 'document';
-        caption = message.caption || '';
-    } else if (message.audio) {
-        mediaFile = message.audio;
-        mediaType = 'audio';
-        caption = message.caption || '';
-    } else if (message.text) {
-        mediaType = 'text';
-        caption = message.text;
-    } else {
-        return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
-    }
-
-    caption = caption.replace(/^\/اذاعة\s*/i, '').trim();
-
-    let fileId = null;
-    if (mediaFile) {
-        fileId = mediaFile.file_id;
-    }
-
-    const db = await ensureDatabaseInitialized();
-    const activeGroups = await db.collection('active_groups').find().toArray();
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const group of activeGroups) {
-        try {
-            switch (mediaType) {
-                case 'text':
-                    await ctx.telegram.sendMessage(group.chat_id, caption);
-                    break;
-                case 'photo':
-                    await ctx.telegram.sendPhoto(group.chat_id, fileId, { caption });
-                    break;
-                case 'video':
-                    await ctx.telegram.sendVideo(group.chat_id, fileId, { caption });
-                    break;
-                case 'document':
-                    await ctx.telegram.sendDocument(group.chat_id, fileId, { caption });
-                    break;
-                case 'audio':
-                    await ctx.telegram.sendAudio(group.chat_id, fileId, { caption });
-                    break;
-            }
-            successCount++;
-        } catch (err) {
-            console.error(`❌ Failed to send to group ${group.chat_id}:`, err);
-            failCount++;
-        }
-    }
-
-    ctx.reply(`📣 تم إرسال الإذاعة بنجاح إلى ${successCount} مجموعة.\n❌ فشل الإرسال إلى ${failCount} مجموعة.`);
-}
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
         try {
             const botId = parseInt(ctx.match[1]);
