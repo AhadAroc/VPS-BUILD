@@ -513,13 +513,27 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
-bot.hears('broadcast', async (ctx) => {
+bot.command('broadcast', async (ctx) => {
     // Check if the user has the required permissions
     if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
         return ctx.reply('❌ ليس لديك الصلاحيات اللازمة لاستخدام هذا الأمر.');
     }
 
     // Example usage: /broadcast <mediaType> <mediaId> <caption>
+    const args = ctx.message.text.split(' ').slice(1);
+    const mediaType = args[0]; // e.g., 'photo', 'video'
+    const mediaId = args[1]; // Telegram file ID
+    const caption = args.slice(2).join(' '); // The rest is the caption
+
+    await broadcastMessage(ctx, mediaType, mediaId, caption);
+});
+bot.hears('broadcast', async (ctx) => {
+    // Check if the user has the required permissions
+    if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
+        return ctx.reply('❌ ليس لديك الصلاحيات اللازمة لاستخدام هذا الأمر.');
+    }
+
+    // Example usage: broadcast <mediaType> <mediaId> <caption>
     const args = ctx.message.text.split(' ').slice(1);
     const mediaType = args[0]; // e.g., 'photo', 'video'
     const mediaId = args[1]; // Telegram file ID
