@@ -518,7 +518,7 @@ bot.action('back_to_main', async (ctx) => {
 });
 bot.command('broadcast', async (ctx) => {
     // Check if the user has the required permissions
-    if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
+    if (!await (ctx, ctx.from.id)) {
         return ctx.reply('❌ ليس لديك الصلاحيات اللازمة لاستخدام هذا الأمر.');
     }
 
