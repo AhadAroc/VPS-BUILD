@@ -239,44 +239,52 @@ function setupMediaHandlers(bot) {
    
 
 
+// Helper function to determine media type and extract relevant information
+function getMediaInfo(message) {
+    if (message.photo) {
+        return {
+            type: 'photo',
+            file: message.photo[message.photo.length - 1],
+            caption: message.caption || ''
+        };
+    } else if (message.video) {
+        return {
+            type: 'video',
+            file: message.video,
+            caption: message.caption || ''
+        };
+    } else if (message.document) {
+        return {
+            type: 'document',
+            file: message.document,
+            caption: message.caption || ''
+        };
+    } else if (message.audio) {
+        return {
+            type: 'audio',
+            file: message.audio,
+            caption: message.caption || ''
+        };
+    } else if (message.text) {
+        return {
+            type: 'text',
+            text: message.text
+        };
+    }
+    return null;
+}
+
 async function handleBroadcast(ctx) {
     console.log('🔊 Broadcast Triggered');
     console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
 
-    const message = ctx.message;
-    let mediaFile = null;
-    let mediaType = null;
-    let caption = '';
-
-    if (message.photo) {
-        mediaFile = message.photo[message.photo.length - 1];
-        mediaType = 'photo';
-        caption = message.caption || '';
-    } else if (message.video) {
-        mediaFile = message.video;
-        mediaType = 'video';
-        caption = message.caption || '';
-    } else if (message.document) {
-        mediaFile = message.document;
-        mediaType = 'document';
-        caption = message.caption || '';
-    } else if (message.audio) {
-        mediaFile = message.audio;
-        mediaType = 'audio';
-        caption = message.caption || '';
-    } else if (message.text) {
-        mediaType = 'teasxasdasdasdsdasxt';
-        caption = message.text;
-    } else {
+    const mediaInfo = getMediaInfo(ctx.message);
+    if (!mediaInfo) {
         return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
     }
 
+    let caption = mediaInfo.caption || mediaInfo.text || '';
     caption = caption.replace(/^\/اذاعة\s*/i, '').trim();
-
-    let fileId = null;
-    if (mediaFile) {
-        fileId = mediaFile.file_id;
-    }
 
     const db = await ensureDatabaseInitialized();
     const activeGroups = await db.collection('active_groups').find().toArray();
@@ -286,21 +294,21 @@ async function handleBroadcast(ctx) {
 
     for (const group of activeGroups) {
         try {
-            switch (mediaType) {
-                case 'texsssssxasacasct':
+            switch (mediaInfo.type) {
+                case 'text':
                     await ctx.telegram.sendMessage(group.chat_id, caption);
                     break;
                 case 'photo':
-                    await ctx.telegram.sendPhoto(group.chat_id, fileId, { caption });
+                    await ctx.telegram.sendPhoto(group.chat_id, mediaInfo.file.file_id, { caption });
                     break;
                 case 'video':
-                    await ctx.telegram.sendVideo(group.chat_id, fileId, { caption });
+                    await ctx.telegram.sendVideo(group.chat_id, mediaInfo.file.file_id, { caption });
                     break;
                 case 'document':
-                    await ctx.telegram.sendDocument(group.chat_id, fileId, { caption });
+                    await ctx.telegram.sendDocument(group.chat_id, mediaInfo.file.file_id, { caption });
                     break;
                 case 'audio':
-                    await ctx.telegram.sendAudio(group.chat_id, fileId, { caption });
+                    await ctx.telegram.sendAudio(group.chat_id, mediaInfo.file.file_id, { caption });
                     break;
             }
             successCount++;
