@@ -338,14 +338,24 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
         for (const group of groups) {
             try {
                 if (mediaType && mediaId) {
-                    // Send media with caption
-                    await ctx.telegram.sendMessage(group.group_id, {
-                        type: mediaType,
-                        media: mediaId,
-                        caption: caption || ''
-                    });
+                    switch (mediaType) {
+                        case 'photo':
+                            await ctx.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
+                            break;
+                        case 'video':
+                            await ctx.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
+                            break;
+                        case 'animation':
+                            await ctx.telegram.sendAnimation(group.group_id, mediaId, { caption: caption || '' });
+                            break;
+                        case 'document':
+                            await ctx.telegram.sendDocument(group.group_id, mediaId, { caption: caption || '' });
+                            break;
+                        default:
+                            console.error('Unsupported media type:', mediaType);
+                            break;
+                    }
                 } else if (caption) {
-                    // Send caption only
                     await ctx.telegram.sendMessage(group.group_id, caption);
                 }
                 console.log(`Message sent to group: ${group.group_id}`); // Debugging line
