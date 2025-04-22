@@ -483,7 +483,31 @@ function setupCommands(bot) {
         }
     });
 
-    
+   // Modify the photo handler to check the flag
+bot.on('photo', async (ctx) => {
+    if (!awaitingBroadcastPhoto) {
+        return; // If not awaiting a broadcast photo, ignore the photo
+    }
+
+    try {
+        const chatId = ctx.chat.id;
+        const photoArray = ctx.message.photo;
+        const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
+        const caption = ctx.message.caption || '';
+
+        // Log the received photo for debugging
+        console.log(`Received photo for broadcast from chat ${chatId} with file ID: ${fileId}`);
+
+        // Broadcast the photo
+        await broadcastMessage(ctx, 'photo', fileId, caption);
+
+        // Reset the flag after broadcasting
+        awaitingBroadcastPhoto = false;
+    } catch (error) {
+        console.error('Error handling photo message:', error);
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
+    }
+}); 
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
