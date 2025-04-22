@@ -185,7 +185,11 @@ async function handleBroadcast(ctx) {
 
                 switch (mediaType) {
                     case 'photo':
-                        await ctx.telegram.sendPhoto(group.chat_id, { source: filePath }, options);
+                        await ctx.telegram.sendPhoto(group.chat_id, {
+                            source: fs.createReadStream(filePath)
+                        }, { caption });
+                        console.log(`Sending media to group ${group.chat_id} from file ${filePath}`);
+                        
                         break;
                     case 'video':
                         await ctx.telegram.sendVideo(group.chat_id, { source: filePath }, options);
