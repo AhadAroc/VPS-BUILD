@@ -703,7 +703,34 @@ bot.use(linkRestrictionMiddleware);
 bot.use(videoRestrictionMiddleware);
 bot.use(gifRestrictionMiddleware);
 bot.use(documentRestrictionMiddleware);
+// Middleware to handle photo messages based on broadcasting state
+bot.use(async (ctx, next) => {
+    if (ctx.updateType === 'message' && ctx.message.photo) {
+        const chatId = ctx.chat.id;
+        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
 
+        if (!isBroadcasting) {
+            return; // Skip photo handling if not in broadcasting mode
+        }
+
+        try {
+            const photoArray = ctx.message.photo;
+            const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
+            const caption = ctx.message.caption || '';
+
+            // Log the received photo for debugging
+            console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
+
+            // Broadcast the photo
+            await broadcastMessage(ctx, 'photo', fileId, caption);
+        } catch (error) {
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
+        }
+    } else {
+        await next(); // Continue to the next middleware or handler
+    }
+});
 
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
