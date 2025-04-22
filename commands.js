@@ -489,28 +489,38 @@ function setupCommands(bot) {
     });
 
     // Listen for photo messages
-    bot.on('photo', async (ctx, next) => {
+    bot.on(['photo', 'text'], async (ctx) => {
         const chatId = ctx.chat.id;
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
     
-        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
+        if (!isBroadcasting) {
+            return; // Ignore messages if not in broadcasting mode
+        }
     
-        if (isBroadcasting) {
-            try {
+        try {
+            if (ctx.message.photo) {
                 const photoArray = ctx.message.photo;
                 const fileId = photoArray[photoArray.length - 1].file_id;
                 const caption = ctx.message.caption || '';
     
-                console.log(`Broadcasting photo: ${fileId}`);
-    
+                console.log(`Broadcasting photo from chat ${chatId} with file ID: ${fileId}`);
                 await broadcastMessage(ctx, 'photo', fileId, caption);
-            } catch (error) {
-                console.error('Error broadcasting photo:', error);
+            } else if (ctx.message.text) {
+                const text = ctx.message.text;
+                console.log(`Broadcasting text from chat ${chatId}: ${text}`);
+                await broadcastMessage(ctx, null, null, text);
             }
-        }
     
-        // Always call next() so the reply logic in `actions.js` runs
-        return next();
+            if (awaitingBroadcastPhoto) {
+                awaitingBroadcastPhoto = false;
+                await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+            }
+        } catch (error) {
+            console.error('Error handling broadcast message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة.');
+        }
     });
+    
     
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
@@ -544,6 +554,7 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
+// Command to toggle broadcasting mode
 bot.command('broadcast', async (ctx) => {
     const chatId = ctx.chat.id;
     const isBroadcasting = chatBroadcastStates.get(chatId) || false;
@@ -553,7 +564,7 @@ bot.command('broadcast', async (ctx) => {
         await ctx.reply('🛑 تم إيقاف وضع الإذاعة.');
     } else {
         chatBroadcastStates.set(chatId, true);
-        await ctx.reply('📢 وضع الإذاعة . يمكنك الآن إرسال الصور للبث يرجى استخدام الامر مرة اخرى للايقاف .');
+        await ctx.reply('📢 وضع الإذاعة مفعل. يمكنك الآن إرسال النصوص والصور للبث. يرجى استخدام الأمر مرة أخرى للإيقاف.');
     }
 });
 
