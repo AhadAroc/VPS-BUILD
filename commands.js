@@ -333,6 +333,8 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
         const db = await ensureDatabaseInitialized();
         const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
+        console.log(`Broadcasting to ${groups.length} groups.`); // Debugging line
+
         for (const group of groups) {
             try {
                 if (mediaType && mediaId) {
@@ -346,6 +348,7 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
                     // Send caption only
                     await ctx.telegram.sendMessage(group.group_id, caption);
                 }
+                console.log(`Message sent to group: ${group.group_id}`); // Debugging line
             } catch (error) {
                 console.error(`Error sending message to group ${group.group_id}:`, error);
             }
