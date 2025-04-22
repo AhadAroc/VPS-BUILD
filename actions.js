@@ -3,6 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
+let awaitingMediaResponse = false;
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 
@@ -2043,13 +2044,14 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
 bot.action('dev_broadcast', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        awaitingBroadcastPhoto = true; // Set the flag to true
-        await ctx.reply('📸 الرجاء إرسال الصورة التي تريد إذاعتها.');
+        awaitingMediaResponse = true; // Set the flag to true
+        await ctx.reply('📸 الرجاء إرسال الوسائط التي تريد إذاعتها.');
     } catch (error) {
         console.error('Error handling broadcast action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة بدء الإذاعة.');
     }
 });
+
 
 
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
@@ -2493,56 +2495,64 @@ bot.on('left_chat_member', (ctx) => {
     }
 });    
 bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
-    const userId = ctx.from.id;
-    const state = pendingReplies.get(userId);
-
-    if (!state || state.step !== 'awaiting_response') return;
-
-    const db = await ensureDatabaseInitialized();
-
-    let mediaType = 'unknown';
-    let fileId;
-    let extension = 'bin';
-
-    if (ctx.message.photo) {
-        mediaType = 'photo';
-        fileId = ctx.message.photo.at(-1).file_id;
-        extension = 'jpg';
-    } else if (ctx.message.wewe) {
-        mediaType = 'wewe';
-        fileId = ctx.message.video.file_id;
-        extension = 'mp4';
-    } else if (ctx.message.document) {
-        mediaType = 'document';
-        fileId = ctx.message.document.file_id;
-        extension = ctx.message.document.file_name?.split('.').pop() || 'file';
-    } else if (ctx.message.animation) {
-        mediaType = 'animation';
-        fileId = ctx.message.animation.file_id;
-        extension = 'mp4';
-    } else if (ctx.message.sticker) {
-        mediaType = 'sticker';
-        fileId = ctx.message.sticker.file_id;
-        extension = 'webp';
+    if (!awaitingMediaResponse) {
+        return; // If not awaiting a media response, ignore the media
     }
 
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    const fileName = `${mediaType}_${Date.now()}_${userId}.${extension}`;
-    const savedFilePath = await saveFile(fileLink, fileName);
+    try {
+        const userId = ctx.from.id;
+        const state = pendingReplies.get(userId);
 
-    await db.collection('replies').insertOne({
-        bot_id: state.botId,
-        trigger_word: state.triggerWord,
-        type: 'media',
-        media_type: mediaType,
-        file_id: fileId,
-        file_path: savedFilePath,
-        created_by: userId,
-        created_at: new Date()
-    });
+        if (!state || state.step !== 'awaiting_response') return;
 
-    await ctx.reply(`✅ تم حفظ الرد (${mediaType}) للكلمة "${state.triggerWord}"`);
-    pendingReplies.delete(userId);
+        const db = await ensureDatabaseInitialized();
+
+        let mediaType = 'unknown';
+        let fileId;
+        let extension = 'bin';
+
+        if (ctx.message.photo) {
+            mediaType = 'photo';
+            fileId = ctx.message.photo.at(-1).file_id;
+            extension = 'jpg';
+        } else if (ctx.message.document) {
+            mediaType = 'document';
+            fileId = ctx.message.document.file_id;
+            extension = ctx.message.document.file_name?.split('.').pop() || 'file';
+        } else if (ctx.message.animation) {
+            mediaType = 'animation';
+            fileId = ctx.message.animation.file_id;
+            extension = 'mp4';
+        } else if (ctx.message.sticker) {
+            mediaType = 'sticker';
+            fileId = ctx.message.sticker.file_id;
+            extension = 'webp';
+        }
+
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        const fileName = `${mediaType}_${Date.now()}_${userId}.${extension}`;
+        const savedFilePath = await saveFile(fileLink, fileName);
+
+        await db.collection('replies').insertOne({
+            bot_id: state.botId,
+            trigger_word: state.triggerWord,
+            type: 'media',
+            media_type: mediaType,
+            file_id: fileId,
+            file_path: savedFilePath,
+            created_by: userId,
+            created_at: new Date()
+        });
+
+        await ctx.reply(`✅ تم حفظ الرد (${mediaType}) للكلمة "${state.triggerWord}"`);
+        pendingReplies.delete(userId);
+
+        // Reset the flag after processing
+        awaitingMediaResponse = false;
+    } catch (error) {
+        console.error('Error handling media message:', error);
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الوسائط.');
+    }
 });
 
 
