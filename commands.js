@@ -339,11 +339,11 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
             try {
                 if (mediaType && mediaId) {
                     // Send media with caption
-                    await ctx.telegram.sendMediaGroup(group.group_id, [{
+                    await ctx.telegram.sendMessage(group.group_id, {
                         type: mediaType,
                         media: mediaId,
                         caption: caption || ''
-                    }]);
+                    });
                 } else if (caption) {
                     // Send caption only
                     await ctx.telegram.sendMessage(group.group_id, caption);
