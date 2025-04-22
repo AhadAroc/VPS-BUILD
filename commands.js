@@ -489,23 +489,29 @@ function setupCommands(bot) {
     });
 
     // Listen for photo messages
-bot.on('photo', async (ctx) => {
-    try {
+    bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
-        const photoArray = ctx.message.photo;
-        const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
-        const caption = ctx.message.caption || '';
-
-        // Log the received photo for debugging
-        console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
-
-        // Broadcast the photo
-        await broadcastMessage(ctx, 'photo', fileId, caption);
-    } catch (error) {
-        console.error('Error handling photo message:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
-    }
-});
+    
+        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
+    
+        if (isBroadcasting) {
+            try {
+                const photoArray = ctx.message.photo;
+                const fileId = photoArray[photoArray.length - 1].file_id;
+                const caption = ctx.message.caption || '';
+    
+                console.log(`Broadcasting photo: ${fileId}`);
+    
+                await broadcastMessage(ctx, 'photo', fileId, caption);
+            } catch (error) {
+                console.error('Error broadcasting photo:', error);
+            }
+        }
+    
+        // Always call next() so the reply logic in `actions.js` runs
+        return next();
+    });
+    
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -544,12 +550,13 @@ bot.command('broadcast', async (ctx) => {
 
     if (isBroadcasting) {
         chatBroadcastStates.set(chatId, false);
-        await ctx.reply('🛑 تم إيقاف وضع الإذاعة. لن يتم بث الصور الآن.');
+        await ctx.reply('🛑 تم إيقاف وضع الإذاعة.');
     } else {
         chatBroadcastStates.set(chatId, true);
         await ctx.reply('📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث.');
     }
 });
+
 bot.hears('broadcast', async (ctx) => {
     // Check if the user has the required permissions
     if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
