@@ -2043,13 +2043,19 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
 bot.action('dev_broadcast', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        awaitingBroadcastPhoto = true; // Set the flag to true
-        await ctx.reply('📸 الرجاء إرسال الصورة التي تريد إذاعتها.');
+
+        const chatId = ctx.chat.id;
+        awaitingBroadcastPhoto = true;
+
+        await ctx.reply('📢 *وضع الإذاعة اليدوي مفعل!*\n\n📸 الرجاء إرسال الصورة أو الوسائط التي تريد إذاعتها الآن.\n\n🛑 لإيقاف هذا الوضع يدويًا، استخدم الأمر: `/cancel_broadcast`', {
+            parse_mode: 'Markdown'
+        });
     } catch (error) {
         console.error('Error handling broadcast action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة بدء الإذاعة.');
     }
 });
+
 
 
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
