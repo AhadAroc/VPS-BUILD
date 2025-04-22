@@ -342,15 +342,7 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
                         case 'photo':
                             await ctx.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
                             break;
-                        case 'video':
-                            await ctx.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
-                            break;
-                        case 'animation':
-                            await ctx.telegram.sendAnimation(group.group_id, mediaId, { caption: caption || '' });
-                            break;
-                        case 'document':
-                            await ctx.telegram.sendDocument(group.group_id, mediaId, { caption: caption || '' });
-                            break;
+                        // Add other media types if needed
                         default:
                             console.error('Unsupported media type:', mediaType);
                             break;
@@ -494,6 +486,25 @@ function setupCommands(bot) {
             return;
         }
     });
+
+    // Listen for photo messages
+bot.on('photo', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const photoArray = ctx.message.photo;
+        const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
+        const caption = ctx.message.caption || '';
+
+        // Log the received photo for debugging
+        console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
+
+        // Broadcast the photo
+        await broadcastMessage(ctx, 'photo', fileId, caption);
+    } catch (error) {
+        console.error('Error handling photo message:', error);
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
+    }
+});
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
