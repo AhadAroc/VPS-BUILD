@@ -104,30 +104,6 @@ async function saveFile(fileLink, fileName) {
 }
 
 
-async function downloadMedia(ctx, message) {
-    let fileId, fileName, mimeType;
-
-    if (message.photo) {
-        fileId = message.photo[message.photo.length - 1].file_id;
-        fileName = `photo.jpg`;
-        mimeType = 'image/jpeg';
-    } else if (message.video) {
-        fileId = message.video.file_id;
-        fileName = `video.mp4`;
-        mimeType = 'video/mp4';
-    } else if (message.document) {
-        fileId = message.document.file_id;
-        fileName = message.document.file_name || `document`;
-        mimeType = message.document.mime_type;
-    } else {
-        throw new Error('Unsupported media type');
-    }
-
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    const { filePath, fileName: savedName } = await saveFile(fileLink, fileName);
-
-    return { filePath, fileName: savedName, mimeType };
-}
 
 // Create a separate function to handle the broadcast logic
 async function handleBroadcast(ctx) {
@@ -136,28 +112,37 @@ async function handleBroadcast(ctx) {
 
     const message = ctx.message;
 
-    if (!message || (!message.text && !message.caption)) {
-        return ctx.reply('الرجاء إرفاق نص مع الوسائط للإذاعة.');
+    if (!message) {
+        return ctx.reply('الرجاء إرفاق محتوى للإذاعة.');
     }
 
     let mediaFile = null;
     let mediaType = null;
+    let caption = '';
 
     if (message.photo) {
         mediaFile = message.photo[message.photo.length - 1];
         mediaType = 'photo';
+        caption = message.caption || '';
     } else if (message.video) {
         mediaFile = message.video;
         mediaType = 'video';
+        caption = message.caption || '';
     } else if (message.document) {
         mediaFile = message.document;
         mediaType = 'document';
+        caption = message.caption || '';
     } else if (message.audio) {
         mediaFile = message.audio;
         mediaType = 'audio';
+        caption = message.caption || '';
+    } else if (message.text) {
+        mediaType = 'text';
+        caption = message.text;
+    } else {
+        return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
     }
 
-    let caption = message.caption || message.text || '';
     caption = caption.replace(/^اذاعة/i, '').trim();
 
     let fileId = null;
@@ -172,13 +157,14 @@ async function handleBroadcast(ctx) {
             console.log('Saved file data:', savedFileData);
         } catch (err) {
             console.error('❌ Failed to download and save media:', err);
+            return ctx.reply('حدث خطأ أثناء معالجة الوسائط. يرجى المحاولة مرة أخرى.');
         }
     }
 
     // Save broadcast data to database
     const db = await ensureDatabaseInitialized();
     const broadcastData = {
-        type: mediaType || 'text',
+        type: mediaType,
         caption: caption,
         file_id: fileId,
         file_path: savedFileData ? savedFileData.filePath : null,
@@ -193,7 +179,9 @@ async function handleBroadcast(ctx) {
 
     for (const group of activeGroups) {
         try {
-            if (savedFileData && fs.existsSync(savedFileData.filePath)) {
+            if (mediaType === 'text') {
+                await ctx.telegram.sendMessage(group.chat_id, caption);
+            } else if (savedFileData && fs.existsSync(savedFileData.filePath)) {
                 const options = { caption };
 
                 switch (mediaType) {
@@ -213,7 +201,7 @@ async function handleBroadcast(ctx) {
                         throw new Error('Unsupported media type');
                 }
             } else {
-                await ctx.telegram.sendMessage(group.chat_id, caption);
+                throw new Error('Media file not found');
             }
 
             successCount++;
