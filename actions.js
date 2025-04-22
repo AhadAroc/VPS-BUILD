@@ -105,119 +105,7 @@ async function saveFile(fileLink, fileName) {
 
 
 
-// Create a separate function to handle the broadcast logic
-async function handleBroadcast(ctx) {
-    console.log('🔊 Broadcast Triggered');
-    console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
 
-    const message = ctx.message;
-
-    if (!message) {
-        return ctx.reply('الرجاء إرفاق محتوى للإذاعة.');
-    }
-
-    let mediaFile = null;
-    let mediaType = null;
-    let caption = '';
-
-    if (message.photo) {
-        mediaFile = message.photo[message.photo.length - 1];
-        mediaType = 'photo';
-        caption = message.caption || '';
-    } else if (message.video) {
-        mediaFile = message.video;
-        mediaType = 'video';
-        caption = message.caption || '';
-    } else if (message.document) {
-        mediaFile = message.document;
-        mediaType = 'document';
-        caption = message.caption || '';
-    } else if (message.audio) {
-        mediaFile = message.audio;
-        mediaType = 'audio';
-        caption = message.caption || '';
-    } else if (message.text) {
-        mediaType = 'text';
-        caption = message.text;
-    } else {
-        return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
-    }
-
-    caption = caption.replace(/^اذاعة/i, '').trim();
-
-    let fileId = null;
-    let savedFileData = null;
-
-    if (mediaFile) {
-        try {
-            fileId = mediaFile.file_id;
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            const fileName = `broadcast_${Date.now()}_${path.basename(fileLink.href)}`;
-            savedFileData = await saveFile(fileLink, fileName);
-            console.log('Saved file data:', savedFileData);
-        } catch (err) {
-            console.error('❌ Failed to download and save media:', err);
-            return ctx.reply('حدث خطأ أثناء معالجة الوسائط. يرجى المحاولة مرة أخرى.');
-        }
-    }
-
-    // Save broadcast data to database
-    const db = await ensureDatabaseInitialized();
-    const broadcastData = {
-        type: mediaType,
-        caption: caption,
-        file_id: fileId,
-        file_path: savedFileData ? savedFileData.filePath : null,
-        created_at: new Date()
-    };
-    await db.collection('broadcasts').insertOne(broadcastData);
-
-    const activeGroups = await db.collection('active_groups').find().toArray();
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const group of activeGroups) {
-        try {
-            if (mediaType === 'text') {
-                await ctx.telegram.sendMessage(group.chat_id, caption);
-            } else if (savedFileData && fs.existsSync(savedFileData.filePath)) {
-                const options = { caption };
-
-                switch (mediaType) {
-                    case 'photo':
-                        await ctx.telegram.sendPhoto(group.chat_id, { source: fs.createReadStream(savedFileData.filePath) }, options);
-                        break;
-                    case 'video':
-                        await ctx.telegram.sendVideo(group.chat_id, { source: fs.createReadStream(savedFileData.filePath) }, options);
-                        break;
-                    case 'document':
-                        await ctx.telegram.sendDocument(group.chat_id, { source: fs.createReadStream(savedFileData.filePath) }, options);
-                        break;
-                    case 'audio':
-                        await ctx.telegram.sendAudio(group.chat_id, { source: fs.createReadStream(savedFileData.filePath) }, options);
-                        break;
-                    default:
-                        throw new Error('Unsupported media type');
-                }
-            } else {
-                throw new Error('Media file not found');
-            }
-
-            successCount++;
-        } catch (err) {
-            console.error(`❌ Failed to send to group ${group.chat_id}:`, err);
-            failCount++;
-        }
-    }
-
-    // Delete the temporary file
-    if (savedFileData && fs.existsSync(savedFileData.filePath)) {
-        fs.unlinkSync(savedFileData.filePath);
-    }
-
-    ctx.reply(`📣 تم إرسال الإذاعة بنجاح إلى ${successCount} مجموعة.\n❌ فشل الإرسال إلى ${failCount} مجموعة.`);
-}
 // Consolidated media handler function
 async function handleMediaMessage(ctx, mediaType) {
     try {
@@ -2132,7 +2020,10 @@ bot.action('dev_broadcast', async (ctx) => {
         await ctx.answerCbQuery();
         await ctx.editMessageText(
             'لإرسال إذاعة، استخدم الأمر /اذاعة متبوعًا بالرسالة أو الوسائط التي تريد إرسالها.\n\n' +
-            'مثال:\n/اذاعة مرحبًا بالجميع!\n\n' +
+            'أمثلة:\n' +
+            '1. لإرسال نص: /اذاعة مرحبًا بالجميع!\n' +
+            '2. لإرسال صورة: أرسل الصورة وأضف تعليقًا يبدأ بـ /اذاعة\n' +
+            '3. لإرسال فيديو أو ملف: أرسل الوسائط وأضف تعليقًا يبدأ بـ /اذاعة\n\n' +
             'يمكنك أيضًا إعادة توجيه رسالة مع الأمر /اذاعة لإرسالها كإذاعة.\n\n' +
             'ملاحظة: حجم الفيديوهات يجب أن لا يتجاوز 10 ميجابايت.',
             {
@@ -2143,10 +2034,98 @@ bot.action('dev_broadcast', async (ctx) => {
                 }
             }
         );
+
+        // Set up a listener for the next message
+        bot.use(async (ctx, next) => {
+            if (ctx.message && ctx.from.id === ctx.from.id) {
+                const isCommand = ctx.message.text && ctx.message.text.startsWith('/اذاعة');
+                const hasCaption = ctx.message.caption && ctx.message.caption.startsWith('/اذاعة');
+
+                if (isCommand || hasCaption) {
+                    await handleBroadcast(ctx);
+                    return;
+                }
+            }
+            return next();
+        });
     } else {
         await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
+
+async function handleBroadcast(ctx) {
+    console.log('🔊 Broadcast Triggered');
+    console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
+
+    const message = ctx.message;
+    let mediaFile = null;
+    let mediaType = null;
+    let caption = '';
+
+    if (message.photo) {
+        mediaFile = message.photo[message.photo.length - 1];
+        mediaType = 'photo';
+        caption = message.caption || '';
+    } else if (message.video) {
+        mediaFile = message.video;
+        mediaType = 'video';
+        caption = message.caption || '';
+    } else if (message.document) {
+        mediaFile = message.document;
+        mediaType = 'document';
+        caption = message.caption || '';
+    } else if (message.audio) {
+        mediaFile = message.audio;
+        mediaType = 'audio';
+        caption = message.caption || '';
+    } else if (message.text) {
+        mediaType = 'text';
+        caption = message.text;
+    } else {
+        return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
+    }
+
+    caption = caption.replace(/^\/اذاعة\s*/i, '').trim();
+
+    let fileId = null;
+    if (mediaFile) {
+        fileId = mediaFile.file_id;
+    }
+
+    const db = await ensureDatabaseInitialized();
+    const activeGroups = await db.collection('active_groups').find().toArray();
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const group of activeGroups) {
+        try {
+            switch (mediaType) {
+                case 'text':
+                    await ctx.telegram.sendMessage(group.chat_id, caption);
+                    break;
+                case 'photo':
+                    await ctx.telegram.sendPhoto(group.chat_id, fileId, { caption });
+                    break;
+                case 'video':
+                    await ctx.telegram.sendVideo(group.chat_id, fileId, { caption });
+                    break;
+                case 'document':
+                    await ctx.telegram.sendDocument(group.chat_id, fileId, { caption });
+                    break;
+                case 'audio':
+                    await ctx.telegram.sendAudio(group.chat_id, fileId, { caption });
+                    break;
+            }
+            successCount++;
+        } catch (err) {
+            console.error(`❌ Failed to send to group ${group.chat_id}:`, err);
+            failCount++;
+        }
+    }
+
+    ctx.reply(`📣 تم إرسال الإذاعة بنجاح إلى ${successCount} مجموعة.\n❌ فشل الإرسال إلى ${failCount} مجموعة.`);
+}
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
         try {
             const botId = parseInt(ctx.match[1]);
