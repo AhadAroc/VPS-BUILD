@@ -131,6 +131,9 @@ async function downloadMedia(ctx, message) {
 
 // Create a separate function to handle the broadcast logic
 async function handleBroadcast(ctx) {
+    console.log('🔊 Broadcast Triggered');
+console.log('📦 ctx.message content:', JSON.stringify(ctx.message, null, 2));
+
     const message = ctx.message;
 
     if (!message || (!message.text && !message.caption)) {
