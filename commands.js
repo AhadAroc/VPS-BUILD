@@ -23,7 +23,8 @@ const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the pa
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
-
+// Map to track broadcasting state for each chat
+const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
 
   // ✅ Function to check if the user is admin or owner
@@ -488,23 +489,29 @@ function setupCommands(bot) {
     });
 
     // Listen for photo messages
-bot.on('photo', async (ctx) => {
-    try {
+    bot.on('photo', async (ctx) => {
         const chatId = ctx.chat.id;
-        const photoArray = ctx.message.photo;
-        const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
-        const caption = ctx.message.caption || '';
-
-        // Log the received photo for debugging
-        console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
-
-        // Broadcast the photo
-        await broadcastMessage(ctx, 'photo', fileId, caption);
-    } catch (error) {
-        console.error('Error handling photo message:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
-    }
-});
+        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
+    
+        if (!isBroadcasting) {
+            return; // Ignore photo messages if not in broadcasting mode
+        }
+    
+        try {
+            const photoArray = ctx.message.photo;
+            const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
+            const caption = ctx.message.caption || '';
+    
+            // Log the received photo for debugging
+            console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
+    
+            // Broadcast the photo
+            await broadcastMessage(ctx, 'photo', fileId, caption);
+        } catch (error) {
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
+        }
+    });
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -538,18 +545,16 @@ bot.action('back_to_main', async (ctx) => {
     }
 });
 bot.command('broadcast', async (ctx) => {
-    // Check if the user has the required permissions
-    if (!await (ctx, ctx.from.id)) {
-        return ctx.reply('❌ ليس لديك الصلاحيات اللازمة لاستخدام هذا الأمر.');
+    const chatId = ctx.chat.id;
+    const isBroadcasting = chatBroadcastStates.get(chatId) || false;
+
+    if (isBroadcasting) {
+        chatBroadcastStates.set(chatId, false);
+        await ctx.reply('🛑 تم إيقاف وضع الإذاعة. لن يتم بث الصور الآن.');
+    } else {
+        chatBroadcastStates.set(chatId, true);
+        await ctx.reply('📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث.');
     }
-
-    // Example usage: /broadcast <mediaType> <mediaId> <caption>
-    const args = ctx.message.text.split(' ').slice(1);
-    const mediaType = args[0]; // e.g., 'photo', 'video'
-    const mediaId = args[1]; // Telegram file ID
-    const caption = args.slice(2).join(' '); // The rest is the caption
-
-    await broadcastMessage(ctx, mediaType, mediaId, caption);
 });
 bot.hears('broadcast', async (ctx) => {
     // Check if the user has the required permissions
