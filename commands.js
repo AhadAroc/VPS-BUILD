@@ -24,7 +24,7 @@ const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the pa
 let mongoClient = null;
 const knownUsers = new Map();
 
-
+let awaitingBroadcastPhoto = false;
 
   // ✅ Function to check if the user is admin or owner
   async function isAdminOrOwner(ctx, userId) {
@@ -350,16 +350,12 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
                 } else if (caption) {
                     await ctx.telegram.sendMessage(group.group_id, caption);
                 }
-                console.log(`Message sent to group: ${group.group_id}`); // Debugging line
             } catch (error) {
-                console.error(`Error sending message to group ${group.group_id}:`, error);
+                console.error(`Error broadcasting to group ${group.group_id}:`, error);
             }
         }
-
-        await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات النشطة.');
     } catch (error) {
         console.error('Error in broadcastMessage:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
     }
 }
 async function getDifficultyLevels() {
@@ -488,23 +484,30 @@ function setupCommands(bot) {
     });
 
     // Listen for photo messages
-bot.on('photo', async (ctx) => {
-    try {
-        const chatId = ctx.chat.id;
-        const photoArray = ctx.message.photo;
-        const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
-        const caption = ctx.message.caption || '';
-
-        // Log the received photo for debugging
-        console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
-
-        // Broadcast the photo
-        await broadcastMessage(ctx, 'photo', fileId, caption);
-    } catch (error) {
-        console.error('Error handling photo message:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
-    }
-});
+    bot.on('photo', async (ctx) => {
+        if (!awaitingBroadcastPhoto) {
+            return; // If not awaiting a broadcast photo, ignore the photo
+        }
+    
+        try {
+            const chatId = ctx.chat.id;
+            const photoArray = ctx.message.photo;
+            const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
+            const caption = ctx.message.caption || '';
+    
+            // Log the received photo for debugging
+            console.log(`Received photo for broadcast from chat ${chatId} with file ID: ${fileId}`);
+    
+            // Broadcast the photo
+            await broadcastMessage(ctx, 'photo', fileId, caption);
+    
+            // Reset the flag after broadcasting
+            awaitingBroadcastPhoto = false;
+        } catch (error) {
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
+        }
+    });
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
