@@ -2567,9 +2567,13 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     // Register the text handler
     bot.on('text', async (ctx) => {
         const userId = ctx.from.id;
-    const userState = pendingReplies.get(userId);
-    const text = ctx.message.text?.trim();
-    const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+        const chatId = ctx.chat.id; // 👈 Fix added here
+        const userState = pendingReplies.get(userId);
+        const text = ctx.message.text?.trim();
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+    
+        // ... rest of your logic
+    
 
 if (isBroadcasting && text) {
     try {
