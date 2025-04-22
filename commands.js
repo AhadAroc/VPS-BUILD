@@ -513,7 +513,7 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
-bot.command('broadcast', async (ctx) => {
+bot.hears('broadcast', async (ctx) => {
     // Check if the user has the required permissions
     if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
         return ctx.reply('❌ ليس لديك الصلاحيات اللازمة لاستخدام هذا الأمر.');
