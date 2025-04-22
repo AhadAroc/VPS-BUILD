@@ -559,9 +559,7 @@ bot.hears('مساعدة', showHelp);
 bot.command('تنزيل مطور', async (ctx) => {
     await demoteUser(ctx, 'developer');
 });
-// Add these lines to your existing command handlers
-bot.command('اذاعة', handleBroadcast);
-bot.hears(/^اذاعة (.+)/, handleBroadcast);
+;
 bot.hears(/^تنزيل مطور/, async (ctx) => {
     await demoteUser(ctx, 'developer');
 });
