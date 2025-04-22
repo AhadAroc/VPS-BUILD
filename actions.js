@@ -2569,6 +2569,25 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const userId = ctx.from.id;
     const userState = pendingReplies.get(userId);
     const text = ctx.message.text?.trim();
+    const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+
+if (isBroadcasting && text) {
+    try {
+        await broadcastMessage(ctx, null, null, text);
+
+        if (awaitingBroadcastPhoto) {
+            awaitingBroadcastPhoto = false;
+            await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+        }
+
+        return; // 🛑 Prevent further processing of this broadcast message
+    } catch (error) {
+        console.error('Error broadcasting text:', error);
+        await ctx.reply('❌ حدث خطأ أثناء بث الرسالة.');
+        return;
+    }
+}
+
 
     if (userState) {
         if (userState.step === 'awaiting_trigger') {
