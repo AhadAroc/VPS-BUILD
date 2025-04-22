@@ -328,7 +328,35 @@ async function showQuizMenu(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المسابقات. الرجاء المحاولة مرة أخرى.');
     }
 }
+async function broadcastMessage(ctx, mediaType, mediaId, caption) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
+        for (const group of groups) {
+            try {
+                if (mediaType && mediaId) {
+                    // Send media with caption
+                    await ctx.telegram.sendMediaGroup(group.group_id, [{
+                        type: mediaType,
+                        media: mediaId,
+                        caption: caption || ''
+                    }]);
+                } else if (caption) {
+                    // Send caption only
+                    await ctx.telegram.sendMessage(group.group_id, caption);
+                }
+            } catch (error) {
+                console.error(`Error sending message to group ${group.group_id}:`, error);
+            }
+        }
+
+        await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات النشطة.');
+    } catch (error) {
+        console.error('Error in broadcastMessage:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
+    }
+}
 async function getDifficultyLevels() {
     const client = new MongoClient(uri);
     try {
@@ -412,7 +440,7 @@ async function checkUserRank(ctx) {
 }
 
 function setupCommands(bot) {
-    const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates,handleBroadcast } = require('./actions'); // these were up there
+    const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
     bot.command('start', async (ctx) => {
         if (ctx.chat.type === 'private') {
             try {
@@ -485,7 +513,20 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
+bot.command('broadcast', async (ctx) => {
+    // Check if the user has the required permissions
+    if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
+        return ctx.reply('❌ ليس لديك الصلاحيات اللازمة لاستخدام هذا الأمر.');
+    }
 
+    // Example usage: /broadcast <mediaType> <mediaId> <caption>
+    const args = ctx.message.text.split(' ').slice(1);
+    const mediaType = args[0]; // e.g., 'photo', 'video'
+    const mediaId = args[1]; // Telegram file ID
+    const caption = args.slice(2).join(' '); // The rest is the caption
+
+    await broadcastMessage(ctx, mediaType, mediaId, caption);
+});
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
