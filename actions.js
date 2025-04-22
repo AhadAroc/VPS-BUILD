@@ -3,11 +3,10 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
-
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 
-const activeHandlerState = new Map();
+
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -53,45 +52,7 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-// Function to handle photo replies
-async function handleReplyPhoto(ctx) {
-    const userId = ctx.from.id;
-    const state = pendingReplies.get(userId);
 
-    if (!state || state.step !== 'awaiting_response') return;
-
-    const db = await ensureDatabaseInitialized();
-    const fileId = ctx.message.photo.at(-1).file_id;
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    const fileName = `photo_${Date.now()}_${userId}.jpg`;
-    const savedFilePath = await saveFile(fileLink, fileName);
-
-    await db.collection('replies').insertOne({
-        bot_id: state.botId,
-        trigger_word: state.triggerWord,
-        type: 'media',
-        media_type: 'photo',
-        file_id: fileId,
-        file_path: savedFilePath,
-        created_by: userId,
-        created_at: new Date()
-    });
-
-    await ctx.reply(`✅ تم حفظ الرد (photo) للكلمة "${state.triggerWord}"`);
-    pendingReplies.delete(userId);
-}
-// Function to handle broadcast photos
-async function handleBroadcastPhoto(ctx) {
-    const fileId = ctx.message.photo.at(-1).file_id;
-    const caption = ctx.message.caption || '';
-
-    try {
-        await broadcastMessage(ctx, 'photo', fileId, caption);
-    } catch (error) {
-        console.error('Error broadcasting photo:', error);
-        await ctx.reply('❌ حدث خطأ أثناء بث الصورة.');
-    }
-}
 // Function to download and save file
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
@@ -2583,50 +2544,8 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     await ctx.reply(`✅ تم حفظ الرد (${mediaType}) للكلمة "${state.triggerWord}"`);
     pendingReplies.delete(userId);
 });
-// Function to handle photo replies
-async function handleReplyPhoto(ctx) {
-    const userId = ctx.from.id;
-    const state = pendingReplies.get(userId);
 
-    if (!state || state.step !== 'awaiting_response') return;
 
-    const db = await ensureDatabaseInitialized();
-    const fileId = ctx.message.photo.at(-1).file_id;
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    const fileName = `photo_${Date.now()}_${userId}.jpg`;
-    const savedFilePath = await saveFile(fileLink, fileName);
-
-    await db.collection('replies').insertOne({
-        bot_id: state.botId,
-        trigger_word: state.triggerWord,
-        type: 'media',
-        media_type: 'photo',
-        file_id: fileId,
-        file_path: savedFilePath,
-        created_by: userId,
-        created_at: new Date()
-    });
-
-    await ctx.reply(`✅ تم حفظ الرد (photo) للكلمة "${state.triggerWord}"`);
-    pendingReplies.delete(userId);
-}
-// Middleware to control which handler processes the message
-bot.use(async (ctx, next) => {
-    if (ctx.updateType === 'message' && ctx.message.photo) {
-        const chatId = ctx.chat.id;
-        const activeHandler = activeHandlerState.get(chatId) || 'default';
-
-        if (activeHandler === 'reply') {
-            await handleReplyPhoto(ctx);
-        } else if (activeHandler === 'broadcast') {
-            await handleBroadcastPhoto(ctx);
-        } else {
-            await next(); // Continue to the next middleware or handler
-        }
-    } else {
-        await next(); // Continue to the next middleware or handler
-    }
-});
 
 
 // Register the text handler
