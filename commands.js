@@ -546,6 +546,23 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
+// Middleware to control which handler processes the message
+bot.use(async (ctx, next) => {
+    if (ctx.updateType === 'message' && ctx.message.photo) {
+        const chatId = ctx.chat.id;
+        const activeHandler = activeHandlerState.get(chatId) || 'default';
+
+        if (activeHandler === 'reply') {
+            await handleReplyPhoto(ctx);
+        } else if (activeHandler === 'broadcast') {
+            await handleBroadcastPhoto(ctx);
+        } else {
+            await next(); // Continue to the next middleware or handler
+        }
+    } else {
+        await next(); // Continue to the next middleware or handler
+    }
+});
 // Command to toggle the active handler
 bot.command('toggle_handler', async (ctx) => {
     const chatId = ctx.chat.id;
@@ -585,6 +602,18 @@ bot.hears('broadcast', async (ctx) => {
 
     await broadcastMessage(ctx, mediaType, mediaId, caption);
 });
+// Function to handle broadcast photos
+async function handleBroadcastPhoto(ctx) {
+    const fileId = ctx.message.photo.at(-1).file_id;
+    const caption = ctx.message.caption || '';
+
+    try {
+        await broadcastMessage(ctx, 'photo', fileId, caption);
+    } catch (error) {
+        console.error('Error broadcasting photo:', error);
+        await ctx.reply('❌ حدث خطأ أثناء بث الصورة.');
+    }
+}
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
