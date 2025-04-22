@@ -20,8 +20,6 @@ let photoMessages = new Map(); // chatId -> Set of message IDs
 const database = require('./database');
 const { isDeveloper } = require('./middlewares');
 const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
-// Map to track which handler is active for each chat
-const activeHandlerState = new Map();
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
@@ -491,29 +489,23 @@ function setupCommands(bot) {
     });
 
     // Listen for photo messages
-    bot.on('photo', async (ctx) => {
+bot.on('photo', async (ctx) => {
+    try {
         const chatId = ctx.chat.id;
-        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
-    
-        if (!isBroadcasting) {
-            return; // Ignore photo messages if not in broadcasting mode
-        }
-    
-        try {
-            const photoArray = ctx.message.photo;
-            const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
-            const caption = ctx.message.caption || '';
-    
-            // Log the received photo for debugging
-            console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
-    
-            // Broadcast the photo
-            await broadcastMessage(ctx, 'photo', fileId, caption);
-        } catch (error) {
-            console.error('Error handling photo message:', error);
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
-        }
-    });
+        const photoArray = ctx.message.photo;
+        const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
+        const caption = ctx.message.caption || '';
+
+        // Log the received photo for debugging
+        console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
+
+        // Broadcast the photo
+        await broadcastMessage(ctx, 'photo', fileId, caption);
+    } catch (error) {
+        console.error('Error handling photo message:', error);
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
+    }
+});
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -546,36 +538,6 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
-// Middleware to control which handler processes the message
-bot.use(async (ctx, next) => {
-    if (ctx.updateType === 'message' && ctx.message.photo) {
-        const chatId = ctx.chat.id;
-        const activeHandler = activeHandlerState.get(chatId) || 'default';
-
-        if (activeHandler === 'reply') {
-            await handleReplyPhoto(ctx);
-        } else if (activeHandler === 'broadcast') {
-            await handleBroadcastPhoto(ctx);
-        } else {
-            await next(); // Continue to the next middleware or handler
-        }
-    } else {
-        await next(); // Continue to the next middleware or handler
-    }
-});
-// Command to toggle the active handler
-bot.command('toggle_handler', async (ctx) => {
-    const chatId = ctx.chat.id;
-    const currentHandler = activeHandlerState.get(chatId) || 'default';
-
-    if (currentHandler === 'reply') {
-        activeHandlerState.set(chatId, 'broadcast');
-        await ctx.reply('📢 تم تفعيل وضع الإذاعة. سيتم بث الصور الآن.');
-    } else {
-        activeHandlerState.set(chatId, 'reply');
-        await ctx.reply('💬 تم تفعيل وضع الرد. سيتم حفظ الصور كأجوبة.');
-    }
-});
 bot.command('broadcast', async (ctx) => {
     const chatId = ctx.chat.id;
     const isBroadcasting = chatBroadcastStates.get(chatId) || false;
@@ -602,18 +564,6 @@ bot.hears('broadcast', async (ctx) => {
 
     await broadcastMessage(ctx, mediaType, mediaId, caption);
 });
-// Function to handle broadcast photos
-async function handleBroadcastPhoto(ctx) {
-    const fileId = ctx.message.photo.at(-1).file_id;
-    const caption = ctx.message.caption || '';
-
-    try {
-        await broadcastMessage(ctx, 'photo', fileId, caption);
-    } catch (error) {
-        console.error('Error broadcasting photo:', error);
-        await ctx.reply('❌ حدث خطأ أثناء بث الصورة.');
-    }
-}
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
@@ -747,34 +697,7 @@ bot.use(linkRestrictionMiddleware);
 bot.use(videoRestrictionMiddleware);
 bot.use(gifRestrictionMiddleware);
 bot.use(documentRestrictionMiddleware);
-// Middleware to handle photo messages based on broadcasting state
-bot.use(async (ctx, next) => {
-    if (ctx.updateType === 'message' && ctx.message.photo) {
-        const chatId = ctx.chat.id;
-        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
 
-        if (!isBroadcasting) {
-            return; // Skip photo handling if not in broadcasting mode
-        }
-
-        try {
-            const photoArray = ctx.message.photo;
-            const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
-            const caption = ctx.message.caption || '';
-
-            // Log the received photo for debugging
-            console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
-
-            // Broadcast the photo
-            await broadcastMessage(ctx, 'photo', fileId, caption);
-        } catch (error) {
-            console.error('Error handling photo message:', error);
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
-        }
-    } else {
-        await next(); // Continue to the next middleware or handler
-    }
-});
 
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
