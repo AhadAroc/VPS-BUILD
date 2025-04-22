@@ -2468,42 +2468,7 @@ async function getCustomQuestionsForChat(chatId) {
             ctx.reply(debugMessage);
         }
     });
-    // Update the broadcast command handler
-    bot.command('اذاعة', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            const message = ctx.message.text.split(' ').slice(1).join(' ');
-            if (!message) {
-                return ctx.reply('الرجاء إدخال رسالة للإذاعة بعد الأمر. مثال:\n/اذاعة مرحبا بالجميع!');
-            }
-    
-            console.log(`Broadcasting message: "${message}"`);
-            console.log(`Number of active groups: ${activeGroups.size}`);
-    
-            let successCount = 0;
-            let failCount = 0;
-    
-            for (const [groupId, groupInfo] of activeGroups) {
-                try {
-                    await ctx.telegram.sendMessage(groupId, message);
-                    console.log(`Successfully sent to group: ${groupInfo.title} (${groupId})`);
-                    successCount++;
-                } catch (error) {
-                    console.error(`Failed to send broadcast to group ${groupId} (${groupInfo.title}):`, error);
-                    failCount++;
-                }
-            }
-    
-            ctx.reply(`تم 😶‍🌫️إرسال الإذاعة بنجاح!\n\nتم الإرسال إلى: ${successCount} مجموعة\nفشل الإرسال إلى: ${failCount} مجموعة`);
-        } else {
-            ctx.reply('عذراً، هذا الأمر للمطورين فقط');
-        }
-    });
-
- // Existing broadcast command
- bot.command('اذاعة', handleBroadcast);
-
- // Add this new hears handler
- bot.hears(/^اذاعة (.+)/, handleBroadcast);
+   
 
 
     bot.command('تنزيل مطور', async (ctx) => {
