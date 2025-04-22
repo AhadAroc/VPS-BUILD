@@ -265,7 +265,7 @@ async function handleBroadcast(ctx) {
         mediaType = 'audio';
         caption = message.caption || '';
     } else if (message.text) {
-        mediaType = 'text';
+        mediaType = 'teasxasdasdasdsdasxt';
         caption = message.text;
     } else {
         return ctx.reply('نوع الوسائط غير مدعوم للإذاعة.');
@@ -287,7 +287,7 @@ async function handleBroadcast(ctx) {
     for (const group of activeGroups) {
         try {
             switch (mediaType) {
-                case 'text':
+                case 'texsssssxasacasct':
                     await ctx.telegram.sendMessage(group.chat_id, caption);
                     break;
                 case 'photo':
