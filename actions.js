@@ -1552,17 +1552,23 @@ async function askNextQuestion(chatId, telegram) {
 // Call this function when initializing the database
 createGroupsTable();
     // Update the updateActiveGroups function
-    async function updateActiveGroups(groupId, groupTitle) {
-        try {
-            await database.addGroup(groupId, groupTitle);
-            
-            // Update the in-memory map if you're using one
-            if (typeof activeGroups !== 'undefined') {
-                activeGroups.set(groupId, { title: groupTitle, id: groupId });
-            }
-        } catch (error) {
-            console.error('Error updating active group:', error);
-        }
+    async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
+        const db = await ensureDatabaseInitialized();
+        const now = new Date();
+        await db.collection('active_groups').updateOne(
+            { chat_id: chatId },
+            { 
+                $set: { 
+                    chat_title: chatTitle,
+                    last_activity: now
+                },
+                $setOnInsert: {
+                    added_by: addedBy,
+                    added_at: now
+                }
+            },
+            { upsert: true }
+        );
     }
     async function hasRequiredPermissions(ctx, userId) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
@@ -2486,6 +2492,33 @@ bot.action('change_bot_name', async (ctx) => {
         await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
+async function checkBotNameAndReply(ctx) {
+    const chatId = ctx.chat.id;
+    const messageText = ctx.message.text.toLowerCase();
+
+    // Check if the chat is an active group
+    if (!activeGroups.has(chatId)) {
+        return;
+    }
+
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botName = await db.collection('bot_names').findOne({ chat_id: chatId });
+
+        if (botName && messageText.includes(botName.name.toLowerCase())) {
+            const replies = [
+                'نعم، أنا هنا!',
+                'مرحبًا! كيف يمكنني مساعدتك؟',
+                'هل ناداني أحد؟',
+                'في خدمتك!'
+            ];
+            const randomReply = replies[Math.floor(Math.random() * replies.length)];
+            await ctx.reply(randomReply, { reply_to_message_id: ctx.message.message_id });
+        }
+    } catch (error) {
+        console.error('Error checking bot name:', error);
+    }
+}   
     
 bot.action('show_current_bot_name', async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
@@ -2628,7 +2661,10 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
             }
             ctx.session.awaitingBotName = false;
         } 
-    
+    // Check for bot name mentions in active groups
+    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+        await checkBotNameAndReply(ctx);
+    }
         // ... rest of your logic
     
 
