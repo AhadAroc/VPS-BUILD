@@ -2671,12 +2671,13 @@ const botResponses = [
         const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
         const botCustomName = botNameDoc?.name?.toLowerCase();
         
-        // Check if message contains "سمبوسة" (the bot's name) or the custom name
-        if (messageText.includes('سمبوسة') || (botCustomName && messageText.includes(botCustomName))) {
+        // Check if message contains the custom name or the default name "سمبوسة"
+        if ((botCustomName && messageText.includes(botCustomName.toLowerCase())) || 
+            (!botCustomName && messageText.includes('سمبوسة'))) {
             console.log(`Bot name mentioned: ${text}`);
             const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
             const displayName = botNameDoc?.name || 'سمبوسة';
-            await ctx.reply(`${displayName} يرد: ${randomResponse}`);
+            await ctx.reply(`${randomResponse}`);
             return; // Exit after reply
         }
 
