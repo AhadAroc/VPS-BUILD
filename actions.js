@@ -270,7 +270,22 @@ async function handleMediaMessage(ctx, mediaType) {
    
 
 
+function removeCircularReferences(obj) {
+    const seen = new WeakSet();
+    return JSON.parse(JSON.stringify(obj, (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+                return; // Omit circular reference
+            }
+            seen.add(value);
+        }
+        return value;
+    }));
+}
 
+// Example usage before storing in MongoDB
+const safeObject = removeCircularReferences(yourObject);
+await db.collection('your_collection').insertOne(safeObject);
 // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleTextMessage(ctx) {
