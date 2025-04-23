@@ -104,7 +104,25 @@ async function saveFile(fileLink, fileName) {
 }
 
 
-
+ // Update the updateActiveGroups function
+ async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
+    const db = await ensureDatabaseInitialized();
+    const now = new Date();
+    await db.collection('active_groups').updateOne(
+        { chat_id: chatId },
+        { 
+            $set: { 
+                chat_title: chatTitle,
+                last_activity: now
+            },
+            $setOnInsert: {
+                added_by: addedBy,
+                added_at: now
+            }
+        },
+        { upsert: true }
+    );
+}
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -1551,25 +1569,7 @@ async function askNextQuestion(chatId, telegram) {
 }
 // Call this function when initializing the database
 createGroupsTable();
-    // Update the updateActiveGroups function
-    async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
-        const db = await ensureDatabaseInitialized();
-        const now = new Date();
-        await db.collection('active_groups').updateOne(
-            { chat_id: chatId },
-            { 
-                $set: { 
-                    chat_title: chatTitle,
-                    last_activity: now
-                },
-                $setOnInsert: {
-                    added_by: addedBy,
-                    added_at: now
-                }
-            },
-            { upsert: true }
-        );
-    }
+   
     async function hasRequiredPermissions(ctx, userId) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
