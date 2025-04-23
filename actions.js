@@ -4563,6 +4563,24 @@ async function sendReply(ctx, reply) {
     try {
         if (reply.type === 'text') {
             await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+        } else if (reply.type === 'text_cycle') {
+            const texts = reply.reply_texts;
+            if (texts && texts.length > 0) {
+                const currentIndex = reply.cycle_index || 0;
+                const textToSend = texts[currentIndex];
+
+                await ctx.reply(textToSend, { reply_to_message_id: ctx.message.message_id });
+
+                const newIndex = (currentIndex + 1) % texts.length;
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').updateOne(
+                    { _id: reply._id },
+                    { $set: { cycle_index: newIndex } }
+                );
+            } else {
+                console.error('No valid texts found in reply_texts for text_cycle type.');
+                await ctx.reply('❌ لا توجد نصوص صالحة للرد.', { reply_to_message_id: ctx.message.message_id });
+            }
         } else if (reply.type === 'media') {
             switch (reply.media_type) {
                 case 'photo':
