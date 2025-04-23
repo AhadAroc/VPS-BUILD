@@ -308,7 +308,7 @@ const customBotName = await getCustomBotName(chatId);
         const loweredName = customBotName.toLowerCase();
         if (userText.includes(loweredName)) {
             const responses = [
-                `Hello! You mentioned the custom bot name: ${customBotName}`,
+                `عيونه 🫶: ${customBotName}`,
                 `Hey! Did someone say ${customBotName}? 👀`,
                 `What's up! You just called ${customBotName} 🤖`,
                 `Yo! ${customBotName} at your service 💬`
