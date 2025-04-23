@@ -5,7 +5,7 @@ let tempReplyWord = '';
 let tempBotId = null;
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
-const botNameResponseIndexes = new Map();
+
 
 // Make sure this is at the top of your file
 const activeGroups = new Map();
@@ -304,29 +304,13 @@ async function handleTextMessage(ctx) {
     }
 // Check for custom bot name
 const customBotName = await getCustomBotName(chatId);
-    if (customBotName) {
-        const loweredName = customBotName.toLowerCase();
-        if (userText.includes(loweredName)) {
-            const responses = [
-                `عيونه 🫶: ${customBotName}`,
-                `Hey! Did someone say ${customBotName}? 👀`,
-                `What's up! You just called ${customBotName} 🤖`,
-                `Yo! ${customBotName} at your service 💬`
-            ];
-
-            // Get current index or default to 0
-            const currentIndex = botNameResponseIndexes.get(chatId) || 0;
-            const reply = responses[currentIndex % responses.length];
-
-            // Update index for next time
-            botNameResponseIndexes.set(chatId, (currentIndex + 1) % responses.length);
-
-            await ctx.reply(reply);
-            return;
-        }
+if (customBotName) {
+    const loweredName = customBotName.toLowerCase();
+    if (userText.includes(loweredName)) {
+        await ctx.reply(`Hello! You mentioned the custom bot name: ${customBotName}`);
+        return;
     }
-
-
+}
 console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotName}"`);
 
 
@@ -2664,28 +2648,17 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     { upsert: true }
                 );
     
+                // Save a default reply for the new bot name
                 await db.collection('replies').updateOne(
-                    { trigger_word: newBotName, bot_id: ctx.botInfo.id },
-                    {
-                        $set: {
-                            trigger_word: newBotName,
-                            reply_texts: [  // <-- Change from reply_text to reply_texts (array)
-                                `عيونه 😌: ${newBotName}`,
-                                `yo: ${newBotName}`,
-                                `hey hey: ${newBotName}`,
-                                `what am busy ??: ${newBotName}`
-                            ],
-                            chat_id: chatId,
-                            bot_id: ctx.botInfo.id,
-                            type: "text_cycle", // Optional: mark it as cycling
-                            created_at: new Date(),
-                            cycle_index: 0 // Start with the first one
-                        }
-                    },
+                    { trigger_word: newBotName, chat_id: chatId },
+                    { $set: { 
+                        trigger_word: newBotName, 
+                        reply_text: `Hello! You mentioned the bot name: ${newBotName}`,
+                        chat_id: chatId,
+                        type: "text"
+                    }},
                     { upsert: true }
                 );
-                
-                
     
                 await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
                 ctx.session.awaitingBotName = false;
@@ -4590,28 +4563,6 @@ async function sendReply(ctx, reply) {
     try {
         if (reply.type === 'text') {
             await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-        } else if (reply.type === 'text_cycle') {
-            // Handle text_cycle type
-            const texts = reply.reply_texts;
-            if (texts && texts.length > 0) {
-                // Get the current text based on cycle_index
-                const currentIndex = reply.cycle_index || 0;
-                const textToSend = texts[currentIndex];
-
-                // Send the reply
-                await ctx.reply(textToSend, { reply_to_message_id: ctx.message.message_id });
-
-                // Update the cycle_index for the next time
-                const newIndex = (currentIndex + 1) % texts.length;
-                const db = await ensureDatabaseInitialized();
-                await db.collection('replies').updateOne(
-                    { _id: reply._id },
-                    { $set: { cycle_index: newIndex } }
-                );
-            } else {
-                console.error('No valid texts found in reply_texts for text_cycle type.');
-                await ctx.reply('❌ لا توجد نصوص صالحة للرد.', { reply_to_message_id: ctx.message.message_id });
-            }
         } else if (reply.type === 'media') {
             switch (reply.media_type) {
                 case 'photo':
@@ -4642,6 +4593,7 @@ async function sendReply(ctx, reply) {
         await ctx.reply('❌ حدث خطأ أثناء إرسال الرد.', { reply_to_message_id: ctx.message.message_id });
     }
 }
+
 
 bot.action('check_subscription', forceCheckSubscription);
 
