@@ -269,7 +269,17 @@ async function handleMediaMessage(ctx, mediaType) {
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    const userText = ctx.message.text.trim().toLowerCase();
+    let userText = ctx.message.text.trim().toLowerCase();
+
+// Normalize mention in group chats (e.g., remove @BotUsername)
+const botUsername = ctx.botInfo.username.toLowerCase();
+if (userText.startsWith(`@${botUsername}`)) {
+    userText = userText.replace(`@${botUsername}`, '').trim();
+}
+
+// Also handle "سمبوسة@bot" cases
+userText = userText.replace(`@${botUsername}`, '').trim();
+
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
