@@ -52,7 +52,14 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-
+const botResponses = [
+    "مرحبا! كيف يمكنني مساعدتك؟",
+    "أهلاً! أنا هنا لخدمتك.",
+    "نعم، أنا موجود. ماذا تحتاج؟",
+    "تفضل، كيف يمكنني مساعدتك اليوم؟",
+    "مرحباً بك! هل لديك أي استفسارات؟",
+    "أنا جاهز لمساعدتك. ما هو سؤالك؟"
+];
 // Function to download and save file
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
@@ -2601,14 +2608,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     pendingReplies.delete(userId);
 });
 
-const botResponses = [
-    "مرحبا! كيف يمكنني مساعدتك؟",
-    "أهلاً! أنا هنا لخدمتك.",
-    "نعم، أنا موجود. ماذا تحتاج؟",
-    "تفضل، كيف يمكنني مساعدتك اليوم؟",
-    "مرحباً بك! هل لديك أي استفسارات؟",
-    "أنا جاهز لمساعدتك. ما هو سؤالك؟"
-];
+
 
 
 // Register the text handler
@@ -2622,25 +2622,25 @@ const botResponses = [
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
     
         // 👇 Normalize messageText (remove bot mention if present)
-        let messageText = text.toLowerCase();
-        const botUsername = ctx.botInfo.username?.toLowerCase();
-        if (botUsername) {
-            messageText = messageText.replace(`@${botUsername}`, '').trim();
-        }
-    
-        try {
-            const db = await ensureDatabaseInitialized();
-    
-            // ✅ Check if the message contains the bot's custom name in this group
-            const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
-            if (botNameDoc && botNameDoc.name) {
-                const botName = botNameDoc.name.toLowerCase();
-                if (messageText.includes(botName)) {
-                    const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-                    await ctx.reply(`${botNameDoc.name} يرد: ${randomResponse}`);
-                    return; // Exit after reply
-                }
+    let messageText = text.toLowerCase();
+    const botUsername = ctx.botInfo.username?.toLowerCase();
+    if (botUsername) {
+        messageText = messageText.replace(`@${botUsername}`, '').trim();
+    }
+
+    try {
+        const db = await ensureDatabaseInitialized();
+
+        // ✅ Check if the message contains the bot's custom name in this group
+        const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+        if (botNameDoc && botNameDoc.name) {
+            const botName = botNameDoc.name.toLowerCase();
+            if (messageText.includes(botName)) {
+                const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+                await ctx.reply(`${botNameDoc.name} يرد: ${randomResponse}`);
+                return; // Exit after reply
             }
+        }
     
             // ✅ Handle changing the bot's custom name
             if (ctx.session && ctx.session.awaitingBotName) {
