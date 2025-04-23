@@ -2635,9 +2635,20 @@ const botResponses = [
                     return; // Exit the function after responding to the bot's name
                 }
             }
-        } catch (error) {
-            console.error('Error handling bot name mention:', error);
-        }
+    
+            // Handle bot name change
+            if (ctx.session && ctx.session.awaitingBotName) {
+                const newBotName = text;
+                await db.collection('bot_names').updateOne(
+                    { chat_id: chatId },
+                    { $set: { name: newBotName } },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
+                ctx.session.awaitingBotName = false;
+                return;
+            }
+    
         // ... rest of your logic
     
 
