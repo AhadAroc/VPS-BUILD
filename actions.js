@@ -269,17 +269,7 @@ async function handleMediaMessage(ctx, mediaType) {
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    let userText = ctx.message.text.trim().toLowerCase();
-
-// Normalize mention in group chats (e.g., remove @BotUsername)
-const botUsername = ctx.botInfo.username.toLowerCase();
-if (userText.startsWith(`@${botUsername}`)) {
-    userText = userText.replace(`@${botUsername}`, '').trim();
-}
-
-// Also handle "سمبوسة@bot" cases
-userText = userText.replace(`@${botUsername}`, '').trim();
-
+    const userText = ctx.message.text.trim().toLowerCase();
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
 
@@ -2627,26 +2617,32 @@ const botResponses = [
     bot.on('text', async (ctx) => {
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
-        const messageText = ctx.message.text.toLowerCase();
-        const userState = pendingReplies.get(userId);
         const text = ctx.message.text?.trim();
+        const userState = pendingReplies.get(userId);
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+    
+        // 👇 Normalize messageText (remove bot mention if present)
+        let messageText = text.toLowerCase();
+        const botUsername = ctx.botInfo.username?.toLowerCase();
+        if (botUsername) {
+            messageText = messageText.replace(`@${botUsername}`, '').trim();
+        }
     
         try {
             const db = await ensureDatabaseInitialized();
+    
+            // ✅ Check if the message contains the bot's custom name in this group
             const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
-            
             if (botNameDoc && botNameDoc.name) {
                 const botName = botNameDoc.name.toLowerCase();
-                
                 if (messageText.includes(botName)) {
                     const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
                     await ctx.reply(`${botNameDoc.name} يرد: ${randomResponse}`);
-                    return; // Exit the function after responding to the bot's name
+                    return; // Exit after reply
                 }
             }
     
-            // Handle bot name change
+            // ✅ Handle changing the bot's custom name
             if (ctx.session && ctx.session.awaitingBotName) {
                 const newBotName = text;
                 await db.collection('bot_names').updateOne(
@@ -2659,12 +2655,14 @@ const botResponses = [
                 return;
             }
     
-            // ... rest of your existing logic ...
+            // 👉 Add your other logic here (like replies, states, quizzes, etc.)
     
         } catch (error) {
             console.error('Error in text handler:', error);
             await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة.');
         }
+    
+    
 
 if (isBroadcasting && text) {
     try {
