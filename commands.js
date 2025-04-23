@@ -591,7 +591,7 @@ bot.command('broadcast', async (ctx) => {
         await ctx.reply('🛑 تم إيقاف وضع الإذاعة.');
     } else {
         chatBroadcastStates.set(chatId, true);
-        await ctx.reply('📢 وضع الإذاعة . يمكنك الآن إرسال الصور للبث يرجى استخدام الامر مرة اخرى للايقاف .');
+        await ctx.reply('📢والفيديوهات تحت مساحة 10 ميغا فقط  وضع الإذاعة . يمكنك الآن إرسال الصور للبث يرجى استخدام الامر مرة اخرى للايقاف .');
     }
 });
 
@@ -968,17 +968,24 @@ async function listVIPUsers(ctx) {
 }}
 
 
-    async function updateActiveGroups(ctx) {
+async function updateActiveGroups(ctx) {
+    const userId = ctx.from.id;
+    const chatId = ctx.chat.id;
+    const chatTitle = ctx.chat.title || 'Private Chat';
+    const chatType = ctx.chat.type;
+    
+    // Only track groups and supergroups
+    if (chatType !== 'group' && chatType !== 'supergroup') {
+        return;
+    }
+
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Use a transaction for atomicity
+        const session = db.client.startSession();
         try {
-            const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
-            const chatTitle = ctx.chat.title || 'Private Chat';
-            const chatType = ctx.chat.type;
-            
-            // Only track groups and supergroups
-            if (chatType === 'group' || chatType === 'supergroup') {
-                const db = await ensureDatabaseInitialized();
-                
+            await session.withTransaction(async () => {
                 // Update or insert the active group
                 await db.collection('active_groups').updateOne(
                     { chat_id: chatId },
@@ -988,7 +995,7 @@ async function listVIPUsers(ctx) {
                             last_activity: new Date()
                         }
                     },
-                    { upsert: true }
+                    { upsert: true, session }
                 );
                 
                 // Track user activity in this group
@@ -998,13 +1005,19 @@ async function listVIPUsers(ctx) {
                         $set: { last_activity: new Date() },
                         $setOnInsert: { joined_at: new Date() }
                     },
-                    { upsert: true }
+                    { upsert: true, session }
                 );
-            }
-        } catch (error) {
-            console.error('Error updating active groups:', error);
+            });
+        } finally {
+            await session.endSession();
         }
+        
+        console.log(`Successfully updated activity for group ${chatId} and user ${userId}`);
+    } catch (error) {
+        console.error('Error updating active groups:', error);
+        // Implement retry logic here if needed
     }
+}
     async function removeLinks(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
