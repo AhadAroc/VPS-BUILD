@@ -2649,8 +2649,12 @@ const botResponses = [
                 return;
             }
     
-        // ... rest of your logic
+            // ... rest of your existing logic ...
     
+        } catch (error) {
+            console.error('Error in text handler:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة.');
+        }
 
 if (isBroadcasting && text) {
     try {
