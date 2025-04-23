@@ -314,12 +314,18 @@ if (customBotName) {
             `Yo! ${customBotName} at your service 💬`
         ];
 
-        // Pick a random one
-        const randomReply = responses[Math.floor(Math.random() * responses.length)];
-        await ctx.reply(randomReply);
+        // Get current index or default to 0
+        const currentIndex = botNameResponseIndexes.get(chatId) || 0;
+        const reply = responses[currentIndex % responses.length];
+
+        // Update index for next time
+        botNameResponseIndexes.set(chatId, (currentIndex + 1) % responses.length);
+
+        await ctx.reply(reply);
         return;
     }
 }
+
 
 console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotName}"`);
 
