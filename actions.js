@@ -801,7 +801,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu  } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 
 
 // Photo handler
@@ -1528,50 +1528,13 @@ async function askNextQuestion(chatId, telegram) {
 // Call this function when initializing the database
 createGroupsTable();
     // Update the updateActiveGroups function
-    async function updateActiveGroups(ctx) {
+    async function updateActiveGroups(groupId, groupTitle) {
         try {
-            const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
-            const chatTitle = ctx.chat.title || 'Private Chat';
-            const chatType = ctx.chat.type;
+            await database.addGroup(groupId, groupTitle);
             
-            // Only track groups and supergroups
-            if (chatType === 'group' || chatType === 'supergroup') {
-                const db = await ensureDatabaseInitialized();
-                
-                // Create a sanitized object with only the data we need
-                // This avoids circular references in the ctx object
-                const groupData = {
-                    chat_id: chatId,
-                    chat_title: chatTitle,
-                    last_activity: new Date(),
-                    chat_type: chatType
-                };
-                
-                // Update or insert the active group with sanitized data
-                await db.collection('active_groups').updateOne(
-                    { chat_id: chatId },
-                    { $set: groupData },
-                    { upsert: true }
-                );
-                
-                // Track user activity in this group with sanitized data
-                const userData = {
-                    user_id: userId,
-                    chat_id: chatId,
-                    last_activity: new Date()
-                };
-                
-                await db.collection('user_groups').updateOne(
-                    { user_id: userId, chat_id: chatId },
-                    { 
-                        $set: { last_activity: new Date() },
-                        $setOnInsert: { joined_at: new Date() }
-                    },
-                    { upsert: true }
-                );
-                
-                console.log(`Successfully updated active group: ${chatTitle} (${chatId})`);
+            // Update the in-memory map if you're using one
+            if (typeof activeGroups !== 'undefined') {
+                activeGroups.set(groupId, { title: groupTitle, id: groupId });
             }
         } catch (error) {
             console.error('Error updating active group:', error);
@@ -4134,18 +4097,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         }
     });
     
-    bot.command('broadcast', async (ctx) => {
-        const chatId = ctx.chat.id;
-        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
-    
-        if (isBroadcasting) {
-            chatBroadcastStates.set(chatId, false);
-            await ctx.reply('🛑 تم إيقاف وضع الإذاعة. لن يتم بث الصور الآن.');
-        } else {
-            chatBroadcastStates.set(chatId, true);
-            await ctx.reply('📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث.');
-        }
-    });
+   
     
     bot.action('dev_source', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
