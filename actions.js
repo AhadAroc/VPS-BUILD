@@ -2632,7 +2632,8 @@ const botResponses = [
             const db = await ensureDatabaseInitialized();
     
             // ✅ Check if the message contains the bot's custom name in this group
-            const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+            // Check if the message contains the bot's custom name in this chat (group or private)
+    const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
     if (botNameDoc && botNameDoc.name) {
         const botName = botNameDoc.name.toLowerCase();
         if (messageText.includes(botName)) {
@@ -2642,7 +2643,7 @@ const botResponses = [
         }
     }
 
-    // ✅ Handle changing the bot's custom name (only in private chats or for admins in groups)
+    // Handle changing the bot's custom name (only in private chats or for admins in groups)
     if (ctx.session && ctx.session.awaitingBotName) {
         if (ctx.chat.type === 'private' || await isAdminOrOwner(ctx, ctx.from.id)) {
             const newBotName = text;
