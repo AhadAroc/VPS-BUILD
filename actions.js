@@ -302,7 +302,12 @@ async function handleTextMessage(ctx) {
         await handleQuizAnswer(ctx, chatId, userId, userText);
         return;
     }
-
+// Check for custom bot name
+const customBotName = await getCustomBotName(chatId);
+if (customBotName && userAnswer.includes(customBotName.toLowerCase())) {
+    await ctx.reply(`Hello! You mentioned the custom bot name: ${customBotName}`);
+    return;
+}
     // Check for user state
     if (userStates.has(userId)) {
         const userState = userStates.get(userId);
@@ -4540,7 +4545,7 @@ async function getCustomBotName(chatId) {
         console.error('Error retrieving custom bot name:', error);
         return null;
     }
-}    
+}   
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
