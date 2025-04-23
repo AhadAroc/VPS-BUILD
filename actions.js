@@ -2834,6 +2834,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const chatId = ctx.chat.id; // 👈 Fix added here
         const userState = pendingReplies.get(userId);
         const text = ctx.message.text?.trim();
+        const messageText = ctx.message.text?.trim(); // Ensure messageText is define
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
     
         // ... rest of your logic
@@ -2870,6 +2871,9 @@ if (messageText.includes(`@${botName}`)) {
     await ctx.reply(randomReply, { reply_to_message_id: ctx.message.message_id });
     return;
 }
+
+
+//broadcasting
 if (isBroadcasting && text) {
     try {
         await broadcastMessage(ctx, null, null, text);
