@@ -366,6 +366,56 @@ console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotNam
         // await ctx.reply('عذرًا، لم أفهم هذه الرسالة. هل يمكنك توضيح طلبك؟');
     }
 }
+async function updateReplyTexts(triggerWord, texts) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').updateOne(
+            { trigger_word: triggerWord },
+            { 
+                $set: { 
+                    reply_texts: texts,
+                    cycle_index: 0
+                }
+            },
+            { upsert: true }
+        );
+        console.log(`Updated reply texts for trigger word: ${triggerWord}`);
+    } catch (error) {
+        console.error('Error updating reply texts:', error);
+    }
+}
+
+async function setReplyTypeToCycle(triggerWord) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').updateOne(
+            { trigger_word: triggerWord },
+            { 
+                $set: { 
+                    type: 'text_cycle'
+                }
+            }
+        );
+        console.log(`Set reply type to text_cycle for trigger word: ${triggerWord}`);
+    } catch (error) {
+        console.error('Error setting reply type:', error);
+    }
+}
+async function setupCyclingReply(ctx, triggerWord, texts) {
+    try {
+        // Update the reply texts and initialize the cycle index
+        await updateReplyTexts(triggerWord, texts);
+
+        // Set the reply type to 'text_cycle'
+        await setReplyTypeToCycle(triggerWord);
+
+        await ctx.reply(`✅ تم إعداد الردود الدورية للكلمة: ${triggerWord}`);
+    } catch (error) {
+        console.error('Error setting up cycling reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إعداد الردود الدورية.');
+    }
+}
+
 
 // Add this function to check subscription status directly
 async function checkSubscriptionStatus(ctx, userId) {
@@ -816,7 +866,12 @@ function setupActions(bot) {
 
 // Photo handler
 
-
+// Example usage: Call this function when a specific command is received
+bot.command('setup_cycle', async (ctx) => {
+    const triggerWord = '8anader';
+    const texts = ["عيونه 😘", "وت ", "بعدين 😒"];
+    await setupCyclingReply(ctx, triggerWord, texts);
+});
 bot.on('new_chat_members', async (ctx) => {
     const newMembers = ctx.message.new_chat_members;
     if (newMembers.some(member => member.id === ctx.botInfo.id)) {
