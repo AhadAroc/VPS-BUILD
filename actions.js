@@ -1775,18 +1775,41 @@ async function askNextQuestion(chatId, telegram) {
 // Call this function when initializing the database
 createGroupsTable();
     // Update the updateActiveGroups function
-    async function updateActiveGroups(groupId, groupTitle) {
+    async function updateActiveGroups(ctx) {
         try {
-            await database.addGroup(groupId, groupTitle);
-            
-            // Update the in-memory map if you're using one
-            if (typeof activeGroups !== 'undefined') {
-                activeGroups.set(groupId, { title: groupTitle, id: groupId });
-            }
+            const groupId = ctx.chat.id;
+            const title = ctx.chat.title;
+    
+            // Only store necessary fields
+            const groupData = {
+                group_id: groupId,
+                title: title,
+                is_active: true,
+                last_activity: new Date()
+            };
+    
+            const db = await ensureDatabaseInitialized();
+            await db.collection('groups').updateOne(
+                { group_id: groupId },
+                { $set: groupData },
+                { upsert: true }
+            );
         } catch (error) {
             console.error('Error updating active group:', error);
         }
     }
+    // Function to mark a group as inactive
+async function markGroupAsInactive(groupId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('groups').updateOne(
+            { group_id: groupId },
+            { $set: { is_active: false } }
+        );
+    } catch (error) {
+        console.error('Error marking group as inactive:', error);
+    }
+}
     async function hasRequiredPermissions(ctx, userId) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
