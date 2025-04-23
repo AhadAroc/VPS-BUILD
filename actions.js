@@ -2657,6 +2657,8 @@ const botResponses = [
         const text = ctx.message.text?.trim();
         const userState = pendingReplies.get(userId);
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+        const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+        const botCustomName = botNameDoc?.name;
     // Normalize messageText (remove bot mention if present)
     let messageText = text.toLowerCase();
     const botUsername = ctx.botInfo.username?.toLowerCase();
@@ -2700,13 +2702,22 @@ const botResponses = [
             }
         }
     
-            // 👉 Add your other logic here (like replies, states, quizzes, etc.)
-    
-        } catch (error) {
-            console.error('Error in text handler:', error);
-            await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة.');
-        }
-    
+      // Check if the message contains the bot's name (case insensitive)
+      if ((botCustomName && text.toLowerCase().includes(botCustomName.toLowerCase())) || 
+      (!botCustomName && text.toLowerCase().includes('سمبوسة'))) {
+      console.log(`Bot name mentioned! Responding to: ${text}`);
+      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+      await ctx.reply(randomResponse);
+      return; // Exit after reply
+  }
+
+  // 👉 Add your other logic here (like replies, states, quizzes, etc.)
+
+} catch (error) {
+  console.error('Error in text handler:', error);
+  await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة.');
+}   
+
     
 
 if (isBroadcasting && text) {
