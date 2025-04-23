@@ -4587,28 +4587,9 @@ async function getCustomBotName(chatId) {
 }   
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
-    const db = await ensureDatabaseInitialized(); // Needed for cycle updates
-
     try {
         if (reply.type === 'text') {
             await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-        } else if (reply.type === 'text_cycle' && Array.isArray(reply.reply_texts)) {
-            const index = reply.cycle_index || 0;
-            const message = reply.reply_texts[index % reply.reply_texts.length];
-
-            if (!message) {
-                console.error('❌ No valid message found in cycle.');
-                await ctx.reply('❌ لا يوجد رد صالح.', { reply_to_message_id: ctx.message.message_id });
-                return;
-            }
-
-            await ctx.reply(message, { reply_to_message_id: ctx.message.message_id });
-
-            // Update cycle index in DB
-            await db.collection('replies').updateOne(
-                { _id: reply._id },
-                { $set: { cycle_index: (index + 1) % reply.reply_texts.length } }
-            );
         } else if (reply.type === 'media') {
             switch (reply.media_type) {
                 case 'photo':
@@ -4639,8 +4620,6 @@ async function sendReply(ctx, reply) {
         await ctx.reply('❌ حدث خطأ أثناء إرسال الرد.', { reply_to_message_id: ctx.message.message_id });
     }
 }
-
-
 
 
 bot.action('check_subscription', forceCheckSubscription);
