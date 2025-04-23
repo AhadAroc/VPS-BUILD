@@ -934,7 +934,11 @@ function setupActions(bot) {
 
     // Use the stage middleware
     bot.use(stage.middleware());
-
+// Middleware to log messages
+bot.use((ctx, next) => {
+    console.log(`Received message in chat ${ctx.chat.id}: ${ctx.message.text}`);
+    return next();
+});
  // Set up media handlers
  (bot);
     const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto, } = require('./commands');
@@ -2880,7 +2884,17 @@ if (ctx.session.awaitingBotNameChange) {
     }
     return;
 }
-
+try {
+    const chatType = ctx.chat.type;
+    
+    // Check if the message is from a group or supergroup
+    if (chatType === 'group' || chatType === 'supergroup') {
+        // Your logic to handle group messages
+        await ctx.reply(`Received your message: ${ctx.message.text}`);
+    }
+} catch (error) {
+    console.error('Error handling text message:', error);
+}
 // Handle bot mentions
 const botName = await getBotName(ctx.botInfo.id);
 if (messageText.includes(`@${botName}`)) {
