@@ -1,4 +1,4 @@
-//gayshit 
+//ultragayshit 
 
 const { adminOnly, isSubscribed } = require('./middlewares');
 const { developerIds } = require('./handlers');
