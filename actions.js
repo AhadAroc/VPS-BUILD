@@ -2616,28 +2616,12 @@ const botResponses = [
     // Register the text handler
     bot.on('text', async (ctx) => {
         const userId = ctx.from.id;
-    const chatId = ctx.chat.id;
-    const messageText = ctx.message.text.toLowerCase();
-    const userState = pendingReplies.get(userId);
-    const text = ctx.message.text?.trim();
-    const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-
-    if (ctx.session.awaitingBotName) {
-        const newBotName = ctx.message.text.trim();
-        try {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('bot_names').updateOne(
-                { chat_id: chatId },
-                { $set: { name: newBotName } },
-                { upsert: true }
-            );
-            await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
-            ctx.session.awaitingBotName = false;
-        } catch (error) {
-            console.error('Error updating bot name:', error);
-            await ctx.reply('❌ حدث خطأ أثناء محاولة تغيير اسم البوت.');
-        }
-    } else {
+        const chatId = ctx.chat.id;
+        const messageText = ctx.message.text.toLowerCase();
+        const userState = pendingReplies.get(userId);
+        const text = ctx.message.text?.trim();
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+    
         try {
             const db = await ensureDatabaseInitialized();
             const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
@@ -2654,7 +2638,6 @@ const botResponses = [
         } catch (error) {
             console.error('Error handling bot name mention:', error);
         }
-    }
         // ... rest of your logic
     
 
