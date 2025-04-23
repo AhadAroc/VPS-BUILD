@@ -1528,13 +1528,50 @@ async function askNextQuestion(chatId, telegram) {
 // Call this function when initializing the database
 createGroupsTable();
     // Update the updateActiveGroups function
-    async function updateActiveGroups(groupId, groupTitle) {
+    async function updateActiveGroups(ctx) {
         try {
-            await database.addGroup(groupId, groupTitle);
+            const userId = ctx.from.id;
+            const chatId = ctx.chat.id;
+            const chatTitle = ctx.chat.title || 'Private Chat';
+            const chatType = ctx.chat.type;
             
-            // Update the in-memory map if you're using one
-            if (typeof activeGroups !== 'undefined') {
-                activeGroups.set(groupId, { title: groupTitle, id: groupId });
+            // Only track groups and supergroups
+            if (chatType === 'group' || chatType === 'supergroup') {
+                const db = await ensureDatabaseInitialized();
+                
+                // Create a sanitized object with only the data we need
+                // This avoids circular references in the ctx object
+                const groupData = {
+                    chat_id: chatId,
+                    chat_title: chatTitle,
+                    last_activity: new Date(),
+                    chat_type: chatType
+                };
+                
+                // Update or insert the active group with sanitized data
+                await db.collection('active_groups').updateOne(
+                    { chat_id: chatId },
+                    { $set: groupData },
+                    { upsert: true }
+                );
+                
+                // Track user activity in this group with sanitized data
+                const userData = {
+                    user_id: userId,
+                    chat_id: chatId,
+                    last_activity: new Date()
+                };
+                
+                await db.collection('user_groups').updateOne(
+                    { user_id: userId, chat_id: chatId },
+                    { 
+                        $set: { last_activity: new Date() },
+                        $setOnInsert: { joined_at: new Date() }
+                    },
+                    { upsert: true }
+                );
+                
+                console.log(`Successfully updated active group: ${chatTitle} (${chatId})`);
             }
         } catch (error) {
             console.error('Error updating active group:', error);
