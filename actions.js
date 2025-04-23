@@ -5,7 +5,7 @@ let tempReplyWord = '';
 let tempBotId = null;
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
-
+const botNameResponseIndexes = new Map();
 
 // Make sure this is at the top of your file
 const activeGroups = new Map();
@@ -304,27 +304,27 @@ async function handleTextMessage(ctx) {
     }
 // Check for custom bot name
 const customBotName = await getCustomBotName(chatId);
-if (customBotName) {
-    const loweredName = customBotName.toLowerCase();
-    if (userText.includes(loweredName)) {
-        const responses = [
-            `Hello! You mentioned the custom bot name: ${customBotName}`,
-            `Hey! Did someone say ${customBotName}? 👀`,
-            `What's up! You just called ${customBotName} 🤖`,
-            `Yo! ${customBotName} at your service 💬`
-        ];
+    if (customBotName) {
+        const loweredName = customBotName.toLowerCase();
+        if (userText.includes(loweredName)) {
+            const responses = [
+                `Hello! You mentioned the custom bot name: ${customBotName}`,
+                `Hey! Did someone say ${customBotName}? 👀`,
+                `What's up! You just called ${customBotName} 🤖`,
+                `Yo! ${customBotName} at your service 💬`
+            ];
 
-        // Get current index or default to 0
-        const currentIndex = botNameResponseIndexes.get(chatId) || 0;
-        const reply = responses[currentIndex % responses.length];
+            // Get current index or default to 0
+            const currentIndex = botNameResponseIndexes.get(chatId) || 0;
+            const reply = responses[currentIndex % responses.length];
 
-        // Update index for next time
-        botNameResponseIndexes.set(chatId, (currentIndex + 1) % responses.length);
+            // Update index for next time
+            botNameResponseIndexes.set(chatId, (currentIndex + 1) % responses.length);
 
-        await ctx.reply(reply);
-        return;
+            await ctx.reply(reply);
+            return;
+        }
     }
-}
 
 
 console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotName}"`);
