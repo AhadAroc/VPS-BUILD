@@ -2503,9 +2503,9 @@ async function checkBotNameAndReply(ctx) {
 
     try {
         const db = await ensureDatabaseInitialized();
-        const botName = await db.collection('bot_names').findOne({ chat_id: chatId });
+        const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
 
-        if (botName && messageText.includes(botName.name.toLowerCase())) {
+        if (botNameDoc && messageText.includes(botNameDoc.name.toLowerCase())) {
             const replies = [
                 'نعم، أنا هنا!',
                 'مرحبًا! كيف يمكنني مساعدتك؟',
@@ -2518,7 +2518,7 @@ async function checkBotNameAndReply(ctx) {
     } catch (error) {
         console.error('Error checking bot name:', error);
     }
-}   
+} 
     
 bot.action('show_current_bot_name', async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
@@ -2654,15 +2654,19 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     { $set: { name: newBotName } },
                     { upsert: true }
                 );
+                
                 await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
+                ctx.session.awaitingBotName = false;
             } catch (error) {
                 console.error('Error updating bot name:', error);
-                await ctx.reply('❌ حدث خطأ أثناء محاولة تغيير اسم البوت.');
+                await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت. يرجى المحاولة مرة أخرى.');
             }
             ctx.session.awaitingBotName = false;
         } 
     // Check for bot name mentions in active groups
+    // Update active groups and check for bot name mentions
     if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+        updateActiveGroups(ctx);
         await checkBotNameAndReply(ctx);
     }
         // ... rest of your logic
