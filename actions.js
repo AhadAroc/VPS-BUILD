@@ -304,10 +304,14 @@ async function handleTextMessage(ctx) {
     }
 // Check for custom bot name
 const customBotName = await getCustomBotName(chatId);
-if (customBotName && userText.includes(customBotName.toLowerCase())) {
-    await ctx.reply(`Hello! You mentioned the custom bot name: ${customBotName}`);
-    return;
+if (customBotName) {
+    const loweredName = customBotName.toLowerCase();
+    if (userText.includes(loweredName)) {
+        await ctx.reply(`Hello! You mentioned the custom bot name: ${customBotName}`);
+        return;
+    }
 }
+
 
     // Check for user state
     if (userStates.has(userId)) {
