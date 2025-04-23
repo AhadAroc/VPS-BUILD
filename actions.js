@@ -2688,7 +2688,17 @@ bot.action(/^count_(\d+)$/, async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء إعداد المسابقة. يرجى المحاولة مرة أخرى.');
     }
 });
-
+// Helper function to get the bot name
+async function getBotName(botId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botData = await db.collection('bot_names').findOne({ bot_id: botId });
+        return botData ? botData.name : null;
+    } catch (error) {
+        console.error('Error retrieving bot name:', error);
+        return null;
+    }
+}
 // Add this function to fetch custom questions
 async function getCustomQuestionsForChat(chatId) {
     try {
@@ -2700,13 +2710,55 @@ async function getCustomQuestionsForChat(chatId) {
         return [];
     }
 }
-    bot.action('change_bot_name', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery();
-            ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
-            awaitingBotName = true;
+
+
+// Function to handle the new bot name
+bot.on('text', async (ctx) => {
+    if (ctx.session.awaitingBotNameChange) {
+        const newBotName = ctx.message.text.trim();
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('bot_names').updateOne(
+                { bot_id: ctx.botInfo.id },
+                { $set: { name: newBotName } },
+                { upsert: true }
+            );
+            ctx.reply(`Bot name changed to: ${newBotName}`);
+            ctx.session.awaitingBotNameChange = false;
+        } catch (error) {
+            console.error('Error changing bot name:', error);
+            ctx.reply('❌ Error changing bot name.');
         }
-    });
+    }
+});
+
+// Function to check for bot mentions and respond
+bot.on('text', async (ctx) => {
+    const messageText = ctx.message.text;
+    const botName = await getBotName(ctx.botInfo.id);
+
+    if (messageText.includes(`@${botName}`)) {
+        const replies = [
+            "Hey there!",
+            "How can I assist you?",
+            "I'm here to help!",
+            "What do you need?"
+        ];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        await ctx.reply(randomReply, { reply_to_message_id: ctx.message.message_id });
+    }
+});
+
+
+
+    // Function to change the bot name and save it
+bot.action('change_bot_name', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        ctx.reply('Please send the new bot name:');
+        ctx.session.awaitingBotNameChange = true;
+    }
+});
     
     bot.action('show_current_bot_name', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
