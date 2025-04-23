@@ -2658,6 +2658,7 @@ const botResponses = [
         const userState = pendingReplies.get(userId);
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
         const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+        const db = await ensureDatabaseInitialized();
         const botCustomName = botNameDoc?.name;
     // Normalize messageText (remove bot mention if present)
     let messageText = text.toLowerCase();
