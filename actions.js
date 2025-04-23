@@ -801,7 +801,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu ,isBroadcasting, } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu  } = require('./commands');
 
 
 // Photo handler
@@ -4097,7 +4097,18 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         }
     });
     
-   
+    bot.command('broadcast', async (ctx) => {
+        const chatId = ctx.chat.id;
+        const isBroadcasting = chatBroadcastStates.get(chatId) || false;
+    
+        if (isBroadcasting) {
+            chatBroadcastStates.set(chatId, false);
+            await ctx.reply('🛑 تم إيقاف وضع الإذاعة. لن يتم بث الصور الآن.');
+        } else {
+            chatBroadcastStates.set(chatId, true);
+            await ctx.reply('📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث.');
+        }
+    });
     
     bot.action('dev_source', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
