@@ -104,25 +104,7 @@ async function saveFile(fileLink, fileName) {
 }
 
 
- // Update the updateActiveGroups function
- async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
-    const db = await ensureDatabaseInitialized();
-    const now = new Date();
-    await db.collection('active_groups').updateOne(
-        { chat_id: chatId },
-        { 
-            $set: { 
-                chat_title: chatTitle,
-                last_activity: now
-            },
-            $setOnInsert: {
-                added_by: addedBy,
-                added_at: now
-            }
-        },
-        { upsert: true }
-    );
-}
+ 
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -1346,7 +1328,25 @@ async function updateLastInteraction(userId, username, firstName, lastName) {
     }
 }
 
-
+// Update the updateActiveGroups function
+async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
+    const db = await ensureDatabaseInitialized();
+    const now = new Date();
+    await db.collection('active_groups').updateOne(
+        { chat_id: chatId },
+        { 
+            $set: { 
+                chat_title: chatTitle,
+                last_activity: now
+            },
+            $setOnInsert: {
+                added_by: addedBy,
+                added_at: now
+            }
+        },
+        { upsert: true }
+    );
+}
 
 async function handleCustomQuestionInput(ctx) {
     const chatId = ctx.chat.id;
