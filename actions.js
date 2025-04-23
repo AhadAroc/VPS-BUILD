@@ -3,7 +3,6 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
-
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 
@@ -801,7 +800,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto, } = require('./commands');
 
 
 // Photo handler
@@ -836,7 +835,32 @@ bot.action(/^set_timer_(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
     }
 });
+bot.action('set_custom_chat_name', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        await ctx.reply('الرجاء إرسال الاسم المحلي الجديد للبوت في هذه المجموعة:');
+        ctx.session.awaitingCustomChatName = true;
+    } else {
+        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
 
+bot.action('remove_custom_chat_name', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        const chatId = ctx.chat.id;
+        try {
+            const db = await ensureDatabaseInitialized();
+            await db.collection('bot_custom_names').deleteOne({ chat_id: chatId });
+            await ctx.reply('تم إزالة الاسم المحلي للبوت في هذه المجموعة.');
+        } catch (error) {
+            console.error('Error removing custom chat name:', error);
+            await ctx.reply('حدث خطأ أثناء إزالة الاسم المحلي للبوت.');
+        }
+    } else {
+        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
 bot.action('show_current_timer', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
@@ -2044,13 +2068,27 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
 bot.action('dev_broadcast', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        awaitingBroadcastPhoto = true; // Set the flag to true
-        await ctx.reply('📸 الرجاء إرسال الصورة التي تريد إذاعتها.');
+        awaitingBroadcastPhoto = true;
+
+        await ctx.reply(
+`📢 وضع الإذاعة مفعل!
+
+📸 الرجاء إرسال الصورة أو الوسائط التي تريد إذاعتها الآن.
+
+🛑 🟩 لإيقاف وتشغيل هذا الوضع يدويًا، استخدم الأمر: /broadcast
+مثال عند التشفيل : 📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث. شغال ✅
+مثال عند الايقاف : 🛑 تم إيقاف وضع الإذاعة. مو شغال ❌
+
+
+`
+        );
     } catch (error) {
         console.error('Error handling broadcast action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة بدء الإذاعة.');
     }
 });
+
+
 
 
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
@@ -2439,21 +2477,36 @@ async function getCustomQuestionsForChat(chatId) {
         return [];
     }
 }
-    bot.action('change_bot_name', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery();
-            ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
-            awaitingBotName = true;
-        }
-    });
+bot.action('change_bot_name', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        await ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
+        ctx.session.awaitingBotName = true;
+    } else {
+        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
     
-    bot.action('show_current_bot_name', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery();
-            const currentBotName = ctx.botInfo.first_name;
-            ctx.reply(`اسم البوت الحالي هو: ${currentBotName}`);
+bot.action('show_current_bot_name', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery();
+        const chatId = ctx.chat.id;
+        try {
+            const db = await ensureDatabaseInitialized();
+            const botName = await db.collection('bot_names').findOne({ chat_id: chatId });
+            if (botName) {
+                await ctx.reply(`اهلا بك عزيزي في قسم اسم البوت\nاسم البوت الآن: ${botName.name}`);
+            } else {
+                await ctx.reply('لم يتم تعيين اسم مخصص للبوت في هذه المجموعة.');
+            }
+        } catch (error) {
+            console.error('Error fetching bot name:', error);
+            await ctx.reply('حدث خطأ أثناء محاولة عرض اسم البوت.');
         }
-    });
+    } else {
+        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
     bot.command('update_groups', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             updateActiveGroups(ctx);
@@ -2554,8 +2607,48 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     // Register the text handler
     bot.on('text', async (ctx) => {
         const userId = ctx.from.id;
-    const userState = pendingReplies.get(userId);
-    const text = ctx.message.text?.trim();
+        const chatId = ctx.chat.id; // 👈 Fix added here
+        const userState = pendingReplies.get(userId);
+        const text = ctx.message.text?.trim();
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+        if (ctx.session.awaitingBotName) {
+            const newBotName = ctx.message.text.trim();
+            const chatId = ctx.chat.id;
+            try {
+                const db = await ensureDatabaseInitialized();
+                await db.collection('bot_names').updateOne(
+                    { chat_id: chatId },
+                    { $set: { name: newBotName } },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
+            } catch (error) {
+                console.error('Error updating bot name:', error);
+                await ctx.reply('❌ حدث خطأ أثناء محاولة تغيير اسم البوت.');
+            }
+            ctx.session.awaitingBotName = false;
+        } 
+    
+        // ... rest of your logic
+    
+
+if (isBroadcasting && text) {
+    try {
+        await broadcastMessage(ctx, null, null, text);
+
+        if (awaitingBroadcastPhoto) {
+            awaitingBroadcastPhoto = false;
+            await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+        }
+
+        return; // 🛑 Prevent further processing of this broadcast message
+    } catch (error) {
+        console.error('Error broadcasting text:', error);
+        await ctx.reply('❌ حدث خطأ أثناء بث الرسالة.');
+        return;
+    }
+}
+
 
     if (userState) {
         if (userState.step === 'awaiting_trigger') {
@@ -3499,9 +3592,7 @@ async function checkForAutomaticReply(ctx) {
         const message = 'قسم اسم البوت - اختر الإجراء المطلوب:';
         const keyboard = {
             inline_keyboard: [
-                [{ text: '• تغيير اسم البوت العام •', callback_data: 'change_bot_name' }],
-        
-               
+                [{ text: '• تغيير اسم البوت •', callback_data: 'change_bot_name' }],
                 [{ text: '• عرض اسم البوت الحالي •', callback_data: 'show_current_bot_name' }],
                 [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
             ]
@@ -4413,20 +4504,21 @@ async function updateGroupInfo(ctx) {
     }
 }
 // Add this function to get the custom bot name for a chat
+
 async function getCustomBotName(chatId) {
     try {
         const db = await ensureDatabaseInitialized();
-        const customName = await db.collection('bot_custom_names').findOne({ chat_id: chatId });
+        const customName = await db.collection('bot_names').findOne({ chat_id: chatId });
         
         if (customName) {
-            return customName.custom_name;
+            return customName.name;
         }
         return null;
     } catch (error) {
         console.error('Error retrieving custom bot name:', error);
         return null;
     }
-}
+}    
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
