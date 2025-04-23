@@ -343,32 +343,26 @@ async function broadcastMessage(ctx, mediaType, mediaId, caption) {
                         case 'photo':
                             await ctx.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
                             break;
-                        case 'video':
-                            await ctx.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
-                            break;
-                        // 🛑 Add more cases for other media if needed
+                        // Add other media types if needed
                         default:
                             console.error('Unsupported media type:', mediaType);
                             break;
                     }
                 } else if (caption) {
-                    // Text-only message
                     await ctx.telegram.sendMessage(group.group_id, caption);
                 }
-
-                console.log(`Message sent to group: ${group.group_id}`);
+                console.log(`Message sent to group: ${group.group_id}`); // Debugging line
             } catch (error) {
-                console.error(`❌ Error sending to group ${group.group_id}:`, error);
+                console.error(`Error sending message to group ${group.group_id}:`, error);
             }
         }
 
         await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات النشطة.');
     } catch (error) {
-        console.error('❌ Error in broadcastMessage:', error);
+        console.error('Error in broadcastMessage:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
     }
 }
-
 async function getDifficultyLevels() {
     const client = new MongoClient(uri);
     try {
@@ -495,61 +489,29 @@ function setupCommands(bot) {
     });
 
     // Listen for photo messages
-    bot.on('photo', async (ctx, next) => {
+    bot.on('photo', async (ctx) => {
         const chatId = ctx.chat.id;
-    
         const isBroadcasting = chatBroadcastStates.get(chatId) || false;
     
-        if (isBroadcasting) {
-            try {
-                const photoArray = ctx.message.photo;
-                const fileId = photoArray[photoArray.length - 1].file_id;
-                const caption = ctx.message.caption || '';
-    
-                console.log(`Broadcasting photo: ${fileId}`);
-    
-                await broadcastMessage(ctx, 'photo', fileId, caption);
-            } catch (error) {
-                console.error('Error broadcasting photo:', error);
-            }
+        if (!isBroadcasting) {
+            return; // Ignore photo messages if not in broadcasting mode
         }
-    
-        // Always call next() so the reply logic in `actions.js` runs
-        return next();
-    });
-    bot.on('video', async (ctx, next) => {
-        const chatId = ctx.chat.id;
-        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-    
-        if (!isBroadcasting) return next(); // Let other handlers deal with it if not broadcasting
     
         try {
-            const video = ctx.message.video;
-            const fileId = video.file_id;
-            const fileSize = video.file_size; // in bytes
+            const photoArray = ctx.message.photo;
+            const fileId = photoArray[photoArray.length - 1].file_id; // Get the highest resolution photo
             const caption = ctx.message.caption || '';
     
-            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            // Log the received photo for debugging
+            console.log(`Received photo from chat ${chatId} with file ID: ${fileId}`);
     
-            if (fileSize > maxSize) {
-                await ctx.reply('❌ الفيديو كبير جدًا. الرجاء إرسال فيديو أقل من 10 ميجابايت.');
-                return;
-            }
-    
-            console.log(`Broadcasting video from chat ${chatId}, size: ${fileSize} bytes`);
-    
-            await broadcastMessage(ctx, 'video', fileId, caption);
-    
-            if (awaitingBroadcastPhoto) {
-                awaitingBroadcastPhoto = false;
-                await ctx.reply('✅ تم إرسال الفيديو.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
-            }
+            // Broadcast the photo
+            await broadcastMessage(ctx, 'photo', fileId, caption);
         } catch (error) {
-            console.error('Error broadcasting video:', error);
-            await ctx.reply('❌ حدث خطأ أثناء بث الفيديو.');
+            console.error('Error handling photo message:', error);
+            await ctx.reply('❌ حدث خطأ أثناء معالجة الصورة.');
         }
     });
-    
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -588,13 +550,12 @@ bot.command('broadcast', async (ctx) => {
 
     if (isBroadcasting) {
         chatBroadcastStates.set(chatId, false);
-        await ctx.reply('🛑 تم إيقاف وضع الإذاعة.');
+        await ctx.reply('🛑 تم إيقاف وضع الإذاعة. لن يتم بث الصور الآن.');
     } else {
         chatBroadcastStates.set(chatId, true);
-        await ctx.reply('📢والفيديوهات تحت مساحة 10 ميغا فقط  وضع الإذاعة . يمكنك الآن إرسال الصور للبث يرجى استخدام الامر مرة اخرى للايقاف .');
+        await ctx.reply('📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث.');
     }
 });
-
 bot.hears('broadcast', async (ctx) => {
     // Check if the user has the required permissions
     if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
@@ -968,24 +929,17 @@ async function listVIPUsers(ctx) {
 }}
 
 
-async function updateActiveGroups(ctx) {
-    const userId = ctx.from.id;
-    const chatId = ctx.chat.id;
-    const chatTitle = ctx.chat.title || 'Private Chat';
-    const chatType = ctx.chat.type;
-    
-    // Only track groups and supergroups
-    if (chatType !== 'group' && chatType !== 'supergroup') {
-        return;
-    }
-
-    try {
-        const db = await ensureDatabaseInitialized();
-        
-        // Use a transaction for atomicity
-        const session = db.client.startSession();
+    async function updateActiveGroups(ctx) {
         try {
-            await session.withTransaction(async () => {
+            const userId = ctx.from.id;
+            const chatId = ctx.chat.id;
+            const chatTitle = ctx.chat.title || 'Private Chat';
+            const chatType = ctx.chat.type;
+            
+            // Only track groups and supergroups
+            if (chatType === 'group' || chatType === 'supergroup') {
+                const db = await ensureDatabaseInitialized();
+                
                 // Update or insert the active group
                 await db.collection('active_groups').updateOne(
                     { chat_id: chatId },
@@ -995,7 +949,7 @@ async function updateActiveGroups(ctx) {
                             last_activity: new Date()
                         }
                     },
-                    { upsert: true, session }
+                    { upsert: true }
                 );
                 
                 // Track user activity in this group
@@ -1005,19 +959,13 @@ async function updateActiveGroups(ctx) {
                         $set: { last_activity: new Date() },
                         $setOnInsert: { joined_at: new Date() }
                     },
-                    { upsert: true, session }
+                    { upsert: true }
                 );
-            });
-        } finally {
-            await session.endSession();
+            }
+        } catch (error) {
+            console.error('Error updating active groups:', error);
         }
-        
-        console.log(`Successfully updated activity for group ${chatId} and user ${userId}`);
-    } catch (error) {
-        console.error('Error updating active groups:', error);
-        // Implement retry logic here if needed
     }
-}
     async function removeLinks(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
@@ -2172,5 +2120,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto, };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed };
 
