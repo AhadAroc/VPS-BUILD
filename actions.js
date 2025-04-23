@@ -2669,20 +2669,22 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     {
                         $set: {
                             trigger_word: newBotName,
-                            reply_text: [
-                                `Hello! You mentioned the bot name: ${newBotName}`,
+                            reply_texts: [  // <-- Change from reply_text to reply_texts (array)
+                                `عيونه 😌: ${newBotName}`,
                                 `yo: ${newBotName}`,
                                 `hey hey: ${newBotName}`,
                                 `what am busy ??: ${newBotName}`
-                            ].join('\n'),
+                            ],
                             chat_id: chatId,
                             bot_id: ctx.botInfo.id,
-                            type: "text",
-                            created_at: new Date()
+                            type: "text_cycle", // Optional: mark it as cycling
+                            created_at: new Date(),
+                            cycle_index: 0 // Start with the first one
                         }
                     },
                     { upsert: true }
                 );
+                
                 
     
                 await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
