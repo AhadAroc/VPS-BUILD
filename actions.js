@@ -311,6 +311,7 @@ if (customBotName) {
         return;
     }
 }
+console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotName}"`);
 
 
     // Check for user state
