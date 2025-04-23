@@ -327,18 +327,33 @@ async function handleLocalBotNameChange(ctx) {
     }
     
     try {
-        // Save the new local name
-        const success = await setLocalBotName(
-            userState.chatId, 
-            ctx.botInfo.id, 
-            newName, 
-            userId
-        );
-        
-        if (success) {
-            await ctx.reply(`✅ تم تغيير اسم البوت المحلي في هذه المجموعة إلى "${newName}" بنجاح.`);
+        // If request is from DM, apply to all groups
+        if (userState.fromDM) {
+            const result = await applyBotNameToAllGroups(
+                ctx.botInfo.id,
+                newName,
+                userId
+            );
+            
+            if (result.success) {
+                await ctx.reply(`✅ تم تغيير اسم البوت المحلي في ${result.groupCount} مجموعة إلى "${newName}" بنجاح.`);
+            } else {
+                await ctx.reply('❌ حدث خطأ أثناء تغيير اسم البوت المحلي. يرجى المحاولة مرة أخرى لاحقًا.');
+            }
         } else {
-            await ctx.reply('❌ حدث خطأ أثناء تغيير اسم البوت المحلي. يرجى المحاولة مرة أخرى لاحقًا.');
+            // If request is from a group, apply only to that group
+            const success = await setLocalBotName(
+                userState.chatId,
+                ctx.botInfo.id, 
+                newName,
+                userId
+            );
+            
+            if (success) {
+                await ctx.reply(`✅ تم تغيير اسم البوت المحلي في هذه المجموعة إلى "${newName}" بنجاح.`);
+            } else {
+                await ctx.reply('❌ حدث خطأ أثناء تغيير اسم البوت المحلي. يرجى المحاولة مرة أخرى لاحقًا.');
+            }
         }
         
         // Clear the state
@@ -351,7 +366,6 @@ async function handleLocalBotNameChange(ctx) {
         return true;
     }
 }
-
 
 // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
@@ -670,7 +684,41 @@ async function endQuiz(ctx, chatId) {
         console.error('Error ending quiz:', error);
     }
 }
-
+// Add a function to apply bot name to all groups
+async function applyBotNameToAllGroups(botId, customName, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Get all active groups
+        const groups = await db.collection('groups').find({ is_active: true }).toArray();
+        
+        // Update bot name for each group
+        for (const group of groups) {
+            await db.collection('bot_local_names').updateOne(
+                { chat_id: group.group_id, bot_id: botId },
+                { 
+                    $set: { 
+                        custom_name: customName,
+                        updated_at: new Date(),
+                        updated_by: userId
+                    }
+                },
+                { upsert: true }
+            );
+        }
+        
+        return {
+            success: true,
+            groupCount: groups.length
+        };
+    } catch (error) {
+        console.error('Error applying bot name to all groups:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
 // Define quiz questions with different difficulty levels
 const difficulties = {
     easy: [
@@ -904,38 +952,23 @@ bot.on('new_chat_members', async (ctx) => {
 });
 
 // Handler for changing local bot name
+// Update the change_local_bot_name action handler to work from DMs
 bot.action('change_local_bot_name', async (ctx) => {
     try {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('تغيير اسم البوت المحلي');
             
-            // Check if this is a group chat
-            if (ctx.chat.type === 'private') {
-                await ctx.editMessageText(
-                    '⚠️ يمكن تغيير اسم البوت المحلي فقط في المجموعات.\n\n' +
-                    'يرجى استخدام هذا الأمر داخل المجموعة التي تريد تغيير اسم البوت فيها.',
-                    {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔙 رجوع', callback_data: 'back_to_bot_name_menu' }]
-                            ]
-                        }
-                    }
-                );
-                return;
-            }
-            
             // Set state to await new local bot name
             userStates.set(ctx.from.id, { 
                 state: 'awaiting_local_bot_name',
-                chatId: ctx.chat.id,
+                fromDM: ctx.chat.type === 'private', // Flag if request is from DM
                 messageId: ctx.callbackQuery.message.message_id
             });
             
             await ctx.editMessageText(
-                '✏️ يرجى إرسال الاسم الجديد للبوت في هذه المجموعة:\n\n' +
-                '• الاسم الحالي: ' + (await getLocalBotName(ctx.chat.id, ctx.botInfo.username) || ctx.botInfo.first_name) + '\n' +
-                '• يمكنك إلغاء العملية بإرسال كلمة "إلغاء"',
+                '✏️ يرجى إرسال الاسم الجديد للبوت في المجموعات:\n\n' +
+                'سيتم تطبيق هذا الاسم على جميع المجموعات التي يوجد فيها البوت.\n\n' +
+                'أرسل "إلغاء" للإلغاء.',
                 {
                     reply_markup: {
                         inline_keyboard: [
@@ -945,11 +978,11 @@ bot.action('change_local_bot_name', async (ctx) => {
                 }
             );
         } else {
-            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+            await ctx.answerCbQuery('❌ عذراً، هذا الأمر مخصص للمطورين فقط.', { show_alert: true });
         }
     } catch (error) {
-        console.error('Error in change_local_bot_name:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء تغيير اسم البوت المحلي', { show_alert: true });
+        console.error('Error in change_local_bot_name action:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
 
@@ -1013,6 +1046,15 @@ bot.action('show_local_bot_names', async (ctx) => {
     }
 });
 
+// Add a back button handler for the bot name menu
+bot.action('back_to_bot_name_menu', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await showBotNameMenu(ctx);
+    } catch (error) {
+        console.error('Error in back_to_bot_name_menu action:', error);
+    }
+});
 // Add a back action for the bot name menu
 bot.action('back_to_bot_name_menu', async (ctx) => {
     await ctx.answerCbQuery();
