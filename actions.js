@@ -3,6 +3,7 @@ let awaitingReplyWord = false;
 let awaitingReplyResponse = false;  // Add this line
 let tempReplyWord = '';
 let tempBotId = null;
+
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 
@@ -800,7 +801,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto, } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu } = require('./commands');
 
 
 // Photo handler
@@ -835,32 +836,7 @@ bot.action(/^set_timer_(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء تحديث الإعدادات.');
     }
 });
-bot.action('set_custom_chat_name', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery();
-        await ctx.reply('الرجاء إرسال الاسم المحلي الجديد للبوت في هذه المجموعة:');
-        ctx.session.awaitingCustomChatName = true;
-    } else {
-        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
 
-bot.action('remove_custom_chat_name', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery();
-        const chatId = ctx.chat.id;
-        try {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('bot_custom_names').deleteOne({ chat_id: chatId });
-            await ctx.reply('تم إزالة الاسم المحلي للبوت في هذه المجموعة.');
-        } catch (error) {
-            console.error('Error removing custom chat name:', error);
-            await ctx.reply('حدث خطأ أثناء إزالة الاسم المحلي للبوت.');
-        }
-    } else {
-        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
 bot.action('show_current_timer', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
@@ -1552,50 +1528,13 @@ async function askNextQuestion(chatId, telegram) {
 // Call this function when initializing the database
 createGroupsTable();
     // Update the updateActiveGroups function
-    async function updateActiveGroups(ctx) {
+    async function updateActiveGroups(groupId, groupTitle) {
         try {
-            const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
-            const chatTitle = ctx.chat.title || 'Private Chat';
-            const chatType = ctx.chat.type;
+            await database.addGroup(groupId, groupTitle);
             
-            // Only track groups and supergroups
-            if (chatType === 'group' || chatType === 'supergroup') {
-                const db = await ensureDatabaseInitialized();
-                
-                // Create a sanitized object with only the data we need
-                // This avoids circular references in the ctx object
-                const groupData = {
-                    chat_id: chatId,
-                    chat_title: chatTitle,
-                    last_activity: new Date(),
-                    chat_type: chatType
-                };
-                
-                // Update or insert the active group with sanitized data
-                await db.collection('active_groups').updateOne(
-                    { chat_id: chatId },
-                    { $set: groupData },
-                    { upsert: true }
-                );
-                
-                // Track user activity in this group with sanitized data
-                const userData = {
-                    user_id: userId,
-                    chat_id: chatId,
-                    last_activity: new Date()
-                };
-                
-                await db.collection('user_groups').updateOne(
-                    { user_id: userId, chat_id: chatId },
-                    { 
-                        $set: { last_activity: new Date() },
-                        $setOnInsert: { joined_at: new Date() }
-                    },
-                    { upsert: true }
-                );
-                
-                console.log(`Successfully updated active group: ${chatTitle} (${chatId})`);
+            // Update the in-memory map if you're using one
+            if (typeof activeGroups !== 'undefined') {
+                activeGroups.set(groupId, { title: groupTitle, id: groupId });
             }
         } catch (error) {
             console.error('Error updating active group:', error);
@@ -2105,27 +2044,13 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
 bot.action('dev_broadcast', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        awaitingBroadcastPhoto = true;
-
-        await ctx.reply(
-`📢 وضع الإذاعة مفعل!
-
-📸 الرجاء إرسال الصورة أو الوسائط التي تريد إذاعتها الآن.
-
-🛑 🟩 لإيقاف وتشغيل هذا الوضع يدويًا، استخدم الأمر: /broadcast
-مثال عند التشفيل : 📢 وضع الإذاعة مفعل. يمكنك الآن إرسال الصور للبث. شغال ✅
-مثال عند الايقاف : 🛑 تم إيقاف وضع الإذاعة. مو شغال ❌
-
-
-`
-        );
+        awaitingBroadcastPhoto = true; // Set the flag to true
+        await ctx.reply('📸 الرجاء إرسال الصورة التي تريد إذاعتها.');
     } catch (error) {
         console.error('Error handling broadcast action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة بدء الإذاعة.');
     }
 });
-
-
 
 
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
@@ -2514,38 +2439,21 @@ async function getCustomQuestionsForChat(chatId) {
         return [];
     }
 }
-bot.action('change_bot_name', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery();
-        await ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
-        ctx.session.awaitingBotName = true;
-    } else {
-        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
-
-    
-bot.action('show_current_bot_name', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
-        await ctx.answerCbQuery();
-        const chatId = ctx.chat.id;
-        try {
-            const db = await ensureDatabaseInitialized();
-            const botName = await db.collection('bot_names').findOne({ chat_id: chatId });
-            if (botName) {
-                await ctx.reply('اهلا بك عزيزي في قسم اسم البوت');
-                await ctx.reply(`اسم البوت الآن: ${botName.name}`);
-            } else {
-                await ctx.reply('لم يتم تعيين اسم مخصص للبوت في هذه المجموعة.');
-            }
-        } catch (error) {
-            console.error('Error fetching bot name:', error);
-            await ctx.reply('حدث خطأ أثناء محاولة عرض اسم البوت.');
+    bot.action('change_bot_name', async (ctx) => {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery();
+            ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
+            awaitingBotName = true;
         }
-    } else {
-        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
-    }
-});
+    });
+    
+    bot.action('show_current_bot_name', async (ctx) => {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery();
+            const currentBotName = ctx.botInfo.first_name;
+            ctx.reply(`اسم البوت الحالي هو: ${currentBotName}`);
+        }
+    });
     bot.command('update_groups', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
             updateActiveGroups(ctx);
@@ -2638,104 +2546,16 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     pendingReplies.delete(userId);
 });
 
-const botResponses = [
-    "مرحبا! كيف يمكنني مساعدتك؟",
-    "أهلاً! أنا هنا لخدمتك.",
-    "نعم، أنا موجود. ماذا تحتاج؟",
-    "تفضل، كيف يمكنني مساعدتك اليوم؟",
-    "مرحباً بك! هل لديك أي استفسارات؟",
-    "أنا جاهز لمساعدتك. ما هو سؤالك؟"
-];
+
 
 
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     // Register the text handler
     bot.on('text', async (ctx) => {
-        try {
-            const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
-            const text = ctx.message.text?.trim();
-            const userState = pendingReplies.get(userId);
-            const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-            
-            // Initialize database connection first
-            const db = await ensureDatabaseInitialized();
-            
-            // Now that db is initialized, we can use it
-            const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
-            const botCustomName = botNameDoc?.name;
-            
-            // Normalize messageText (remove bot mention if present)
-            let messageText = text.toLowerCase();
-            const botUsername = ctx.botInfo.username?.toLowerCase();
-            if (botUsername) {
-                messageText = messageText.replace(`@${botUsername}`, '').trim();
-            }
-    
-            // Check if message contains the custom name or the default name "سمبوسة"
-            if ((botCustomName && messageText.includes(botCustomName.toLowerCase())) || 
-                (!botCustomName && messageText.includes('سمبوسة'))) {
-                console.log(`Bot name mentioned: ${text}`);
-                const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-                await ctx.reply(`${randomResponse}`);
-                return; // Exit after reply
-            }
-    
-            // Handle changing the bot's custom name (only in private chats or for admins in groups)
-            if (ctx.session && ctx.session.awaitingBotName) {
-                if (ctx.chat.type === 'private' || await isAdminOrOwner(ctx, ctx.from.id)) {
-                    const newBotName = text;
-                    await db.collection('bot_names').updateOne(
-                        { chat_id: chatId },
-                        { $set: { name: newBotName } },
-                        { upsert: true }
-                    );
-                    await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
-                    ctx.session.awaitingBotName = false;
-                    return;
-                } else {
-                    await ctx.reply('❌ عذراً، فقط المشرفون يمكنهم تغيير اسم البوت في المجموعات.');
-                    ctx.session.awaitingBotName = false;
-                    return;
-                }
-            }
-    
-      // Check if the message contains the bot's name (case insensitive)
-      if ((botCustomName && text.toLowerCase().includes(botCustomName.toLowerCase())) || 
-      (!botCustomName && text.toLowerCase().includes('سمبوسة'))) {
-      console.log(`Bot name mentioned! Responding to: ${text}`);
-      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-      await ctx.reply(randomResponse);
-      return; // Exit after reply
-  }
-
-  // 👉 Add your other logic here (like replies, states, quizzes, etc.)
-
-} catch (error) {
-  console.error('Error in text handler:', error);
-  await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة.');
-}   
-
-    
-
-if (isBroadcasting && text) {
-    try {
-        await broadcastMessage(ctx, null, null, text);
-
-        if (awaitingBroadcastPhoto) {
-            awaitingBroadcastPhoto = false;
-            await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
-        }
-
-        return; // 🛑 Prevent further processing of this broadcast message
-    } catch (error) {
-        console.error('Error broadcasting text:', error);
-        await ctx.reply('❌ حدث خطأ أثناء بث الرسالة.');
-        return;
-    }
-}
-
+        const userId = ctx.from.id;
+    const userState = pendingReplies.get(userId);
+    const text = ctx.message.text?.trim();
 
     if (userState) {
         if (userState.step === 'awaiting_trigger') {
@@ -3679,7 +3499,9 @@ async function checkForAutomaticReply(ctx) {
         const message = 'قسم اسم البوت - اختر الإجراء المطلوب:';
         const keyboard = {
             inline_keyboard: [
-                [{ text: '• تغيير اسم البوت •', callback_data: 'change_bot_name' }],
+                [{ text: '• تغيير اسم البوت العام •', callback_data: 'change_bot_name' }],
+        
+               
                 [{ text: '• عرض اسم البوت الحالي •', callback_data: 'show_current_bot_name' }],
                 [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
             ]
@@ -4591,21 +4413,20 @@ async function updateGroupInfo(ctx) {
     }
 }
 // Add this function to get the custom bot name for a chat
-
 async function getCustomBotName(chatId) {
     try {
         const db = await ensureDatabaseInitialized();
-        const customName = await db.collection('bot_names').findOne({ chat_id: chatId });
+        const customName = await db.collection('bot_custom_names').findOne({ chat_id: chatId });
         
         if (customName) {
-            return customName.name;
+            return customName.custom_name;
         }
         return null;
     } catch (error) {
         console.error('Error retrieving custom bot name:', error);
         return null;
     }
-}    
+}
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
