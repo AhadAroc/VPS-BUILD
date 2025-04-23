@@ -52,14 +52,7 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-const botResponses = [
-    "مرحبا! كيف يمكنني مساعدتك؟",
-    "أهلاً! أنا هنا لخدمتك.",
-    "نعم، أنا موجود. ماذا تحتاج؟",
-    "تفضل، كيف يمكنني مساعدتك اليوم؟",
-    "مرحباً بك! هل لديك أي استفسارات؟",
-    "أنا جاهز لمساعدتك. ما هو سؤالك؟"
-];
+
 // Function to download and save file
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
@@ -270,22 +263,7 @@ async function handleMediaMessage(ctx, mediaType) {
    
 
 
-function removeCircularReferences(obj) {
-    const seen = new WeakSet();
-    return JSON.parse(JSON.stringify(obj, (key, value) => {
-        if (typeof value === 'object' && value !== null) {
-            if (seen.has(value)) {
-                return; // Omit circular reference
-            }
-            seen.add(value);
-        }
-        return value;
-    }));
-}
 
-// Example usage before storing in MongoDB
-const safeObject = removeCircularReferences(yourObject);
-await db.collection('your_collection').insertOne(safeObject);
 // Add this function to handle quiz answers
 // Add this after the showQuizMenu function
 async function handleTextMessage(ctx) {
@@ -2623,7 +2601,14 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     pendingReplies.delete(userId);
 });
 
-
+const botResponses = [
+    "مرحبا! كيف يمكنني مساعدتك؟",
+    "أهلاً! أنا هنا لخدمتك.",
+    "نعم، أنا موجود. ماذا تحتاج؟",
+    "تفضل، كيف يمكنني مساعدتك اليوم؟",
+    "مرحباً بك! هل لديك أي استفسارات؟",
+    "أنا جاهز لمساعدتك. ما هو سؤالك؟"
+];
 
 
 // Register the text handler
@@ -2637,25 +2622,25 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
     
         // 👇 Normalize messageText (remove bot mention if present)
-    let messageText = text.toLowerCase();
-    const botUsername = ctx.botInfo.username?.toLowerCase();
-    if (botUsername) {
-        messageText = messageText.replace(`@${botUsername}`, '').trim();
-    }
-
-    try {
-        const db = await ensureDatabaseInitialized();
-
-        // ✅ Check if the message contains the bot's custom name in this group
-        const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
-        if (botNameDoc && botNameDoc.name) {
-            const botName = botNameDoc.name.toLowerCase();
-            if (messageText.includes(botName)) {
-                const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-                await ctx.reply(`${botNameDoc.name} يرد: ${randomResponse}`);
-                return; // Exit after reply
-            }
+        let messageText = text.toLowerCase();
+        const botUsername = ctx.botInfo.username?.toLowerCase();
+        if (botUsername) {
+            messageText = messageText.replace(`@${botUsername}`, '').trim();
         }
+    
+        try {
+            const db = await ensureDatabaseInitialized();
+    
+            // ✅ Check if the message contains the bot's custom name in this group
+            const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+            if (botNameDoc && botNameDoc.name) {
+                const botName = botNameDoc.name.toLowerCase();
+                if (messageText.includes(botName)) {
+                    const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+                    await ctx.reply(`${botNameDoc.name} يرد: ${randomResponse}`);
+                    return; // Exit after reply
+                }
+            }
     
             // ✅ Handle changing the bot's custom name
             if (ctx.session && ctx.session.awaitingBotName) {
@@ -3585,29 +3570,26 @@ bot.on('sticker', async (ctx) => {
 // based on your existing code and requirements.
 
 async function checkForAutomaticReply(ctx) {
+    const text = ctx.message.text.trim().toLowerCase();
+    const botId = ctx.botInfo.id;
+
     try {
         const db = await ensureDatabaseInitialized();
-        const userText = ctx.message.text.trim().toLowerCase();
-        console.log(`Searching for reply with keyword: ${userText}`);
         
-        // First, try to find an exact match
-        let reply = await db.collection('replies').findOne({ trigger_word: userText });
-        
-        // If no exact match, try to find a partial match
+        // First, try to find a bot-specific reply
+        let reply = await db.collection('replies').findOne({
+            bot_id: botId,
+            trigger_word: text
+        });
+
+        // If no bot-specific reply is found, try to find a global reply
         if (!reply) {
-            const partialMatches = await db.collection('replies').find({
-                trigger_word: { $regex: new RegExp(userText, 'i') }
-            }).toArray();
-            
-            if (partialMatches.length > 0) {
-                // If multiple partial matches, choose the one with the closest length
-                reply = partialMatches.reduce((closest, current) => {
-                    return (Math.abs(current.trigger_word.length - userText.length) < Math.abs(closest.trigger_word.length - userText.length)) ? current : closest;
-                });
-            }
+            reply = await db.collection('replies').findOne({
+                trigger_word: text,
+                bot_id: { $exists: false }
+            });
         }
-        
-        console.log('Reply search result:', reply);
+
         return reply;
     } catch (error) {
         console.error('Error checking for automatic reply:', error);
