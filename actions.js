@@ -307,10 +307,20 @@ const customBotName = await getCustomBotName(chatId);
 if (customBotName) {
     const loweredName = customBotName.toLowerCase();
     if (userText.includes(loweredName)) {
-        await ctx.reply(`Hello! You mentioned the custom bot name: ${customBotName}`);
+        const responses = [
+            `Hello! You mentioned the custom bot name: ${customBotName}`,
+            `Hey! Did someone say ${customBotName}? 👀`,
+            `What's up! You just called ${customBotName} 🤖`,
+            `Yo! ${customBotName} at your service 💬`
+        ];
+
+        // Pick a random one
+        const randomReply = responses[Math.floor(Math.random() * responses.length)];
+        await ctx.reply(randomReply);
         return;
     }
 }
+
 console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotName}"`);
 
 
