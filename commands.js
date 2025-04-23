@@ -511,6 +511,38 @@ function setupCommands(bot) {
         // Always call next() so the reply logic in `actions.js` runs
         return next();
     });
+    bot.on('video', async (ctx, next) => {
+        const chatId = ctx.chat.id;
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+    
+        if (!isBroadcasting) return next(); // Let other handlers deal with it if not broadcasting
+    
+        try {
+            const video = ctx.message.video;
+            const fileId = video.file_id;
+            const fileSize = video.file_size; // in bytes
+            const caption = ctx.message.caption || '';
+    
+            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    
+            if (fileSize > maxSize) {
+                await ctx.reply('❌ الفيديو كبير جدًا. الرجاء إرسال فيديو أقل من 10 ميجابايت.');
+                return;
+            }
+    
+            console.log(`Broadcasting video from chat ${chatId}, size: ${fileSize} bytes`);
+    
+            await broadcastMessage(ctx, 'video', fileId, caption);
+    
+            if (awaitingBroadcastPhoto) {
+                awaitingBroadcastPhoto = false;
+                await ctx.reply('✅ تم إرسال الفيديو.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+            }
+        } catch (error) {
+            console.error('Error broadcasting video:', error);
+            await ctx.reply('❌ حدث خطأ أثناء بث الفيديو.');
+        }
+    });
     
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
