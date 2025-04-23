@@ -4569,9 +4569,13 @@ async function sendReply(ctx, reply) {
                 const currentIndex = reply.cycle_index || 0;
                 const textToSend = texts[currentIndex];
 
+                console.log(`Current index: ${currentIndex}, Text to send: ${textToSend}`);
+
                 await ctx.reply(textToSend, { reply_to_message_id: ctx.message.message_id });
 
                 const newIndex = (currentIndex + 1) % texts.length;
+                console.log(`New index: ${newIndex}`);
+
                 const db = await ensureDatabaseInitialized();
                 await db.collection('replies').updateOne(
                     { _id: reply._id },
