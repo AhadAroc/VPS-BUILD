@@ -32,7 +32,7 @@ const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
-//const { updateActiveGroup } = require('./database');
+const { updateActiveGroup } = require('./database');
 // Quiz state constants
 const QUIZ_STATE = {
     INACTIVE: 0,
@@ -1328,25 +1328,7 @@ async function updateLastInteraction(userId, username, firstName, lastName) {
     }
 }
 
-// Update the updateActiveGroups function
-async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
-    const db = await ensureDatabaseInitialized();
-    const now = new Date();
-    await db.collection('active_groups').updateOne(
-        { chat_id: chatId },
-        { 
-            $set: { 
-                chat_title: chatTitle,
-                last_activity: now
-            },
-            $setOnInsert: {
-                added_by: addedBy,
-                added_at: now
-            }
-        },
-        { upsert: true }
-    );
-}
+
 
 async function handleCustomQuestionInput(ctx) {
     const chatId = ctx.chat.id;
