@@ -3570,26 +3570,29 @@ bot.on('sticker', async (ctx) => {
 // based on your existing code and requirements.
 
 async function checkForAutomaticReply(ctx) {
-    const text = ctx.message.text.trim().toLowerCase();
-    const botId = ctx.botInfo.id;
-
     try {
         const db = await ensureDatabaseInitialized();
+        const userText = ctx.message.text.trim().toLowerCase();
+        console.log(`Searching for reply with keyword: ${userText}`);
         
-        // First, try to find a bot-specific reply
-        let reply = await db.collection('replies').findOne({
-            bot_id: botId,
-            trigger_word: text
-        });
-
-        // If no bot-specific reply is found, try to find a global reply
+        // First, try to find an exact match
+        let reply = await db.collection('replies').findOne({ trigger_word: userText });
+        
+        // If no exact match, try to find a partial match
         if (!reply) {
-            reply = await db.collection('replies').findOne({
-                trigger_word: text,
-                bot_id: { $exists: false }
-            });
+            const partialMatches = await db.collection('replies').find({
+                trigger_word: { $regex: new RegExp(userText, 'i') }
+            }).toArray();
+            
+            if (partialMatches.length > 0) {
+                // If multiple partial matches, choose the one with the closest length
+                reply = partialMatches.reduce((closest, current) => {
+                    return (Math.abs(current.trigger_word.length - userText.length) < Math.abs(closest.trigger_word.length - userText.length)) ? current : closest;
+                });
+            }
         }
-
+        
+        console.log('Reply search result:', reply);
         return reply;
     } catch (error) {
         console.error('Error checking for automatic reply:', error);
