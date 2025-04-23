@@ -2889,8 +2889,11 @@ try {
     
     // Check if the message is from a group or supergroup
     if (chatType === 'group' || chatType === 'supergroup') {
-        // Your logic to handle group messages
-        await ctx.reply(`Received your message: ${ctx.message.text}`);
+        const messageText = ctx.message.text.toLowerCase();
+        const botName = ctx.botInfo.username.toLowerCase();
+        if (messageText.includes(`@${botName}`)) {
+            await ctx.reply('Hello! How can I assist you?', { reply_to_message_id: ctx.message.message_id });
+        }
     }
 } catch (error) {
     console.error('Error handling text message:', error);
