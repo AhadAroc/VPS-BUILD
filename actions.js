@@ -2712,42 +2712,6 @@ async function getCustomQuestionsForChat(chatId) {
 }
 
 
-// Function to handle the new bot name
-bot.on('text', async (ctx) => {
-    if (ctx.session.awaitingBotNameChange) {
-        const newBotName = ctx.message.text.trim();
-        try {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('bot_names').updateOne(
-                { bot_id: ctx.botInfo.id },
-                { $set: { name: newBotName } },
-                { upsert: true }
-            );
-            ctx.reply(`Bot name changed to: ${newBotName}`);
-            ctx.session.awaitingBotNameChange = false;
-        } catch (error) {
-            console.error('Error changing bot name:', error);
-            ctx.reply('❌ Error changing bot name.');
-        }
-    }
-});
-
-// Function to check for bot mentions and respond
-bot.on('text', async (ctx) => {
-    const messageText = ctx.message.text;
-    const botName = await getBotName(ctx.botInfo.id);
-
-    if (messageText.includes(`@${botName}`)) {
-        const replies = [
-            "Hey there!",
-            "How can I assist you?",
-            "I'm here to help!",
-            "What do you need?"
-        ];
-        const randomReply = replies[Math.floor(Math.random() * replies.length)];
-        await ctx.reply(randomReply, { reply_to_message_id: ctx.message.message_id });
-    }
-});
 
 
 
@@ -2874,7 +2838,38 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     
         // ... rest of your logic
     
+// Handle bot name change
+if (ctx.session.awaitingBotNameChange) {
+    const newBotName = messageText;
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('bot_names').updateOne(
+            { bot_id: ctx.botInfo.id },
+            { $set: { name: newBotName } },
+            { upsert: true }
+        );
+        ctx.reply(`Bot name changed to: ${newBotName}`);
+        ctx.session.awaitingBotNameChange = false;
+    } catch (error) {
+        console.error('Error changing bot name:', error);
+        ctx.reply('❌ Error changing bot name.');
+    }
+    return;
+}
 
+// Handle bot mentions
+const botName = await getBotName(ctx.botInfo.id);
+if (messageText.includes(`@${botName}`)) {
+    const replies = [
+        "Hey there!",
+        "How can I assist you?",
+        "I'm here to help!",
+        "What do you need?"
+    ];
+    const randomReply = replies[Math.floor(Math.random() * replies.length)];
+    await ctx.reply(randomReply, { reply_to_message_id: ctx.message.message_id });
+    return;
+}
 if (isBroadcasting && text) {
     try {
         await broadcastMessage(ctx, null, null, text);
