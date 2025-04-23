@@ -2652,56 +2652,54 @@ const botResponses = [
     // For the text handler that's causing errors, update it to:
     // Register the text handler
     bot.on('text', async (ctx) => {
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-        const text = ctx.message.text?.trim();
-        const userState = pendingReplies.get(userId);
-        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-        const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
-        const db = await ensureDatabaseInitialized();
-        const botCustomName = botNameDoc?.name;
-    // Normalize messageText (remove bot mention if present)
-    let messageText = text.toLowerCase();
-    const botUsername = ctx.botInfo.username?.toLowerCase();
-    if (botUsername) {
-        messageText = messageText.replace(`@${botUsername}`, '').trim();
-    }
-
-    try {
-        const db = await ensureDatabaseInitialized();
-
-        // Check if the message contains the bot's custom name in this chat (group or private)
-        const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
-        const botCustomName = botNameDoc?.name?.toLowerCase();
-        
-        // Check if message contains the custom name or the default name "سمبوسة"
-        if ((botCustomName && messageText.includes(botCustomName.toLowerCase())) || 
-            (!botCustomName && messageText.includes('سمبوسة'))) {
-            console.log(`Bot name mentioned: ${text}`);
-            const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-            const displayName = botNameDoc?.name || 'سمبوسة';
-            await ctx.reply(`${randomResponse}`);
-            return; // Exit after reply
-        }
-
-        // Handle changing the bot's custom name (only in private chats or for admins in groups)
-        if (ctx.session && ctx.session.awaitingBotName) {
-            if (ctx.chat.type === 'private' || await isAdminOrOwner(ctx, ctx.from.id)) {
-                const newBotName = text;
-                await db.collection('bot_names').updateOne(
-                    { chat_id: chatId },
-                    { $set: { name: newBotName } },
-                    { upsert: true }
-                );
-                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
-                ctx.session.awaitingBotName = false;
-                return;
-            } else {
-                await ctx.reply('❌ عذراً، فقط المشرفون يمكنهم تغيير اسم البوت في المجموعات.');
-                ctx.session.awaitingBotName = false;
-                return;
+        try {
+            const userId = ctx.from.id;
+            const chatId = ctx.chat.id;
+            const text = ctx.message.text?.trim();
+            const userState = pendingReplies.get(userId);
+            const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+            
+            // Initialize database connection first
+            const db = await ensureDatabaseInitialized();
+            
+            // Now that db is initialized, we can use it
+            const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+            const botCustomName = botNameDoc?.name;
+            
+            // Normalize messageText (remove bot mention if present)
+            let messageText = text.toLowerCase();
+            const botUsername = ctx.botInfo.username?.toLowerCase();
+            if (botUsername) {
+                messageText = messageText.replace(`@${botUsername}`, '').trim();
             }
-        }
+    
+            // Check if message contains the custom name or the default name "سمبوسة"
+            if ((botCustomName && messageText.includes(botCustomName.toLowerCase())) || 
+                (!botCustomName && messageText.includes('سمبوسة'))) {
+                console.log(`Bot name mentioned: ${text}`);
+                const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+                await ctx.reply(`${randomResponse}`);
+                return; // Exit after reply
+            }
+    
+            // Handle changing the bot's custom name (only in private chats or for admins in groups)
+            if (ctx.session && ctx.session.awaitingBotName) {
+                if (ctx.chat.type === 'private' || await isAdminOrOwner(ctx, ctx.from.id)) {
+                    const newBotName = text;
+                    await db.collection('bot_names').updateOne(
+                        { chat_id: chatId },
+                        { $set: { name: newBotName } },
+                        { upsert: true }
+                    );
+                    await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
+                    ctx.session.awaitingBotName = false;
+                    return;
+                } else {
+                    await ctx.reply('❌ عذراً، فقط المشرفون يمكنهم تغيير اسم البوت في المجموعات.');
+                    ctx.session.awaitingBotName = false;
+                    return;
+                }
+            }
     
       // Check if the message contains the bot's name (case insensitive)
       if ((botCustomName && text.toLowerCase().includes(botCustomName.toLowerCase())) || 
