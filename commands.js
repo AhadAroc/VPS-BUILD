@@ -2159,5 +2159,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto, };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
 
