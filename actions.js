@@ -2486,6 +2486,7 @@ bot.action('change_bot_name', async (ctx) => {
         await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
+
     
 bot.action('show_current_bot_name', async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
@@ -2495,7 +2496,8 @@ bot.action('show_current_bot_name', async (ctx) => {
             const db = await ensureDatabaseInitialized();
             const botName = await db.collection('bot_names').findOne({ chat_id: chatId });
             if (botName) {
-                await ctx.reply(`اهلا بك عزيزي في قسم اسم البوت\nاسم البوت الآن: ${botName.name}`);
+                await ctx.reply('اهلا بك عزيزي في قسم اسم البوت');
+                await ctx.reply(`اسم البوت الآن: ${botName.name}`);
             } else {
                 await ctx.reply('لم يتم تعيين اسم مخصص للبوت في هذه المجموعة.');
             }
@@ -2599,7 +2601,14 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     pendingReplies.delete(userId);
 });
 
-
+const botResponses = [
+    "مرحبا! كيف يمكنني مساعدتك؟",
+    "أهلاً! أنا هنا لخدمتك.",
+    "نعم، أنا موجود. ماذا تحتاج؟",
+    "تفضل، كيف يمكنني مساعدتك اليوم؟",
+    "مرحباً بك! هل لديك أي استفسارات؟",
+    "أنا جاهز لمساعدتك. ما هو سؤالك؟"
+];
 
 
 // Register the text handler
@@ -2628,7 +2637,21 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
             }
             ctx.session.awaitingBotName = false;
         } 
-    
+        try {
+            const db = await ensureDatabaseInitialized();
+            const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
+            
+            if (botNameDoc && botNameDoc.name) {
+                const botName = botNameDoc.name.toLowerCase();
+                
+                if (messageText.includes(botName)) {
+                    const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+                    await ctx.reply(`${botNameDoc.name} يرد: ${randomResponse}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error handling bot name mention:', error);
+        }
         // ... rest of your logic
     
 
