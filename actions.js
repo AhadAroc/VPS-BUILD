@@ -261,7 +261,96 @@ async function handleMediaMessage(ctx, mediaType) {
 }
 
    
+// Function to get local bot name for a specific chat
+async function getLocalBotName(chatId, defaultName) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const localName = await db.collection('bot_local_names').findOne({
+            chat_id: chatId
+        });
+        
+        return localName ? localName.custom_name : defaultName;
+    } catch (error) {
+        console.error('Error getting local bot name:', error);
+        return defaultName;
+    }
+}
 
+// Function to set local bot name for a specific chat
+async function setLocalBotName(chatId, botId, customName, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Update or insert the local name
+        await db.collection('bot_local_names').updateOne(
+            { chat_id: chatId, bot_id: botId },
+            { 
+                $set: { 
+                    custom_name: customName,
+                    updated_at: new Date(),
+                    updated_by: userId
+                }
+            },
+            { upsert: true }
+        );
+        
+        return true;
+    } catch (error) {
+        console.error('Error setting local bot name:', error);
+        return false;
+    }
+}
+
+// Add this to your message handler to process the new local bot name
+// This should be added to your existing message handler where you process text messages
+async function handleLocalBotNameChange(ctx) {
+    const userId = ctx.from.id;
+    const userState = userStates.get(userId);
+    
+    if (!userState || userState.state !== 'awaiting_local_bot_name') {
+        return false; // Not waiting for a local bot name
+    }
+    
+    const newName = ctx.message.text.trim();
+    
+    // Check if user wants to cancel
+    if (newName.toLowerCase() === 'إلغاء' || newName.toLowerCase() === 'الغاء') {
+        userStates.delete(userId);
+        await ctx.reply('✅ تم إلغاء عملية تغيير اسم البوت المحلي.');
+        return true;
+    }
+    
+    // Validate the new name
+    if (newName.length < 2 || newName.length > 64) {
+        await ctx.reply('❌ يجب أن يكون طول الاسم بين 2 و 64 حرفًا. يرجى المحاولة مرة أخرى أو إرسال "إلغاء" للإلغاء.');
+        return true;
+    }
+    
+    try {
+        // Save the new local name
+        const success = await setLocalBotName(
+            userState.chatId, 
+            ctx.botInfo.id, 
+            newName, 
+            userId
+        );
+        
+        if (success) {
+            await ctx.reply(`✅ تم تغيير اسم البوت المحلي في هذه المجموعة إلى "${newName}" بنجاح.`);
+        } else {
+            await ctx.reply('❌ حدث خطأ أثناء تغيير اسم البوت المحلي. يرجى المحاولة مرة أخرى لاحقًا.');
+        }
+        
+        // Clear the state
+        userStates.delete(userId);
+        return true;
+    } catch (error) {
+        console.error('Error in handleLocalBotNameChange:', error);
+        await ctx.reply('❌ حدث خطأ أثناء تغيير اسم البوت المحلي. يرجى المحاولة مرة أخرى لاحقًا.');
+        userStates.delete(userId);
+        return true;
+    }
+}
 
 
 // Add this function to handle quiz answers
@@ -813,6 +902,123 @@ bot.on('new_chat_members', async (ctx) => {
         await updateActiveGroup(ctx.chat.id, ctx.chat.title, ctx.from.id);
     }
 });
+
+// Handler for changing local bot name
+bot.action('change_local_bot_name', async (ctx) => {
+    try {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('تغيير اسم البوت المحلي');
+            
+            // Check if this is a group chat
+            if (ctx.chat.type === 'private') {
+                await ctx.editMessageText(
+                    '⚠️ يمكن تغيير اسم البوت المحلي فقط في المجموعات.\n\n' +
+                    'يرجى استخدام هذا الأمر داخل المجموعة التي تريد تغيير اسم البوت فيها.',
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🔙 رجوع', callback_data: 'back_to_bot_name_menu' }]
+                            ]
+                        }
+                    }
+                );
+                return;
+            }
+            
+            // Set state to await new local bot name
+            userStates.set(ctx.from.id, { 
+                state: 'awaiting_local_bot_name',
+                chatId: ctx.chat.id,
+                messageId: ctx.callbackQuery.message.message_id
+            });
+            
+            await ctx.editMessageText(
+                '✏️ يرجى إرسال الاسم الجديد للبوت في هذه المجموعة:\n\n' +
+                '• الاسم الحالي: ' + (await getLocalBotName(ctx.chat.id, ctx.botInfo.username) || ctx.botInfo.first_name) + '\n' +
+                '• يمكنك إلغاء العملية بإرسال كلمة "إلغاء"',
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🔙 رجوع', callback_data: 'back_to_bot_name_menu' }]
+                        ]
+                    }
+                }
+            );
+        } else {
+            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error in change_local_bot_name:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء تغيير اسم البوت المحلي', { show_alert: true });
+    }
+});
+
+// Handler for showing local bot names
+bot.action('show_local_bot_names', async (ctx) => {
+    try {
+        if (await isDeveloper(ctx, ctx.from.id)) {
+            await ctx.answerCbQuery('عرض أسماء البوت المحلية');
+            
+            const db = await ensureDatabaseInitialized();
+            const localNames = await db.collection('bot_local_names').find({
+                bot_id: ctx.botInfo.id
+            }).toArray();
+            
+            if (localNames.length === 0) {
+                await ctx.editMessageText(
+                    '📝 لا توجد أسماء محلية مخصصة للبوت حاليًا.\n\n' +
+                    'يمكنك تعيين أسماء محلية للبوت في المجموعات المختلفة باستخدام خيار "تغيير اسم البوت المحلي".',
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🔙 رجوع', callback_data: 'back_to_bot_name_menu' }]
+                            ]
+                        }
+                    }
+                );
+                return;
+            }
+            
+            // Build a list of local names with group info
+            let messageText = '📋 قائمة أسماء البوت المحلية:\n\n';
+            
+            for (const item of localNames) {
+                let groupName = 'مجموعة غير معروفة';
+                try {
+                    const chatInfo = await ctx.telegram.getChat(item.chat_id);
+                    groupName = chatInfo.title || `مجموعة ${item.chat_id}`;
+                } catch (error) {
+                    console.log(`Couldn't fetch info for chat ${item.chat_id}`);
+                }
+                
+                messageText += `• ${groupName}:\n  "${item.custom_name}"\n\n`;
+            }
+            
+            await ctx.editMessageText(
+                messageText,
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🔙 رجوع', callback_data: 'back_to_bot_name_menu' }]
+                        ]
+                    }
+                }
+            );
+        } else {
+            await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error in show_local_bot_names:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض أسماء البوت المحلية', { show_alert: true });
+    }
+});
+
+// Add a back action for the bot name menu
+bot.action('back_to_bot_name_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    showBotNameMenu(ctx);
+});
+
 // Add this new action handler
 bot.action('confirm_subscription', confirmSubscription);
 // Add these action handlers for timer settings
@@ -3530,21 +3736,21 @@ async function checkForAutomaticReply(ctx) {
         ctx.editMessageText(message, { reply_markup: keyboard });
     }
     
-    // Add a new function to show the bot name menu
-    function showBotNameMenu(ctx) {
-        const message = 'قسم اسم البوت - اختر الإجراء المطلوب:';
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '• تغيير اسم البوت العام •', callback_data: 'change_bot_name' }],
-        
-               
-                [{ text: '• عرض اسم البوت الحالي •', callback_data: 'show_current_bot_name' }],
-                [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
-            ]
-        };
-    
-        ctx.editMessageText(message, { reply_markup: keyboard });
-    }
+    // Add this to your existing showBotNameMenu function
+function showBotNameMenu(ctx) {
+    const message = 'قسم اسم البوت - اختر الإجراء المطلوب:';
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '• تغيير اسم البوت العام •', callback_data: 'change_bot_name' }],
+            [{ text: '• تغيير اسم البوت المحلي •', callback_data: 'change_local_bot_name' }],
+            [{ text: '• عرض اسم البوت الحالي •', callback_data: 'show_current_bot_name' }],
+            [{ text: '• عرض أسماء البوت المحلية •', callback_data: 'show_local_bot_names' }],
+            [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
+        ]
+    };
+
+    ctx.editMessageText(message, { reply_markup: keyboard });
+}
 
     bot.action('list_developers', async (ctx) => {
         if (await isDeveloper(ctx, ctx.from.id)) {
