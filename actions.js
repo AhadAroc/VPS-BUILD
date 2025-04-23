@@ -2641,21 +2641,27 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     { $set: { name: newBotName } },
                     { upsert: true }
                 );
-                
-                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}"`);
+    
+                // Save a default reply for the new bot name
+                await db.collection('replies').updateOne(
+                    { trigger_word: newBotName, chat_id: chatId },
+                    { $set: { 
+                        trigger_word: newBotName, 
+                        reply_text: `Hello! You mentioned the bot name: ${newBotName}`,
+                        chat_id: chatId,
+                        type: "text"
+                    }},
+                    { upsert: true }
+                );
+    
+                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
                 ctx.session.awaitingBotName = false;
             } catch (error) {
                 console.error('Error updating bot name:', error);
                 await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت. يرجى المحاولة مرة أخرى.');
+                ctx.session.awaitingBotName = false;
             }
-            ctx.session.awaitingBotName = false;
-        } 
-    // Check for bot name mentions in active groups
-    // Update active groups and check for bot name mentions
-    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        updateActiveGroups(ctx);
-        await checkBotNameAndReply(ctx);
-    }
+        }
         // ... rest of your logic
     
 
