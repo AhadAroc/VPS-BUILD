@@ -880,7 +880,7 @@ bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const isDM = ctx.chat.type === 'private';
-        
+        const { isSubscribed } = require('./middlewares');
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
         
         // Check subscription status
