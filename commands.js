@@ -1,6 +1,6 @@
 //gayshit 
 
-const { adminOnly, isSubscribed } = require('./middlewares');
+const { adminOnly } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
 const { createPrimaryDevelopersTable } = require('./database');
@@ -57,7 +57,24 @@ async function isVIP(ctx, userId) {
         return false;
     }
 }
-
+async function isSubscribed(ctx, userId) {
+    try {
+        const channelUsername = 'ctrlsrc'; // Replace with your channel username
+        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
+        const wasSubscribed = ctx.session.isSubscribed || false;
+        const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
+        
+        ctx.session.isSubscribed = isNowSubscribed;
+        
+        return {
+            isSubscribed: isNowSubscribed,
+            statusChanged: wasSubscribed !== isNowSubscribed
+        };
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return { isSubscribed: false, statusChanged: false };
+    }
+}
 // Add this middleware function
 async function photoRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.photo) {
@@ -905,7 +922,7 @@ bot.hears('بدء', async (ctx) => {
         }
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+        ctx.reply('❌asdasdasdasdasdasdasdasdasdasdasdasdsadasd.');
     }
 });
 
@@ -2141,7 +2158,7 @@ bot.start(async (ctx) => {
         await handleStartCommand(ctx);
     } catch (error) {
         console.error('Error in /start command handler:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+        await ctx.reply('sss.');
     }
 });
 
