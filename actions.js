@@ -307,7 +307,7 @@ const customBotName = await getCustomBotName(chatId);
 if (customBotName) {
     const loweredName = customBotName.toLowerCase();
     if (userText.includes(loweredName)) {
-        await ctx.reply(`Hello! You mentioned the custom bot name: ${customBotName}`);
+        await ctx.reply(`عيونه 😘: ${customBotName}`);
         return;
     }
 }
@@ -2708,7 +2708,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     { trigger_word: newBotName, chat_id: chatId },
                     { $set: { 
                         trigger_word: newBotName, 
-                        reply_text: `Hello! You mentioned the bot name: ${newBotName}`,
+                        reply_text: `عيونه 🙌: ${newBotName}`,
                         chat_id: chatId,
                         type: "text"
                     }},
