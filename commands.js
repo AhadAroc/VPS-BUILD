@@ -453,7 +453,7 @@ async function checkUserRank(ctx) {
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
-    const {isSubscribed } = require('./middlewares');
+    
     bot.command('start', async (ctx) => {
         if (ctx.chat.type === 'private') {
             try {
