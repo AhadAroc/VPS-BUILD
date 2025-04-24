@@ -3253,7 +3253,7 @@ if (await isDeveloper(ctx, userId)) {
 
     } catch (error) {
         console.error('Error in message handler:', error);
-        await ctx.reply('حدث خطأ أثناء معالجة رسالتك. الرجاء المحاولة مرة أخرى لاحقًا.');
+        await ctx.reply('هلا ! يرجى ارسال /start');
     }
 
     await next();
