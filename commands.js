@@ -863,12 +863,14 @@ bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const isDM = ctx.chat.type === 'private';
-        const { isSubscribed } = require('./middlewares');
+
+        const { isSubscribed } = require('./middlewares'); // ✅ import once here
+
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
         
-        // Check subscription status
-        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
-        if (!isSubscribed) {
+        const { isSubscribed: subscribed, statusChanged } = await isSubscribed(ctx, userId); // ✅ correct
+
+        if (!subscribed) {
             return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
                 reply_markup: {
                     inline_keyboard: [
@@ -878,6 +880,9 @@ bot.hears('بدء', async (ctx) => {
                 }
             });
         }
+
+        // rest of your logic...
+
 
         // First check if it's a DM and user is a developer
         if (isDM) {
