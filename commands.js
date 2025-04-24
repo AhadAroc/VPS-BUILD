@@ -1,4 +1,4 @@
-//ultragayshit 
+//gayshit 
 
 const { adminOnly, isSubscribed } = require('./middlewares');
 const { developerIds } = require('./handlers');
@@ -865,6 +865,19 @@ bot.hears('بدء', async (ctx) => {
         
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
         
+        // Check subscription status
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        if (!isSubscribed) {
+            return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+
         // First check if it's a DM and user is a developer
         if (isDM) {
             const isDevResult = await isDeveloper(ctx, userId);
