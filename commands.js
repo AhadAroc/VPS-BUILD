@@ -1,5 +1,5 @@
 //gayshit 
-const { isSubscribed } = require('./middlewares'); // Adjust the path if necessary
+
 const { adminOnly } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
@@ -57,58 +57,7 @@ async function isVIP(ctx, userId) {
         return false;
     }
 }
-// Update the "بدء" command handler
-// Update the "بدء" command handler
-bot.hears('بدء', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        const isDM = ctx.chat.type === 'private';
-        
-        console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
-        
-        // Check subscription status
-        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
-        if (!isSubscribed) {
-            return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
-                }
-            });
-        }
 
-        // First check if it's a DM and user is a developer
-        if (isDM) {
-            const isDevResult = await isDeveloper(ctx, userId);
-            console.log('DEBUG: isDeveloper result:', isDevResult);
-            
-            if (isDevResult) {
-                console.log('DEBUG: Showing developer panel');
-                return await showDevPanel(ctx);
-            } else {
-                console.log('DEBUG: Not a developer, showing regular DM message');
-                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
-            }
-        } 
-        
-        // For group chats
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        
-        if (isAdmin || isVIPUser) {
-            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
-            return showMainMenu(ctx);
-        } else {
-            console.log('DEBUG: Regular user in group, showing basic message');
-            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
-        }
-    } catch (error) {
-        console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌asdasdasdasdasdasdasdasdasdasdasdasdsadasd.');
-    }
-});
 // Add this middleware function
 async function photoRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.photo) {
@@ -504,7 +453,24 @@ async function checkUserRank(ctx) {
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
-    
+    async function isSubscribed(ctx, userId) {
+        try {
+            const channelUsername = 'ctrlsrc'; // Replace with your channel username
+            const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
+            const wasSubscribed = ctx.session.isSubscribed || false;
+            const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
+            
+            ctx.session.isSubscribed = isNowSubscribed;
+            
+            return {
+                isSubscribed: isNowSubscribed,
+                statusChanged: wasSubscribed !== isNowSubscribed
+            };
+        } catch (error) {
+            console.error('Error checking subscription:', error);
+            return { isSubscribed: false, statusChanged: false };
+        }
+    }
     bot.command('start', async (ctx) => {
         if (ctx.chat.type === 'private') {
             try {
@@ -908,7 +874,58 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     chatStates.delete(ctx.chat.id);
     await showQuizMenu(ctx);
 });
+// Update the "بدء" command handler
+// Update the "بدء" command handler
+bot.hears('بدء', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const isDM = ctx.chat.type === 'private';
+        
+        console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+        
+        // Check subscription status
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        if (!isSubscribed) {
+            return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
 
+        // First check if it's a DM and user is a developer
+        if (isDM) {
+            const isDevResult = await isDeveloper(ctx, userId);
+            console.log('DEBUG: isDeveloper result:', isDevResult);
+            
+            if (isDevResult) {
+                console.log('DEBUG: Showing developer panel');
+                return await showDevPanel(ctx);
+            } else {
+                console.log('DEBUG: Not a developer, showing regular DM message');
+                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
+            }
+        } 
+        
+        // For group chats
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        
+        if (isAdmin || isVIPUser) {
+            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
+            return showMainMenu(ctx);
+        } else {
+            console.log('DEBUG: Regular user in group, showing basic message');
+            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
+        }
+    } catch (error) {
+        console.error('Error handling "بدء" command:', error);
+        ctx.reply('❌asdasdasdasdasdasdasdasdasdasdasdasdsadasd.');
+    }
+});
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
