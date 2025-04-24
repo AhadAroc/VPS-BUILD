@@ -1,5 +1,5 @@
 //gayshit 
-
+const { isSubscribed } = require('./middlewares'); // Adjust the path if necessary
 const { adminOnly } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
