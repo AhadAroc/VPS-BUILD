@@ -864,14 +864,24 @@ bot.hears('بدء', async (ctx) => {
         const userId = ctx.from.id;
         const isDM = ctx.chat.type === 'private';
 
-        const { isSubscribed } = require('./middlewares'); // ✅ import once here
+        // ✅ lazy import to avoid circular error
+        const { isSubscribed } = require('./middlewares');
 
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
-        
-        const { isSubscribed: subscribed, statusChanged } = await isSubscribed(ctx, userId); // ✅ correct
+
+        // ✅ subscription check wrapped in try/catch
+        let subscribed = false;
+        try {
+            const result = await isSubscribed(ctx, userId);
+            console.log('DEBUG: Subscription check result:', result);
+            subscribed = result?.isSubscribed;
+        } catch (subError) {
+            console.error('❌ Error checking subscription:', subError);
+            return ctx.reply('❌ حدث خطأ أثناء التحقق من الاشتراك. حاول مرة أخرى لاحقًا.');
+        }
 
         if (!subscribed) {
-            return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
+            return ctx.reply('❌ يرجى الاشتراك بقناة البوت لاستخدامه', {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
@@ -881,39 +891,35 @@ bot.hears('بدء', async (ctx) => {
             });
         }
 
-        // rest of your logic...
-
-
-        // First check if it's a DM and user is a developer
+        // ✅ if in DM and user is a developer
         if (isDM) {
             const isDevResult = await isDeveloper(ctx, userId);
             console.log('DEBUG: isDeveloper result:', isDevResult);
-            
+
             if (isDevResult) {
-                console.log('DEBUG: Showing developer panel');
                 return await showDevPanel(ctx);
             } else {
-                console.log('DEBUG: Not a developer, showing regular DM message');
-                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
+                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك.');
             }
-        } 
-        
-        // For group chats
+        }
+
+        // ✅ group logic
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
-        
+
         if (isAdmin || isVIPUser) {
             console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
             return showMainMenu(ctx);
         } else {
-            console.log('DEBUG: Regular user in group, showing basic message');
-            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
+            return ctx.reply('📌 لا تملك صلاحيات كافية.\nفقط المشرفين أو VIP يمكنهم استخدام هذا الأمر.');
         }
+
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌asdasdasdasdasdasdasdasdasdasdasdasdsadasd.');
+        await ctx.reply('❌ حدث خطأ غير متوقع أثناء تنفيذ الأمر.');
     }
 });
+``
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
