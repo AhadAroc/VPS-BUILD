@@ -27,11 +27,17 @@ const knownUsers = new Map();
 const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
    // Add this function near the top of your file, after your imports and before the bot commands
-   async function getBotGroups(botId) {
+   async function getBotGroups(botId, userId) {
     try {
         const db = await ensureDatabaseInitialized();
-        const groups = await db.collection('groups').find({ is_active: true }).toArray();
-        return groups.filter(group => group.bot_id === botId);
+        const groups = await db.collection('groups').find({ 
+            is_active: true,
+            $or: [
+                { bot_id: botId },
+                { members: userId }  // Assuming you have a 'members' field in your groups collection
+            ]
+        }).toArray();
+        return groups;
     } catch (error) {
         console.error('Error fetching bot groups:', error);
         return [];
@@ -504,8 +510,8 @@ function setupCommands(bot) {
                 // Regular user who is subscribed
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                 
-                // Check if the bot has been added to any groups
-                const botGroups = await getBotGroups(ctx.botInfo.id);
+                // Check if the bot has been added to any groups or if the user is in any groups with the bot
+                const botGroups = await getBotGroups(ctx.botInfo.id, userId);
                 
                 let keyboard = [
                     [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
@@ -514,7 +520,13 @@ function setupCommands(bot) {
                 ];
                 
                 if (botGroups.length > 0) {
-                    keyboard.unshift([{ text: '🔄 العودة إلى المجموعة', callback_data: 'return_to_group' }]);
+                    // If there are multiple groups, you might want to show a list or just the first one
+                    const firstGroup = botGroups[0];
+                    keyboard.unshift([{ text: `🔄 العودة إلى ${firstGroup.title}`, callback_data: `return_to_group:${firstGroup.group_id}` }]);
+                    
+                    if (botGroups.length > 1) {
+                        keyboard.unshift([{ text: '📋 عرض قائمة المجموعات', callback_data: 'show_group_list' }]);
+                    }
                 }
                 
                 return ctx.reply(welcomeMessage, {
