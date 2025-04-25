@@ -993,14 +993,8 @@ bot.hears('بدء', async (ctx) => {
         
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
         
-        // Update active groups tracking
-        if (!isDM) {
-            await updateActiveGroups(ctx);
-        }
-        
-        // First check if it's a DM
+        // First check if it's a DM and user is a developer
         if (isDM) {
-            // Check if user is a developer
             const isDevResult = await isDeveloper(ctx, userId);
             console.log('DEBUG: isDeveloper result:', isDevResult);
             
@@ -1008,46 +1002,27 @@ bot.hears('بدء', async (ctx) => {
                 console.log('DEBUG: Showing developer panel');
                 return await showDevPanel(ctx);
             } else {
-                // Check subscription status for regular users
-                const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
-                
-                if (isUserSubscribed) {
-                    // User is subscribed, show the "Add to Group" button
-                    return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يمكنك إضافة البوت إلى مجموعتك للاستفادة من خدماته.', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                            ]
-                        }
-                    });
-                } else {
-                    // User is not subscribed, show subscription prompt
-                    let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-                    
-                    // Create inline keyboard with subscription buttons directly with the two channels
-                    const inlineKeyboard = [
-                        [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
-                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ];
-                    // Add buttons for each channel the user needs to subscribe to
-                    notSubscribedChannels.forEach(channel => {
-                        inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
-                    });
-                    
-                    // Add verification button
-                    inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
-                    
-                    return ctx.reply(subscriptionMessage, {
-                        reply_markup: {
-                            inline_keyboard: inlineKeyboard
-                        }
-                    });
-                }
+                console.log('DEBUG: Not a developer, showing regular DM message');
+                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
             }
         } 
+        
+        // For group chats
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        
+        if (isAdmin || isVIPUser) {
+            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
+            return showMainMenu(ctx);
+        } else {
+            console.log('DEBUG: Regular user in group, showing basic message');
+            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
+        }
+    } catch (error) {
+        console.error('Error handling "بدء" command:', error);
+        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
         
         // For group chats
         const isAdmin = await isAdminOrOwner(ctx, userId);
