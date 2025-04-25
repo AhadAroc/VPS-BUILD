@@ -1,8 +1,6 @@
 const { developerIds } = require('./config');
 const { getDb, pool } = require('./database');
-// Add this near the top of your middlewares.js file
-const subscriptionCheckInterval = 24 * 60 * 60 * 1000; // Check once every 24 hours
-const lastSubscriptionCheck = new Map(); // Track when we last checked each user
+
 // Create a Map to cache subscription status
 const subscriptionCache = new Map();
 async function isAdminOrOwner(ctx, userId) {
@@ -15,14 +13,7 @@ async function isAdminOrOwner(ctx, userId) {
         return false;
     }
 }
-// Add this function after the isSubscribed function
-function shouldCheckSubscription(userId) {
-    const lastCheck = lastSubscriptionCheck.get(userId);
-    if (!lastCheck) return true; // Never checked before
-    
-    const now = Date.now();
-    return (now - lastCheck) > subscriptionCheckInterval;
-}
+
 async function getDevelopers() {
     try {
         // First, check MongoDB for developers
@@ -157,38 +148,16 @@ function setupMiddlewares(bot) {
             
             const userId = ctx.from.id;
             
-            // If this is a callback query for checking subscription, allow it
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+            // For private chats, check subscription - EVEN FOR DEVELOPERS
+            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+            
+            // If user is subscribed, allow them to proceed
+            if (isUserSubscribed) {
                 return next();
             }
             
-            // Determine if we need to check subscription now or can use cached result
-            let subscriptionResult;
-            
-            if (shouldCheckSubscription(userId)) {
-                // Time to check subscription again
-                console.log(`Performing periodic subscription check for user ${userId}`);
-                subscriptionResult = await isSubscribed(ctx, userId);
-                // Update the last check time
-                lastSubscriptionCheck.set(userId, Date.now());
-            } else {
-                // Use cached result from the subscriptionCache
-                const cachedResult = subscriptionCache.get(userId);
-                if (cachedResult) {
-                    subscriptionResult = {
-                        isSubscribed: cachedResult.isSubscribed,
-                        statusChanged: false,
-                        notSubscribedChannels: cachedResult.notSubscribedChannels || []
-                    };
-                } else {
-                    // No cached result, perform a check
-                    subscriptionResult = await isSubscribed(ctx, userId);
-                    lastSubscriptionCheck.set(userId, Date.now());
-                }
-            }
-            
-            // If user is subscribed, allow them to proceed
-            if (subscriptionResult.isSubscribed) {
+            // If this is a callback query for checking subscription, allow it
+            if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
                 return next();
             }
             
@@ -226,8 +195,32 @@ function setupMiddlewares(bot) {
         }
     });
 }
-
-
+// Add the check_subscription function directly in this file
+async function check_subscription(ctx) {
+    try {
+        const userId = ctx.from.id;
+        await ctx.answerCbQuery('جاري التحقق من اشتراكك...');
+        
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        
+        if (isSubscribed) {
+            // User is now subscribed
+            await ctx.editMessageText('✅ تم التحقق من اشتراكك بنجاح! يمكنك الآن استخدام البوت بشكل كامل.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔄 بدء استخدام البوت', callback_data: 'start_using_bot' }]
+                    ]
+                }
+            });
+        } else {
+            // User is still not subscribed
+            await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error in check_subscription:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك.', { show_alert: true });
+    }
+}
 function adminOnly(handler) {
     return async (ctx) => {
         try {
