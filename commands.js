@@ -1,6 +1,6 @@
-//gayshit 
+//ultragayshit 
 
-const { adminOnly } = require('./middlewares');
+const { adminOnly, isSubscribed } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
 const { createPrimaryDevelopersTable } = require('./database');
@@ -453,7 +453,6 @@ async function checkUserRank(ctx) {
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
-    
     bot.command('start', async (ctx) => {
         if (ctx.chat.type === 'private') {
             try {
@@ -863,63 +862,39 @@ bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const isDM = ctx.chat.type === 'private';
-
-        // ✅ lazy import to avoid circular error
-        const { isSubscribed } = require('./middlewares');
-
+        
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
-
-        // ✅ subscription check wrapped in try/catch
-        let subscribed = false;
-        try {
-            const result = await isSubscribed(ctx, userId);
-            console.log('DEBUG: Subscription check result:', result);
-            subscribed = result?.isSubscribed;
-        } catch (subError) {
-            console.error('❌ Error checking subscription:', subError);
-            return ctx.reply('❌ حدث خطأ أثناء التحقق من الاشتراك. حاول مرة أخرى لاحقًا.');
-        }
-
-        if (!subscribed) {
-            return ctx.reply('❌ يرجى الاشتراك بقناة البوت لاستخدامه', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                    ]
-                }
-            });
-        }
-
-        // ✅ if in DM and user is a developer
+        
+        // First check if it's a DM and user is a developer
         if (isDM) {
             const isDevResult = await isDeveloper(ctx, userId);
             console.log('DEBUG: isDeveloper result:', isDevResult);
-
+            
             if (isDevResult) {
+                console.log('DEBUG: Showing developer panel');
                 return await showDevPanel(ctx);
             } else {
-                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك.');
+                console.log('DEBUG: Not a developer, showing regular DM message');
+                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
             }
-        }
-
-        // ✅ group logic
+        } 
+        
+        // For group chats
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
-
+        
         if (isAdmin || isVIPUser) {
             console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
             return showMainMenu(ctx);
         } else {
-            return ctx.reply('📌 لا تملك صلاحيات كافية.\nفقط المشرفين أو VIP يمكنهم استخدام هذا الأمر.');
+            console.log('DEBUG: Regular user in group, showing basic message');
+            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
         }
-
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        await ctx.reply('❌ حدث خطأ غير متوقع أثناء تنفيذ الأمر.');
+        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
-``
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
@@ -973,8 +948,25 @@ async function listVIPUsers(ctx) {
         }
     }
     
-    
-}
+    async function isSubscribed(ctx, userId) {
+    try {
+        const channelUsername = 'ctrlsrc'; // Replace with your channel username
+        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
+        const wasSubscribed = ctx.session.isSubscribed || false;
+        const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
+        
+        ctx.session.isSubscribed = isNowSubscribed;
+        
+        return {
+            isSubscribed: isNowSubscribed,
+            statusChanged: wasSubscribed !== isNowSubscribed
+        };
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return { isSubscribed: false, statusChanged: false };
+    }
+}}
+
 
     async function updateActiveGroups(ctx) {
         try {
@@ -2153,7 +2145,7 @@ bot.start(async (ctx) => {
         await handleStartCommand(ctx);
     } catch (error) {
         console.error('Error in /start command handler:', error);
-        await ctx.reply('sss.');
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
 
@@ -2167,5 +2159,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
 
