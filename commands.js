@@ -984,46 +984,10 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     chatStates.delete(ctx.chat.id);
     await showQuizMenu(ctx);
 });
+
+// Update the "بدء" command handler
+// Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        const isDM = ctx.chat.type === 'private';
-        
-        console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
-        
-        // First check if it's a DM and user is a developer
-        if (isDM) {
-            const isDevResult = await isDeveloper(ctx, userId);
-            console.log('DEBUG: isDeveloper result:', isDevResult);
-            
-            if (isDevResult) {
-                console.log('DEBUG: Showing developer panel');
-                return await showDevPanel(ctx);
-            } else {
-                console.log('DEBUG: Not a developer, showing regular DM message');
-                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
-            }
-        } 
-        
-        // For group chats
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        
-        if (isAdmin || isVIPUser) {
-            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
-            return showMainMenu(ctx);
-        } else {
-            console.log('DEBUG: Regular user in group, showing basic message');
-            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
-        }
-    } catch (error) {
-        console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
-    }
-});
-// Update the "بدء" command handler
-// Update the "بدء" command handler
-bot.hears('xxxiiixxxxiiiixxxx', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const isDM = ctx.chat.type === 'private';
