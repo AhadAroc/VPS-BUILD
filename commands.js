@@ -477,13 +477,13 @@ function setupCommands(bot) {
             }
             
             // For private chats - ALWAYS check subscription status first
-            const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
             
             if (!isUserSubscribed) {
                 // User is not subscribed, show subscription prompt regardless of developer status
                 const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                 
-                // Create inline keyboard with subscription buttons
+                // Create inline keyboard with subscription buttons - directly specify the channels
                 const inlineKeyboard = [
                     [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
                     [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
