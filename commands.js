@@ -508,7 +508,7 @@ function setupCommands(bot) {
 bot.action('check_subscription', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+        const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
         
         if (isUserSubscribed) {
             // User is now subscribed to all channels
@@ -526,6 +526,27 @@ bot.action('check_subscription', async (ctx) => {
         } else {
             // User is still not subscribed to all channels
             await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
+            
+            // Reshow the subscription message with links to the channels
+            let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            
+            // Create inline keyboard with subscription buttons
+            const inlineKeyboard = [];
+            
+            // Add buttons for each channel the user needs to subscribe to
+            notSubscribedChannels.forEach(channel => {
+                inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
+            });
+            
+            // Add verification button
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+            
+            // Edit the message to show the subscription links again
+            await ctx.editMessageText(subscriptionMessage, {
+                reply_markup: {
+                    inline_keyboard: inlineKeyboard
+                }
+            });
         }
     } catch (error) {
         console.error('Error in check_subscription action:', error);
