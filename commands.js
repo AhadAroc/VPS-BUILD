@@ -624,7 +624,7 @@ function setupCommands(bot) {
                 // User is not subscribed to all channels
                 await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
                 
-                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                const subscriptionMessage = 'لم تشترك 😒😒 في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                 
                 const inlineKeyboard = notSubscribedChannels.map(channel => 
                     [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
