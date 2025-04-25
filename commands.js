@@ -582,67 +582,66 @@ function setupCommands(bot) {
         }
     });
 
-// we updat this to check via chaneel id if the user is in the group :
-bot.action('check_subscription', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        const requiredChannels = [
-            { id: -1002276669807, username: 'ctrlsrc', title: 'قناة السورس' },
-            { id: -1002558408202, username: 'T0_B7', title: 'القناة الرسمية' }
-        ];
-        
-        let allSubscribed = true;
-        let notSubscribedChannels = [];
-
-        for (const channel of requiredChannels) {
-            try {
-                const chatMember = await ctx.telegram.getChatMember(channel.id, userId);
-                if (!['member', 'administrator', 'creator'].includes(chatMember.status)) {
+    bot.action('check_subscription', async (ctx) => {
+        try {
+            const userId = ctx.from.id;
+            const requiredChannels = [
+                { id: -1002276669807, username: 'ctrlsrc', title: 'قناة السورس' },
+                { id: -1002558408202, username: 'T0_B7', title: 'القناة الرسمية' }
+            ];
+            
+            let allSubscribed = true;
+            let notSubscribedChannels = [];
+    
+            for (const channel of requiredChannels) {
+                try {
+                    const chatMember = await ctx.telegram.getChatMember(channel.id, userId);
+                    if (!['member', 'administrator', 'creator'].includes(chatMember.status)) {
+                        allSubscribed = false;
+                        notSubscribedChannels.push(channel);
+                    }
+                } catch (error) {
+                    console.error(`Error checking subscription for channel ${channel.username}:`, error);
                     allSubscribed = false;
                     notSubscribedChannels.push(channel);
                 }
-            } catch (error) {
-                console.error(`Error checking subscription for channel ${channel.username}:`, error);
-                allSubscribed = false;
-                notSubscribedChannels.push(channel);
             }
+    
+            if (allSubscribed) {
+                // User is subscribed to all channels
+                const welcomeMessage = 'شكرًا للاشتراك! يمكنك الآن استخدام البوت.';
+                
+                await ctx.editMessageText(welcomeMessage, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                            [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                            [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                        ]
+                    }
+                });
+            } else {
+                // User is not subscribed to all channels
+                await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
+                
+                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                
+                const inlineKeyboard = notSubscribedChannels.map(channel => 
+                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+                );
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+                
+                await ctx.editMessageText(subscriptionMessage, {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error in check_subscription action:', error);
+            await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
         }
-
-        if (allSubscribed) {
-            // User is subscribed to all channels
-            const welcomeMessage = 'شكرًا للاشتراك! يمكنك الآن استخدام البوت.';
-            
-            await ctx.editMessageText(welcomeMessage, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                        [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                    ]
-                }
-            });
-        } else {
-            // User is not subscribed to all channels
-            await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
-            
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-            
-            const inlineKeyboard = notSubscribedChannels.map(channel => 
-                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-            );
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
-            
-            await ctx.editMessageText(subscriptionMessage, {
-                reply_markup: {
-                    inline_keyboard: inlineKeyboard
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in check_subscription action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
-    }
-});
+    });
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
