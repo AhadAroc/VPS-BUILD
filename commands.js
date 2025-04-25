@@ -454,43 +454,75 @@ async function checkUserRank(ctx) {
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
     bot.command('start', async (ctx) => {
-        if (ctx.chat.type === 'private') {
-            try {
-                const userId = ctx.from.id;
-                // Check if user is subscribed to the channel
-                const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+        try {
+            const userId = ctx.from.id;
+            const isDM = ctx.chat.type === 'private';
+            
+            console.log(`DEBUG: "/start" command triggered by user: ${userId} in chat type: ${ctx.chat.type}`);
+            
+            // Update user's last interaction time
+            await updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
+            
+            // Different handling for DMs vs Groups
+            if (isDM) {
+                // Check if user is subscribed to required channels
+                const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
                 
                 // Welcome message
-                const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
+                const welcomeMessage = 'مرحبا بك في البوت! 🤖';
                 
                 if (isUserSubscribed) {
                     // User is subscribed, show the "Add to Group" button
-                    await ctx.reply(welcomeMessage, {
+                    await ctx.reply(`${welcomeMessage}\n\nأنت مشترك في جميع القنوات المطلوبة. يمكنك الآن استخدام البوت بالكامل.`, {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
                             ]
                         }
                     });
+                    
+                    // Check if the user is a developer and show dev panel if applicable
+                    const isDevResult = await isDeveloper(ctx, userId);
+                    if (isDevResult) {
+                        await showDevPanel(ctx);
+                    }
                 } else {
                     // User is not subscribed, show subscription prompt
-                    await ctx.reply(welcomeMessage, {
+                    let subscriptionMessage = `${welcomeMessage}\n\nلاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:`;
+                    
+                    // Create inline keyboard with subscription buttons
+                    const inlineKeyboard = [];
+                    
+                    // Add buttons for each channel the user needs to subscribe to
+                    notSubscribedChannels.forEach(channel => {
+                        inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
+                    });
+                    
+                    // Add verification button
+                    inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+                    
+                    await ctx.reply(subscriptionMessage, {
                         reply_markup: {
-                            inline_keyboard: [
-                                [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                            ]
+                            inline_keyboard: inlineKeyboard
                         }
                     });
                 }
-            } catch (error) {
-                console.error('Error in start command:', error);
-                await ctx.reply('حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
+            } else {
+                // This is a group chat
+                // Update active groups list
+                await updateActiveGroup(ctx.chat.id, ctx.chat.title, ctx.from.id);
+                
+                // Optional: Send a welcome message when bot is first added to a group
+                // This can be detected by checking if the message is a /start command with a startgroup parameter
+                if (ctx.message.text.includes('startgroup')) {
+                    await ctx.reply('شكراً لإضافتي إلى المجموعة! 🎉\nيمكنك استخدام الأمر "بدء" لعرض قائمة الأوامر المتاحة.');
+                }
             }
-        } else {
-            // This is a group chat, do nothing
-            return;
+        } catch (error) {
+            console.error('Error in start command:', error);
+            await ctx.reply('حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
         }
     });
 
@@ -865,8 +897,14 @@ bot.hears('بدء', async (ctx) => {
         
         console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
         
-        // First check if it's a DM and user is a developer
+        // Update active groups tracking
+        if (!isDM) {
+            await updateActiveGroups(ctx);
+        }
+        
+        // First check if it's a DM
         if (isDM) {
+            // Check if user is a developer
             const isDevResult = await isDeveloper(ctx, userId);
             console.log('DEBUG: isDeveloper result:', isDevResult);
             
@@ -874,8 +912,41 @@ bot.hears('بدء', async (ctx) => {
                 console.log('DEBUG: Showing developer panel');
                 return await showDevPanel(ctx);
             } else {
-                console.log('DEBUG: Not a developer, showing regular DM message');
-                return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يرجى إضافة البوت إلى مجموعتك للاستفادة من خدماته.');
+                // Check subscription status for regular users
+                const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+                
+                if (isUserSubscribed) {
+                    // User is subscribed, show the "Add to Group" button
+                    return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يمكنك إضافة البوت إلى مجموعتك للاستفادة من خدماته.', {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                            ]
+                        }
+                    });
+                } else {
+                    // User is not subscribed, show subscription prompt
+                    let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                    
+                    // Create inline keyboard with subscription buttons
+                    const inlineKeyboard = [];
+                    
+                    // Add buttons for each channel the user needs to subscribe to
+                    notSubscribedChannels.forEach(channel => {
+                        inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
+                    });
+                    
+                    // Add verification button
+                    inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+                    
+                    return ctx.reply(subscriptionMessage, {
+                        reply_markup: {
+                            inline_keyboard: inlineKeyboard
+                        }
+                    });
+                }
             }
         } 
         
@@ -888,13 +959,14 @@ bot.hears('بدء', async (ctx) => {
             return showMainMenu(ctx);
         } else {
             console.log('DEBUG: Regular user in group, showing basic message');
-            return ctx.reply('اذا قمت بارسال بدء بدون صلاحيات يرجى اخذ الصلاحيات اولا غير ذالك ! يمكنك استخدام الأوامر المتاحة في مجموعتك.');
+            return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
         }
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
@@ -949,22 +1021,74 @@ async function listVIPUsers(ctx) {
     }
     
     async function isSubscribed(ctx, userId) {
-    try {
-        const channelUsername = 'ctrlsrc'; // Replace with your channel username
-        const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
-        const wasSubscribed = ctx.session.isSubscribed || false;
-        const isNowSubscribed = ['member', 'administrator', 'creator'].includes(member.status);
-        
-        ctx.session.isSubscribed = isNowSubscribed;
-        
-        return {
-            isSubscribed: isNowSubscribed,
-            statusChanged: wasSubscribed !== isNowSubscribed
-        };
-    } catch (error) {
-        console.error('Error checking subscription:', error);
-        return { isSubscribed: false, statusChanged: false };
-    }
+        try {
+            // Check if we have a cached result that's still valid (cache for 5 minutes)
+            const cachedResult = subscriptionCache.get(userId);
+            if (cachedResult && (Date.now() - cachedResult.timestamp < 5 * 60 * 1000)) {
+                console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
+                return { 
+                    isSubscribed: cachedResult.isSubscribed, 
+                    statusChanged: false 
+                };
+            }
+    
+            console.log(`Checking subscription status for user ${userId}`);
+            
+            // Define the channels that require subscription
+            const requiredChannels = [
+                { username: 'ctrlsrc', title: 'قناة السورس' },
+                { username: 'T0_B7', title: 'القناة الرسمية' }
+            ];
+            
+            let allSubscribed = true;
+            let notSubscribedChannels = [];
+            
+            // Check each channel
+            for (const channel of requiredChannels) {
+                try {
+                    // Verify the bot is an admin in the channel first
+                    const botMember = await ctx.telegram.getChatMember(`@${channel.username}`, ctx.botInfo.id);
+                    if (!['administrator', 'creator'].includes(botMember.status)) {
+                        console.warn(`Bot is not an admin in @${channel.username}. Status: ${botMember.status}`);
+                        // Continue checking anyway, but log the warning
+                    }
+                    
+                    const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
+                    const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
+                    
+                    if (!isSubbed) {
+                        allSubscribed = false;
+                        notSubscribedChannels.push(channel);
+                    }
+                    
+                    console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed}`);
+                } catch (error) {
+                    console.error(`Error checking subscription for @${channel.username}:`, error);
+                    // If we can't check, assume not subscribed for safety
+                    allSubscribed = false;
+                    notSubscribedChannels.push(channel);
+                }
+            }
+            
+            // Store the result in cache
+            const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
+            subscriptionCache.set(userId, { 
+                isSubscribed: allSubscribed, 
+                timestamp: Date.now(),
+                notSubscribedChannels: notSubscribedChannels
+            });
+            
+            // Return the result with status change indicator
+            return { 
+                isSubscribed: allSubscribed, 
+                statusChanged: previousStatus !== allSubscribed,
+                notSubscribedChannels: notSubscribedChannels
+            };
+        } catch (error) {
+            console.error(`Error in isSubscribed check for user ${userId}:`, error);
+            // Default to false on error
+            return { isSubscribed: false, statusChanged: false };
+        }
 }}
 
 
