@@ -454,45 +454,29 @@ async function checkUserRank(ctx) {
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
     bot.command('start', async (ctx) => {
-        try {
-            const userId = ctx.from.id;
-            const isDM = ctx.chat.type === 'private';
-            
-            console.log(`DEBUG: "/start" command triggered by user: ${userId} in chat type: ${ctx.chat.type}`);
-            
-            // Update user's last interaction time
-            await updateLastInteraction(userId, ctx.from.username, ctx.from.first_name, ctx.from.last_name);
-            
-            // Different handling for DMs vs Groups
-            if (isDM) {
-                // Check if user is a developer
-                const isDevResult = await isDeveloper(ctx, userId);
-                
-                if (isDevResult) {
-                    // Developer gets special panel
-                    return await showDevPanel(ctx);
-                }
-                
-                // Check if user is subscribed to required channels
+        if (ctx.chat.type === 'private') {
+            try {
+                const userId = ctx.from.id;
+                // Check if user is subscribed to the channels
                 const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
                 
                 // Welcome message
-                const welcomeMessage = 'مرحبا بك في البوت! 🤖';
+                const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                 
                 if (isUserSubscribed) {
-                    // User is subscribed, show the "Add to Group" button
-                    await ctx.reply(`${welcomeMessage}\n\nأنت مشترك في جميع القنوات المطلوبة. يمكنك الآن استخدام البوت بالكامل.`, {
+                    // User is subscribed to all required channels, show the "Add to Group" button
+                    await ctx.reply(welcomeMessage, {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                                [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                                [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                                [{ text: 'القناة الرسمية', url: 'https://t.me/T0_B7' }]
                             ]
                         }
                     });
                 } else {
-                    // User is not subscribed, show subscription prompt
-                    let subscriptionMessage = `${welcomeMessage}\n\nلاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:`;
+                    // User is not subscribed to all required channels, show subscription prompt
+                    let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                     
                     // Create inline keyboard with subscription buttons
                     const inlineKeyboard = [];
@@ -511,20 +495,13 @@ function setupCommands(bot) {
                         }
                     });
                 }
-            } else {
-                // This is a group chat
-                // Update active groups list
-                await updateActiveGroup(ctx.chat.id, ctx.chat.title, ctx.from.id);
-                
-                // Optional: Send a welcome message when bot is first added to a group
-                // This can be detected by checking if the message is a /start command with a startgroup parameter
-                if (ctx.message.text.includes('startgroup')) {
-                    await ctx.reply('شكراً لإضافتي إلى المجموعة! 🎉\nيمكنك استخدام الأمر "بدء" لعرض قائمة الأوامر المتاحة.');
-                }
+            } catch (error) {
+                console.error('Error in start command:', error);
+                await ctx.reply('حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
             }
-        } catch (error) {
-            console.error('Error in start command:', error);
-            await ctx.reply('حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
+        } else {
+            // This is a group chat, do nothing
+            return;
         }
     });
 
