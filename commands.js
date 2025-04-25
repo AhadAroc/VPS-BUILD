@@ -481,7 +481,7 @@ function setupCommands(bot) {
             
             if (!isUserSubscribed) {
                 // User is not subscribed, show subscription prompt regardless of developer status
-                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات ال😒😒😒😒😒😒😒تالية:';
                 
                 // Create inline keyboard with subscription buttons - directly specify the channels
                 const inlineKeyboard = [
