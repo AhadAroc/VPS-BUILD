@@ -104,8 +104,15 @@ async function isSubscribed(ctx, userId) {
             }
         }
         
-        // Store the result in cache
+        // Clear the cache if the status has changed
         const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
+        const statusChanged = previousStatus !== allSubscribed;
+        
+        if (statusChanged) {
+            console.log(`Subscription status changed for user ${userId}: ${previousStatus} -> ${allSubscribed}`);
+        }
+        
+        // Store the result in cache with a shorter expiration time (30 seconds)
         subscriptionCache.set(userId, { 
             isSubscribed: allSubscribed, 
             timestamp: Date.now(),
@@ -115,7 +122,7 @@ async function isSubscribed(ctx, userId) {
         // Return the result with status change indicator
         return { 
             isSubscribed: allSubscribed, 
-            statusChanged: previousStatus !== allSubscribed,
+            statusChanged: statusChanged,
             notSubscribedChannels: notSubscribedChannels
         };
     } catch (error) {
@@ -139,13 +146,7 @@ function setupMiddlewares(bot) {
             
             const userId = ctx.from.id;
             
-            // Skip for developers (they don't need to subscribe)
-            if (await isDeveloper(ctx, userId)) {
-                console.log(`User ${userId} is a developer, skipping subscription check`);
-                return next();
-            }
-            
-            // For private chats, check subscription
+            // For private chats, check subscription - EVEN FOR DEVELOPERS
             const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
             
             // If user is subscribed, allow them to proceed
