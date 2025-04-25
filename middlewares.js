@@ -147,7 +147,7 @@ function setupMiddlewares(bot) {
             const userId = ctx.from.id;
             
             // For private chats, check subscription - EVEN FOR DEVELOPERS
-            const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
             
             // If user is subscribed, allow them to proceed
             if (isUserSubscribed) {
@@ -162,18 +162,14 @@ function setupMiddlewares(bot) {
             // If user is not subscribed, show subscription message
             console.log(`User ${userId} is not subscribed, showing subscription message`);
             
-            let subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى😒😒😒😒 الاشتراك في القنوات التالية:';
+            let subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
             
-            // Create inline keyboard with subscription buttons
-            const inlineKeyboard = [];
-            
-            // Add buttons for each channel the user needs to subscribe to
-            notSubscribedChannels.forEach(channel => {
-                inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
-            });
-            
-            // Add verification button
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+            // Create inline keyboard with subscription buttons directly
+            const inlineKeyboard = [
+                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
+                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+            ];
             
             // If it's a callback query, answer it and edit the message
             if (ctx.callbackQuery) {
