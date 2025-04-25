@@ -504,7 +504,34 @@ function setupCommands(bot) {
             return;
         }
     });
-
+// Add or update this callback handler
+bot.action('check_subscription', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+        
+        if (isUserSubscribed) {
+            // User is now subscribed to all channels
+            const welcomeMessage = 'شكرًا للاشتراك! يمكنك الآن استخدام البوت.';
+            
+            await ctx.editMessageText(welcomeMessage, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                        [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                    ]
+                }
+            });
+        } else {
+            // User is still not subscribed to all channels
+            await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
+        }
+    } catch (error) {
+        console.error('Error in check_subscription action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
+    }
+});
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
