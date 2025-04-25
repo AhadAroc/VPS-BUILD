@@ -486,10 +486,20 @@ function setupCommands(bot) {
                 );
             }
             
+            // Check if the user is a developer
+            const isDevResult = await isDeveloper(ctx, userId);
+            
             // Check if the bot is in a group
             if (!isDM) {
                 await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
-                // Bot is in a group, show group-specific message
+                
+                // If the user is a developer, show the dev panel
+                if (isDevResult) {
+                    console.log('DEBUG: Showing developer panel in group');
+                    return await showDevPanel(ctx);
+                }
+                
+                // Bot is in a group, show group-specific message for non-developers
                 return ctx.reply('مرحبًا! أنا هنا لمساعدتكم في إدارة المجموعة. استخدموا الأوامر المتاحة للاستفادة من خدماتي.');
             }
             
@@ -500,11 +510,9 @@ function setupCommands(bot) {
                 return await handleUnsubscribedUser(ctx);
             }
             
-            // User is subscribed, now check if they're a developer
-            const isDevResult = await isDeveloper(ctx, userId);
-            
+            // User is subscribed
             if (isDevResult) {
-                console.log('DEBUG: Showing developer panel');
+                console.log('DEBUG: Showing developer panel in DM');
                 return await showDevPanel(ctx);
             } else {
                 // Regular user who is subscribed
