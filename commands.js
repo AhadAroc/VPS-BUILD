@@ -34,13 +34,48 @@ let awaitingBroadcastPhoto = false;
             is_active: true,
             $or: [
                 { bot_id: botId },
-                { members: userId }  // Assuming you have a 'members' field in your groups collection
+                { members: userId }
             ]
-        }).toArray();
+        })
+        .sort({ added_at: -1 }) // Sort by the most recently added
+        .limit(5) // Limit to the 5 most recent groups, adjust as needed
+        .toArray();
         return groups;
     } catch (error) {
         console.error('Error fetching bot groups:', error);
         return [];
+    }
+}
+async function getLatestGroupsMembersState(botId, userId) {
+    try {
+        const groups = await getBotGroups(botId, userId);
+        const membersState = {};
+
+        for (const group of groups) {
+            try {
+                const chatMembers = await bot.telegram.getChatAdministrators(group.chat_id);
+                for (const member of chatMembers) {
+                    if (!membersState[member.user.id]) {
+                        membersState[member.user.id] = {
+                            id: member.user.id,
+                            username: member.user.username,
+                            first_name: member.user.first_name,
+                            last_name: member.user.last_name,
+                            isAdmin: member.status === 'administrator' || member.status === 'creator',
+                            groups: []
+                        };
+                    }
+                    membersState[member.user.id].groups.push(group.chat_id);
+                }
+            } catch (error) {
+                console.error(`Error fetching members for group ${group.chat_id}:`, error);
+            }
+        }
+
+        return membersState;
+    } catch (error) {
+        console.error('Error getting latest groups members state:', error);
+        return {};
     }
 }
   // ✅ Function to check if the user is admin or owner
