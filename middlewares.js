@@ -226,53 +226,7 @@ function setupMiddlewares(bot) {
         }
     });
 }
-// Add handler for check_subscription callback
-bot.action('check_subscription', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        await ctx.answerCbQuery('جاري التحقق من اشتراكك...');
-        
-        // Always perform a fresh check when the user clicks the button
-        const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
-        
-        if (isUserSubscribed) {
-            // User is now subscribed to all channels
-            // Update the last check time
-            lastSubscriptionCheck.set(userId, Date.now());
-            
-            await ctx.editMessageText('✅ تم التحقق من اشتراكك بنجاح! يمكنك الآن استخدام البوت بشكل كامل.', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🔄 بدء استخدام البوت', callback_data: 'start_using_bot' }]
-                    ]
-                }
-            });
-        } else {
-            // User is still not subscribed to all channels
-            await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
-            
-            // Reshow the subscription message with links to the channels
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-            
-            // Create inline keyboard with subscription buttons
-            const inlineKeyboard = [
-                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
-                [{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]
-            ];
-            
-            // Edit the message to show the subscription links again
-            await ctx.editMessageText(subscriptionMessage, {
-                reply_markup: {
-                    inline_keyboard: inlineKeyboard
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in check_subscription action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
-    }
-});
+/
 function adminOnly(handler) {
     return async (ctx) => {
         try {
