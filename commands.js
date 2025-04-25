@@ -984,8 +984,6 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     chatStates.delete(ctx.chat.id);
     await showQuizMenu(ctx);
 });
-// Update the "بدء" command handler
-// Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
@@ -1023,6 +1021,70 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+// Update the "بدء" command handler
+// Update the "بدء" command handler
+bot.hears('xxxiiixxxxiiiixxxx', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const isDM = ctx.chat.type === 'private';
+        
+        console.log('DEBUG: بدء command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+        
+        // Update active groups tracking
+        if (!isDM) {
+            await updateActiveGroups(ctx);
+        }
+        
+        // First check if it's a DM
+        if (isDM) {
+            // Check if user is a developer
+            const isDevResult = await isDeveloper(ctx, userId);
+            console.log('DEBUG: isDeveloper result:', isDevResult);
+            
+            if (isDevResult) {
+                console.log('DEBUG: Showing developer panel');
+                return await showDevPanel(ctx);
+            } else {
+                // Check subscription status for regular users
+                const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+                
+                if (isUserSubscribed) {
+                    // User is subscribed, show the "Add to Group" button
+                    return ctx.reply('مرحبًا! هذا البوت مخصص للاستخدام في المجموعات. يمكنك إضافة البوت إلى مجموعتك للاستفادة من خدماته.', {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                            ]
+                        }
+                    });
+                } else {
+                    // User is not subscribed, show subscription prompt
+                    let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                    
+                    // Create inline keyboard with subscription buttons directly with the two channels
+                    const inlineKeyboard = [
+                        [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ];
+                    // Add buttons for each channel the user needs to subscribe to
+                    notSubscribedChannels.forEach(channel => {
+                        inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
+                    });
+                    
+                    // Add verification button
+                    inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+                    
+                    return ctx.reply(subscriptionMessage, {
+                        reply_markup: {
+                            inline_keyboard: inlineKeyboard
+                        }
+                    });
+                }
+            }
+        } 
         
         // For group chats
         const isAdmin = await isAdminOrOwner(ctx, userId);
