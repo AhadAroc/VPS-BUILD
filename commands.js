@@ -528,7 +528,6 @@ function setupCommands(bot) {
             await ctx.reply('❌ حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
         }
     });
- 
 
 // Add or update this callback handler
 bot.action('check_subscription', async (ctx) => {
