@@ -476,7 +476,32 @@ function setupCommands(bot) {
                 return; // In groups, just track activity but don't show the start message
             }
             
-            // For private chats
+            // For private chats - ALWAYS check subscription status first
+            const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+            
+            if (!isUserSubscribed) {
+                // User is not subscribed, show subscription prompt regardless of developer status
+                let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                
+                // Create inline keyboard with subscription buttons
+                const inlineKeyboard = [];
+                
+                // Add buttons for each channel the user needs to subscribe to
+                notSubscribedChannels.forEach(channel => {
+                    inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
+                });
+                
+                // Add verification button
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+                
+                return ctx.reply(subscriptionMessage, {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
+                });
+            }
+            
+            // User is subscribed, now check if they're a developer
             if (isDM) {
                 // Check if user is a developer
                 const isDevResult = await isDeveloper(ctx, userId);
@@ -485,44 +510,18 @@ function setupCommands(bot) {
                     console.log('DEBUG: Showing developer panel');
                     return await showDevPanel(ctx);
                 } else {
-                    // Check subscription status for regular users
-                    const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
-                    
-                    // Welcome message
+                    // Regular user who is subscribed
                     const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                     
-                    if (isUserSubscribed) {
-                        // User is subscribed, show the "Add to Group" button
-                        return ctx.reply(welcomeMessage, {
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                    [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                                ]
-                            }
-                        });
-                    } else {
-                        // User is not subscribed, show subscription prompt
-                        let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-                        
-                        // Create inline keyboard with subscription buttons
-                        const inlineKeyboard = [];
-                        
-                        // Add buttons for each channel the user needs to subscribe to
-                        notSubscribedChannels.forEach(channel => {
-                            inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
-                        });
-                        
-                        // Add verification button
-                        inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
-                        
-                        return ctx.reply(subscriptionMessage, {
-                            reply_markup: {
-                                inline_keyboard: inlineKeyboard
-                            }
-                        });
-                    }
+                    return ctx.reply(welcomeMessage, {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                            ]
+                        }
+                    });
                 }
             }
         } catch (error) {
