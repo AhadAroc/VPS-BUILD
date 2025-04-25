@@ -997,7 +997,63 @@ async function listVIPUsers(ctx) {
     }
 }
     
- 
+ // Add this function near the top of your file with other utility functions
+async function updateLastInteraction(userId, username, firstName, lastName) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Update or insert the user record
+        await db.collection('users').updateOne(
+            { user_id: userId },
+            { 
+                $set: { 
+                    username: username || null,
+                    first_name: firstName || null,
+                    last_name: lastName || null,
+                    last_active: new Date()
+                },
+                $setOnInsert: { 
+                    joined_at: new Date(),
+                    is_banned: false
+                }
+            },
+            { upsert: true }
+        );
+        
+        console.log(`Updated last interaction for user ${userId}`);
+    } catch (error) {
+        console.error('Error updating user interaction:', error);
+        // Don't throw the error, just log it to prevent breaking the command flow
+    }
+}
+
+// Add this function to update active groups in the database
+async function updateActiveGroup(chatId, chatTitle, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Update or insert the group record
+        await db.collection('groups').updateOne(
+            { group_id: chatId },
+            { 
+                $set: { 
+                    title: chatTitle,
+                    last_activity: new Date(),
+                    is_active: true
+                },
+                $setOnInsert: { 
+                    added_by: userId,
+                    added_at: new Date()
+                }
+            },
+            { upsert: true }
+        );
+        
+        console.log(`Updated active group: ${chatTitle} (${chatId})`);
+    } catch (error) {
+        console.error('Error updating active group:', error);
+    }
+}
    
     async function listSecondaryDevelopers(ctx) {
         try {
