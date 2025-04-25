@@ -61,13 +61,14 @@ async function isDeveloper(ctx, userId) {
 
 async function isSubscribed(ctx, userId) {
     try {
-        // Check if we have a cached result that's still valid (cache for 5 minutes)
+        // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
         const cachedResult = subscriptionCache.get(userId);
-        if (cachedResult && (Date.now() - cachedResult.timestamp < 5 * 60 * 1000)) {
+        if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
             console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
             return { 
                 isSubscribed: cachedResult.isSubscribed, 
-                statusChanged: false 
+                statusChanged: false,
+                notSubscribedChannels: cachedResult.notSubscribedChannels || []
             };
         }
 
@@ -85,22 +86,16 @@ async function isSubscribed(ctx, userId) {
         // Check each channel
         for (const channel of requiredChannels) {
             try {
-                // Verify the bot is an admin in the channel first
-                const botMember = await ctx.telegram.getChatMember(`@${channel.username}`, ctx.botInfo.id);
-                if (!['administrator', 'creator'].includes(botMember.status)) {
-                    console.warn(`Bot is not an admin in @${channel.username}. Status: ${botMember.status}`);
-                    // Continue checking anyway, but log the warning
-                }
-                
+                // Force a fresh check by bypassing any Telegram API caching
                 const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
                 const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
+                
+                console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed} (${member.status})`);
                 
                 if (!isSubbed) {
                     allSubscribed = false;
                     notSubscribedChannels.push(channel);
                 }
-                
-                console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed}`);
             } catch (error) {
                 console.error(`Error checking subscription for @${channel.username}:`, error);
                 // If we can't check, assume not subscribed for safety
@@ -126,53 +121,78 @@ async function isSubscribed(ctx, userId) {
     } catch (error) {
         console.error(`Error in isSubscribed check for user ${userId}:`, error);
         // Default to false on error
-        return { isSubscribed: false, statusChanged: false };
+        return { 
+            isSubscribed: false, 
+            statusChanged: false,
+            notSubscribedChannels: []
+        };
     }
 }
-
 function setupMiddlewares(bot) {
+    // Add a middleware to check subscription for all commands in private chats
     bot.use(async (ctx, next) => {
         try {
-            // Skip subscription check for non-command messages
-            if (!ctx.message || !ctx.message.text || !ctx.message.text.startsWith('/')) {
-                return next();
-            }
-            
-            // Skip subscription check for groups and channels
+            // Skip for non-private chats
             if (ctx.chat && ctx.chat.type !== 'private') {
                 return next();
             }
             
             const userId = ctx.from.id;
             
-            // Check if user is a developer
+            // Skip for developers (they don't need to subscribe)
             if (await isDeveloper(ctx, userId)) {
+                console.log(`User ${userId} is a developer, skipping subscription check`);
                 return next();
             }
             
-            // For private chats with commands, check subscription
-            try {
-                const { isSubscribed } = await isSubscribed(ctx, userId);
-                if (isSubscribed) {
-                    return next();
-                } else {
-                    return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                            ]
-                        }
-                    });
-                }
-            } catch (subError) {
-                // If subscription check fails, allow the user to proceed
-                console.error('Error checking subscription:', subError);
+            // For private chats, check subscription
+            const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+            
+            // If user is subscribed, allow them to proceed
+            if (isUserSubscribed) {
                 return next();
             }
+            
+            // If this is a callback query for checking subscription, allow it
+            if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+                return next();
+            }
+            
+            // If user is not subscribed, show subscription message
+            console.log(`User ${userId} is not subscribed, showing subscription message`);
+            
+            let subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            
+            // Create inline keyboard with subscription buttons
+            const inlineKeyboard = [];
+            
+            // Add buttons for each channel the user needs to subscribe to
+            notSubscribedChannels.forEach(channel => {
+                inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
+            });
+            
+            // Add verification button
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+            
+            // If it's a callback query, answer it and edit the message
+            if (ctx.callbackQuery) {
+                await ctx.answerCbQuery('يرجى الاشتراك في جميع القنوات المطلوبة');
+                await ctx.editMessageText(subscriptionMessage, {
+                    reply_markup: { inline_keyboard: inlineKeyboard }
+                });
+            } else {
+                // Otherwise send a new message
+                await ctx.reply(subscriptionMessage, {
+                    reply_markup: { inline_keyboard: inlineKeyboard }
+                });
+            }
+            
+            // Don't proceed to the next middleware
+            return;
         } catch (error) {
-            console.error('Error in middleware:', error);
-            return next(); // Always proceed on error
+            console.error('Error in subscription middleware:', error);
+            // On error, allow the user to proceed
+            return next();
         }
     });
 }
