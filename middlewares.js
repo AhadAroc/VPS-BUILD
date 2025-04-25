@@ -1,6 +1,8 @@
 const { developerIds } = require('./config');
 const { getDb, pool } = require('./database');
 
+// Create a Map to cache subscription status
+const subscriptionCache = new Map();
 async function isAdminOrOwner(ctx, userId) {
     try {
         if (ctx.chat.type === 'private') return false;
@@ -193,7 +195,32 @@ function setupMiddlewares(bot) {
         }
     });
 }
-
+// Add the check_subscription function directly in this file
+async function check_subscription(ctx) {
+    try {
+        const userId = ctx.from.id;
+        await ctx.answerCbQuery('جاري التحقق من اشتراكك...');
+        
+        const { isSubscribed, statusChanged } = await isSubscribed(ctx, userId);
+        
+        if (isSubscribed) {
+            // User is now subscribed
+            await ctx.editMessageText('✅ تم التحقق من اشتراكك بنجاح! يمكنك الآن استخدام البوت بشكل كامل.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔄 بدء استخدام البوت', callback_data: 'start_using_bot' }]
+                    ]
+                }
+            });
+        } else {
+            // User is still not subscribed
+            await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error in check_subscription:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك.', { show_alert: true });
+    }
+}
 function adminOnly(handler) {
     return async (ctx) => {
         try {
