@@ -481,18 +481,14 @@ function setupCommands(bot) {
             
             if (!isUserSubscribed) {
                 // User is not subscribed, show subscription prompt regardless of developer status
-                let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                 
                 // Create inline keyboard with subscription buttons
-                const inlineKeyboard = [];
-                
-                // Add buttons for each channel the user needs to subscribe to
-                notSubscribedChannels.forEach(channel => {
-                    inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
-                });
-                
-                // Add verification button
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+                const inlineKeyboard = [
+                    [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
+                    [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                ];
                 
                 return ctx.reply(subscriptionMessage, {
                     reply_markup: {
@@ -553,18 +549,14 @@ bot.action('check_subscription', async (ctx) => {
             await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
             
             // Reshow the subscription message with links to the channels
-            let subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
             
             // Create inline keyboard with subscription buttons
-            const inlineKeyboard = [];
-            
-            // Add buttons for each channel the user needs to subscribe to
-            notSubscribedChannels.forEach(channel => {
-                inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
-            });
-            
-            // Add verification button
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+            const inlineKeyboard = [
+                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
+                [{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]
+            ];
             
             // Edit the message to show the subscription links again
             await ctx.editMessageText(subscriptionMessage, {
