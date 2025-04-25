@@ -465,6 +465,14 @@ function setupCommands(bot) {
             
             // Different handling for DMs vs Groups
             if (isDM) {
+                // Check if user is a developer
+                const isDevResult = await isDeveloper(ctx, userId);
+                
+                if (isDevResult) {
+                    // Developer gets special panel
+                    return await showDevPanel(ctx);
+                }
+                
                 // Check if user is subscribed to required channels
                 const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
                 
@@ -482,12 +490,6 @@ function setupCommands(bot) {
                             ]
                         }
                     });
-                    
-                    // Check if the user is a developer and show dev panel if applicable
-                    const isDevResult = await isDeveloper(ctx, userId);
-                    if (isDevResult) {
-                        await showDevPanel(ctx);
-                    }
                 } else {
                     // User is not subscribed, show subscription prompt
                     let subscriptionMessage = `${welcomeMessage}\n\nلاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:`;
