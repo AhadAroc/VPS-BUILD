@@ -470,55 +470,48 @@ function setupCommands(bot) {
                 );
             }
             
-            // Update active groups tracking
+            // Check if the bot is in a group
             if (!isDM) {
                 await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
-                return; // In groups, just track activity but don't show the start message
+                // Bot is in a group, show group-specific message
+                return ctx.reply('مرحبًا! أنا هنا لمساعدتكم في إدارة المجموعة. استخدموا الأوامر المتاحة للاستفادة من خدماتي.');
             }
             
-            // For private chats - ALWAYS check subscription status first
+            // For private chats - check subscription status
             const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
             
             if (!isUserSubscribed) {
-                // User is not subscribed, show subscription prompt regardless of developer status
-                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-                
-                // Create inline keyboard with subscription buttons - directly specify the channels
-                const inlineKeyboard = [
-                    [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
-                    [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                ];
-                
-                return ctx.reply(subscriptionMessage, {
-                    reply_markup: {
-                        inline_keyboard: inlineKeyboard
-                    }
-                });
+                return await handleUnsubscribedUser(ctx);
             }
             
             // User is subscribed, now check if they're a developer
-            if (isDM) {
-                // Check if user is a developer
-                const isDevResult = await isDeveloper(ctx, userId);
+            const isDevResult = await isDeveloper(ctx, userId);
+            
+            if (isDevResult) {
+                console.log('DEBUG: Showing developer panel');
+                return await showDevPanel(ctx);
+            } else {
+                // Regular user who is subscribed
+                const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                 
-                if (isDevResult) {
-                    console.log('DEBUG: Showing developer panel');
-                    return await showDevPanel(ctx);
-                } else {
-                    // Regular user who is subscribed
-                    const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
-                    
-                    return ctx.reply(welcomeMessage, {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                            ]
-                        }
-                    });
+                // Check if the bot has been added to any groups
+                const botGroups = await getBotGroups(ctx.botInfo.id);
+                
+                let keyboard = [
+                    [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                    [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                ];
+                
+                if (botGroups.length > 0) {
+                    keyboard.unshift([{ text: '🔄 العودة إلى المجموعة', callback_data: 'return_to_group' }]);
                 }
+                
+                return ctx.reply(welcomeMessage, {
+                    reply_markup: {
+                        inline_keyboard: keyboard
+                    }
+                });
             }
         } catch (error) {
             console.error('Error in /start command:', error);
