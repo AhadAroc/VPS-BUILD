@@ -481,7 +481,7 @@ function setupCommands(bot) {
             
             if (!isUserSubscribed) {
                 // User is not subscribed, show subscription prompt regardless of developer status
-                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات ال😒😒😒😒😒😒😒تالية:';
+                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                 
                 // Create inline keyboard with subscription buttons - directly specify the channels
                 const inlineKeyboard = [
@@ -549,7 +549,7 @@ bot.action('check_subscription', async (ctx) => {
             await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
             
             // Reshow the subscription message with links to the channels
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، 😒😒😒😒😒يرجى الاشتراك في القنوات التالية:';
             
             // Create inline keyboard with subscription buttons
             const inlineKeyboard = [
