@@ -974,9 +974,12 @@ bot.hears('بدء', async (ctx) => {
                     // User is not subscribed, show subscription prompt
                     let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                     
-                    // Create inline keyboard with subscription buttons
-                    const inlineKeyboard = [];
-                    
+                    // Create inline keyboard with subscription buttons directly with the two channels
+                    const inlineKeyboard = [
+                        [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ];
                     // Add buttons for each channel the user needs to subscribe to
                     notSubscribedChannels.forEach(channel => {
                         inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
