@@ -535,21 +535,26 @@ function setupCommands(bot) {
                 // For non-developers, check subscription status
                 const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
                 
-                if (!isUserSubscribed) {
+                if (!isUserSubscribed) { // so when user is  subbed this appears :
                     return await handleUnsubscribedUser(ctx);
                 }
                 
-                // Regular subscribed user in DM
+                // this is only showed if the user havent added the bot to the group ( the bot should check to see if the users in the group match the users id )
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                 let keyboard = [
                     [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
                     [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
                     [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
                 ];
-                
+// after const welcomeMessage is bypassed by the user being in the group we call showDevPanel if the 2 statements are met ( 1 - user is  subbed , user is in the group and the group bypassed the welcomeMessage) : 
+
+
+                //add else if user not subbed ask to subscribe : 
                 return ctx.reply(welcomeMessage, {
                     reply_markup: { inline_keyboard: keyboard }
                 });
+
+                //add :
             } 
             
             // For group chats
@@ -577,14 +582,34 @@ function setupCommands(bot) {
         }
     });
 
-// Add or update this callback handler
+// we updat this to check via chaneel id if the user is in the group :
 bot.action('check_subscription', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+        const requiredChannels = [
+            { id: -1002276669807, username: 'ctrlsrc', title: 'قناة السورس' },
+            { id: -1002558408202, username: 'T0_B7', title: 'القناة الرسمية' }
+        ];
         
-        if (isUserSubscribed) {
-            // User is now subscribed to all channels
+        let allSubscribed = true;
+        let notSubscribedChannels = [];
+
+        for (const channel of requiredChannels) {
+            try {
+                const chatMember = await ctx.telegram.getChatMember(channel.id, userId);
+                if (!['member', 'administrator', 'creator'].includes(chatMember.status)) {
+                    allSubscribed = false;
+                    notSubscribedChannels.push(channel);
+                }
+            } catch (error) {
+                console.error(`Error checking subscription for channel ${channel.username}:`, error);
+                allSubscribed = false;
+                notSubscribedChannels.push(channel);
+            }
+        }
+
+        if (allSubscribed) {
+            // User is subscribed to all channels
             const welcomeMessage = 'شكرًا للاشتراك! يمكنك الآن استخدام البوت.';
             
             await ctx.editMessageText(welcomeMessage, {
@@ -597,20 +622,16 @@ bot.action('check_subscription', async (ctx) => {
                 }
             });
         } else {
-            // User is still not subscribed to all channels
+            // User is not subscribed to all channels
             await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
             
-            // Reshow the subscription message with links to the channels
             const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
             
-            // Create inline keyboard with subscription buttons
-            const inlineKeyboard = [
-                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
-                [{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]
-            ];
+            const inlineKeyboard = notSubscribedChannels.map(channel => 
+                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+            );
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
             
-            // Edit the message to show the subscription links again
             await ctx.editMessageText(subscriptionMessage, {
                 reply_markup: {
                     inline_keyboard: inlineKeyboard
