@@ -489,63 +489,56 @@ function setupCommands(bot) {
             // Check if the user is a developer
             const isDevResult = await isDeveloper(ctx, userId);
             
-            // Check if the bot is in a group
-            if (!isDM) {
-                await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
-                
+            // For DMs
+            if (isDM) {
                 // If the user is a developer, show the dev panel
                 if (isDevResult) {
-                    console.log('DEBUG: Showing developer panel in group');
+                    console.log('DEBUG: Showing developer panel in DM');
                     return await showDevPanel(ctx);
                 }
                 
-                // Bot is in a group, show group-specific message for non-developers
-                return ctx.reply('مرحبًا! أنا هنا لمساعدتكم في إدارة المجموعة. استخدموا الأوامر المتاحة للاستفادة من خدماتي.');
-            }
-            
-            // For private chats - check subscription status
-            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
-            
-            if (!isUserSubscribed) {
-                return await handleUnsubscribedUser(ctx);
-            }
-            
-            // User is subscribed
-            if (isDevResult) {
-                console.log('DEBUG: Showing developer panel in DM');
-                return await showDevPanel(ctx);
-            } else {
-                // Regular user who is subscribed
+                // For non-developers, check subscription status
+                const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+                
+                if (!isUserSubscribed) {
+                    return await handleUnsubscribedUser(ctx);
+                }
+                
+                // Regular subscribed user in DM
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
-                
-                // Check if the bot has been added to any groups or if the user is in any groups with the bot
-                const botGroups = await getBotGroups(ctx.botInfo.id, userId);
-                
                 let keyboard = [
                     [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
                     [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
                     [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
                 ];
                 
-                if (botGroups.length > 0) {
-                    // If there are multiple groups, you might want to show a list or just the first one
-                    const firstGroup = botGroups[0];
-                    keyboard.unshift([{ text: `🔄 العودة إلى ${firstGroup.title}`, callback_data: `return_to_group:${firstGroup.group_id}` }]);
-                    
-                    if (botGroups.length > 1) {
-                        keyboard.unshift([{ text: '📋 عرض قائمة المجموعات', callback_data: 'show_group_list' }]);
-                    }
-                }
-                
                 return ctx.reply(welcomeMessage, {
-                    reply_markup: {
-                        inline_keyboard: keyboard
-                    }
+                    reply_markup: { inline_keyboard: keyboard }
                 });
+            } 
+            
+            // For group chats
+            await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
+            
+            // If the user is a developer, show the dev panel
+            if (isDevResult) {
+                console.log('DEBUG: Showing developer panel in group');
+                return await showDevPanel(ctx);
+            }
+            
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVIPUser = await isVIP(ctx, userId);
+            
+            if (isAdmin || isVIPUser) {
+                console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
+                return showMainMenu(ctx);
+            } else {
+                console.log('DEBUG: Regular user in group, showing basic message');
+                return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
             }
         } catch (error) {
-            console.error('Error in /start command:', error);
-            await ctx.reply('❌ حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
+            console.error('Error handling "start" command:', error);
+            ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
         }
     });
 
