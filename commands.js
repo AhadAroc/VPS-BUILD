@@ -518,6 +518,18 @@ function setupCommands(bot) {
             await ctx.reply('❌ حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
         }
     });
+    // Add this function near the top of your file, after your imports and before the bot commands
+async function getBotGroups(botId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const groups = await db.collection('groups').find({ is_active: true }).toArray();
+        return groups.filter(group => group.bot_id === botId);
+    } catch (error) {
+        console.error('Error fetching bot groups:', error);
+        return [];
+    }
+}
+
 // Add or update this callback handler
 bot.action('check_subscription', async (ctx) => {
     try {
