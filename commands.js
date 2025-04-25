@@ -26,7 +26,17 @@ const knownUsers = new Map();
 // Map to track broadcasting state for each chat
 const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
-
+   // Add this function near the top of your file, after your imports and before the bot commands
+   async function getBotGroups(botId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const groups = await db.collection('groups').find({ is_active: true }).toArray();
+        return groups.filter(group => group.bot_id === botId);
+    } catch (error) {
+        console.error('Error fetching bot groups:', error);
+        return [];
+    }
+}
   // ✅ Function to check if the user is admin or owner
   async function isAdminOrOwner(ctx, userId) {
     try {
@@ -518,17 +528,7 @@ function setupCommands(bot) {
             await ctx.reply('❌ حدث خطأ أثناء بدء البوت. الرجاء المحاولة مرة أخرى.');
         }
     });
-    // Add this function near the top of your file, after your imports and before the bot commands
-async function getBotGroups(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const groups = await db.collection('groups').find({ is_active: true }).toArray();
-        return groups.filter(group => group.bot_id === botId);
-    } catch (error) {
-        console.error('Error fetching bot groups:', error);
-        return [];
-    }
-}
+ 
 
 // Add or update this callback handler
 bot.action('check_subscription', async (ctx) => {
