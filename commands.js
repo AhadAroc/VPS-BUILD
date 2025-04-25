@@ -543,9 +543,9 @@ bot.action('check_subscription', async (ctx) => {
             await ctx.editMessageText(welcomeMessage, {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                        [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: 'القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                        [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                        [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
                     ]
                 }
             });
@@ -554,7 +554,7 @@ bot.action('check_subscription', async (ctx) => {
             await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
             
             // Reshow the subscription message with links to the channels
-            let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            let subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
             
             // Create inline keyboard with subscription buttons
             const inlineKeyboard = [];
@@ -565,7 +565,7 @@ bot.action('check_subscription', async (ctx) => {
             });
             
             // Add verification button
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
             
             // Edit the message to show the subscription links again
             await ctx.editMessageText(subscriptionMessage, {
