@@ -61,36 +61,72 @@ async function isDeveloper(ctx, userId) {
 
 async function isSubscribed(ctx, userId) {
     try {
-        // First check if the user is a developer - developers are always "subscribed"
-        if (await isDeveloper(ctx, userId)) {
-            return {
-                isSubscribed: true,
-                statusChanged: false
+        // Check if we have a cached result that's still valid (cache for 5 minutes)
+        const cachedResult = subscriptionCache.get(userId);
+        if (cachedResult && (Date.now() - cachedResult.timestamp < 5 * 60 * 1000)) {
+            console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
+            return { 
+                isSubscribed: cachedResult.isSubscribed, 
+                statusChanged: false 
             };
+        }
+
+        console.log(`Checking subscription status for user ${userId}`);
+        
+        // Define the channels that require subscription
+        const requiredChannels = [
+            { username: 'ctrlsrc', title: 'قناة السورس' },
+            { username: 'T0_B7', title: 'القناة الرسمية' }
+        ];
+        
+        let allSubscribed = true;
+        let notSubscribedChannels = [];
+        
+        // Check each channel
+        for (const channel of requiredChannels) {
+            try {
+                // Verify the bot is an admin in the channel first
+                const botMember = await ctx.telegram.getChatMember(`@${channel.username}`, ctx.botInfo.id);
+                if (!['administrator', 'creator'].includes(botMember.status)) {
+                    console.warn(`Bot is not an admin in @${channel.username}. Status: ${botMember.status}`);
+                    // Continue checking anyway, but log the warning
+                }
+                
+                const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
+                const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
+                
+                if (!isSubbed) {
+                    allSubscribed = false;
+                    notSubscribedChannels.push(channel);
+                }
+                
+                console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed}`);
+            } catch (error) {
+                console.error(`Error checking subscription for @${channel.username}:`, error);
+                // If we can't check, assume not subscribed for safety
+                allSubscribed = false;
+                notSubscribedChannels.push(channel);
+            }
         }
         
-        try {
-            // Try to check membership, but wrap in another try/catch to handle API errors
-            const chatMember = await ctx.telegram.getChatMember('@ctrlsrc', userId);
-            return {
-                isSubscribed: ['member', 'administrator', 'creator'].includes(chatMember.status),
-                statusChanged: false
-            };
-        } catch (memberError) {
-            // If we can't check membership, assume the user is subscribed
-            console.log(`Cannot verify subscription for user ${userId}, assuming subscribed:`, memberError.description);
-            return {
-                isSubscribed: true,
-                statusChanged: false
-            };
-        }
-    } catch (error) {
-        // This is a fallback for any other errors
-        console.error('خطأ في التحقق من الاشتراك:', error);
-        return {
-            isSubscribed: true, // Always assume subscribed on error to avoid blocking users
-            statusChanged: false
+        // Store the result in cache
+        const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
+        subscriptionCache.set(userId, { 
+            isSubscribed: allSubscribed, 
+            timestamp: Date.now(),
+            notSubscribedChannels: notSubscribedChannels
+        });
+        
+        // Return the result with status change indicator
+        return { 
+            isSubscribed: allSubscribed, 
+            statusChanged: previousStatus !== allSubscribed,
+            notSubscribedChannels: notSubscribedChannels
         };
+    } catch (error) {
+        console.error(`Error in isSubscribed check for user ${userId}:`, error);
+        // Default to false on error
+        return { isSubscribed: false, statusChanged: false };
     }
 }
 
