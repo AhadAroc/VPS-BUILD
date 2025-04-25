@@ -1,6 +1,6 @@
 //ultragayshit 
 
-const { adminOnly, isSubscribed } = require('./middlewares');
+const { adminOnly, isSubscribed,setupMiddlewares } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
 const { createPrimaryDevelopersTable } = require('./database');
@@ -1078,76 +1078,8 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
         }
     }
     
-    async function isSubscribed(ctx, userId) {
-        try {
-            // Check if we have a cached result that's still valid (cache for 5 minutes)
-            const cachedResult = subscriptionCache.get(userId);
-            if (cachedResult && (Date.now() - cachedResult.timestamp < 5 * 60 * 1000)) {
-                console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
-                return { 
-                    isSubscribed: cachedResult.isSubscribed, 
-                    statusChanged: false 
-                };
-            }
-    
-            console.log(`Checking subscription status for user ${userId}`);
-            
-            // Define the channels that require subscription
-            const requiredChannels = [
-                { username: 'ctrlsrc', title: 'قناة السورس' },
-                { username: 'T0_B7', title: 'القناة الرسمية' }
-            ];
-            
-            let allSubscribed = true;
-            let notSubscribedChannels = [];
-            
-            // Check each channel
-            for (const channel of requiredChannels) {
-                try {
-                    // Verify the bot is an admin in the channel first
-                    const botMember = await ctx.telegram.getChatMember(`@${channel.username}`, ctx.botInfo.id);
-                    if (!['administrator', 'creator'].includes(botMember.status)) {
-                        console.warn(`Bot is not an admin in @${channel.username}. Status: ${botMember.status}`);
-                        // Continue checking anyway, but log the warning
-                    }
-                    
-                    const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
-                    const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
-                    
-                    if (!isSubbed) {
-                        allSubscribed = false;
-                        notSubscribedChannels.push(channel);
-                    }
-                    
-                    console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed}`);
-                } catch (error) {
-                    console.error(`Error checking subscription for @${channel.username}:`, error);
-                    // If we can't check, assume not subscribed for safety
-                    allSubscribed = false;
-                    notSubscribedChannels.push(channel);
-                }
-            }
-            
-            // Store the result in cache
-            const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
-            subscriptionCache.set(userId, { 
-                isSubscribed: allSubscribed, 
-                timestamp: Date.now(),
-                notSubscribedChannels: notSubscribedChannels
-            });
-            
-            // Return the result with status change indicator
-            return { 
-                isSubscribed: allSubscribed, 
-                statusChanged: previousStatus !== allSubscribed,
-                notSubscribedChannels: notSubscribedChannels
-            };
-        } catch (error) {
-            console.error(`Error in isSubscribed check for user ${userId}:`, error);
-            // Default to false on error
-            return { isSubscribed: false, statusChanged: false };
-        }
-}}
+   
+}
 
 
     async function updateActiveGroups(ctx) {
