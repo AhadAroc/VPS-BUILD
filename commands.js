@@ -473,51 +473,35 @@ function setupCommands(bot) {
             // Update active groups tracking
             if (!isDM) {
                 await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
-                return; // In groups, just track activity but don't show the start message
             }
             
-            // For private chats - ALWAYS check subscription status first
-            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+            // Check subscription status
+            const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
             
             if (!isUserSubscribed) {
-                // User is not subscribed, show subscription prompt regardless of developer status
-                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-                
-                // Create inline keyboard with subscription buttons - directly specify the channels
-                const inlineKeyboard = [
-                    [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
-                    [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                ];
-                
-                return ctx.reply(subscriptionMessage, {
-                    reply_markup: {
-                        inline_keyboard: inlineKeyboard
-                    }
-                });
+                return await handleUnsubscribedUser(ctx, notSubscribedChannels);
             }
             
-            // User is subscribed, now check if they're a developer
+            // User is subscribed, now check their role
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isDev = await isDeveloper(ctx, userId);
+            const isVIPUser = await isVIP(ctx, userId);
+            
             if (isDM) {
-                // Check if user is a developer
-                const isDevResult = await isDeveloper(ctx, userId);
-                
-                if (isDevResult) {
+                if (isDev) {
                     console.log('DEBUG: Showing developer panel');
                     return await showDevPanel(ctx);
                 } else {
-                    // Regular user who is subscribed
-                    const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
-                    
-                    return ctx.reply(welcomeMessage, {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                            ]
-                        }
-                    });
+                    return await handleRegularUserInDM(ctx);
+                }
+            } else {
+                // In groups
+                if (isAdmin || isVIPUser) {
+                    console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
+                    return await showMainMenu(ctx);
+                } else {
+                    console.log('DEBUG: Regular user in group, showing basic message');
+                    return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
                 }
             }
         } catch (error) {
@@ -549,7 +533,7 @@ bot.action('check_subscription', async (ctx) => {
             await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
             
             // Reshow the subscription message with links to the channels
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، 😒😒😒😒😒يرجى الاشتراك في القنوات التالية:';
+            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
             
             // Create inline keyboard with subscription buttons
             const inlineKeyboard = [
