@@ -736,6 +736,7 @@ function setupCommands(bot) {
         }
     });
     
+
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -749,15 +750,14 @@ bot.action('back_to_main', async (ctx) => {
             {
                 type: 'photo',
                 media: photoUrl,
-                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:'
+                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات أيضًا. اختر خيارًا:'
             },
             {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                        
-                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                        [{ text: '📜 عرض الأوامر', callback_data: 'check_subscription_show_commands' }],
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'check_subscription_quiz_bot' }],
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
                     ]
                 }
@@ -768,6 +768,7 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
+
 bot.command('broadcast', async (ctx) => {
     const chatId = ctx.chat.id;
     const isBroadcasting = chatBroadcastStates.get(chatId) || false;
