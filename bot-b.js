@@ -30,7 +30,7 @@ app.post('/check-subscription', async (req, res) => {
     res.json({ subscribed });
 });
 
-const PORT = 80;
+const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Bot B server running on port ${PORT}`);
 });
