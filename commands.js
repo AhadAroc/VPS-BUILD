@@ -47,6 +47,43 @@ let awaitingBroadcastPhoto = false;
         return [];
     }
 }
+async function subscriptionCheck(ctx, next) {
+    try {
+        const userId = ctx.from.id;
+        const requiredChannels = [
+            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+            { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+        ];
+
+        const channelIds = requiredChannels.map(channel => channel.id);
+
+        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+            userId,
+            channels: channelIds
+        });
+
+        const { subscribed } = response.data;
+
+        if (subscribed) {
+            return next();
+        } else {
+            const subscriptionMessage = 'يرجى الاشتراك في القنوات التالية لاستخدام البوت:';
+            const inlineKeyboard = requiredChannels.map(channel => 
+                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+            );
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+
+            await ctx.reply(subscriptionMessage, {
+                reply_markup: {
+                    inline_keyboard: inlineKeyboard
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error in subscription check:', error);
+        ctx.reply('❌ حدث خطأ أثناء التحقق من الاشتراك.');
+    }
+}
 async function getLatestGroupsMembersState(botId, userId) {
     try {
         const groups = await getBotGroups(botId, userId);
@@ -2350,5 +2387,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,subscriptionCheck };
 
