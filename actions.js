@@ -1842,7 +1842,16 @@ bot.action('quiz_bot', async (ctx) => {
 
 bot.action('show_commands', async (ctx) => {
     try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
+        const userId = ctx.from.id;
+        
+        // Check subscription status
+        const { isSubscribed } = await check_subscription(ctx);
+        
+        if (!isSubscribed) {
+            return; // Exit if the user is not subscribed
+        }
+
+        if (!await hasRequiredPermissions(ctx, userId)) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
