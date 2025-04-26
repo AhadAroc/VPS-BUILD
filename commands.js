@@ -20,6 +20,7 @@ let photoMessages = new Map(); // chatId -> Set of message IDs
 const database = require('./database');
 const { isDeveloper } = require('./middlewares');
 const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
+const axios = require('axios');
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
