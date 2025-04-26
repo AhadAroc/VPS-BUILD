@@ -6,6 +6,7 @@ app.use(express.json());
 
 const botB = new Telegraf('8044558556:AAFcF-AsSGgY4luoDdGh5Kt3s2UxGxTxsQw');
 
+
 app.post('/check-subscription', async (req, res) => {
     const { userId, channels } = req.body;
     let subscribed = true;
@@ -27,7 +28,7 @@ app.post('/check-subscription', async (req, res) => {
     res.json({ subscribed });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 80;
 app.listen(PORT, () => {
     console.log(`Bot B server running on port ${PORT}`);
 });
