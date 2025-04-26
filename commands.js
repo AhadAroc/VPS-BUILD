@@ -27,6 +27,54 @@ const knownUsers = new Map();
 // Map to track broadcasting state for each chat
 const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
+const cron = require('node-cron');
+
+async function checkElevatedUserSubscriptions() {
+    try {
+        const users = await getElevatedUsers(); // Fetch users with elevated permissions from the database
+        for (const user of users) {
+            const userId = user.id;
+            const ctx = { from: { id: userId }, telegram: bot.telegram }; // Mock context for the function
+            
+            await check_subscription(ctx);
+        }
+    } catch (error) {
+        console.error('Error checking elevated user subscriptions:', error);
+    }
+}
+// Schedule the subscription check to run every hour
+cron.schedule('0 * * * *', () => {
+    console.log('Running scheduled subscription check for elevated users...');
+    checkElevatedUserSubscriptions();
+});
+
+
+async function getElevatedUsers() {
+    const client = new MongoClient(uri);
+    try {
+        await client.connect();
+        const database = client.db('yourDatabaseName'); // Replace with your actual database name
+        const usersCollection = database.collection('users'); // Replace with your actual collection name
+
+        // Query to find users with elevated permissions
+        const elevatedUsers = await usersCollection.find({
+            $or: [
+                { role: 'owner' },
+                { role: 'admin' },
+                { role: 'developer' },
+                { role: 'secondaryDeveloper' }
+            ]
+        }).toArray();
+
+        return elevatedUsers;
+    } catch (error) {
+        console.error('Error fetching elevated users:', error);
+        return [];
+    } finally {
+        await client.close();
+    }
+}
+
    // Add this function near the top of your file, after your imports and before the bot commands
    async function getBotGroups(botId, userId) {
     try {
@@ -47,43 +95,7 @@ let awaitingBroadcastPhoto = false;
         return [];
     }
 }
-async function subscriptionCheck(ctx, next) {
-    try {
-        const userId = ctx.from.id;
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
-        ];
 
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        if (subscribed) {
-            return next();
-        } else {
-            const subscriptionMessage = 'يرجى الاشتراك في القنوات التالية لاستخدام البوت:';
-            const inlineKeyboard = requiredChannels.map(channel => 
-                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-            );
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
-
-            await ctx.reply(subscriptionMessage, {
-                reply_markup: {
-                    inline_keyboard: inlineKeyboard
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in subscription check:', error);
-        ctx.reply('❌ حدث خطأ أثناء التحقق من الاشتراك.');
-    }
-}
 async function getLatestGroupsMembersState(botId, userId) {
     try {
         const groups = await getBotGroups(botId, userId);
@@ -2387,5 +2399,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,subscriptionCheck };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
 
