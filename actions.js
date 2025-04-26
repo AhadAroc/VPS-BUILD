@@ -27,7 +27,7 @@ cloudinary.config({
 });
 // Add this to your global variables
 const quizSettings = new Map();
-const { isDeveloper,isSubscribed } = require('./middlewares');
+const { isDeveloper,isSubscribed,subscriptionCheck } = require('./middlewares');
 const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
@@ -1821,7 +1821,7 @@ bot.action('quiz_bot', async (ctx) => {
     }
 });
 
-bot.action('show_commands', async (ctx) => {
+bot.action('show_commands', subscriptionCheck, async (ctx) => {
     try {
         if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
