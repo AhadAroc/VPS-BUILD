@@ -589,25 +589,19 @@ function setupCommands(bot) {
                 { id: -1002276669807, username: 'ctrlsrc', title: 'قناة السورس' },
                 { id: -1002558408202, username: 'T0_B7', title: 'القناة الرسمية' }
             ];
-            
-            let allSubscribed = true;
-            let notSubscribedChannels = [];
     
-            for (const channel of requiredChannels) {
-                try {
-                    const chatMember = await ctx.telegram.getChatMember(channel.id, userId);
-                    if (!['member', 'administrator', 'creator'].includes(chatMember.status)) {
-                        allSubscribed = false;
-                        notSubscribedChannels.push(channel);
-                    }
-                } catch (error) {
-                    console.error(`Error checking subscription for channel ${channel.username}:`, error);
-                    allSubscribed = false;
-                    notSubscribedChannels.push(channel);
-                }
-            }
+            // Extract channel IDs for the Axios request
+            const channelIds = requiredChannels.map(channel => channel.id);
     
-            if (allSubscribed) {
+            // Send a POST request to Bot B
+            const response = await axios.post('http://69.62.114.242/check-subscription', {
+                userId,
+                channels: channelIds
+            });
+    
+            const { subscribed } = response.data;
+    
+            if (subscribed) {
                 // User is subscribed to all channels
                 const welcomeMessage = 'شكرًا للاشتراك! يمكنك الآن استخدام البوت.';
                 
@@ -624,9 +618,9 @@ function setupCommands(bot) {
                 // User is not subscribed to all channels
                 await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
                 
-                const subscriptionMessage = 'لم تشترك 😒😒 في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                 
-                const inlineKeyboard = notSubscribedChannels.map(channel => 
+                const inlineKeyboard = requiredChannels.map(channel => 
                     [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
                 );
                 inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
