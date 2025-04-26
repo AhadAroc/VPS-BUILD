@@ -27,7 +27,6 @@ const knownUsers = new Map();
 // Map to track broadcasting state for each chat
 const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
-
    // Add this function near the top of your file, after your imports and before the bot commands
    async function getBotGroups(botId, userId) {
     try {
@@ -139,44 +138,6 @@ function trackUser(ctx) {
         });
     }
 }
-async function showCommands(ctx) {
-    try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-        }
-
-        await ctx.editMessageCaption(
-            '📜 *قائمة الأوامر:*\n\n' +
-            '🔹 */معرفي , رتبتي* – ظهور رتبتك - ظهور الايدي و معرفك\n' +
-            '🔹 */رفع امن مسابقات* – رفع امن مسابقات\n' +
-            '🔹 */تنزيل امن مسابقات* – تنزيل امن مسابقات\n' +
-            '🔹 */لستة مميز* – عرض قائمة المميزين\n' +
-            '🔹 */ترقية ادمن* – ترقية إلى أدمن\n' +
-            '🔹 */تنزيل* – إزالة رتبة الأدمن\n' +
-            '🔹 */ترقية مطور* – ترقية إلى مطور\n' +
-            '🔹 */ترقية مطور ثانوي* – ترقية إلى مطور ثانوي\n' +
-            '🔹 */تنزيل مطور* – لتنزيل مطور أول أو ثانوي، اذهب إلى خاص البوت كمطور\n' +
-            '🔹 */رابط المجموعة* – الحصول على رابط المجموعة\n' +
-            '🔹 */نداء الجميع* – مناداة جميع الأعضاء\n' +
-            '🔹 */كتم* – كتم مستخدم\n' +
-           
-            '🔹 */منع متحركة* – منع إرسال الصور المتحركة\n' +
-            '🔹 */تفعيل متحركة* – السماح بإرسال الصور المتحركة',
-            {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🔙 رجوع', callback_data: 'back' }]
-                    ]
-                }
-            }
-        );
-
-    } catch (error) {
-        console.error('Error in showCommands:', error);
-        await ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
-    }
-}
 
 async function linkRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.entities && ctx.message.entities.some(e => e.type === 'url')) {
@@ -279,14 +240,15 @@ async function showMainMenu(ctx) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                [{ text: '📜 عرض الأوامر', callback_data: 'check_subscription_show_commands' }],
-                [{ text: '🎮 بوت المسابقات', callback_data: 'check_subscription_quiz_bot' }],
+                [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                
+                [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                 [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
             ]
         };
 
         await ctx.replyWithPhoto(photoUrl, {
-            caption: '🤖 استخدم الامر : مساعدة للحصول على معلومات التشغيل والرفع والاستخدام.\nمرحبًا! أنا بوت الحماية والمسابقات أيضًا. اختر خيارًا:',
+            caption: '🤖استخدم الامر : مساعدة للحصول على معلومات التشغيل والرفع والاستخدام  مرحبًا! أنا بوت الحماية والمسابقات ايضا اختر خيارًا:',
             reply_markup: keyboard
         });
     } catch (error) {
@@ -294,7 +256,6 @@ async function showMainMenu(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية.');
     }
 }
-
 async function showHelp(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
@@ -544,6 +505,58 @@ async function checkUserRank(ctx) {
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
+    bot.use(async (ctx, next) => {
+        try {
+            // allow if it's a private message without buttons
+            if (ctx.chat?.type === 'private' && !ctx.callbackQuery) {
+                return next();
+            }
+    
+            const userId = ctx.from?.id;
+            if (!userId) {
+                return next();
+            }
+    
+            const requiredChannels = [
+                { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+                { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+            ];
+    
+            const channelIds = requiredChannels.map(channel => channel.id);
+    
+            const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+                userId,
+                channels: channelIds
+            });
+    
+            const { subscribed } = response.data;
+    
+            if (subscribed) {
+                // user is good -> continue to whatever command they pressed
+                return next();
+            } else {
+                // user is not subscribed -> block everything else and show subscription message
+                if (ctx.callbackQuery) {
+                    await ctx.answerCbQuery('❌ يرجى الاشتراك أولاً!', { show_alert: true });
+                }
+    
+                const inlineKeyboard = requiredChannels.map(channel => 
+                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+                );
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+    
+                await ctx.reply('⚠️ للاستخدام الكامل للبوت، يرجى الاشتراك في القنوات التالية:', {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Middleware subscription check error:', error);
+            return next(); // let the bot work even if check fails (fail-safe)
+        }
+    });
+    
     bot.command('start', async (ctx) => {
         try {
             const userId = ctx.from.id;
@@ -621,54 +634,7 @@ function setupCommands(bot) {
             ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
         }
     });
-    bot.action(/^check_subscription_(.+)/, async (ctx) => {
-        const actionAfterCheck = ctx.match[1]; // 'show_commands', 'quiz_bot', etc.
-        const userId = ctx.from.id;
-    
-        try {
-            // 1. Check subscription
-            const requiredChannels = [
-                { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-                { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
-            ];
-            const channelIds = requiredChannels.map(channel => channel.id);
-            
-            const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-                userId,
-                channels: channelIds
-            });
-    
-            const { subscribed } = response.data;
-    
-            if (!subscribed) {
-                await ctx.answerCbQuery('❌ يجب عليك الاشتراك في القنوات أولاً.');
-                const subscriptionMessage = 'يرجى الاشتراك في القنوات التالية لاستخدام البوت:';
-                const inlineKeyboard = requiredChannels.map(channel => 
-                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-                );
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
-                return await ctx.editMessageText(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            }
-    
-            // 2. If subscribed, trigger the original action
-            if (actionAfterCheck === 'show_commands') {
-                // call your show_commands function here
-                await showCommands(ctx);
-            } else if (actionAfterCheck === 'quiz_bot') {
-                // call your quiz_bot function here
-                await launchQuizBot(ctx);
-            } else {
-                await ctx.reply('❓ أمر غير معروف.');
-            }
-    
-        } catch (error) {
-            console.error('Error in universal subscription checker:', error);
-            await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك.');
-        }
-    });
-    
+
     bot.action('check_subscription', async (ctx) => {
         try {
             const userId = ctx.from.id;
@@ -775,7 +741,6 @@ function setupCommands(bot) {
         }
     });
     
-
 // Add this callback handler for returning to the main menu
 bot.action('back_to_main', async (ctx) => {
     try {
@@ -789,14 +754,15 @@ bot.action('back_to_main', async (ctx) => {
             {
                 type: 'photo',
                 media: photoUrl,
-                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات أيضًا. اختر خيارًا:'
+                caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:'
             },
             {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'check_subscription_show_commands' }],
-                        [{ text: '🎮 بوت المسابقات', callback_data: 'check_subscription_quiz_bot' }],
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
                     ]
                 }
@@ -807,7 +773,6 @@ bot.action('back_to_main', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
-
 bot.command('broadcast', async (ctx) => {
     const chatId = ctx.chat.id;
     const isBroadcasting = chatBroadcastStates.get(chatId) || false;
@@ -1090,7 +1055,7 @@ bot.hears('بدء', async (ctx) => {
         const userId = ctx.from.id;
         const requiredChannels = [
             { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
+            { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
         ];
 
         // Extract channel IDs for the Axios request
