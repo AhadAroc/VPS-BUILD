@@ -1,11 +1,13 @@
+require('dotenv').config(); // <--- load .env first
 const express = require('express');
 const { Telegraf } = require('telegraf');
 
 const app = express();
 app.use(express.json());
 
-const botB = new Telegraf('8044558556:AAFcF-AsSGgY4luoDdGh5Kt3s2UxGxTxsQw');
+const botB = new Telegraf(process.env.BOTB_TOKEN); // <--- clean and safe
 
+botB.launch(); // optional but good to avoid timeout
 
 app.post('/check-subscription', async (req, res) => {
     const { userId, channels } = req.body;
@@ -28,7 +30,7 @@ app.post('/check-subscription', async (req, res) => {
     res.json({ subscribed });
 });
 
-const PORT = process.env.PORT || 80;
+const PORT = 80;
 app.listen(PORT, () => {
     console.log(`Bot B server running on port ${PORT}`);
 });
