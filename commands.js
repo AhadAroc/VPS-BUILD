@@ -1032,8 +1032,8 @@ bot.hears('بدء', async (ctx) => {
                         reply_markup: {
                             inline_keyboard: [
                                 [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                                [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }]
                             ]
                         }
                     });
@@ -1043,8 +1043,8 @@ bot.hears('بدء', async (ctx) => {
                     
                     // Create inline keyboard with subscription buttons directly with the two channels
                     const inlineKeyboard = [
-                        [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }],
+                        [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                        [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
                         [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
                     ];
                     // Add buttons for each channel the user needs to subscribe to
