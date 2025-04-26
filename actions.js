@@ -880,7 +880,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups,check_subscription } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups } = require('./commands');
 
 
 // Photo handler
@@ -1897,7 +1897,7 @@ bot.action('show_commands', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-const { getLeaderboard } = require('./database');
+
 
 // ... other code ...
 
