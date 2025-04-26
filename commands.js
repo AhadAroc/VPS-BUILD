@@ -595,7 +595,7 @@ function setupCommands(bot) {
             const channelIds = requiredChannels.map(channel => channel.id);
     
             // Send a POST request to Bot B
-            const response = await axios.post('http://69.62.114.242/check-subscription', {
+            const response = await axios.post('http://69.62.114.242:80/check-subscription', {
                 userId,
                 channels: channelIds
             });
