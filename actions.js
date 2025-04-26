@@ -27,12 +27,13 @@ cloudinary.config({
 });
 // Add this to your global variables
 const quizSettings = new Map();
-const { isDeveloper,isSubscribed,subscriptionCheck } = require('./middlewares');
+const { isDeveloper,isSubscribed } = require('./middlewares');
 const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
 const { updateActiveGroup } = require('./database');
+const cron = require('node-cron');
 // Quiz state constants
 const QUIZ_STATE = {
     INACTIVE: 0,
@@ -52,6 +53,24 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
+async function checkElevatedUserSubscriptions() {
+    try {
+        const users = await getElevatedUsers(); // Fetch users with elevated permissions from the database
+        for (const user of users) {
+            const userId = user.id;
+            const ctx = { from: { id: userId }, telegram: bot.telegram }; // Mock context for the function
+            
+            await check_subscription(ctx);
+        }
+    } catch (error) {
+        console.error('Error checking elevated user subscriptions:', error);
+    }
+}
+// Schedule the subscription check to run every hour
+cron.schedule('0 * * * *', () => {
+    console.log('Running scheduled subscription check for elevated users...');
+    checkElevatedUserSubscriptions();
+});
 
 // Function to download and save file
 // Function to download and save file
@@ -1821,7 +1840,7 @@ bot.action('quiz_bot', async (ctx) => {
     }
 });
 
-bot.action('show_commands', subscriptionCheck, async (ctx) => {
+bot.action('show_commands', async (ctx) => {
     try {
         if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
