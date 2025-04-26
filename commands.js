@@ -1014,8 +1014,22 @@ bot.hears('بدء', async (ctx) => {
             await updateActiveGroups(ctx);
         }
 
-        // Check subscription status
-        const { isSubscribed: isUserSubscribed, notSubscribedChannels } = await isSubscribed(ctx, userId);
+        // Define required channels
+        const requiredChannels = [
+            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+            { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+        ];
+
+        // Extract channel IDs for the Axios request
+        const channelIds = requiredChannels.map(channel => channel.id);
+
+        // Send a POST request to Bot B to check subscription
+        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+            userId,
+            channels: channelIds
+        });
+
+        const { subscribed } = response.data;
 
         if (isDM) {
             // Handle direct messages
@@ -1025,7 +1039,7 @@ bot.hears('بدء', async (ctx) => {
             if (isDevResult) {
                 console.log('DEBUG: Showing developer panel');
                 return await showDevPanel(ctx);
-            } else if (isUserSubscribed) {
+            } else if (subscribed) {
                 return ctx.reply('مرحبًا! يمكنك استخدام البوت في المجموعات.', {
                     reply_markup: {
                         inline_keyboard: [
@@ -1036,7 +1050,17 @@ bot.hears('بدء', async (ctx) => {
                     }
                 });
             } else {
-                return promptSubscription(ctx, notSubscribedChannels);
+                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                const inlineKeyboard = requiredChannels.map(channel => 
+                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+                );
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+
+                return ctx.reply(subscriptionMessage, {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
+                });
             }
         } else {
             // Handle group chats
@@ -1052,30 +1076,10 @@ bot.hears('بدء', async (ctx) => {
             }
         }
     } catch (error) {
-        console.error('Error handling "بدء" command:', error);
+        console.error('Error in بدء command:', error);
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
-
-function promptSubscription(ctx, notSubscribedChannels) {
-    let subscriptionMessage = 'مرحبًا! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-    const inlineKeyboard = [
-        [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-        [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-    ];
-    notSubscribedChannels.forEach(channel => {
-        inlineKeyboard.push([{ text: `📢 اشترك في ${channel.title}`, url: `https://t.me/${channel.username}` }]);
-    });
-    inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
-
-    return ctx.reply(subscriptionMessage, {
-        reply_markup: {
-            inline_keyboard: inlineKeyboard
-        }
-    });
-}
-
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
