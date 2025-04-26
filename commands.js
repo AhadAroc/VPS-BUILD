@@ -604,17 +604,13 @@ function setupCommands(bot) {
     
             if (subscribed) {
                 // User is subscribed to all channels
-                const welcomeMessage = 'شكرًا للاشتراك! يمكنك الآن استخدام البوت.';
-                
-                await ctx.editMessageText(welcomeMessage, {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                            [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-                            [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }]
-                        ]
-                    }
-                });
+                if (ctx.chat.type === 'private') {
+                    // Show developer menu in DMs
+                    await showDevPanel(ctx);
+                } else {
+                    // Show main menu in groups
+                    await showMainMenu(ctx);
+                }
             } else {
                 // User is not subscribed to all channels
                 await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
