@@ -519,7 +519,7 @@ function setupCommands(bot) {
     
             const requiredChannels = [
                 { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-                { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+                { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
             ];
     
             const channelIds = requiredChannels.map(channel => channel.id);
@@ -640,7 +640,7 @@ function setupCommands(bot) {
             const userId = ctx.from.id;
             const requiredChannels = [
                 { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-                { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+                { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
             ];
     
             // Extract channel IDs for the Axios request
@@ -1055,7 +1055,7 @@ bot.hears('بدء', async (ctx) => {
         const userId = ctx.from.id;
         const requiredChannels = [
             { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
         ];
 
         // Extract channel IDs for the Axios request
