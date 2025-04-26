@@ -240,9 +240,11 @@ async function showMainMenu(ctx) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                { text: '📜 عرض الأوامر', callback_data: 'check_subscription_show_commands' }
+,
                 
-                [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+{ text: '🎮 بوت المسابقات', callback_data: 'check_subscription_quiz_bot' }
+
                 [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
             ]
         };
@@ -582,7 +584,54 @@ function setupCommands(bot) {
             ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
         }
     });
-
+    bot.action(/^check_subscription_(.+)/, async (ctx) => {
+        const actionAfterCheck = ctx.match[1]; // 'show_commands', 'quiz_bot', etc.
+        const userId = ctx.from.id;
+    
+        try {
+            // 1. Check subscription
+            const requiredChannels = [
+                { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+                { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
+            ];
+            const channelIds = requiredChannels.map(channel => channel.id);
+            
+            const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+                userId,
+                channels: channelIds
+            });
+    
+            const { subscribed } = response.data;
+    
+            if (!subscribed) {
+                await ctx.answerCbQuery('❌ يجب عليك الاشتراك في القنوات أولاً.');
+                const subscriptionMessage = 'يرجى الاشتراك في القنوات التالية لاستخدام البوت:';
+                const inlineKeyboard = requiredChannels.map(channel => 
+                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+                );
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+                return await ctx.editMessageText(subscriptionMessage, {
+                    reply_markup: { inline_keyboard: inlineKeyboard }
+                });
+            }
+    
+            // 2. If subscribed, trigger the original action
+            if (actionAfterCheck === 'show_commands') {
+                // call your show_commands function here
+                await showCommands(ctx);
+            } else if (actionAfterCheck === 'quiz_bot') {
+                // call your quiz_bot function here
+                await launchQuizBot(ctx);
+            } else {
+                await ctx.reply('❓ أمر غير معروف.');
+            }
+    
+        } catch (error) {
+            console.error('Error in universal subscription checker:', error);
+            await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من الاشتراك.');
+        }
+    });
+    
     bot.action('check_subscription', async (ctx) => {
         try {
             const userId = ctx.from.id;
