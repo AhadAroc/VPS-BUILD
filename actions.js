@@ -665,10 +665,10 @@ async function checkSubscription(ctx) {
             // User is subscribed to all channels
             if (ctx.chat.type === 'private') {
                 // Show developer menu in DMs
-                await showDevPanel(ctx);
+                await show_commands(ctx);
             } else {
                 // Show main menu in groups
-                await showMainMenu(ctx);
+                await show_commands(ctx);
             }
         } else {
             // User is not subscribed to all channels
