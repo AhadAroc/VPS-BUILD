@@ -240,17 +240,14 @@ async function showMainMenu(ctx) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                { text: '📜 عرض الأوامر', callback_data: 'check_subscription_show_commands' }
-,
-                
-{ text: '🎮 بوت المسابقات', callback_data: 'check_subscription_quiz_bot' }
-
+                [{ text: '📜 عرض الأوامر', callback_data: 'check_subscription_show_commands' }],
+                [{ text: '🎮 بوت المسابقات', callback_data: 'check_subscription_quiz_bot' }],
                 [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
             ]
         };
 
         await ctx.replyWithPhoto(photoUrl, {
-            caption: '🤖استخدم الامر : مساعدة للحصول على معلومات التشغيل والرفع والاستخدام  مرحبًا! أنا بوت الحماية والمسابقات ايضا اختر خيارًا:',
+            caption: '🤖 استخدم الامر : مساعدة للحصول على معلومات التشغيل والرفع والاستخدام.\nمرحبًا! أنا بوت الحماية والمسابقات أيضًا. اختر خيارًا:',
             reply_markup: keyboard
         });
     } catch (error) {
@@ -258,6 +255,7 @@ async function showMainMenu(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية.');
     }
 }
+
 async function showHelp(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
