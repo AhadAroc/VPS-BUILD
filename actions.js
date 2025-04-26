@@ -103,35 +103,7 @@ async function saveFile(fileLink, fileName) {
     }
 }
 
-async function show_commands(ctx) {
-    try {
-        await ctx.reply('📜 *قائمة الأوامر:*\n\n' +
-            '🔹 */ معرفي , رتبتي* –  ظهور رتبتك - ظهور الايدي و معرفك\n' +
-            '🔹 */رفع امن مسابقات* – رفع امن مسابقات\n' +
-            '🔹 */تنزيل امن مسابقات* – تنزيل امن مسابقات\n' +
-            '🔹 */لستة مميز* – عرض قائمة المميزين\n' +
-            '🔹 */ترقية ادمن* – ترقية إلى أدمن\n' +
-            '🔹 */تنزيل* – إزالة رتبة الأدمن\n' +
-            '🔹 */ترقية مطور* – ترقية إلى مطور\n' +
-            '🔹 */ترقية مطور ثانوي* – ترقية إلى مطور ثانوي\n' +
-            '🔹 */تنزيل مطور* – لتنزيل مطور أول أو ثانوي، اذهب إلى خاص البوت كمطور\n' +
-            '🔹 */رابط المجموعة* – الحصول على رابط المجموعة\n' +
-            '🔹 */نداء الجميع* – مناداة جميع الأعضاء\n' +
-            '🔹 */كتم* – كتم مستخدم\n' +
-            '🔹 */الغاء كتم* – إلغاء كتم مستخدم\n' +
-            '🔹 */مسح* – حذف آخر رسالة\n' +
-            '🔹 */تثبيت* – تثبيت رسالة\n' +
-            '🔹 */نكتة* – إرسال نكتة\n' +
-            '🔹 */طرد* – طرد مستخدم\n' +
-            '🔹 */مسح الصور* – حذف آخر الصور المرسلة\n' +
-            '🔹 */منع الصور* – منع إرسال الصور\n' +
-            '🔹 */سماح الصور* – السماح بإرسال الصور\n' +
-            '🔹 */ازالة الروابط* – حذف الروابط في المجموعة\n' +
-            '🔹 */فتح روابط* – السماح بمشاركة الروابط\n', { parse_mode: 'Markdown' });
-    } catch (error) {
-        console.error('Error in show_commands:', error);
-    }
-}
+
  
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
@@ -670,56 +642,6 @@ async function endQuiz(ctx, chatId) {
         console.error('Error ending quiz:', error);
     }
 }
-async function checkSubscription(ctx) {
-    try {
-        const userId = ctx.from.id;
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
-        ];
-
-        // Extract channel IDs for the Axios request
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        // Send a POST request to Bot B
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        if (subscribed) {
-            // User is subscribed to all channels
-            if (ctx.chat.type === 'private') {
-                // Show developer menu in DMs
-                await show_commands(ctx);
-            } else {
-                // Show main menu in groups
-                await show_commands(ctx);
-            }
-        } else {
-            // User is not subscribed to all channels
-            await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
-            
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-            
-            const inlineKeyboard = requiredChannels.map(channel => 
-                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-            );
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
-            
-            await ctx.editMessageText(subscriptionMessage, {
-                reply_markup: {
-                    inline_keyboard: inlineKeyboard
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in check_subscription action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
-    }
-}
 
 // Define quiz questions with different difficulty levels
 const difficulties = {
@@ -1015,7 +937,7 @@ bot.action('show_current_timer', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء عرض الوقت الحالي.');
     }
 });
-
+  
 async function showDevPanel(ctx) {
     try {
         // Check if the message is from a private chat (DM)
@@ -1901,16 +1823,7 @@ bot.action('quiz_bot', async (ctx) => {
 
 bot.action('show_commands', async (ctx) => {
     try {
-        const userId = ctx.from.id;
-        
-        // Use the checkSubscription function
-        const isSubscribed = await checkSubscription(ctx);
-        
-        if (!isSubscribed) {
-            return; // Exit if the user is not subscribed
-        }
-
-        if (!await hasRequiredPermissions(ctx, userId)) {
+        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
