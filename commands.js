@@ -586,8 +586,8 @@ function setupCommands(bot) {
         try {
             const userId = ctx.from.id;
             const requiredChannels = [
-                { id: -1002276669807, username: 'ctrlsrc', title: 'قناة السورس' },
-                { id: -1002558408202, username: 'T0_B7', title: 'القناة الرسمية' }
+                { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+                { id: -1002331727102, username: 'eavemestary', title: 'القناة الرسمية' }
             ];
     
             // Extract channel IDs for the Axios request
@@ -609,8 +609,8 @@ function setupCommands(bot) {
                     reply_markup: {
                         inline_keyboard: [
                             [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                            [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                            [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+                            [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                            [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }]
                         ]
                     }
                 });
