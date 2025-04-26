@@ -169,7 +169,7 @@ function setupMiddlewares(bot) {
             // If user is not subscribed, show subscription message
             console.log(`User ${userId} is not subscribed, showing subscription message`);
             
-            let subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            let subscriptionMessage = ' لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية , اذا قمت بل اشتراك يرجى ارسال بدء  للاستخدام:';
             
             // Create inline keyboard with subscription buttons directly
             const inlineKeyboard = [
