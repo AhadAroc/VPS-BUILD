@@ -33,7 +33,6 @@ const { addQuizQuestion } = require('./database');
 const database = require('./database');
 const { Markup } = require('telegraf');
 const { updateActiveGroup } = require('./database');
-const cron = require('node-cron');
 // Quiz state constants
 const QUIZ_STATE = {
     INACTIVE: 0,
@@ -53,24 +52,6 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
-async function checkElevatedUserSubscriptions() {
-    try {
-        const users = await getElevatedUsers(); // Fetch users with elevated permissions from the database
-        for (const user of users) {
-            const userId = user.id;
-            const ctx = { from: { id: userId }, telegram: bot.telegram }; // Mock context for the function
-            
-            await check_subscription(ctx);
-        }
-    } catch (error) {
-        console.error('Error checking elevated user subscriptions:', error);
-    }
-}
-// Schedule the subscription check to run every hour
-cron.schedule('0 * * * *', () => {
-    console.log('Running scheduled subscription check for elevated users...');
-    checkElevatedUserSubscriptions();
-});
 
 // Function to download and save file
 // Function to download and save file
@@ -880,7 +861,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups, } = require('./commands');
 
 
 // Photo handler
@@ -1842,16 +1823,7 @@ bot.action('quiz_bot', async (ctx) => {
 
 bot.action('show_commands', async (ctx) => {
     try {
-        const userId = ctx.from.id;
-        
-        // Check subscription status
-        const { isSubscribed } = await check_subscription(ctx);
-        
-        if (!isSubscribed) {
-            return; // Exit if the user is not subscribed
-        }
-
-        if (!await hasRequiredPermissions(ctx, userId)) {
+        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
@@ -1897,7 +1869,7 @@ bot.action('show_commands', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-
+const { getLeaderboard } = require('./database');
 
 // ... other code ...
 
