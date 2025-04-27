@@ -1115,39 +1115,7 @@ bot.hears('بدء', async (ctx) => {
 
 
 
-// Add this new action handler
-bot.action('check_subscription_auto', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
-        ];
 
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        if (subscribed) {
-            await ctx.answerCbQuery('✅ تم التحقق من اشتراكك بنجاح!');
-            if (ctx.chat.type === 'private') {
-                await showDevPanel(ctx);
-            } else {
-                await showMainMenu(ctx);
-            }
-        } else {
-            await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
-        }
-    } catch (error) {
-        console.error('Error in check_subscription_auto action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
-    }
-});
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
