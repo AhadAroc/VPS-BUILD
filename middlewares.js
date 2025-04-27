@@ -5,7 +5,7 @@ const SUBSCRIPTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 // Add this new Map to store last check times
 const lastSubscriptionCheckTime = new Map();
-
+const subscriptionStatusCache = new Map(); // cache to remember users
 // Create a Map to cache subscription status
 const subscriptionCache = new Map();
 async function isAdminOrOwner(ctx, userId) {
@@ -146,57 +146,57 @@ function setupMiddlewares(bot) {
     // Add a middleware to check subscription for all commands in private chats
     bot.use(async (ctx, next) => {
         try {
-            // Skip for non-private chats
+            // Skip non-private chats
             if (ctx.chat && ctx.chat.type !== 'private') {
                 return next();
             }
-            
-            const userId = ctx.from.id;
-            
-            // For private chats, check subscription - EVEN FOR DEVELOPERS
-            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
-            
-            // If user is subscribed, allow them to proceed
-            if (isUserSubscribed) {
+    
+            const userId = ctx.from?.id;
+            if (!userId) return next();
+    
+            // Allow immediately if user already passed recently
+            if (subscriptionStatusCache.has(userId) && subscriptionStatusCache.get(userId) === true) {
                 return next();
             }
-            
-            // If this is a callback query for checking subscription, allow it
+    
+            // Allow checking subscription manually
             if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
                 return next();
             }
-            
-            // If user is not subscribed, show subscription message
+    
+            // Real subscription check
+            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+    
+            if (isUserSubscribed) {
+                subscriptionStatusCache.set(userId, true); // ✅ cache user
+                return next();
+            }
+    
             console.log(`User ${userId} is not subscribed, showing subscription message`);
-            
-            let subscriptionMessage = ' لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية , اذا قمت بل اشتراك يرجى ارسال بدء  للاستخدام:';
-            
-            // Create inline keyboard with subscription buttons directly
+    
+            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
             const inlineKeyboard = [
                 [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
                 [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
                 [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
             ];
-            
-            // If it's a callback query, answer it and edit the message
+    
             if (ctx.callbackQuery) {
-                await ctx.answerCbQuery('يرجى الاشتراك في جميع القنوات المطلوبة');
+                await ctx.answerCbQuery('❗ يرجى الاشتراك في القنوات أولاً');
                 await ctx.editMessageText(subscriptionMessage, {
                     reply_markup: { inline_keyboard: inlineKeyboard }
                 });
             } else {
-                // Otherwise send a new message
                 await ctx.reply(subscriptionMessage, {
                     reply_markup: { inline_keyboard: inlineKeyboard }
                 });
             }
-            
-            // Don't proceed to the next middleware
-            return;
+    
+            return; // block further processing
+    
         } catch (error) {
             console.error('Error in subscription middleware:', error);
-            // On error, allow the user to proceed
-            return next();
+            return next(); // if error, allow access (better UX)
         }
     });
 }
