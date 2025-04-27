@@ -83,8 +83,8 @@ async function isSubscribed(ctx, userId) {
         
         // Define the channels that require subscription
         const requiredChannels = [
-            { username: 'ctrlsrc', title: 'قناة السورس' },
-            { username: 'T0_B7', title: 'القناة الرسمية' }
+            { username: 'leavemestary', title: 'قناة السورس' },
+            { username: 'sub2vea', title: 'القناة الرسمية' }
         ];
         
         let allSubscribed = true;
@@ -143,6 +143,7 @@ async function isSubscribed(ctx, userId) {
     }
 }
 function setupMiddlewares(bot) {
+    //  this needs improvment its not getting the the member info right . 
     bot.use(async (ctx, next) => {
         try {
             // ✅ If not a group chat (private, etc), allow without subscription check
@@ -153,8 +154,18 @@ function setupMiddlewares(bot) {
             const userId = ctx.from?.id;
             if (!userId) return next();
     
+            // Check if the user's subscription status is cached
+            let isSubscribed = subscriptionStatusCache.get(userId);
+    
+            // If not cached, perform a real-time check
+            if (isSubscribed === undefined) {
+                const subscriptionResult = await isSubscribed(ctx, userId);
+                isSubscribed = subscriptionResult.isSubscribed;
+                subscriptionStatusCache.set(userId, isSubscribed);
+            }
+    
             // ✅ Allow if user is already confirmed
-            if (subscriptionStatusCache.has(userId) && subscriptionStatusCache.get(userId) === true) {
+            if (isSubscribed) {
                 return next();
             }
     
@@ -190,7 +201,7 @@ function setupMiddlewares(bot) {
             console.error('Error in subscription middleware:', error);
             return next(); // on error, allow (fail safe)
         }
-    });    
+    });  
 }
 // Add the check_subscription function directly in this file
 async function check_subscription(ctx) {
