@@ -1153,6 +1153,8 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 // Update the "بدء" command handler
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
+    console.log(`DEBUG بدء triggered in chat type: ${ctx.chat.type}, userId: ${userId}, subscribed: ${subscribed}`);
+
     try {
         const userId = ctx.from.id;
 
