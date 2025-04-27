@@ -88,13 +88,7 @@ async function isSubscribed(ctx, userId) {
             -1002331727102   // ID of 'leavemestary'
         ];
 
-        // 🔥 Call your Bot B server to check
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
+        
 
         // Cache the result
         subscriptionCache.set(userId, {
