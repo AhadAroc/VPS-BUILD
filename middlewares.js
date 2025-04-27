@@ -66,17 +66,18 @@ async function isDeveloper(ctx, userId) {
     }
 }
 
-async function isSubscribed(ctx, userId) {
+async function isSubscribed(ctx, userId, callback) {
     try {
         // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
         const cachedResult = subscriptionCache.get(userId);
         if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
             console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
-            return { 
-                isSubscribed: cachedResult.isSubscribed, 
+            callback({
+                isSubscribed: cachedResult.isSubscribed,
                 statusChanged: false,
                 notSubscribedChannels: cachedResult.notSubscribedChannels || []
-            };
+            });
+            return;
         }
 
         console.log(`Checking subscription status for user ${userId}`);
@@ -127,19 +128,19 @@ async function isSubscribed(ctx, userId) {
         });
         
         // Return the result with status change indicator
-        return { 
-            isSubscribed: allSubscribed, 
+        callback({
+            isSubscribed: allSubscribed,
             statusChanged: statusChanged,
             notSubscribedChannels: notSubscribedChannels
-        };
+        });
     } catch (error) {
         console.error(`Error in isSubscribed check for user ${userId}:`, error);
         // Default to false on error
-        return { 
-            isSubscribed: false, 
+        callback({
+            isSubscribed: false,
             statusChanged: false,
             notSubscribedChannels: []
-        };
+        });
     }
 }
 function setupMiddlewares(bot) {
@@ -155,47 +156,40 @@ function setupMiddlewares(bot) {
             if (!userId) return next();
     
             // Check if the user's subscription status is cached
-            let isSubscribed = subscriptionStatusCache.get(userId);
+            isSubscribed(ctx, userId, (subscriptionResult) => {
+                const { isSubscribed } = subscriptionResult;
     
-            // If not cached, perform a real-time check
-            if (isSubscribed === undefined) {
-                const subscriptionResult = await isSubscribed(ctx, userId);
-                isSubscribed = subscriptionResult.isSubscribed;
-                subscriptionStatusCache.set(userId, isSubscribed);
-            }
+                // ✅ Allow if user is already confirmed
+                if (isSubscribed) {
+                    return next();
+                }
     
-            // ✅ Allow if user is already confirmed
-            if (isSubscribed) {
-                return next();
-            }
+                // ✅ Allow if user is clicking 'check_subscription' manually
+                if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+                    return next();
+                }
     
-            // ✅ Allow if user is clicking 'check_subscription' manually
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
-                return next();
-            }
+                // ❌ Otherwise, block and ask them to subscribe
+                console.log(`User ${userId} is not subscribed in group, blocking.`);
     
-            // ❌ Otherwise, block and ask them to subscribe
-            console.log(`User ${userId} is not subscribed in group, blocking.`);
+                const subscriptionMessage = '⚠️ لاستخدام البوت داخل المجموعة، يجب عليك الاشتراك في القنوات التالية:';
+                const inlineKeyboard = [
+                    [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
+                    [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                ];
     
-            const subscriptionMessage = '⚠️ لاستخدام البوت داخل المجموعة، يجب عليك الاشتراك في القنوات التالية:';
-            const inlineKeyboard = [
-                [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-                [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-            ];
-    
-            if (ctx.callbackQuery) {
-                await ctx.answerCbQuery('❗ اشترك أولا بالقنوات');
-                await ctx.editMessageText(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                }).catch(err => console.error('editMessageText error:', err));
-            } else {
-                await ctx.reply(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            }
-    
-            return; // stop everything until subscribed
+                if (ctx.callbackQuery) {
+                    ctx.answerCbQuery('❗ اشترك أولا بالقنوات');
+                    ctx.editMessageText(subscriptionMessage, {
+                        reply_markup: { inline_keyboard: inlineKeyboard }
+                    }).catch(err => console.error('editMessageText error:', err));
+                } else {
+                    ctx.reply(subscriptionMessage, {
+                        reply_markup: { inline_keyboard: inlineKeyboard }
+                    });
+                }
+            });
     
         } catch (error) {
             console.error('Error in subscription middleware:', error);
