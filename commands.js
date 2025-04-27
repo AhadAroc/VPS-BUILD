@@ -21,6 +21,7 @@ const database = require('./database');
 const { isDeveloper } = require('./middlewares');
 const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
 const axios = require('axios');
+const subscriptionStatusCache = new Map();
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
@@ -567,7 +568,9 @@ async function checkUserSubscription(ctx) {
         }
     } catch (error) {
         console.error('Error in checkUserSubscription:', error);
-        await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => {});
+        if (ctx.callbackQuery) {
+            await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => {});
+        }
         return false; // treat as not subscribed on error
     }
 }
