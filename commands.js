@@ -586,11 +586,7 @@ function setupCommands(bot) {
                 }
                 
                 // For non-developers, check subscription status using check_subscription
-                const isUserSubscribed = await check_subscription(ctx);
-                
-                if (!isUserSubscribed) {
-                    return await handleUnsubscribedUser(ctx);
-                }
+                await check_subscription(ctx);
                 
                 // This is only showed if the user hasn't added the bot to the group
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
@@ -629,7 +625,6 @@ function setupCommands(bot) {
             ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
         }
     });
-
     bot.action('check_subscription', async (ctx) => {
         try {
             const userId = ctx.from.id;
