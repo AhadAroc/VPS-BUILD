@@ -276,7 +276,7 @@ async function getDevelopersList() {
 module.exports = { 
     isAdminOrOwner, 
     isDeveloper, 
-    isSubscribed, 
+   
     adminOnly,
     setupMiddlewares,
     getDevelopers,
