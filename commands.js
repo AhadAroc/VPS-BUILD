@@ -1065,42 +1065,19 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
-        const userId = ctx.from.id;
-        
-        // ✅ Call your subscription checker middleware correctly
-        const { isSubscribed: subscribed } = await isSubscribed(ctx, userId);
-
-        if (subscribed) {
-            if (ctx.chat.type === 'private') {
-                await showDevPanel(ctx);
-                return;
-            } else {
-                await showMainMenu(ctx);
-                return;
-            }
-        }
-
-        // user not subscribed
         if (ctx.chat.type === 'private') {
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-
-            const inlineKeyboard = [
-                [{ text: `📢 قناة السورس`, url: `https://t.me/sub2vea` }],
-                [{ text: `📢 القناة الرسمية`, url: `https://t.me/leavemestary` }],
-                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-            ];
-
-            await ctx.reply(subscriptionMessage, {
-                reply_markup: { inline_keyboard: inlineKeyboard }
-            });
+            await showDevPanel(ctx);
+            return;
         } else {
-            await ctx.reply('❌ تحتاج للاشتراك في القنوات المطلوبة لاستخدام البوت.');
+            await showMainMenu(ctx);
+            return;
         }
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
 
 
 
