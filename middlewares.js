@@ -69,8 +69,64 @@ async function isDeveloper(ctx, userId) {
 
 
 function setupMiddlewares(bot) {
-     
-}
+ // Add a middleware to check subscription for all commands in private chats
+     bot.use(async (ctx, next) => {
+         try {
+             // Skip for non-private chats
+             if (ctx.chat && ctx.chat.type !== 'private') {
+                 return next();
+             }
+             
+             const userId = ctx.from.id;
+             
+             // For private chats, check subscription - EVEN FOR DEVELOPERS
+             const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+             
+             // If user is subscribed, allow them to proceed
+             if (isUserSubscribed) {
+                 return next();
+             }
+             
+             // If this is a callback query for checking subscription, allow it
+             if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
+                 return next();
+             }
+             
+             // If user is not subscribed, show subscription message
+             console.log(`User ${userId} is not subscribed, showing subscription message`);
+             
+             let subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+             
+             // Create inline keyboard with subscription buttons directly
+             const inlineKeyboard = [
+                 [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                 [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
+                 [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+             ];
+             
+             // If it's a callback query, answer it and edit the message
+             if (ctx.callbackQuery) {
+                 await ctx.answerCbQuery('يرجى الاشتراك في جميع القنوات المطلوبة');
+                 await ctx.editMessageText(subscriptionMessage, {
+                     reply_markup: { inline_keyboard: inlineKeyboard }
+                 });
+             } else {
+                 // Otherwise send a new message
+                 await ctx.reply(subscriptionMessage, {
+                     reply_markup: { inline_keyboard: inlineKeyboard }
+                 });
+             }
+             
+             // Don't proceed to the next middleware
+             return;
+         } catch (error) {
+             console.error('Error in subscription middleware:', error);
+             // On error, allow the user to proceed
+             return next();
+         }
+     });
+ }    
+
 // Add the check_subscription function directly in this file
 async function check_subscription(ctx) {
     try {
