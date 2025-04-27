@@ -67,58 +67,7 @@ async function isDeveloper(ctx, userId) {
     }
 }
 
-async function isSubscribed(ctx, userId) {
-    try {
-        // Check from cache (valid for 1 min)
-        const cachedResult = subscriptionCache.get(userId);
-        if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
-            console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
-            return {
-                isSubscribed: cachedResult.isSubscribed,
-                statusChanged: false,
-                notSubscribedChannels: cachedResult.notSubscribedChannels || []
-            };
-        }
 
-        console.log(`Checking subscription via Bot B for user ${userId}`);
-
-        // Channel IDs you want to check (MUST be IDs, not usernames)
-        const channelIds = [
-            -1002555424660,  // ID of 'sub2vea'
-            -1002331727102   // ID of 'leavemestary'
-        ];
-
-        // 🔥 Call your Bot B server to check
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        // Cache the result
-        subscriptionCache.set(userId, {
-            isSubscribed: subscribed,
-            timestamp: Date.now(),
-            notSubscribedChannels: subscribed ? [] : channelIds
-        });
-
-        return {
-            isSubscribed: subscribed,
-            statusChanged: false, // You can add smarter change detection if you want
-            notSubscribedChannels: subscribed ? [] : channelIds
-        };
-
-    } catch (error) {
-        console.error(`Error checking subscription for user ${userId} via Bot B:`, error);
-        // Fail-safe: assume not subscribed
-        return {
-            isSubscribed: false,
-            statusChanged: false,
-            notSubscribedChannels: []
-        };
-    }
-}
 function setupMiddlewares(bot) {
     //  this needs improvment its not getting the the member info right . 
     bot.use(async (ctx, next) => {
