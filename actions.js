@@ -4122,13 +4122,24 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         }
     }); 
     // Update the back_to_dev_panel action handler
-    bot.action('back_to_dev_panel', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery();
-            showDevPanel(ctx);
-        }
-    });
-    
+bot.action('back_to_dev_panel', async (ctx) => {
+    const userId = ctx.from.id;
+
+    // Check if this is the first time the /start command is executed
+    if (ownerId === null) {
+        ownerId = userId; // Set the current user as the owner
+        console.log(`Owner set to user ID: ${ownerId}`);
+    }
+
+    // Check if the user is a developer or the owner
+    const isDev = await isDeveloper(ctx, userId);
+    if (isDev || userId === ownerId) {
+        await ctx.answerCbQuery();
+        showDevPanel(ctx);
+    } else {
+        ctx.answerCbQuery('⛔ عذرًا، هذه اللوحة مخصصة للمطورين فقط.', { show_alert: true });
+    }
+});
     
   
     
