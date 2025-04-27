@@ -1063,7 +1063,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-// Update the "بدء" command handler
+
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
@@ -1075,6 +1075,7 @@ bot.hears('بدء', async (ctx) => {
 
         const channelIds = requiredChannels.map(channel => channel.id);
 
+        // Check subscription status
         const response = await axios.post('http://69.62.114.242:80/check-subscription', {
             userId,
             channels: channelIds
