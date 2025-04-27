@@ -1,5 +1,6 @@
 const { developerIds } = require('./config');
 const { getDb, pool } = require('./database');
+const axios = require('axios');
 // Add this at the top of the file with other imports
 const SUBSCRIPTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
@@ -68,7 +69,7 @@ async function isDeveloper(ctx, userId) {
 
 async function isSubscribed(ctx, userId) {
     try {
-        // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
+        // Check from cache (valid for 1 min)
         const cachedResult = subscriptionCache.get(userId);
         if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
             console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
@@ -79,62 +80,38 @@ async function isSubscribed(ctx, userId) {
             };
         }
 
-        console.log(`Checking subscription status for user ${userId}`);
-        
-        // Define the channels that require subscription
-        const requiredChannels = [
-            { username: 'leavemestary', title: 'قناة السورس' },
-            { username: 'sub2vea', title: 'القناة الرسمية' }
+        console.log(`Checking subscription via Bot B for user ${userId}`);
+
+        // Channel IDs you want to check (MUST be IDs, not usernames)
+        const channelIds = [
+            -1002555424660,  // ID of 'sub2vea'
+            -1002331727102   // ID of 'leavemestary'
         ];
-        
-        let allSubscribed = true;
-        let notSubscribedChannels = [];
-        
-        // Check each channel
-        for (const channel of requiredChannels) {
-            try {
-                // Force a fresh check by bypassing any Telegram API caching
-                const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
-                const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
-                
-                console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed} (${member.status})`);
-                
-                if (!isSubbed) {
-                    allSubscribed = false;
-                    notSubscribedChannels.push(channel);
-                }
-            } catch (error) {
-                console.error(`Error checking subscription for @${channel.username}:`, error);
-                // If we can't check, assume not subscribed for safety
-                allSubscribed = false;
-                notSubscribedChannels.push(channel);
-            }
-        }
-        
-        // Clear the cache if the status has changed
-        const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
-        const statusChanged = previousStatus !== allSubscribed;
-        
-        if (statusChanged) {
-            console.log(`Subscription status changed for user ${userId}: ${previousStatus} -> ${allSubscribed}`);
-        }
-        
-        // Store the result in cache with a shorter expiration time (30 seconds)
-        subscriptionCache.set(userId, { 
-            isSubscribed: allSubscribed, 
-            timestamp: Date.now(),
-            notSubscribedChannels: notSubscribedChannels
+
+        // 🔥 Call your Bot B server to check
+        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+            userId,
+            channels: channelIds
         });
-        
-        // Return the result with status change indicator
+
+        const { subscribed } = response.data;
+
+        // Cache the result
+        subscriptionCache.set(userId, {
+            isSubscribed: subscribed,
+            timestamp: Date.now(),
+            notSubscribedChannels: subscribed ? [] : channelIds
+        });
+
         return {
-            isSubscribed: allSubscribed,
-            statusChanged: statusChanged,
-            notSubscribedChannels: notSubscribedChannels
+            isSubscribed: subscribed,
+            statusChanged: false, // You can add smarter change detection if you want
+            notSubscribedChannels: subscribed ? [] : channelIds
         };
+
     } catch (error) {
-        console.error(`Error in isSubscribed check for user ${userId}:`, error);
-        // Default to false on error
+        console.error(`Error checking subscription for user ${userId} via Bot B:`, error);
+        // Fail-safe: assume not subscribed
         return {
             isSubscribed: false,
             statusChanged: false,
