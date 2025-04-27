@@ -5,7 +5,8 @@ let tempReplyWord = '';
 let tempBotId = null;
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
-
+// Declare ownerId at the top of your file
+let ownerId = null;
 
 // Make sure this is at the top of your file
 const activeGroups = new Map();
