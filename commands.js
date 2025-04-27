@@ -1,6 +1,6 @@
 //ultragayshit 
 
-const { adminOnly, isSubscribed,setupMiddlewares } = require('./middlewares');
+const { adminOnly,setupMiddlewares } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
 const { createPrimaryDevelopersTable } = require('./database');
@@ -195,7 +195,82 @@ async function gifRestrictionMiddleware(ctx, next) {
     }
     return next();
 }
+async function isSubscribed(ctx, userId) {
+    try {
+        // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
+        const cachedResult = subscriptionCache.get(userId);
+        if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
+            console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
+            return {
+                isSubscribed: cachedResult.isSubscribed,
+                statusChanged: false,
+                notSubscribedChannels: cachedResult.notSubscribedChannels || []
+            };
+        }
 
+        console.log(`Checking subscription status for user ${userId}`);
+        
+        // Define the channels that require subscription
+        const requiredChannels = [
+            { username: 'leavemestary', title: 'قناة السورس' },
+            { username: 'sub2vea', title: 'القناة الرسمية' }
+        ];
+        
+        let allSubscribed = true;
+        let notSubscribedChannels = [];
+        
+        // Check each channel
+        for (const channel of requiredChannels) {
+            try {
+                // Force a fresh check by bypassing any Telegram API caching
+                const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
+                const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
+                
+                console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed} (${member.status})`);
+                
+                if (!isSubbed) {
+                    allSubscribed = false;
+                    notSubscribedChannels.push(channel);
+                }
+            } catch (error) {
+                console.error(`Error checking subscription for @${channel.username}:`, error);
+                // If we can't check, assume not subscribed for safety
+                allSubscribed = false;
+                notSubscribedChannels.push(channel);
+            }
+        }
+        
+        // Clear the cache if the status has changed
+        const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
+        const statusChanged = previousStatus !== allSubscribed;
+        
+        if (statusChanged) {
+            console.log(`Subscription status changed for user ${userId}: ${previousStatus} -> ${allSubscribed}`);
+        }
+        
+        // Store the result in cache with a shorter expiration time (30 seconds)
+        subscriptionCache.set(userId, { 
+            isSubscribed: allSubscribed, 
+            timestamp: Date.now(),
+            notSubscribedChannels: notSubscribedChannels
+        });
+        
+        // Return the result with status change indicator
+        return {
+            isSubscribed: allSubscribed,
+            statusChanged: statusChanged,
+            notSubscribedChannels: notSubscribedChannels
+        };
+    } catch (error) {
+        console.error(`Error in isSubscribed check for user ${userId}:`, error);
+        // Default to false on error
+        return {
+            isSubscribed: false,
+            statusChanged: false,
+            notSubscribedChannels: []
+        };
+    }
+}
 async function documentRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.document) {
         const chatId = ctx.chat.id;
@@ -2428,5 +2503,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,isSubscribed,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
 
