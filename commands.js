@@ -585,29 +585,24 @@ function setupCommands(bot) {
                     return await showDevPanel(ctx);
                 }
                 
-                // For non-developers, check subscription status
-                const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+                // For non-developers, check subscription status using check_subscription
+                const isUserSubscribed = await check_subscription(ctx);
                 
-                if (!isUserSubscribed) { // so when user is  subbed this appears :
+                if (!isUserSubscribed) {
                     return await handleUnsubscribedUser(ctx);
                 }
                 
-                // this is only showed if the user havent added the bot to the group ( the bot should check to see if the users in the group match the users id )
+                // This is only showed if the user hasn't added the bot to the group
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                 let keyboard = [
                     [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
                     [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
                     [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
                 ];
-// after const welcomeMessage is bypassed by the user being in the group we call showDevPanel if the 2 statements are met ( 1 - user is  subbed , user is in the group and the group bypassed the welcomeMessage) : 
 
-
-                //add else if user not subbed ask to subscribe : 
                 return ctx.reply(welcomeMessage, {
                     reply_markup: { inline_keyboard: keyboard }
                 });
-
-                //add :
             } 
             
             // For group chats
