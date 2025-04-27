@@ -66,18 +66,17 @@ async function isDeveloper(ctx, userId) {
     }
 }
 
-async function isSubscribed(ctx, userId, callback) {
+async function isSubscribed(ctx, userId) {
     try {
         // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
         const cachedResult = subscriptionCache.get(userId);
         if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
             console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
-            callback({
+            return {
                 isSubscribed: cachedResult.isSubscribed,
                 statusChanged: false,
                 notSubscribedChannels: cachedResult.notSubscribedChannels || []
-            });
-            return;
+            };
         }
 
         console.log(`Checking subscription status for user ${userId}`);
@@ -128,19 +127,19 @@ async function isSubscribed(ctx, userId, callback) {
         });
         
         // Return the result with status change indicator
-        callback({
+        return {
             isSubscribed: allSubscribed,
             statusChanged: statusChanged,
             notSubscribedChannels: notSubscribedChannels
-        });
+        };
     } catch (error) {
         console.error(`Error in isSubscribed check for user ${userId}:`, error);
         // Default to false on error
-        callback({
+        return {
             isSubscribed: false,
             statusChanged: false,
             notSubscribedChannels: []
-        });
+        };
     }
 }
 function setupMiddlewares(bot) {
