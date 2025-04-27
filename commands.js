@@ -27,7 +27,9 @@ const knownUsers = new Map();
 // Map to track broadcasting state for each chat
 const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
+// Declare ownerId and ownerMessageSent at the top of your file
 let ownerId = null;
+let ownerMessageSent = false;
    // Add this function near the top of your file, after your imports and before the bot commands
    async function getBotGroups(botId, userId) {
     try {
@@ -1406,6 +1408,63 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
     }
     async function showDevPanel(ctx) {
         try {
+            if (ctx.chat.type !== 'private') {
+                await ctx.reply('⚠️ يمكن استخدام لوحة التحكم في الرسائل الخاصة فقط.');
+                return;
+            }
+    
+            const userId = ctx.from.id;
+    
+            if (ownerId === null) {
+                ownerId = userId;
+                console.log(`Owner set to user ID: ${ownerId}`);
+            }
+    
+            const isDev = await isDeveloper(ctx, userId);
+            if (!isDev && userId !== ownerId) {
+                await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطورين فقط.');
+                return;
+            }
+    
+            if (userId === ownerId && !ownerMessageSent) {
+                await ctx.reply('🎉 شكراً لتفضيل البوت! أنت الآن المالك ويمكنك الوصول إلى قائمة المطورين.');
+                ownerMessageSent = true; // Set the flag to true after sending the message
+            }
+    
+            const message = 'مرحبا عزيزي المطور\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '• الردود •', callback_data: 'dev_replies' }],
+                    [{ text: '• الإذاعة •', callback_data: 'dev_broadcast' }],
+                    [{ text: 'السورس', callback_data: 'dev_source' }],
+                    [{ text: '• اسم البوت •', callback_data: 'dev_bot_name' }],
+                    [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
+                    [{ text: 'المطورين', callback_data: 'dev_developers' }],
+                    [{ text: 'قريبا', callback_data: 'dev_welcome' }],
+                    [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                ]
+            };
+    
+            await loadActiveGroupsFromDatabase();
+    
+            if (ctx.callbackQuery) {
+                const msg = ctx.callbackQuery.message;
+                if (msg.caption) {
+                    await ctx.editMessageCaption(message, { reply_markup: keyboard });
+                } else {
+                    await ctx.editMessageText(message, { reply_markup: keyboard });
+                }
+            } else {
+                await ctx.reply(message, { reply_markup: keyboard });
+            }
+        } catch (error) {
+            console.error('Error in showDevPanel:', error);
+            await ctx.reply('❌ حدث خطأ أثناء محاولة عرض لوحة التحكم للمطور.');
+        }
+    }
+    async function showDevPanel(ctx) {
+        try {
             // Check if the message is from a private chat (DM)
             if (ctx.chat.type !== 'private') {
                 await ctx.reply('⚠️ يمكن استخدام لوحة التحكم في الرسائل الخاصة فقط.');
@@ -1460,8 +1519,7 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
         } catch (error) {
             console.error('Error in showDevPanel:', error);
             await ctx.reply('❌ حدث خطأ أثناء محاولة عرض لوحة التحكم للمطور.');
-        }
-    }    function getCommandList() {
+        }    }    function getCommandList() {
         return `📜 *قائمة الأوامر:*
     
     🔹 /معرفي – ظهور الايدي و معرفك
