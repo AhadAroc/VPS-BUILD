@@ -632,58 +632,7 @@ async function isSubscribed(ctx, userId) {
 }
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
-    bot.use(async (ctx, next) => {
-        try {
-            // allow if it's a private message without buttons
-            if (ctx.chat?.type === 'private' && !ctx.callbackQuery) {
-                return next();
-            }
-    
-            const userId = ctx.from?.id;
-            if (!userId) {
-                return next();
-            }
-    
-            const requiredChannels = [
-                { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-                { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
-            ];
-    
-            const channelIds = requiredChannels.map(channel => channel.id);
-    
-            const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-                userId,
-                channels: channelIds
-            });
-    
-            const { subscribed } = response.data;
-    
-            if (subscribed) {
-                // user is good -> continue to whatever command they pressed
-                return next();
-            } else {
-                // user is not subscribed -> block everything else and show subscription message
-                if (ctx.callbackQuery) {
-                    await ctx.answerCbQuery('❌ يرجى الاشتراك أولاً!', { show_alert: true });
-                }
-    
-                const inlineKeyboard = requiredChannels.map(channel => 
-                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-                );
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
-    
-                await ctx.reply('⚠️ للاستخدام الكامل للبوت، يرجى الاشتراك في القنوات التالية:', {
-                    reply_markup: {
-                        inline_keyboard: inlineKeyboard
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Middleware subscription check error:', error);
-            return next(); // let the bot work even if check fails (fail-safe)
-        }
-    });
-    
+   
     bot.command('start', async (ctx) => {
         try {
             const userId = ctx.from.id;
