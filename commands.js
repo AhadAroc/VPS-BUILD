@@ -1068,6 +1068,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
+
         const requiredChannels = [
             { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
             { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
@@ -1084,34 +1085,41 @@ bot.hears('بدء', async (ctx) => {
         const { subscribed } = response.data;
 
         if (subscribed) {
-            // User is subscribed to all channels
+            // ✅ already subscribed
             if (ctx.chat.type === 'private') {
-                // Show developer menu in DMs
-                await showDevPanel(ctx);
+                await showDevPanel(ctx);  // show dev menu immediately
             } else {
-                // Show main menu in groups
-                await showMainMenu(ctx);
+                await showMainMenu(ctx); // group menu
             }
         } else {
-            // User is not subscribed to all channels
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-            
-            const inlineKeyboard = requiredChannels.map(channel => 
-                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-            );
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription_auto' }]);
-            
-            await ctx.reply(subscriptionMessage, {
-                reply_markup: {
-                    inline_keyboard: inlineKeyboard
-                }
-            });
+            // ❌ not subscribed yet
+            if (ctx.chat.type === 'private') {
+                // only show subscription request if in private chat
+                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                
+                const inlineKeyboard = requiredChannels.map(channel => 
+                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+                );
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription_auto' }]);
+                
+                await ctx.reply(subscriptionMessage, {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
+                });
+            } else {
+                // if in group chat, maybe just silent fail or send something simple
+                await ctx.reply('❌ تحتاج للاشتراك في القنوات المطلوبة لاستخدام البوت.');
+            }
         }
+
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
+
 
 // Add this new action handler
 bot.action('check_subscription_auto', async (ctx) => {
