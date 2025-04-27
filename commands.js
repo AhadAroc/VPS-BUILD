@@ -1066,26 +1066,17 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
-        ];
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
+        
+        // ✅ Call your subscription checker middleware correctly
+        const { isSubscribed: subscribed } = await isSubscribed(ctx, userId);
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
                 await showDevPanel(ctx);
-                return; // ⬅️ SUPER IMPORTANT
+                return;
             } else {
                 await showMainMenu(ctx);
-                return; // ⬅️ IMPORTANT
+                return;
             }
         }
 
@@ -1093,15 +1084,14 @@ bot.hears('بدء', async (ctx) => {
         if (ctx.chat.type === 'private') {
             const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
 
-            const inlineKeyboard = requiredChannels.map(channel => 
-                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-            );
-            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription_auto' }]);
+            const inlineKeyboard = [
+                [{ text: `📢 قناة السورس`, url: `https://t.me/sub2vea` }],
+                [{ text: `📢 القناة الرسمية`, url: `https://t.me/leavemestary` }],
+                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+            ];
 
             await ctx.reply(subscriptionMessage, {
-                reply_markup: {
-                    inline_keyboard: inlineKeyboard
-                }
+                reply_markup: { inline_keyboard: inlineKeyboard }
             });
         } else {
             await ctx.reply('❌ تحتاج للاشتراك في القنوات المطلوبة لاستخدام البوت.');
@@ -1111,6 +1101,7 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
 
 
 
