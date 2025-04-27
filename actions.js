@@ -3262,7 +3262,7 @@ if (await isDeveloper(ctx, userId)) {
 
     } catch (error) {
         console.error('Error in message handler:', error);
-        await ctx.reply('هلا ! يرجى ارسال /start');
+        await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
     }
 
     await next();
