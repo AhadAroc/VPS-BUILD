@@ -143,55 +143,7 @@ async function isSubscribed(ctx, userId) {
     }
 }
 function setupMiddlewares(bot) {
-    // Add a middleware to check subscription for all commands in private chats
-    bot.use(async (ctx, next) => {
-        try {
-            // Allow everything outside private chats
-            if (ctx.chat && ctx.chat.type !== 'private') {
-                return next();
-            }
     
-            const userId = ctx.from?.id;
-            if (!userId) return next();
-    
-            // ✅ Allow user if already confirmed before
-            if (subscriptionStatusCache.has(userId) && subscriptionStatusCache.get(userId) === true) {
-                return next();
-            }
-    
-            // ✅ Allow clicking the 'check_subscription' button without blocking
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
-                return next();
-            }
-    
-            // ❌ User is not confirmed yet, block him and ask to subscribe
-            console.log(`User ${userId} is not subscribed (not in cache), showing subscription request.`);
-    
-            const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك، ثم اضغط تحقق من الاشتراك:';
-            const inlineKeyboard = [
-                [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-                [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-            ];
-    
-            if (ctx.callbackQuery) {
-                await ctx.answerCbQuery('❗ اشترك أولاً بالقنوات');
-                await ctx.editMessageText(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                }).catch(err => console.error('editMessageText error:', err));
-            } else {
-                await ctx.reply(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            }
-    
-            return; // 🚫 don't allow the user to continue
-    
-        } catch (error) {
-            console.error('Error in subscription middleware:', error);
-            return next();
-        }
-    });
 }
 // Add the check_subscription function directly in this file
 async function check_subscription(ctx) {
