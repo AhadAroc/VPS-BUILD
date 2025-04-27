@@ -1195,9 +1195,9 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const { isSubscribed: subscribed } = await isSubscribed(ctx, userId);
+        const subscribed = await checkUserSubscription(ctx);
 
-        console.log(`DEBUG: بدإ triggered | chat type: ${ctx.chat.type} | userId: ${userId} | subscribed: ${subscribed}`);
+        console.log(`DEBUG: بدإ triggered | userId: ${userId} | subscribed: ${subscribed}`);
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
@@ -1207,7 +1207,6 @@ bot.hears('بدء', async (ctx) => {
                 console.log('DEBUG: Showing Main Menu (group)');
                 await showMainMenu(ctx);
             }
-            return;
         } else {
             console.log('DEBUG: User not subscribed, sending subscription buttons.');
             const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
@@ -1221,9 +1220,7 @@ bot.hears('بدء', async (ctx) => {
             await ctx.reply(subscriptionMessage, {
                 reply_markup: { inline_keyboard: inlineKeyboard }
             });
-            return;
         }
-
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
         ctx.reply('❌ حدث خطأ أثناء المعالجة.');
