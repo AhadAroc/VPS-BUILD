@@ -519,7 +519,7 @@ async function checkUserRank(ctx) {
 async function checkUserSubscription(ctx) {
     try {
         const userId = ctx.from.id;
-
+        const subscriptionStatusCache = new Map();
         // Define the channels that require subscription
         const requiredChannels = [
             { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
