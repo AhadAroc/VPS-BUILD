@@ -505,9 +505,9 @@ async function checkUserRank(ctx) {
 async function checkUserSubscription(ctx) {
     try {
         const userId = ctx.from.id;
-        const { isSubscribed } = await isSubscribed(ctx, userId);
+        const { isSubscribed: subscribed } = await isSubscribed(ctx, userId); // ✅ renamed here!
 
-        if (isSubscribed) {
+        if (subscribed) {
             subscriptionStatusCache.set(userId, true);
 
             if (ctx.chat?.type === 'private') {
@@ -542,6 +542,7 @@ async function checkUserSubscription(ctx) {
         return false; // treat as not subscribed on error
     }
 }
+
 async function isSubscribed(ctx, userId) {
     try {
         // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
