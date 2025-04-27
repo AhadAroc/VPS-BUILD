@@ -224,38 +224,48 @@ async function hasRequiredPermissions(ctx, userId) {
 async function showMainMenu(ctx) {
     try {
         const userId = ctx.from.id;
-        
-        // Check if the user is an admin, owner, secondary developer, or VIP
+
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
 
-        if (!isAdmin && !isSecDev && !isVIPUser) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والأعضاء المميزين فقط.');
+        const isSpecialUser = isAdmin || isSecDev || isVIPUser;
+
+        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
+
+        let keyboard;
+
+        if (isSpecialUser) {
+            // ✅ Admins, SecDev, VIPs get the full menu
+            keyboard = {
+                inline_keyboard: [
+                    [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                    [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                    [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+                ]
+            };
+        } else {
+            // 👥 Normal members get a simple limited menu
+            keyboard = {
+                inline_keyboard: [
+                    [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                    [{ text: '📢 تابع قناة البوت', url: 'https://t.me/ctrlsrc' }]
+                ]
+            };
         }
 
-        // Get the original photo URL
-        const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
-        
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
-                
-                [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
-            ]
-        };
-
         await ctx.replyWithPhoto(photoUrl, {
-            caption: '🤖استخدم الامر : مساعدة للحصول على معلومات التشغيل والرفع والاستخدام  مرحبًا! أنا بوت الحماية والمسابقات ايضا اختر خيارًا:',
+            caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات. اختر خيارًا:',
             reply_markup: keyboard
         });
+        
     } catch (error) {
         console.error('Error in showMainMenu:', error);
         await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية.');
     }
 }
+
 async function showHelp(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
