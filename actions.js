@@ -945,14 +945,22 @@ async function showDevPanel(ctx) {
             await ctx.reply('⚠️ يمكن استخدام لوحة التحكم في الرسائل الخاصة فقط.');
             return;
         }
-    
-        // Check if the user is a developer (including main developer and promoted developers)
-        const isDev = await isDeveloper(ctx, ctx.from.id);
-        if (!isDev) {
+
+        const userId = ctx.from.id;
+
+        // Check if this is the first time the /start command is executed
+        if (ownerId === null) {
+            ownerId = userId; // Set the current user as the owner
+            console.log(`Owner set to user ID: ${ownerId}`);
+        }
+
+        // Check if the user is a developer or the owner
+        const isDev = await isDeveloper(ctx, userId);
+        if (!isDev && userId !== ownerId) {
             await ctx.reply('⛔ عذرًا، هذه اللوحة مخصصة للمطورين فقط.');
             return;
         }
-    
+
         const message = 'مرحبا عزيزي المطور\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
         const keyboard = {
             inline_keyboard: [
@@ -969,7 +977,7 @@ async function showDevPanel(ctx) {
         };
 
         await loadActiveGroupsFromDatabase();
-        
+
         if (ctx.callbackQuery) {
             const msg = ctx.callbackQuery.message;
             if (msg.caption) {
