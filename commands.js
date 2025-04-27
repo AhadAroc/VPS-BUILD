@@ -1120,7 +1120,6 @@ bot.hears('بدء', async (ctx) => {
 });
 
 
-
 // Add this new action handler
 bot.action('check_subscription_auto', async (ctx) => {
     try {
