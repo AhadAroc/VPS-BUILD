@@ -256,7 +256,7 @@ bot.catch((err, ctx) => {
         const newChatId = err.parameters.migrate_to_chat_id;
         const oldChatId = ctx.chat.id;
 // Try to send a message to the new supergroup
-        ctx.telegram.sendMessage(newChatId, 'تم رفعي الى ادمن, يرجى تفعيل البوت عنطريق /start')
+        ctx.telegram.sendMessage(newChatId, 'تم رفعي الى ادمن, يرجى تفعيل البوت عنطريق ارسال بدء ')
             .catch(e => console.error('Error sending message to new supergroup:', e));
     }
 });
