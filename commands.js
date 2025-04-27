@@ -701,7 +701,7 @@ function setupCommands(bot) {
                return next(); // let the bot work even if check fails (fail-safe)
            }
        });
-    bot.command('start', async (ctx) => {
+       bot.command('start', async (ctx) => {
         try {
             const userId = ctx.from.id;
             const isDM = ctx.chat.type === 'private';
@@ -726,6 +726,10 @@ function setupCommands(bot) {
                 );
             }
     
+            // Check if the user is subscribed
+            const subscribed = await checkUserSubscription(ctx);
+            if (!subscribed) return; // Stop if not subscribed
+    
             const isDevResult = await isDeveloper(ctx, userId);
     
             if (isDM) {
@@ -734,11 +738,7 @@ function setupCommands(bot) {
                     return await showDevPanel(ctx);
                 }
     
-                // 📛 call the new function
-                const subscribed = await checkUserSubscription(ctx);
-                if (!subscribed) return; // stop if not subscribed
-    
-                // fallback welcome (only if necessary)
+                // Fallback welcome (only if necessary)
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
                 const keyboard = [
                     [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
