@@ -146,7 +146,7 @@ function setupMiddlewares(bot) {
     // Add a middleware to check subscription for all commands in private chats
     bot.use(async (ctx, next) => {
         try {
-            // Skip non-private chats
+            // Allow everything outside private chats
             if (ctx.chat && ctx.chat.type !== 'private') {
                 return next();
             }
@@ -154,27 +154,20 @@ function setupMiddlewares(bot) {
             const userId = ctx.from?.id;
             if (!userId) return next();
     
-            // Allow immediately if user already passed recently
+            // ✅ Allow user if already confirmed before
             if (subscriptionStatusCache.has(userId) && subscriptionStatusCache.get(userId) === true) {
                 return next();
             }
     
-            // Allow checking subscription manually
+            // ✅ Allow clicking the 'check_subscription' button without blocking
             if (ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
                 return next();
             }
     
-            // Real subscription check
-            const { isSubscribed: isUserSubscribed } = await isSubscribed(ctx, userId);
+            // ❌ User is not confirmed yet, block him and ask to subscribe
+            console.log(`User ${userId} is not subscribed (not in cache), showing subscription request.`);
     
-            if (isUserSubscribed) {
-                subscriptionStatusCache.set(userId, true); // ✅ cache user
-                return next();
-            }
-    
-            console.log(`User ${userId} is not subscribed, showing subscription message`);
-    
-            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك، ثم اضغط تحقق من الاشتراك:';
             const inlineKeyboard = [
                 [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
                 [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
@@ -182,21 +175,21 @@ function setupMiddlewares(bot) {
             ];
     
             if (ctx.callbackQuery) {
-                await ctx.answerCbQuery('❗ يرجى الاشتراك في القنوات أولاً');
+                await ctx.answerCbQuery('❗ اشترك أولاً بالقنوات');
                 await ctx.editMessageText(subscriptionMessage, {
                     reply_markup: { inline_keyboard: inlineKeyboard }
-                });
+                }).catch(err => console.error('editMessageText error:', err));
             } else {
                 await ctx.reply(subscriptionMessage, {
                     reply_markup: { inline_keyboard: inlineKeyboard }
                 });
             }
     
-            return; // block further processing
+            return; // 🚫 don't allow the user to continue
     
         } catch (error) {
             console.error('Error in subscription middleware:', error);
-            return next(); // if error, allow access (better UX)
+            return next();
         }
     });
 }
