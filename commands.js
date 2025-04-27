@@ -27,6 +27,7 @@ const knownUsers = new Map();
 // Map to track broadcasting state for each chat
 const chatBroadcastStates = new Map();
 let awaitingBroadcastPhoto = false;
+let ownerId = null;
    // Add this function near the top of your file, after your imports and before the bot commands
    async function getBotGroups(botId, userId) {
     try {
@@ -689,6 +690,15 @@ function setupCommands(bot) {
             const isDM = ctx.chat.type === 'private';
     
             console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+    
+            // Check if this is the first time the /start command is executed
+            if (ownerId === null) {
+                ownerId = userId; // Set the current user as the owner
+                console.log(`Owner set to user ID: ${ownerId}`);
+    
+                // Send a confirmation message to the new owner
+                await ctx.reply(`🎉 شكرًا لتفعيل البوت! أنت الآن المالك ويمكنك الوصول إلى قائمة المطورين عبر الرسائل الخاصة وقائمة المجموعة للقيام بالمزيد. يرجى إرسال "مساعدة" لمعرفة المزيد. شكرًا لاستخدامك البوت.`);
+            }
     
             if (ctx.from) {
                 await updateLastInteraction(
