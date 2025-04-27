@@ -518,7 +518,23 @@ async function checkUserRank(ctx) {
 async function checkUserSubscription(ctx) {
     try {
         const userId = ctx.from.id;
-        const { isSubscribed: subscribed } = await isSubscribed(ctx, userId); // ✅ renamed here!
+
+        // Define the channels that require subscription
+        const requiredChannels = [
+            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
+        ];
+
+        // Extract channel IDs for the Axios request
+        const channelIds = requiredChannels.map(channel => channel.id);
+
+        // Send a POST request to Bot B
+        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+            userId,
+            channels: channelIds
+        });
+
+        const { subscribed } = response.data;
 
         if (subscribed) {
             subscriptionStatusCache.set(userId, true);
