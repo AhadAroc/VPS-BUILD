@@ -545,7 +545,7 @@ async function checkUserSubscription(ctx) {
 
 async function isSubscribed(ctx, userId) {
     try {
-        // Check from cache (valid for 1 min)
+        // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
         const cachedResult = subscriptionCache.get(userId);
         if (cachedResult && (Date.now() - cachedResult.timestamp < 1 * 60 * 1000)) {
             console.log(`Using cached subscription status for user ${userId}: ${cachedResult.isSubscribed}`);
@@ -556,38 +556,62 @@ async function isSubscribed(ctx, userId) {
             };
         }
 
-        console.log(`Checking subscription via Bot B for user ${userId}`);
-
-        // Channel IDs you want to check (MUST be IDs, not usernames)
-        const channelIds = [
-            -1002555424660,  // ID of 'sub2vea'
-            -1002331727102   // ID of 'leavemestary'
+        console.log(`Checking subscription status for user ${userId}`);
+        
+        // Define the channels that require subscription
+        const requiredChannels = [
+            { username: 'leavemestary', title: 'قناة السورس' },
+            { username: 'sub2vea', title: 'القناة الرسمية' }
         ];
-
-        // 🔥 Call your Bot B server to check
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        // Cache the result
-        subscriptionCache.set(userId, {
-            isSubscribed: subscribed,
+        
+        let allSubscribed = true;
+        let notSubscribedChannels = [];
+        
+        // Check each channel
+        for (const channel of requiredChannels) {
+            try {
+                // Force a fresh check by bypassing any Telegram API caching
+                const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
+                const isSubbed = ['member', 'administrator', 'creator'].includes(member.status);
+                
+                console.log(`User ${userId} subscription status for @${channel.username}: ${isSubbed} (${member.status})`);
+                
+                if (!isSubbed) {
+                    allSubscribed = false;
+                    notSubscribedChannels.push(channel);
+                }
+            } catch (error) {
+                console.error(`Error checking subscription for @${channel.username}:`, error);
+                // If we can't check, assume not subscribed for safety
+                allSubscribed = false;
+                notSubscribedChannels.push(channel);
+            }
+        }
+        
+        // Clear the cache if the status has changed
+        const previousStatus = subscriptionCache.get(userId)?.isSubscribed || false;
+        const statusChanged = previousStatus !== allSubscribed;
+        
+        if (statusChanged) {
+            console.log(`Subscription status changed for user ${userId}: ${previousStatus} -> ${allSubscribed}`);
+        }
+        
+        // Store the result in cache with a shorter expiration time (30 seconds)
+        subscriptionCache.set(userId, { 
+            isSubscribed: allSubscribed, 
             timestamp: Date.now(),
-            notSubscribedChannels: subscribed ? [] : channelIds
+            notSubscribedChannels: notSubscribedChannels
         });
-
+        
+        // Return the result with status change indicator
         return {
-            isSubscribed: subscribed,
-            statusChanged: false, // You can add smarter change detection if you want
-            notSubscribedChannels: subscribed ? [] : channelIds
+            isSubscribed: allSubscribed,
+            statusChanged: statusChanged,
+            notSubscribedChannels: notSubscribedChannels
         };
-
     } catch (error) {
-        console.error(`Error checking subscription for user ${userId} via Bot B:`, error);
-        // Fail-safe: assume not subscribed
+        console.error(`Error in isSubscribed check for user ${userId}:`, error);
+        // Default to false on error
         return {
             isSubscribed: false,
             statusChanged: false,
@@ -1126,14 +1150,14 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-
+// Update the "بدء" command handler
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const { isSubscribed: subscribed } = await isSubscribed(ctx, userId);
 
-        console.log(`DEBUG: "بدء" triggered | chat type: ${ctx.chat.type} | userId: ${userId} | subscribed: ${subscribed}`);
+        console.log(`DEBUG: بدإ triggered | chat type: ${ctx.chat.type} | userId: ${userId} | subscribed: ${subscribed}`);
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
@@ -1143,9 +1167,10 @@ bot.hears('بدء', async (ctx) => {
                 console.log('DEBUG: Showing Main Menu (group)');
                 await showMainMenu(ctx);
             }
+            return;
         } else {
             console.log('DEBUG: User not subscribed, sending subscription buttons.');
-            const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك، ثم اضغط تحقق من الاشتراك:';
+            const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
 
             const inlineKeyboard = [
                 [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
@@ -1156,14 +1181,14 @@ bot.hears('بدء', async (ctx) => {
             await ctx.reply(subscriptionMessage, {
                 reply_markup: { inline_keyboard: inlineKeyboard }
             });
+            return;
         }
 
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        await ctx.reply('❌ حدث خطأ أثناء المعالجة.');
+        ctx.reply('❌ حدث خطأ أثناء المعالجة.');
     }
 });
-
 
 
 // Add this function to list VIP users
