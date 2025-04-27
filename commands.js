@@ -643,6 +643,7 @@ function setupCommands(bot) {
                 { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
             ];
     
+            // Extract channel IDs for the Axios request
             const channelIds = requiredChannels.map(channel => channel.id);
     
             // Send a POST request to Bot B
@@ -655,39 +656,23 @@ function setupCommands(bot) {
     
             if (subscribed) {
                 // User is subscribed to all channels
-                await ctx.answerCbQuery('✅ تم التحقق من اشتراكك بنجاح!', { show_alert: true });
-                
-                // Check if the user is a developer
-                const isDevResult = await isDeveloper(ctx, userId);
-                
-                if (isDevResult) {
-                    // User is a developer, show dev panel
+                if (ctx.chat.type === 'private') {
+                    // Show developer menu in DMs
                     await showDevPanel(ctx);
-                } else if (ctx.chat.type === 'private') {
-                    // In private chat, non-developers see a welcome message
-                    await ctx.editMessageText('مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                            ]
-                        }
-                    });
                 } else {
-                    // In groups, show main menu
+                    // Show main menu in groups
                     await showMainMenu(ctx);
                 }
             } else {
                 // User is not subscribed to all channels
-                await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
+                await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
                 
-                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
                 
                 const inlineKeyboard = requiredChannels.map(channel => 
                     [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
                 );
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
                 
                 await ctx.editMessageText(subscriptionMessage, {
                     reply_markup: {
@@ -697,7 +682,7 @@ function setupCommands(bot) {
             }
         } catch (error) {
             console.error('Error in check_subscription action:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.', { show_alert: true });
+            await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
         }
     });
     // Listen for photo messages
@@ -1063,20 +1048,20 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-
+// Update the "بدء" command handler
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
-
         const requiredChannels = [
             { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
             { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
         ];
 
+        // Extract channel IDs for the Axios request
         const channelIds = requiredChannels.map(channel => channel.id);
 
-        // Check subscription status
+        // Send a POST request to Bot B to check subscription
         const response = await axios.post('http://69.62.114.242:80/check-subscription', {
             userId,
             channels: channelIds
@@ -1085,72 +1070,32 @@ bot.hears('بدء', async (ctx) => {
         const { subscribed } = response.data;
 
         if (subscribed) {
-            // ✅ already subscribed
+            // User is subscribed to all channels
             if (ctx.chat.type === 'private') {
-                await showDevPanel(ctx);  // show dev menu immediately
-            } else {
-                await showMainMenu(ctx); // group menu
-            }
-        } else {
-            // ❌ not subscribed yet
-            if (ctx.chat.type === 'private') {
-                // only show subscription request if in private chat
-                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
-                
-                const inlineKeyboard = requiredChannels.map(channel => 
-                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-                );
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription_auto' }]);
-                
-                await ctx.reply(subscriptionMessage, {
-                    reply_markup: {
-                        inline_keyboard: inlineKeyboard
-                    }
-                });
-            } else {
-                // if in group chat, maybe just silent fail or send something simple
-                await ctx.reply('❌ تحتاج للاشتراك في القنوات المطلوبة لاستخدام البوت.');
-            }
-        }
-
-    } catch (error) {
-        console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
-    }
-});
-
-
-// Add this new action handler
-bot.action('check_subscription_auto', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
-        ];
-
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        if (subscribed) {
-            await ctx.answerCbQuery('✅ تم التحقق من اشتراكك بنجاح!');
-            if (ctx.chat.type === 'private') {
+                // Show developer menu in DMs
                 await showDevPanel(ctx);
             } else {
+                // Show main menu in groups
                 await showMainMenu(ctx);
             }
         } else {
-            await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
+            // User is not subscribed to all channels
+            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            
+            const inlineKeyboard = requiredChannels.map(channel => 
+                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+            );
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+            
+            await ctx.reply(subscriptionMessage, {
+                reply_markup: {
+                    inline_keyboard: inlineKeyboard
+                }
+            });
         }
     } catch (error) {
-        console.error('Error in check_subscription_auto action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
+        console.error('Error handling "بدء" command:', error);
+        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
 
