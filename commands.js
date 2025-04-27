@@ -642,8 +642,11 @@ function setupCommands(bot) {
                 { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
                 { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
             ];
+    
+            // Extract channel IDs for the Axios request
             const channelIds = requiredChannels.map(channel => channel.id);
     
+            // Send a POST request to Bot B
             const response = await axios.post('http://69.62.114.242:80/check-subscription', {
                 userId,
                 channels: channelIds
@@ -652,52 +655,36 @@ function setupCommands(bot) {
             const { subscribed } = response.data;
     
             if (subscribed) {
-                await ctx.answerCbQuery('✅ تم التحقق من اشتراكك بنجاح!', { show_alert: true });
-    
-                const isDevResult = await isDeveloper(ctx, userId);
-    
-                if (isDevResult) {
-                    await showDevPanel(ctx);
-                    return; // 🛑 important!
-                }
-    
+                // User is subscribed to all channels
                 if (ctx.chat.type === 'private') {
-                    await ctx.editMessageText('مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                            ]
-                        }
-                    }).catch(err => console.error('editMessageText failed:', err)); // 🔥
-                    return;
+                    // Show developer menu in DMs
+                    await showDevPanel(ctx);
                 } else {
+                    // Show main menu in groups
                     await showMainMenu(ctx);
-                    return;
                 }
             } else {
-                await ctx.answerCbQuery('❌ لم يتم الاشتراك في جميع القنوات المطلوبة بعد.', { show_alert: true });
-    
-                const subscriptionMessage = 'لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                // User is not subscribed to all channels
+                await ctx.answerCbQuery('❌ يرجى الاشتراك في جميع القنوات المطلوبة أولاً.');
+                
+                const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+                
                 const inlineKeyboard = requiredChannels.map(channel => 
                     [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
                 );
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
-    
+                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+                
                 await ctx.editMessageText(subscriptionMessage, {
                     reply_markup: {
                         inline_keyboard: inlineKeyboard
                     }
-                }).catch(err => console.error('editMessageText failed:', err)); // 🔥
-                return;
+                });
             }
         } catch (error) {
             console.error('Error in check_subscription action:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.', { show_alert: true });
+            await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
         }
     });
-    
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
@@ -1061,29 +1048,56 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-
+// Update the "بدء" command handler
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
-        if (ctx.chat.type === 'private') {
-            await showDevPanel(ctx);
-            return;
+        const userId = ctx.from.id;
+        const requiredChannels = [
+            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
+        ];
+
+        // Extract channel IDs for the Axios request
+        const channelIds = requiredChannels.map(channel => channel.id);
+
+        // Send a POST request to Bot B to check subscription
+        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+            userId,
+            channels: channelIds
+        });
+
+        const { subscribed } = response.data;
+
+        if (subscribed) {
+            // User is subscribed to all channels
+            if (ctx.chat.type === 'private') {
+                // Show developer menu in DMs
+                await showDevPanel(ctx);
+            } else {
+                // Show main menu in groups
+                await showMainMenu(ctx);
+            }
         } else {
-            await showMainMenu(ctx);
-            return;
+            // User is not subscribed to all channels
+            const subscriptionMessage = 'لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            
+            const inlineKeyboard = requiredChannels.map(channel => 
+                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+            );
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]);
+            
+            await ctx.reply(subscriptionMessage, {
+                reply_markup: {
+                    inline_keyboard: inlineKeyboard
+                }
+            });
         }
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
-
-
-
-
-
-
-
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
