@@ -502,6 +502,46 @@ async function checkUserRank(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
     }
 }
+async function checkUserSubscription(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const { isSubscribed } = await isSubscribed(ctx, userId);
+
+        if (isSubscribed) {
+            subscriptionStatusCache.set(userId, true);
+
+            if (ctx.chat?.type === 'private') {
+                await showDevPanel(ctx);
+            } else {
+                await showMainMenu(ctx);
+            }
+            return true; // ✅ Subscribed
+        } else {
+            const subscriptionMessage = '⚠️ لاستخدام البوت، يرجى الاشتراك في القنوات التالية:';
+            const inlineKeyboard = [
+                [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
+                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+            ];
+
+            if (ctx.callbackQuery) {
+                await ctx.answerCbQuery('❗ اشترك أولاً');
+                await ctx.editMessageText(subscriptionMessage, {
+                    reply_markup: { inline_keyboard: inlineKeyboard }
+                }).catch(err => console.error('editMessageText error:', err));
+            } else {
+                await ctx.reply(subscriptionMessage, {
+                    reply_markup: { inline_keyboard: inlineKeyboard }
+                });
+            }
+            return false; // ❌ Not subscribed
+        }
+    } catch (error) {
+        console.error('Error in checkUserSubscription:', error);
+        await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => {});
+        return false; // treat as not subscribed on error
+    }
+}
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
@@ -561,10 +601,9 @@ function setupCommands(bot) {
         try {
             const userId = ctx.from.id;
             const isDM = ctx.chat.type === 'private';
-            
+    
             console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
-            
-            // Track user interaction
+    
             if (ctx.from) {
                 await updateLastInteraction(
                     ctx.from.id, 
@@ -573,49 +612,45 @@ function setupCommands(bot) {
                     ctx.from.last_name
                 );
             }
-            
-            // Check if the user is a developer
+    
             const isDevResult = await isDeveloper(ctx, userId);
-            
-            // For DMs
+    
             if (isDM) {
-                // If the user is a developer, show the dev panel
                 if (isDevResult) {
                     console.log('DEBUG: Showing developer panel in DM');
                     return await showDevPanel(ctx);
                 }
-                
-                // For non-developers, check subscription status using check_subscription
-                await check_subscription(ctx);
-                
-                // This is only showed if the user hasn't added the bot to the group
+    
+                // 📛 call the new function
+                const subscribed = await checkUserSubscription(ctx);
+                if (!subscribed) return; // stop if not subscribed
+    
+                // fallback welcome (only if necessary)
                 const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
-                let keyboard = [
+                const keyboard = [
                     [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
                     [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
                     [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
                 ];
-
                 return ctx.reply(welcomeMessage, {
                     reply_markup: { inline_keyboard: keyboard }
                 });
-            } 
-            
-            // For group chats
+            }
+    
+            // For groups
             await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
-            
-            // If the user is a developer, show the dev panel
+    
             if (isDevResult) {
                 console.log('DEBUG: Showing developer panel in group');
                 return await showDevPanel(ctx);
             }
-            
+    
             const isAdmin = await isAdminOrOwner(ctx, userId);
             const isVIPUser = await isVIP(ctx, userId);
-            
+    
             if (isAdmin || isVIPUser) {
                 console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
-                return showMainMenu(ctx);
+                return await showMainMenu(ctx);
             } else {
                 console.log('DEBUG: Regular user in group, showing basic message');
                 return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
@@ -625,6 +660,7 @@ function setupCommands(bot) {
             ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
         }
     });
+    
     bot.action('check_subscription', async (ctx) => {
         try {
             const userId = ctx.from.id;
