@@ -1153,28 +1153,29 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 // Update the "بدء" command handler
 // Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
-    console.log(`DEBUG بدء triggered in chat type: ${ctx.chat.type}, userId: ${userId}, subscribed: ${subscribed}`);
-
     try {
         const userId = ctx.from.id;
-
-        // ✅ Use the cached/fresh isSubscribed function (not manual axios)
         const { isSubscribed: subscribed } = await isSubscribed(ctx, userId);
+
+        console.log(`DEBUG: بدإ triggered | chat type: ${ctx.chat.type} | userId: ${userId} | subscribed: ${subscribed}`);
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
+                console.log('DEBUG: Showing Dev Panel (private)');
                 await showDevPanel(ctx);
             } else {
+                console.log('DEBUG: Showing Main Menu (group)');
                 await showMainMenu(ctx);
             }
             return;
         } else {
-            const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! لاستخدام البوت بشكل كامل، يرجى الاشتراك في القنوات التالية:';
+            console.log('DEBUG: User not subscribed, sending subscription buttons.');
+            const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
 
             const inlineKeyboard = [
                 [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
                 [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-                [{ text: '✅ تحقق من الاشتراك مرة أخرى', callback_data: 'check_subscription' }]
+                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
             ];
 
             await ctx.reply(subscriptionMessage, {
@@ -1185,7 +1186,7 @@ bot.hears('بدء', async (ctx) => {
 
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+        ctx.reply('❌ حدث خطأ أثناء المعالجة.');
     }
 });
 
