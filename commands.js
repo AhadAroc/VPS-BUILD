@@ -1349,7 +1349,12 @@ bot.on('left_chat_member', async (ctx) => {
         `;
 
         try {
-            await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
+            if (ownerId) {
+                await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
+                console.log(`Notification sent to owner (ID: ${ownerId})`);
+            } else {
+                console.warn('Owner ID is not set. Cannot send notification.');
+            }
         } catch (error) {
             console.error('Error sending removal message to owner:', error);
         }
