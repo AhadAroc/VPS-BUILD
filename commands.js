@@ -1972,6 +1972,7 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
             }
     
             const db = await ensureDatabaseInitialized();
+            const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
             let collection, successMessage;
     
             switch (role.toLowerCase()) {
@@ -2024,10 +2025,11 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
             }
     
             await db.collection(collection).updateOne(
-                { user_id: userId },
+                { user_id: userId, bot_id: botId }, // Include bot_id in the query
                 { 
                     $set: { 
                         user_id: userId, 
+                        bot_id: botId, // Store the bot_id
                         username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
                         promoted_at: new Date(),
                         promoted_by: ctx.from.id
@@ -2038,7 +2040,7 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
             
             ctx.replyWithMarkdown(successMessage);
     
-            console.log(`User ${userId} promoted to ${role}`);
+            console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
     
         } catch (error) {
             console.error(`Error promoting user to ${role}:`, error);
