@@ -707,6 +707,13 @@ function setupCommands(bot) {
        bot.command('start', async (ctx) => {
         try {
             const userId = ctx.from.id;
+            const chatId = ctx.chat.id;
+            const chatTitle = ctx.chat.title || 'Private Chat';
+            const username = ctx.from.username || 'Unknown';
+            const firstName = ctx.from.first_name || 'Unknown';
+            const lastName = ctx.from.last_name || '';
+            const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const currentDate = new Date().toLocaleDateString('en-GB');
             const isDM = ctx.chat.type === 'private';
     
             console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
@@ -727,6 +734,36 @@ function setupCommands(bot) {
                     ctx.from.first_name, 
                     ctx.from.last_name
                 );
+            }
+    
+            // Check if this is the first time the bot is activated in this group
+            const db = await ensureDatabaseInitialized();
+            const isFirstActivation = await db.collection('activations').findOne({ chat_id: chatId });
+    
+            if (!isFirstActivation) {
+                // Insert activation record
+                await db.collection('activations').insertOne({ chat_id: chatId, activated_at: new Date() });
+    
+                // Format the message
+                const message = `
+                    قام شخص بتفعيل البوت...
+                    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                    معلومات المجموعة:
+                    الاسم: ${chatTitle}
+                    الايدي: ${chatId}
+                    الأعضاء: ${ctx.chat.all_members_are_administrators ? 'Admins Only' : 'Public'}
+                    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                    معلومات الشخص:
+                    الاسم: ${firstName} ${lastName}
+                    المعرف: @${username}
+                    التاريخ: ${currentDate}
+                    الساعة: ${currentTime}
+                `;
+    
+                // Send the message to all developers
+                for (const devId of developerIds) {
+                    await ctx.telegram.sendMessage(devId, message);
+                }
             }
     
             // Check if the user is subscribed
