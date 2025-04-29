@@ -1313,7 +1313,11 @@ bot.on('left_chat_member', async (ctx) => {
 
             // Send the message to all developers
             for (const devId of developerIds) {
-                await ctx.telegram.sendMessage(devId, message);
+                try {
+                    await ctx.telegram.sendMessage(devId, message);
+                } catch (error) {
+                    console.error(`Error sending message to developer ${devId}:`, error);
+                }
             }
         }
     } catch (error) {
