@@ -78,40 +78,12 @@ bot.start((ctx) => {
         [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
     ]));
 });
-// Middleware to ensure only API requests are processed
-bot.use(async (ctx, next) => {
-    if (ctx.updateType === 'message' && ctx.message.text) {
-        const text = ctx.message.text.toLowerCase();
-        if (text.includes('api')) {
-            return next();
-        } else {
-            return;
-        }
-    }
-    return next();
-});
+
 // Handle "Create Bot" option
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-// Add broadcast commands
-bot.command('broadcast_private', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return ctx.reply('❌ هذا الأمر للمطورين فقط.');
-    // Logic to broadcast to private bot subscribers
-    ctx.reply('📢 تم إرسال الإذاعة للمشتركين في البوت الخاص.');
-});
 
-bot.command('broadcast_general', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return ctx.reply('❌ هذا الأمر للمطورين فقط.');
-    // Logic to broadcast to all subscribers and active bots
-    ctx.reply('📢 تم إرسال الإذاعة للمشتركين في البوت الخاص والكرّوبات المفعلة.');
-});
-
-bot.command('broadcast_bots', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return ctx.reply('❌ هذا الأمر للمطورين فقط.');
-    // Logic to broadcast only within active bots
-    ctx.reply('📢 تم إرسال الإذاعة في الكرّوبات فقط.');
-});
 // Handle token submission
 bot.on('text', async (ctx) => {
     const token = ctx.message.text.trim();
@@ -124,7 +96,7 @@ bot.on('text', async (ctx) => {
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return;
+        return ctx.reply('❌ التوكن غير صالح. تأكد من نسخه بشكل صحيح من @BotFather.');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
