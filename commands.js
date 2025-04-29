@@ -86,21 +86,32 @@ async function getLatestGroupsMembersState(botId, userId) {
         return {};
     }
 }
-  // ✅ Function to check if the user is admin or owner
+  // ✅ Function to check if the user is admin or owner // u fuked with this part
   async function isAdminOrOwner(ctx, userId) {
     try {
-        if (!ctx.chat) {
-            console.error('Chat context is missing');
-            return false;
-        }
-
-        const chatId = ctx.chat.id;
-        const chatMember = await ctx.telegram.getChatMember(chatId, userId);
-
-        return ['creator', 'administrator'].includes(chatMember.status);
+        const member = await ctx.telegram.getChatMember(ctx.chat.id, userId);
+        return ['administrator', 'creator'].includes(member.status);
     } catch (error) {
-        console.error('Error checking admin status:', error);
-        // In case of an error, we'll assume the user is not an admin
+        if (error.response && error.response.error_code === 403 && error.response.description.includes('bot was kicked')) {
+            console.error('Bot was kicked from the group:', ctx.chat.id);
+            // Notify the owner about the bot being kicked
+            if (ownerId) {
+                const message = `
+                    🚫 تم طرد البوت من المجموعة
+                    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                    👥 *اسم المجموعة:* ${ctx.chat.title || 'Unknown'}
+                    🆔 *ايدي المجموعة:* ${ctx.chat.id}
+                `;
+                try {
+                    await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
+                    console.log(`Notification sent to owner (ID: ${ownerId})`);
+                } catch (notifyError) {
+                    console.error('Error notifying owner about bot being kicked:', notifyError);
+                }
+            }
+        } else {
+            console.error('Error checking admin status:', error);
+        }
         return false;
     }
 }
