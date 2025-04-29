@@ -1227,7 +1227,36 @@ bot.hears('بدء', async (ctx) => {
     }
 });
 
+bot.on('left_chat_member', async (ctx) => {
+    try {
+        const leftMember = ctx.message.left_chat_member;
+        
+        // Check if the bot was the one who left
+        if (leftMember.id === ctx.botInfo.id) {
+            const chatTitle = ctx.chat.title || 'Unknown';
+            const chatId = ctx.chat.id;
+            const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const currentDate = new Date().toLocaleDateString('en-GB');
 
+            const message = `
+                ⌯ تم طرد البوت من المجموعة ⌯
+                ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                ⌯ اسم المجموعة ⌯: ${chatTitle}
+                ⌯ ايدي المجموعة ⌯: ${chatId}
+                ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                ⌯ الوقت ⌯: ${currentTime}
+                ⌯ التاريخ ⌯: ${currentDate}
+            `;
+
+            // Send the message to all developers
+            for (const devId of developerIds) {
+                await ctx.telegram.sendMessage(devId, message);
+            }
+        }
+    } catch (error) {
+        console.error('Error handling bot kick notification:', error);
+    }
+});
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
     try {
