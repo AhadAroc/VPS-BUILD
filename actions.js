@@ -3709,7 +3709,8 @@ async function checkForAutomaticReply(ctx) {
             await ctx.answerCbQuery('عرض قائمة المطورين');
             try {
                 const db = await ensureDatabaseInitialized();
-                const developers = await db.collection('developers').find({}).toArray();
+                const botId = ctx.botInfo.id; // Get the current bot's ID
+                const developers = await db.collection('developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
                 
                 if (developers.length > 0) {
                     const developersList = await Promise.all(developers.map(async (dev, index) => {
@@ -3881,7 +3882,8 @@ async function checkForAutomaticReply(ctx) {
             await ctx.answerCbQuery('حذف المطورين');
             try {
                 const db = await ensureDatabaseInitialized();
-                const developers = await db.collection('developers').find({}).toArray();
+                const botId = ctx.botInfo.id; // Get the current bot's ID
+                const developers = await db.collection('developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
                 
                 if (developers.length > 0) {
                     const keyboard = await Promise.all(developers.map(async (dev, index) => {
@@ -4146,79 +4148,81 @@ bot.action('back_to_dev_panel', async (ctx) => {
     
    
     
-    bot.action('list_secondary_developers', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('عرض قائمة المطورين الثانويين');
-            try {
-                const db = await ensureDatabaseInitialized();
-                const secondaryDevs = await db.collection('secondary_developers').find().toArray();
-    
-                if (secondaryDevs.length > 0) {
-                    const devsList = await Promise.all(secondaryDevs.map(async (dev, index) => {
-                        let displayName = dev.username ? `@${dev.username}` : 'بدون معرف';
-                        try {
-                            const user = await ctx.telegram.getChat(dev.user_id);
-                            displayName = user.username ? `@${user.username}` : user.first_name || 'بدون اسم';
-                        } catch (error) {
-                            console.error(`Error fetching user info for ${dev.user_id}:`, error);
-                        }
-                        return `${index + 1}. ${displayName} ↫ معرف ↓\n${dev.user_id}`;
-                    }));
-                    await ctx.reply(`قائمة المطورين الثانويين:\n\n${devsList.join('\n\n')}`);
-                } else {
-                    await ctx.reply('لا يوجد مطورين ثانويين حاليًا.');
-                }
-            } catch (error) {
-                console.error('Error fetching secondary developers:', error);
-                await ctx.reply('❌ حدث خطأ أثناء جلب قائمة المطورين الثانويين. الرجاء المحاولة مرة أخرى لاحقًا.');
-                
-                // Additional error logging
-                console.error('Error details:', error.message);
-                console.error('Error stack:', error.stack);
+bot.action('list_secondary_developers', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('عرض قائمة المطورين الثانويين');
+        try {
+            const db = await ensureDatabaseInitialized();
+            const botId = ctx.botInfo.id; // Get the current bot's ID
+            const secondaryDevs = await db.collection('secondary_developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
+
+            if (secondaryDevs.length > 0) {
+                const devsList = await Promise.all(secondaryDevs.map(async (dev, index) => {
+                    let displayName = dev.username ? `@${dev.username}` : 'بدون معرف';
+                    try {
+                        const user = await ctx.telegram.getChat(dev.user_id);
+                        displayName = user.username ? `@${user.username}` : user.first_name || 'بدون اسم';
+                    } catch (error) {
+                        console.error(`Error fetching user info for ${dev.user_id}:`, error);
+                    }
+                    return `${index + 1}. ${displayName} ↫ معرف ↓\n${dev.user_id}`;
+                }));
+                await ctx.reply(`قائمة المطورين الثانويين:\n\n${devsList.join('\n\n')}`);
+            } else {
+                await ctx.reply('لا يوجد مطورين ثانويين حاليًا.');
             }
-        } else {
-            ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        } catch (error) {
+            console.error('Error fetching secondary developers:', error);
+            await ctx.reply('❌ حدث خطأ أثناء جلب قائمة المطورين الثانويين. الرجاء المحاولة مرة أخرى لاحقًا.');
+            
+            // Additional error logging
+            console.error('Error details:', error.message);
+            console.error('Error stack:', error.stack);
         }
-    });
-    
-    bot.action('delete_secondary_developers', async (ctx) => {
-        if (await isDeveloper(ctx, ctx.from.id)) {
-            await ctx.answerCbQuery('حذف المطورين الثانويين');
-            try {
-                const db = await ensureDatabaseInitialized();
-                const secondaryDevs = await db.collection('secondary_developers').find().toArray();
-    
-                if (secondaryDevs.length > 0) {
-                    const keyboard = await Promise.all(secondaryDevs.map(async (dev, index) => {
-                        let displayName = dev.username ? `@${dev.username}` : 'بدون معرف';
-                        try {
-                            const user = await ctx.telegram.getChat(dev.user_id);
-                            displayName = user.username ? `@${user.username}` : user.first_name || 'بدون اسم';
-                        } catch (error) {
-                            console.error(`Error fetching user info for ${dev.user_id}:`, error);
-                        }
-                        return [{
-                            text: `${index + 1}. ${displayName}`,
-                            callback_data: `confirm_delete_secondary_dev_${dev.user_id}`
-                        }];
-                    }));
-    
-                    keyboard.push([{ text: 'إلغاء', callback_data: 'cancel_delete_secondary_developers' }]);
-    
-                    await ctx.editMessageText('قائمة المطورين الثانويين:', {
-                        reply_markup: { inline_keyboard: keyboard }
-                    });
-                } else {
-                    await ctx.editMessageText('لا يوجد مطورين ثانويين لحذفهم.');
-                }
-            } catch (error) {
-                console.error('Error fetching secondary developers for deletion:', error);
-                await ctx.editMessageText('❌ حدث خطأ أثناء جلب قائمة المطورين الثانويين. الرجاء المحاولة مرة أخرى لاحقًا.');
+    } else {
+        ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
+
+bot.action('delete_secondary_developers', async (ctx) => {
+    if (await isDeveloper(ctx, ctx.from.id)) {
+        await ctx.answerCbQuery('حذف المطورين الثانويين');
+        try {
+            const db = await ensureDatabaseInitialized();
+            const botId = ctx.botInfo.id; // Get the current bot's ID
+            const secondaryDevs = await db.collection('secondary_developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
+
+            if (secondaryDevs.length > 0) {
+                const keyboard = await Promise.all(secondaryDevs.map(async (dev, index) => {
+                    let displayName = dev.username ? `@${dev.username}` : 'بدون معرف';
+                    try {
+                        const user = await ctx.telegram.getChat(dev.user_id);
+                        displayName = user.username ? `@${user.username}` : user.first_name || 'بدون اسم';
+                    } catch (error) {
+                        console.error(`Error fetching user info for ${dev.user_id}:`, error);
+                    }
+                    return [{
+                        text: `${index + 1}. ${displayName}`,
+                        callback_data: `confirm_delete_secondary_dev_${dev.user_id}`
+                    }];
+                }));
+
+                keyboard.push([{ text: 'إلغاء', callback_data: 'cancel_delete_secondary_developers' }]);
+
+                await ctx.editMessageText('قائمة المطورين الثانويين:', {
+                    reply_markup: { inline_keyboard: keyboard }
+                });
+            } else {
+                await ctx.editMessageText('لا يوجد مطورين ثانويين لحذفهم.');
             }
-        } else {
-            ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        } catch (error) {
+            console.error('Error fetching secondary developers for deletion:', error);
+            await ctx.editMessageText('❌ حدث خطأ أثناء جلب قائمة المطورين الثانويين. الرجاء المحاولة مرة أخرى لاحقًا.');
         }
-    });
+    } else {
+        ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+    }
+});
     
     bot.action(/^confirm_delete_secondary_dev_(\d+)$/, async (ctx) => {
         const devIdToDelete = ctx.match[1];
