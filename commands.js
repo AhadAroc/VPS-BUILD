@@ -728,6 +728,15 @@ function setupCommands(bot) {
     
             console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
     
+            // Check if this is the first time the /start command is executed
+            if (ownerId === null) {
+                ownerId = userId; // Set the current user as the owner
+                console.log(`Owner set to user ID: ${ownerId}`);
+    
+                // Send a confirmation message to the new owner
+                await ctx.reply(`🎉 شكرًا لتفعيل البوت! أنت الآن المالك ويمكنك الوصول إلى قائمة المطورين عبر الرسائل الخاصة وقائمة المجموعة للقيام بالمزيد. يرجى إرسال "مساعدة" لمعرفة المزيد. شكرًا لاستخدامك البوت.`);
+            }
+    
             // Check if the user has a specific rank
             const isDev = await isDeveloper(ctx, userId);
             const isAdmin = await isAdminOrOwner(ctx, userId);
@@ -735,12 +744,7 @@ function setupCommands(bot) {
     
             // Only proceed if the user is a dev, admin, or sec dev
             if (!isDev && !isAdmin && !isSecDev) {
-                if (ownerId === null) {
-                    ownerId = userId; // Set the current user as the owner
-                    console.log(`Owner set to user ID: ${ownerId}`);
-                } else {
-                    return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
-                }
+                return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
             }
     
             if (ctx.from) {
