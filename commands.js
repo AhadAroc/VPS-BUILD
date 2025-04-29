@@ -714,7 +714,7 @@ function setupCommands(bot) {
             return next(); // let the bot work even if check fails (fail-safe)
         }
     });
-       bot.command('start', async (ctx) => {
+    bot.command('start', async (ctx) => {
         try {
             const userId = ctx.from.id;
             const chatId = ctx.chat.id;
@@ -727,6 +727,16 @@ function setupCommands(bot) {
             const isDM = ctx.chat.type === 'private';
     
             console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+    
+            // Check if the user has a specific rank
+            const isDev = await isDeveloper(ctx, userId);
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isSecDev = await isSecondaryDeveloper(ctx, userId);
+    
+            // Only proceed if the user is a dev, admin, or sec dev
+            if (!isDev && !isAdmin && !isSecDev) {
+                return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
+            }
     
             // Check if this is the first time the /start command is executed
             if (ownerId === null) {
@@ -780,10 +790,8 @@ function setupCommands(bot) {
             const subscribed = await checkUserSubscription(ctx);
             if (!subscribed) return; // Stop if not subscribed
     
-            const isDevResult = await isDeveloper(ctx, userId);
-    
             if (isDM) {
-                if (isDevResult) {
+                if (isDev) {
                     console.log('DEBUG: Showing developer panel in DM');
                     return await showDevPanel(ctx);
                 }
@@ -803,12 +811,11 @@ function setupCommands(bot) {
             // For groups
             await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
     
-            if (isDevResult) {
+            if (isDev) {
                 console.log('DEBUG: Showing developer panel in group');
                 return await showDevPanel(ctx);
             }
     
-            const isAdmin = await isAdminOrOwner(ctx, userId);
             const isVIPUser = await isVIP(ctx, userId);
     
             if (isAdmin || isVIPUser) {
@@ -1238,10 +1245,18 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 });
 
 // Update the "بدء" command handler
-// Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
+
+        // Check if the user is a secondary developer, admin, or owner
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+
+        if (!isSecDev && !isAdmin) {
+            return ctx.reply('❌ هذا الأمر مخصص للمطورين الثانويين والمشرفين فقط.');
+        }
+
         const subscribed = await checkUserSubscription(ctx);
 
         console.log(`DEBUG: بدإ triggered | userId: ${userId} | subscribed: ${subscribed}`);
