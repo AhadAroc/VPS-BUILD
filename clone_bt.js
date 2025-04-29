@@ -85,7 +85,7 @@ bot.use(async (ctx, next) => {
         if (text.includes('api')) {
             return next();
         } else {
-            return ctx.reply('❌ التوكن غير صالح. تأكد من نسخه بشكل صحيح من @BotFather.');
+            return;
         }
     }
     return next();
