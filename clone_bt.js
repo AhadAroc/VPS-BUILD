@@ -649,7 +649,7 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 
 
-async function cloneBot(originalBotToken, newBotToken) {
+async function cloneBot(originalBotToken, newBotToken, ownerId) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
     const cloneDbName = `bot_${cloneId}_db`;
@@ -664,7 +664,7 @@ async function cloneBot(originalBotToken, newBotToken) {
             return;
         }
 
-        // Replace the bot token and database name in the new file
+        // Replace the bot token, database name, and owner ID in the new file
         exec(`sed -i 's/const BOT_TOKEN = .*/const BOT_TOKEN = "${newBotToken}";/' ${cloneName}.js`, (error) => {
             if (error) {
                 console.error(`Error replacing token: ${error}`);
@@ -677,28 +677,36 @@ async function cloneBot(originalBotToken, newBotToken) {
                     return;
                 }
 
-                // Start the new bot process with PM2
-                exec(`pm2 start ${cloneName}.js --name ${cloneName}`, (error) => {
+                exec(`sed -i 's/const OWNER_ID = .*/const OWNER_ID = "${ownerId}";/' ${cloneName}.js`, (error) => {
                     if (error) {
-                        console.error(`Error starting clone: ${error}`);
+                        console.error(`Error replacing owner ID: ${error}`);
                         return;
                     }
-                    console.log(`Clone ${cloneName} started successfully`);
+
+                    // Start the new bot process with PM2
+                    exec(`pm2 start ${cloneName}.js --name ${cloneName}`, (error) => {
+                        if (error) {
+                            console.error(`Error starting clone: ${error}`);
+                            return;
+                        }
+                        console.log(`Clone ${cloneName} started successfully`);
+                    });
                 });
             });
         });
     });
 
     // Create a new database entry for the clone
-    await createCloneDbEntry(cloneId, newBotToken, cloneDbName);
+    await createCloneDbEntry(cloneId, newBotToken, cloneDbName, ownerId);
 }
 
-async function createCloneDbEntry(botId, botToken, dbName) {
+async function createCloneDbEntry(botId, botToken, dbName, ownerId) {
     const db = await connectToMongoDB(dbName);
     const CloneModel = mongoose.model('Clone', new mongoose.Schema({
         botId: String,
         botToken: String,
         dbName: String,
+        ownerId: String,
         createdAt: Date,
         expiresAt: Date,
         statistics: {
@@ -711,6 +719,7 @@ async function createCloneDbEntry(botId, botToken, dbName) {
         botId,
         botToken,
         dbName,
+        ownerId,
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     });
