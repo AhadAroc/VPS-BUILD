@@ -1289,7 +1289,29 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ أثناء المعالجة.');
     }
 });
+bot.on('new_chat_members', async (ctx) => {
+    const newMembers = ctx.message.new_chat_members;
+    if (newMembers.some(member => member.id === ctx.botInfo.id)) {
+        const chatTitle = ctx.chat.title || 'Unknown';
+        const chatId = ctx.chat.id;
+        const message = `
+            ⌯ تم إضافة البوت إلى المجموعة ⌯
+            ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+            ⌯ اسم المجموعة ⌯: ${chatTitle}
+            ⌯ ايدي المجموعة ⌯: ${chatId}
+        `;
 
+        // Send the message to the bot owner and developers
+        const recipients = [ownerId, ...developerIds];
+        for (const recipientId of recipients) {
+            try {
+                await ctx.telegram.sendMessage(recipientId, message);
+            } catch (error) {
+                console.error(`Error sending message to ${recipientId}:`, error);
+            }
+        }
+    }
+});
 bot.on('left_chat_member', async (ctx) => {
     try {
         const leftMember = ctx.message.left_chat_member;
@@ -1298,25 +1320,20 @@ bot.on('left_chat_member', async (ctx) => {
         if (leftMember.id === ctx.botInfo.id) {
             const chatTitle = ctx.chat.title || 'Unknown';
             const chatId = ctx.chat.id;
-            const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            const currentDate = new Date().toLocaleDateString('en-GB');
-
             const message = `
                 ⌯ تم طرد البوت من المجموعة ⌯
                 ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
                 ⌯ اسم المجموعة ⌯: ${chatTitle}
                 ⌯ ايدي المجموعة ⌯: ${chatId}
-                ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-                ⌯ الوقت ⌯: ${currentTime}
-                ⌯ التاريخ ⌯: ${currentDate}
             `;
 
-            // Send the message to all developers
-            for (const devId of developerIds) {
+            // Send the message to the bot owner and developers
+            const recipients = [ownerId, ...developerIds];
+            for (const recipientId of recipients) {
                 try {
-                    await ctx.telegram.sendMessage(devId, message);
+                    await ctx.telegram.sendMessage(recipientId, message);
                 } catch (error) {
-                    console.error(`Error sending message to developer ${devId}:`, error);
+                    console.error(`Error sending message to ${recipientId}:`, error);
                 }
             }
         }
