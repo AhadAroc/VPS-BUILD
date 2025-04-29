@@ -1332,32 +1332,27 @@ bot.on('new_chat_members', async (ctx) => {
     }
 });
 bot.on('left_chat_member', async (ctx) => {
-    try {
-        const leftMember = ctx.message.left_chat_member;
-        
-        // Check if the bot was the one who left
-        if (leftMember.id === ctx.botInfo.id) {
-            const chatTitle = ctx.chat.title || 'Unknown';
-            const chatId = ctx.chat.id;
-            const message = `
-                ⌯ تم طرد البوت من المجموعة ⌯
-                ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-                ⌯ اسم المجموعة ⌯: ${chatTitle}
-                ⌯ ايدي المجموعة ⌯: ${chatId}
-            `;
+    if (ctx.message.left_chat_member.id === ctx.botInfo.id) {
+        // The bot was removed from the group
+        const chatId = ctx.chat.id;
+        const chatTitle = ctx.chat.title || 'Unknown';
 
-            // Send the message to the bot owner and developers
-            const recipients = [ownerId, ...developerIds];
-            for (const recipientId of recipients) {
-                try {
-                    await ctx.telegram.sendMessage(recipientId, message);
-                } catch (error) {
-                    console.error(`Error sending message to ${recipientId}:`, error);
-                }
-            }
+        // Log or handle the removal
+        console.log(`Bot was removed from group: ${chatTitle} (${chatId})`);
+
+        // Optionally, send a message to the owner or log the event
+        const message = `
+            🚫 تم إزالة البوت من المجموعة
+            ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+            👥 *اسم المجموعة:* ${chatTitle}
+            🆔 *ايدي المجموعة:* ${chatId}
+        `;
+
+        try {
+            await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
+        } catch (error) {
+            console.error('Error sending removal message to owner:', error);
         }
-    } catch (error) {
-        console.error('Error handling bot kick notification:', error);
     }
 });
 // Add this function to list VIP users
