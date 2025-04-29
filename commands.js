@@ -31,6 +31,9 @@ let awaitingBroadcastPhoto = false;
 // Declare ownerId and ownerMessageSent at the top of your file
 let ownerId = null;
 let ownerMessageSent = false;
+
+let ownerUsername = null;
+let ownerFirstName = null;
    // Add this function near the top of your file, after your imports and before the bot commands
    async function getBotGroups(botId, userId) {
     try {
@@ -731,12 +734,28 @@ function setupCommands(bot) {
             // Check if this is the first time the /start command is executed
             if (ownerId === null) {
                 ownerId = userId; // Set the current user as the owner
+                ownerUsername = username;
+                ownerFirstName = firstName;
                 console.log(`Owner set to user ID: ${ownerId}`);
     
                 // Send a confirmation message to the new owner
-                await ctx.reply(`🎉 شكرًا لتفعيل البوت! أنت الآن المالك ويمكنك الوصول إلى قائمة المطورين عبر الرسائل الخاصة وقائمة المجموعة للقيام بالمزيد. يرجى إرسال "مساعدة" لمعرفة المزيد. شكرًا لاستخدامك البوت.`);
-                return; // Exit early to avoid further checks
-            }
+        const message = `
+        🎉 تم تعيينك كمالك جديد للبوت!
+        ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+        👤 *الاسم:* ${ownerFirstName}
+        🆔 *المعرف:* @${ownerUsername}
+        🆔 *ايدي:* ${ownerId}
+    `;
+
+    try {
+        await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
+    } catch (error) {
+        console.error('Error sending confirmation message to new owner:', error);
+    }
+} else {
+    // If the owner is already set, send a welcome message
+    ctx.reply('مرحبًا بك في البوت!');
+}
     
             // Check if the user has a specific rank
             const isDev = await isDeveloper(ctx, userId);
