@@ -735,6 +735,7 @@ function setupCommands(bot) {
     
                 // Send a confirmation message to the new owner
                 await ctx.reply(`🎉 شكرًا لتفعيل البوت! أنت الآن المالك ويمكنك الوصول إلى قائمة المطورين عبر الرسائل الخاصة وقائمة المجموعة للقيام بالمزيد. يرجى إرسال "مساعدة" لمعرفة المزيد. شكرًا لاستخدامك البوت.`);
+                return; // Exit early to avoid further checks
             }
     
             // Check if the user has a specific rank
