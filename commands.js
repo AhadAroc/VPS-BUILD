@@ -910,23 +910,46 @@ function setupCommands(bot) {
         }
     });
     bot.on('new_chat_members', async (ctx) => {
-        if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
+        if (!ctx.message.new_chat_member) return;
+        
+        const botId = ctx.botInfo.id;
+        const newMemberId = ctx.message.new_chat_member.id;
+    
+        if (newMemberId === botId) {
             const db = await database.ensureDatabaseInitialized();
             await db.collection('groups').updateOne(
                 { group_id: ctx.chat.id },
-                { $set: { 
-                    group_id: ctx.chat.id,
-                    title: ctx.chat.title,
-                    is_active: true,
-                    bot_id: config.botId,
-                    added_at: new Date()
-                }},
+                {
+                    $set: {
+                        group_id: ctx.chat.id,
+                        title: ctx.chat.title || 'Unknown',
+                        is_active: true,
+                        bot_id: config.botId,  // This is correct because config.botId = forked bot's ID
+                        added_at: new Date()
+                    }
+                },
                 { upsert: true }
             );
-            console.log(`Group ${ctx.chat.title} (${ctx.chat.id}) saved to DB`);
+    
+            console.log(`✅ [${config.botUsername}] Saved group ${ctx.chat.title} (${ctx.chat.id}) to database`);
         }
     });
+    bot.on('left_chat_member', async (ctx) => {
+        if (!ctx.message.left_chat_member) return;
     
+        const botId = ctx.botInfo.id;
+        const leftMemberId = ctx.message.left_chat_member.id;
+    
+        if (leftMemberId === botId) {
+            const db = await database.ensureDatabaseInitialized();
+            await db.collection('groups').updateOne(
+                { group_id: ctx.chat.id },
+                { $set: { is_active: false } }
+            );
+    
+            console.log(`🚪 [${config.botUsername}] Removed from group ${ctx.chat.title} (${ctx.chat.id}) — marked inactive`);
+        }
+    });
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
