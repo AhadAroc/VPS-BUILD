@@ -70,7 +70,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-
+// At the top of your file, after initializing the bot
+bot.command('broadcast_dm', handleBroadcastDM);
+bot.command('broadcast_groups', handleBroadcastGroups);
+bot.command('broadcast_all', handleBroadcastAll);
+bot.hears('broadcast_all', handleBroadcastAll);
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -670,11 +674,7 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 //Commands 
 
-// At the top of your file, after initializing the bot
-bot.command('broadcast_dm', handleBroadcastDM);
-bot.command('broadcast_groups', handleBroadcastGroups);
-bot.command('broadcast_all', handleBroadcastAll);
-bot.hears('broadcast_all', handleBroadcastAll);
+
 
 // Then define these handler functions:
 // Implement broadcast handlers
@@ -718,18 +718,25 @@ async function handleBroadcastAll(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
-    ctx.reply('Please send the message you want to broadcast to all users and groups.');
-    bot.once('message', async (msgCtx) => {
-        let totalSuccess = 0;
-        let totalFail = 0;
-        for (const [botId, botInfo] of Object.entries(activeBots)) {
-            const botInstance = new Telegraf(botInfo.token);
-            const { successCount, failCount } = await handleBroadcast(msgCtx, 'all', botInstance);
-            totalSuccess += successCount;
-            totalFail += failCount;
-        }
-        ctx.reply(`Broadcast completed for all bots.\nTotal Success: ${totalSuccess}\nTotal Failed: ${totalFail}`);
-    });
+
+    // Extract the message content after the command
+    const messageContent = ctx.message.text.split(' ').slice(1).join(' ');
+
+    if (!messageContent) {
+        return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_all <your message>');
+    }
+
+    let totalSuccess = 0;
+    let totalFail = 0;
+
+    for (const [botId, botInfo] of Object.entries(activeBots)) {
+        const botInstance = new Telegraf(botInfo.token);
+        const { successCount, failCount } = await handleBroadcast({ message: { text: messageContent } }, 'all', botInstance);
+        totalSuccess += successCount;
+        totalFail += failCount;
+    }
+
+    ctx.reply(`Broadcast completed for all bots.\nTotal Success: ${totalSuccess}\nTotal Failed: ${totalFail}`);
 }
 async function getUserIdsFromDatabase(botToken) {
     try {
