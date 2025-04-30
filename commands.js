@@ -1371,19 +1371,37 @@ bot.on('left_chat_member', async (ctx) => {
         }
     }
 });
+async function checkForBroadcastTrigger() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
 
-async function broadcastAcrossAllBots(ctx, message, type = 'all') {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
+        if (trigger) {
+            console.log('Found broadcast trigger:', trigger);
+            await broadcastAcrossAllBots(null, trigger.message, trigger.type);
+            
+            // Mark the trigger as processed
+            await db.collection('broadcast_triggers').updateOne(
+                { _id: trigger._id },
+                { $set: { triggered: false, processedAt: new Date() } }
+            );
+        }
+    } catch (error) {
+        console.error('Error checking for broadcast trigger:', error);
     }
-
-    const CloneModel = mongoose.model('Clone');
-    const activeBots = await CloneModel.find({ isActive: true });
+}
+async function broadcastAcrossAllBots(ctx, message, type = 'all') {
+    console.log('Starting broadcast across all bots');
+    
+    const db = await ensureDatabaseInitialized();
+    const activeBots = await db.collection('clones').find({ isActive: true }).toArray();
+    console.log(`Found ${activeBots.length} active bots`);
 
     let totalSuccess = 0;
     let totalFail = 0;
 
     for (const bot of activeBots) {
+        console.log(`Processing bot: ${bot.botToken}`);
         try {
             const botInstance = new Telegraf(bot.botToken);
             
@@ -1404,6 +1422,8 @@ async function broadcastAcrossAllBots(ctx, message, type = 'all') {
                     break;
             }
 
+            console.log(`Found ${targetChats.length} target chats for bot ${bot.botToken}`);
+
             for (const chatId of targetChats) {
                 try {
                     await botInstance.telegram.sendMessage(chatId, message);
@@ -1418,15 +1438,9 @@ async function broadcastAcrossAllBots(ctx, message, type = 'all') {
         }
     }
 
-    await ctx.reply(`Broadcast complete.\nSuccessful: ${totalSuccess}\nFailed: ${totalFail}`);
-}
-async function checkForBroadcastTrigger() {
-    const db = await ensureDatabaseInitialized();
-    const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
-    
-    if (trigger) {
-        await broadcastAcrossAllBots({ from: { id: ADMIN_ID } }, trigger.message, trigger.type);
-        await db.collection('broadcast_triggers').deleteOne({ _id: trigger._id });
+    console.log(`Broadcast completed. Success: ${totalSuccess}, Failed: ${totalFail}`);
+    if (ctx) {
+        ctx.reply(`Broadcast completed.\nSuccess: ${totalSuccess}\nFailed: ${totalFail}`);
     }
 }
 
