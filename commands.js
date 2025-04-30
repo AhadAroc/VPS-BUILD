@@ -1325,7 +1325,7 @@ bot.on('new_chat_members', async (ctx) => {
         const chatTitle = ctx.chat.title || 'Unknown';
         const chatId = ctx.chat.id;
         const message = `
-            ⌯ تم إضافة البوت إلى المجموعة ⌯
+            ⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
             ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
             ⌯ اسم المجموعة ⌯: ${chatTitle}
             ⌯ ايدي المجموعة ⌯: ${chatId}
@@ -1371,6 +1371,67 @@ bot.on('left_chat_member', async (ctx) => {
         }
     }
 });
+
+async function broadcastAcrossAllBots(ctx, message, type = 'all') {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+
+    const CloneModel = mongoose.model('Clone');
+    const activeBots = await CloneModel.find({ isActive: true });
+
+    let totalSuccess = 0;
+    let totalFail = 0;
+
+    for (const bot of activeBots) {
+        try {
+            const botInstance = new Telegraf(bot.botToken);
+            
+            let targetChats;
+            switch (type) {
+                case 'dm':
+                    targetChats = await getUserIdsFromDatabase(bot.botToken);
+                    break;
+                case 'groups':
+                    targetChats = await getGroupIdsFromDatabase(bot.botToken);
+                    break;
+                case 'all':
+                default:
+                    targetChats = [
+                        ...(await getUserIdsFromDatabase(bot.botToken)),
+                        ...(await getGroupIdsFromDatabase(bot.botToken))
+                    ];
+                    break;
+            }
+
+            for (const chatId of targetChats) {
+                try {
+                    await botInstance.telegram.sendMessage(chatId, message);
+                    totalSuccess++;
+                } catch (error) {
+                    console.error(`Failed to send message to chat ${chatId} for bot ${bot.botToken}:`, error);
+                    totalFail++;
+                }
+            }
+        } catch (error) {
+            console.error(`Error broadcasting with bot ${bot.botToken}:`, error);
+        }
+    }
+
+    await ctx.reply(`Broadcast complete.\nSuccessful: ${totalSuccess}\nFailed: ${totalFail}`);
+}
+async function checkForBroadcastTrigger() {
+    const db = await ensureDatabaseInitialized();
+    const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
+    
+    if (trigger) {
+        await broadcastAcrossAllBots({ from: { id: ADMIN_ID } }, trigger.message, trigger.type);
+        await db.collection('broadcast_triggers').deleteOne({ _id: trigger._id });
+    }
+}
+
+// Call this function periodically
+setInterval(checkForBroadcastTrigger, 60000); // Check every
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
     try {
