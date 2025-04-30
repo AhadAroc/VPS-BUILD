@@ -86,8 +86,30 @@ bot.action('create_bot', (ctx) => {
 
 // Handle token submission
 bot.on('text', async (ctx) => {
-    const token = ctx.message.text.trim();
+    const text = ctx.message.text.trim();
     const userId = ctx.from.id;
+
+    // Check if it's a broadcast command
+    if (text.startsWith('/broadcast_')) {
+        if (userId !== ADMIN_ID) {
+            return ctx.reply('⛔ This command is only available to the admin.');
+        }
+        
+        const broadcastType = text.split('_')[1];
+        switch (broadcastType) {
+            case 'dm':
+                return handleBroadcastDM(ctx);
+            case 'groups':
+                return handleBroadcastGroups(ctx);
+            case 'all':
+                return handleBroadcastAll(ctx);
+            default:
+                return ctx.reply('Invalid broadcast command.');
+        }
+    }
+
+    // If not a broadcast command, treat as token submission
+    const token = text;
 
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
@@ -96,7 +118,7 @@ bot.on('text', async (ctx) => {
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ;
+        return ctx.reply('❌ التوكن غير صالح. يرجى إدخال توكن صحيح.');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
