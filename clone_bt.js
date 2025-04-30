@@ -773,6 +773,22 @@ async function getGroupIdsFromDatabase(botToken) {
     }
 }
 
+async function getBotGroups(botId) {
+    const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
+    try {
+        const db = await ensureDatabaseInitialized();
+        const groups = await db.collection('groups').find({ 
+            is_active: true,
+            bot_id: botId
+        }).toArray();
+
+        console.log(`Bot ${botId} has ${groups.length} active groups`);
+        return groups;
+    } catch (error) {
+        console.error('Error fetching bot groups:', error);
+        return [];
+    }
+}
 
 async function handleBroadcast(ctx, type, message) {
     let successCount = 0, failCount = 0;
