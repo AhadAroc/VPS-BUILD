@@ -70,11 +70,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-// At the top of your file, after initializing the bot
-bot.command('broadcast_dm', handleBroadcastDM);
-bot.command('broadcast_groups', handleBroadcastGroups);
-bot.command('broadcast_all', handleBroadcastAll);
-bot.hears('broadcast_all', handleBroadcastAll);
+
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -421,6 +417,11 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
 });
+// At the top of your file, after initializing the bot
+bot.command('broadcast_dm', handleBroadcastDM);
+bot.command('broadcast_groups', handleBroadcastGroups);
+bot.command('broadcast_all', handleBroadcastAll);
+
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
