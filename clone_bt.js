@@ -677,47 +677,22 @@ bot.command('broadcast_all', handleBroadcastAll);
 bot.hears('broadcast_all', handleBroadcastAll);
 
 // Then define these handler functions:
+// Implement broadcast handlers
 async function handleBroadcastDM(ctx) {
-    console.log('broadcast_dm command triggered by user:', ctx.from.id);
-    if (ctx.from.id !== ADMIN_ID) {
-        console.log('Unauthorized access attempt to broadcast_dm by user:', ctx.from.id);
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
     ctx.reply('Please send the message you want to broadcast to all users via DM.');
-    console.log('Waiting for broadcast message from admin');
-    bot.once('message', (msgCtx) => {
-        console.log('Received broadcast message for DMs');
-        handleBroadcast(msgCtx, 'dm');
-    });
+    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'dm'));
 }
 
 async function handleBroadcastGroups(ctx) {
-    console.log('broadcast_groups command triggered by user:', ctx.from.id);
-    if (ctx.from.id !== ADMIN_ID) {
-        console.log('Unauthorized access attempt to broadcast_groups by user:', ctx.from.id);
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
     ctx.reply('Please send the message you want to broadcast to all groups.');
-    console.log('Waiting for broadcast message from admin');
-    bot.once('message', (msgCtx) => {
-        console.log('Received broadcast message for groups');
-        handleBroadcast(msgCtx, 'groups');
-    });
+    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'groups'));
 }
 
 async function handleBroadcastAll(ctx) {
-    console.log('broadcast_all command triggered by user:', ctx.from.id);
-    if (ctx.from.id !== ADMIN_ID) {
-        console.log('Unauthorized access attempt to broadcast_all by user:', ctx.from.id);
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
     ctx.reply('Please send the message you want to broadcast to all users and groups.');
-    console.log('Waiting for broadcast message from admin');
-    bot.once('message', (msgCtx) => {
-        console.log('Received broadcast message for all');
-        handleBroadcast(msgCtx, 'all');
-    });
+    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'all'));
 }
+
 async function handleBroadcast(ctx, type) {
     const message = ctx.message.text;
     let successCount = 0;
@@ -727,17 +702,34 @@ async function handleBroadcast(ctx, type) {
     // This is a placeholder, you'll need to implement the actual broadcasting
     console.log(`Broadcasting message: "${message}" to ${type}`);
 
-    ctx.reply(`Broadcast completed.\nSuccess: ${successCount}\nFailed: ${failCount}`);
-}
-async function getUserIdsFromDatabase(botToken) {
-    try {
-        // Assuming you have a User model
-        const users = await User.find({ associatedBotToken: botToken }).distinct('userId');
-        return users;
-    } catch (error) {
-        console.error('Error fetching user IDs:', error);
-        return [];
+    // Example implementation (you'll need to adjust this based on your actual data structure)
+    if (type === 'dm' || type === 'all') {
+        const userIds = await getUserIdsFromDatabase();
+        for (const userId of userIds) {
+            try {
+                await ctx.telegram.sendMessage(userId, message);
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to send message to user ${userId}:`, error);
+                failCount++;
+            }
+        }
     }
+
+    if (type === 'groups' || type === 'all') {
+        const groupIds = await getGroupIdsFromDatabase();
+        for (const groupId of groupIds) {
+            try {
+                await ctx.telegram.sendMessage(groupId, message);
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to send message to group ${groupId}:`, error);
+                failCount++;
+            }
+        }
+    }
+
+    ctx.reply(`Broadcast completed.\nSuccess: ${successCount}\nFailed: ${failCount}`);
 }
 
 async function getGroupIdsFromDatabase(botToken) {
