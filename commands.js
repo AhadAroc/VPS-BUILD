@@ -50,8 +50,7 @@ let ownerFirstName = null;
         return [];
     }
 }
-}
-}
+
 async function getLatestGroupsMembersState(botId, userId) {
     try {
         const groups = await getBotGroups(botId, userId);
