@@ -692,7 +692,19 @@ bot.command('broadcast_all', async (ctx) => {
         handleBroadcast(msgCtx, 'all');
     });
 });
-
+bot.hears('broadcast_all', async (ctx) => {
+    console.log('broadcast_all command triggered by user:', ctx.from.id);
+    if (ctx.from.id !== ADMIN_ID) {
+        console.log('Unauthorized access attempt to broadcast_all by user:', ctx.from.id);
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+    ctx.reply('Please send the message you want to broadcast to all users and groups.');
+    console.log('Waiting for broadcast message from admin');
+    bot.once('message', (msgCtx) => {
+        console.log('Received broadcast message for all');
+        handleBroadcast(msgCtx, 'all');
+    });
+});
 async function handleBroadcast(ctx, type) {
     const message = ctx.message.text;
     let successCount = 0;
