@@ -95,16 +95,23 @@ bot.on('text', async (ctx) => {
             return ctx.reply('⛔ This command is only available to the admin.');
         }
         
-        const broadcastType = text.split('_')[1];
+        const [command, ...messageParts] = text.split(' ');
+        const broadcastType = command.split('_')[1];
+        const broadcastMessage = messageParts.join(' ');
+
+        if (!broadcastMessage) {
+            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
+        }
+
         switch (broadcastType) {
             case 'dm':
-                return handleBroadcastDM(ctx);
+                return handleBroadcastDM(ctx, broadcastMessage);
             case 'groups':
-                return handleBroadcastGroups(ctx);
+                return handleBroadcastGroups(ctx, broadcastMessage);
             case 'all':
-                return handleBroadcastAll(ctx);
+                return handleBroadcastAll(ctx, broadcastMessage);
             default:
-                return ctx.reply('Invalid broadcast command.');
+                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
         }
     }
 
