@@ -22,6 +22,7 @@ const { isDeveloper } = require('./middlewares');
 const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
 const axios = require('axios');
 const subscriptionStatusCache = new Map();
+const config = require('./config');
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
