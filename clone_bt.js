@@ -435,8 +435,26 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 // At the top of your file, after initializing the bot
 bot.command('broadcast_dm', handleBroadcastDM);
 bot.command('broadcast_groups', handleBroadcastGroups);
-bot.command('broadcast_all', handleBroadcastAll);
+bot.command('broadcast_all', async (ctx) => {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
 
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast.');
+    }
+
+    const db = await ensureDatabaseInitialized();
+    await db.collection('broadcast_triggers').insertOne({
+        triggered: true,
+        message: message,
+        type: 'all',
+        createdAt: new Date()
+    });
+
+    ctx.reply('Broadcast triggered. It will be sent shortly across all bots.');
+});
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
