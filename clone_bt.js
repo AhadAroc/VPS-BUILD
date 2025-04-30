@@ -646,9 +646,120 @@ async function checkAndUpdateActivation(cloneId, userId) {
 
 const { createClonedDatabase, connectToMongoDB } = require('./database');
 
+//Commands 
 
+// Broadcast to DMs
+bot.command('broadcast_dm', async (ctx) => {
+    if (ctx.from.id !== ADMIN_ID) return ctx.reply('⛔ This command is only available to the admin.');
+    ctx.reply('Please send the message you want to broadcast to all users via DM.');
+    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'dm'));
+});
 
+// Broadcast to groups
+bot.command('broadcast_groups', async (ctx) => {
+    if (ctx.from.id !== ADMIN_ID) return ctx.reply('⛔ This command is only available to the admin.');
+    ctx.reply('Please send the message you want to broadcast to all groups.');
+    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'groups'));
+});
 
+// Broadcast to both DMs and groups
+bot.command('broadcast_all', async (ctx) => {
+    if (ctx.from.id !== ADMIN_ID) return ctx.reply('⛔ This command is only available to the admin.');
+    ctx.reply('Please send the message you want to broadcast to all users and groups.');
+    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'all'));
+});
+
+async function handleBroadcast(ctx, type) {
+    const message = ctx.message.text;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const [botId, botInfo] of Object.entries(activeBots)) {
+        try {
+            const bot = new Telegraf(botInfo.token);
+            await bot.telegram.sendMessage(botInfo.ownerId, `Initiating broadcast for bot ${botInfo.username}`);
+            
+            if (type === 'dm' || type === 'all') {
+                const dmResult = await broadcastToDMs(bot, message);
+                successCount += dmResult.success;
+                failCount += dmResult.fail;
+            }
+            
+            if (type === 'groups' || type === 'all') {
+                const groupResult = await broadcastToGroups(bot, message);
+                successCount += groupResult.success;
+                failCount += groupResult.fail;
+            }
+            
+            await bot.telegram.sendMessage(botInfo.ownerId, `Broadcast completed for bot ${botInfo.username}`);
+        } catch (error) {
+            console.error(`Error broadcasting for bot ${botInfo.username}:`, error);
+            failCount++;
+        }
+    }
+
+    ctx.reply(`Broadcast completed.\nSuccess: ${successCount}\nFailed: ${failCount}`);
+}
+
+async function broadcastToDMs(bot, message) {
+    // Implement logic to get all user IDs from the database
+    const userIds = await getUserIdsFromDatabase(bot.token);
+    let success = 0;
+    let fail = 0;
+
+    for (const userId of userIds) {
+        try {
+            await bot.telegram.sendMessage(userId, message);
+            success++;
+        } catch (error) {
+            console.error(`Failed to send message to user ${userId}:`, error);
+            fail++;
+        }
+    }
+
+    return { success, fail };
+}
+
+async function broadcastToGroups(bot, message) {
+    // Implement logic to get all group IDs from the database
+    const groupIds = await getGroupIdsFromDatabase(bot.token);
+    let success = 0;
+    let fail = 0;
+
+    for (const groupId of groupIds) {
+        try {
+            await bot.telegram.sendMessage(groupId, message);
+            success++;
+        } catch (error) {
+            console.error(`Failed to send message to group ${groupId}:`, error);
+            fail++;
+        }
+    }
+
+    return { success, fail };
+}
+
+async function getUserIdsFromDatabase(botToken) {
+    try {
+        // Assuming you have a User model
+        const users = await User.find({ associatedBotToken: botToken }).distinct('userId');
+        return users;
+    } catch (error) {
+        console.error('Error fetching user IDs:', error);
+        return [];
+    }
+}
+
+async function getGroupIdsFromDatabase(botToken) {
+    try {
+        // Assuming you have a Group model
+        const groups = await Group.find({ associatedBotToken: botToken }).distinct('groupId');
+        return groups;
+    } catch (error) {
+        console.error('Error fetching group IDs:', error);
+        return [];
+    }
+}
 async function cloneBot(originalBotToken, newBotToken, ownerId) {
     const cloneId = uuidv4();
     const cloneName = `clone-${cloneId}`;
