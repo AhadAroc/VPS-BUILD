@@ -650,23 +650,47 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 // Broadcast to DMs
 bot.command('broadcast_dm', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return ctx.reply('⛔ This command is only available to the admin.');
+    console.log('broadcast_dm command triggered by user:', ctx.from.id);
+    if (ctx.from.id !== ADMIN_ID) {
+        console.log('Unauthorized access attempt to broadcast_dm by user:', ctx.from.id);
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
     ctx.reply('Please send the message you want to broadcast to all users via DM.');
-    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'dm'));
+    console.log('Waiting for broadcast message from admin');
+    bot.once('message', (msgCtx) => {
+        console.log('Received broadcast message for DMs');
+        handleBroadcast(msgCtx, 'dm');
+    });
 });
 
 // Broadcast to groups
 bot.command('broadcast_groups', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return ctx.reply('⛔ This command is only available to the admin.');
+    console.log('broadcast_groups command triggered by user:', ctx.from.id);
+    if (ctx.from.id !== ADMIN_ID) {
+        console.log('Unauthorized access attempt to broadcast_groups by user:', ctx.from.id);
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
     ctx.reply('Please send the message you want to broadcast to all groups.');
-    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'groups'));
+    console.log('Waiting for broadcast message from admin');
+    bot.once('message', (msgCtx) => {
+        console.log('Received broadcast message for groups');
+        handleBroadcast(msgCtx, 'groups');
+    });
 });
 
 // Broadcast to both DMs and groups
 bot.command('broadcast_all', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return ctx.reply('⛔ This command is only available to the admin.');
+    console.log('broadcast_all command triggered by user:', ctx.from.id);
+    if (ctx.from.id !== ADMIN_ID) {
+        console.log('Unauthorized access attempt to broadcast_all by user:', ctx.from.id);
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
     ctx.reply('Please send the message you want to broadcast to all users and groups.');
-    bot.once('message', (msgCtx) => handleBroadcast(msgCtx, 'all'));
+    console.log('Waiting for broadcast message from admin');
+    bot.once('message', (msgCtx) => {
+        console.log('Received broadcast message for all');
+        handleBroadcast(msgCtx, 'all');
+    });
 });
 
 async function handleBroadcast(ctx, type) {
