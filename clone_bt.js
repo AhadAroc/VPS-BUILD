@@ -445,15 +445,20 @@ bot.command('broadcast_all', async (ctx) => {
         return ctx.reply('Please provide a message to broadcast.');
     }
 
-    const db = await ensureDatabaseInitialized();
-    await db.collection('broadcast_triggers').insertOne({
-        triggered: true,
-        message: message,
-        type: 'all',
-        createdAt: new Date()
-    });
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('broadcast_triggers').insertOne({
+            triggered: true,
+            message: message,
+            type: 'all',
+            createdAt: new Date()
+        });
 
-    ctx.reply('Broadcast triggered. It will be sent shortly across all bots.');
+        ctx.reply('Broadcast triggered. It will be sent shortly across all bots.');
+    } catch (error) {
+        console.error('Error triggering broadcast:', error);
+        ctx.reply('An error occurred while triggering the broadcast.');
+    }
 });
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
