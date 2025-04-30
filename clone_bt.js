@@ -772,77 +772,42 @@ async function getGroupIdsFromDatabase(botToken) {
         return [];
     }
 }
+
+
 async function handleBroadcast(ctx, type, message) {
-    if (ctx.from?.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
+    let successCount = 0, failCount = 0;
 
-    let totalTargetChats = 0;
-    let totalSuccessCount = 0;
-    let totalFailCount = 0;
+    for (const botId in activeBots) {
+        const botInfo = activeBots[botId];
+        const bot = new Telegraf(botInfo.token);
 
-    // Fetch all active bots
-    const CloneModel = mongoose.model('Clone');
-    const activeBots = await CloneModel.find({ isActive: true });
-
-    const progress = await ctx.reply('Preparing broadcast...');
-
-    for (const botInfo of activeBots) {
-        let botTargetChats = [];
-        switch (type) {
-            case 'dm':
-                botTargetChats = await getUserIdsFromDatabase(botInfo.botToken);
-                break;
-            case 'groups':
-                botTargetChats = await getGroupIdsFromDatabase(botInfo.botToken);
-                break;
-            case 'all':
-                botTargetChats = [
-                    ...(await getUserIdsFromDatabase(botInfo.botToken)),
-                    ...(await getGroupIdsFromDatabase(botInfo.botToken))
-                ];
-                break;
-            default:
-                return ctx.reply('Invalid broadcast type.');
-        }
-
-        totalTargetChats += botTargetChats.length;
-
-        // Create a new bot instance for each clone
-        const cloneBot = new Telegraf(botInfo.botToken);
-
-        for (const chatId of botTargetChats) {
-            try {
-                await cloneBot.telegram.sendMessage(chatId, message);
-                totalSuccessCount++;
-            } catch (error) {
-                console.error(`Failed to send message to chat ${chatId} with bot ${botInfo.botToken}:`, error);
-                totalFailCount++;
+        try {
+            if (type === 'dm') {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+            } else if (type === 'groups') {
+                // Assuming you stored group IDs somewhere per bot
+                const groups = await getBotGroups(botId, botInfo.createdBy); // reuse your function
+                for (const group of groups) {
+                    await bot.telegram.sendMessage(group.chat_id, message);
+                }
+            } else if (type === 'all') {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+                const groups = await getBotGroups(botId, botInfo.createdBy);
+                for (const group of groups) {
+                    await bot.telegram.sendMessage(group.chat_id, message);
+                }
             }
 
-            if ((totalSuccessCount + totalFailCount) % 10 === 0) {
-                await ctx.telegram.editMessageText(
-                    ctx.chat.id,
-                    progress.message_id,
-                    null,
-                    `Broadcasting: ${totalSuccessCount + totalFailCount}/${totalTargetChats} completed`
-                );
-            }
+            successCount++;
+        } catch (err) {
+            console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
+            failCount++;
         }
-
-        // Destroy the bot instance after use
-        cloneBot.stop();
     }
 
-    const senderInfo = ctx.from?.username ? `@${ctx.from.username}` : `User ID: ${ctx.from?.id || 'Unknown'}`;
-    
-    await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        progress.message_id,
-        null,
-        `Broadcast completed across all bots.\nSuccessful: ${totalSuccessCount}\nFailed: ${totalFailCount}\nSent by: ${senderInfo}`
-    );
+    ctx.reply(`Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}`);
 }
+
 
 async function updateActiveGroups(bot) {
     setInterval(() => updateActiveGroups(bot), 24 * 60 * 60 * 1000);
