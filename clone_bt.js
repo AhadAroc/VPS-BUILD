@@ -83,15 +83,51 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-bot.on('new_chat_members', (ctx) => {
-    if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
-        // Bot was added to a new group
-        activeGroups.set(ctx.chat.id, {
-            title: ctx.chat.title,
-            type: ctx.chat.type
-        });
+// Save groups to database when bot is added
+bot.on('new_chat_members', async (ctx) => {
+    if (!ctx.message.new_chat_member) return;
+    
+    const botId = ctx.botInfo.id;
+    const newMemberId = ctx.message.new_chat_member.id;
+
+    if (newMemberId === botId) {
+        const db = await database.ensureDatabaseInitialized();
+        await db.collection('groups').updateOne(
+            { group_id: ctx.chat.id },
+            {
+                $set: {
+                    group_id: ctx.chat.id,
+                    title: ctx.chat.title || 'Unknown',
+                    is_active: true,
+                    bot_id: config.botId,
+                    added_at: new Date()
+                }
+            },
+            { upsert: true }
+        );
+
+        console.log(`✅ [${config.botUsername}] Saved group ${ctx.chat.title} (${ctx.chat.id}) to database`);
     }
 });
+
+// Mark groups inactive when bot is removed
+bot.on('left_chat_member', async (ctx) => {
+    if (!ctx.message.left_chat_member) return;
+
+    const botId = ctx.botInfo.id;
+    const leftMemberId = ctx.message.left_chat_member.id;
+
+    if (leftMemberId === botId) {
+        const db = await database.ensureDatabaseInitialized();
+        await db.collection('groups').updateOne(
+            { group_id: ctx.chat.id },
+            { $set: { is_active: false } }
+        );
+
+        console.log(`🚪 [${config.botUsername}] Removed from group ${ctx.chat.title} (${ctx.chat.id}) — marked inactive`);
+    }
+});
+
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
