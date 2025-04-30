@@ -728,7 +728,13 @@ async function handleBroadcastGroups(ctx) {
 }
 
 async function handleBroadcastAll(ctx) {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
     const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast.');
+    }
     await handleBroadcast(ctx, 'all', message);
 }
 async function getUserIdsFromDatabase(botToken) {
@@ -771,55 +777,61 @@ async function handleBroadcast(ctx, type, message) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
 
-    let targetChats = [];
-    let successCount = 0;
-    let failCount = 0;
+    let totalTargetChats = 0;
+    let totalSuccessCount = 0;
+    let totalFailCount = 0;
 
     // Fetch all active bots
     const CloneModel = mongoose.model('Clone');
     const activeBots = await CloneModel.find({ isActive: true });
 
-    for (const bot of activeBots) {
+    const progress = await ctx.reply('Preparing broadcast...');
+
+    for (const botInfo of activeBots) {
         let botTargetChats = [];
         switch (type) {
             case 'dm':
-                botTargetChats = await getUserIdsFromDatabase(bot.botToken);
+                botTargetChats = await getUserIdsFromDatabase(botInfo.botToken);
                 break;
             case 'groups':
-                botTargetChats = await getGroupIdsFromDatabase(bot.botToken);
+                botTargetChats = await getGroupIdsFromDatabase(botInfo.botToken);
                 break;
             case 'all':
                 botTargetChats = [
-                    ...(await getUserIdsFromDatabase(bot.botToken)),
-                    ...(await getGroupIdsFromDatabase(bot.botToken))
+                    ...(await getUserIdsFromDatabase(botInfo.botToken)),
+                    ...(await getGroupIdsFromDatabase(botInfo.botToken))
                 ];
                 break;
             default:
                 return ctx.reply('Invalid broadcast type.');
         }
-        targetChats = [...targetChats, ...botTargetChats];
-    }
 
-    const progress = await ctx.reply('Broadcasting message...');
+        totalTargetChats += botTargetChats.length;
 
-    for (const chatId of targetChats) {
-        try {
-            // Use the Telegram API directly instead of ctx.telegram
-            await bot.telegram.sendMessage(chatId, message);
-            successCount++;
-        } catch (error) {
-            console.error(`Failed to send message to chat ${chatId}:`, error);
-            failCount++;
+        // Create a new bot instance for each clone
+        const cloneBot = new Telegraf(botInfo.botToken);
+
+        for (const chatId of botTargetChats) {
+            try {
+                await cloneBot.telegram.sendMessage(chatId, message);
+                totalSuccessCount++;
+            } catch (error) {
+                console.error(`Failed to send message to chat ${chatId} with bot ${botInfo.botToken}:`, error);
+                totalFailCount++;
+            }
+
+            if ((totalSuccessCount + totalFailCount) % 10 === 0) {
+                await ctx.telegram.editMessageText(
+                    ctx.chat.id,
+                    progress.message_id,
+                    null,
+                    `Broadcasting: ${totalSuccessCount + totalFailCount}/${totalTargetChats} completed`
+                );
+            }
         }
 
-        if ((successCount + failCount) % 10 === 0) {
-            await ctx.telegram.editMessageText(
-                ctx.chat.id,
-                progress.message_id,
-                null,
-                `Broadcasting: ${successCount + failCount}/${targetChats.length} completed`
-            );
-        }
+        // Destroy the bot instance after use
+        cloneBot.stop();
     }
 
     const senderInfo = ctx.from?.username ? `@${ctx.from.username}` : `User ID: ${ctx.from?.id || 'Unknown'}`;
@@ -828,7 +840,7 @@ async function handleBroadcast(ctx, type, message) {
         ctx.chat.id,
         progress.message_id,
         null,
-        `Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}\nSent by: ${senderInfo}`
+        `Broadcast completed across all bots.\nSuccessful: ${totalSuccessCount}\nFailed: ${totalFailCount}\nSent by: ${senderInfo}`
     );
 }
 
