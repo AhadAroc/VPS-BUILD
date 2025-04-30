@@ -86,9 +86,12 @@ bot.action('create_bot', (ctx) => {
 // Save groups to database when bot is added
 bot.on('new_chat_members', async (ctx) => {
     if (!ctx.message.new_chat_member) return;
-    
-    const botId = ctx.botInfo.id;
+
     const newMemberId = ctx.message.new_chat_member.id;
+
+    // Get bot info safely
+    const botInfo = await ctx.telegram.getMe();
+    const botId = botInfo.id;
 
     if (newMemberId === botId) {
         const db = await database.ensureDatabaseInitialized();
@@ -99,7 +102,7 @@ bot.on('new_chat_members', async (ctx) => {
                     group_id: ctx.chat.id,
                     title: ctx.chat.title || 'Unknown',
                     is_active: true,
-                    bot_id: config.botId,
+                    bot_id: config.botId,  // config.botId should be correct from fork config
                     added_at: new Date()
                 }
             },
@@ -114,8 +117,10 @@ bot.on('new_chat_members', async (ctx) => {
 bot.on('left_chat_member', async (ctx) => {
     if (!ctx.message.left_chat_member) return;
 
-    const botId = ctx.botInfo.id;
     const leftMemberId = ctx.message.left_chat_member.id;
+
+    const botInfo = await ctx.telegram.getMe();
+    const botId = botInfo.id;
 
     if (leftMemberId === botId) {
         const db = await database.ensureDatabaseInitialized();
