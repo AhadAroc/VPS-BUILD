@@ -687,64 +687,18 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 // Then define these handler functions:
 // Implement broadcast handlers
 async function handleBroadcastDM(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-    ctx.reply('Please send the message you want to broadcast to all users via DM.');
-    bot.once('message', async (msgCtx) => {
-        let totalSuccess = 0;
-        let totalFail = 0;
-        for (const [botId, botInfo] of Object.entries(activeBots)) {
-            const botInstance = new Telegraf(botInfo.token);
-            const { successCount, failCount } = await handleBroadcast(msgCtx, 'dm', botInstance);
-            totalSuccess += successCount;
-            totalFail += failCount;
-        }
-        ctx.reply(`Broadcast completed for all bots.\nTotal Success: ${totalSuccess}\nTotal Failed: ${totalFail}`);
-    });
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    await handleBroadcast(ctx, 'dm', message);
 }
 
 async function handleBroadcastGroups(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-    ctx.reply('Please send the message you want to broadcast to all groups.');
-    bot.once('message', async (msgCtx) => {
-        let totalSuccess = 0;
-        let totalFail = 0;
-        for (const [botId, botInfo] of Object.entries(activeBots)) {
-            const botInstance = new Telegraf(botInfo.token);
-            const { successCount, failCount } = await handleBroadcast(msgCtx, 'groups', botInstance);
-            totalSuccess += successCount;
-            totalFail += failCount;
-        }
-        ctx.reply(`Broadcast completed for all bots.\nTotal Success: ${totalSuccess}\nTotal Failed: ${totalFail}`);
-    });
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    await handleBroadcast(ctx, 'groups', message);
 }
 
 async function handleBroadcastAll(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-
-    // Extract the message content after the command
-    const messageContent = ctx.message.text.split(' ').slice(1).join(' ');
-
-    if (!messageContent) {
-        return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_all <your message>');
-    }
-
-    let totalSuccess = 0;
-    let totalFail = 0;
-
-    for (const [botId, botInfo] of Object.entries(activeBots)) {
-        const botInstance = new Telegraf(botInfo.token);
-        const { successCount, failCount } = await handleBroadcast({ message: { text: messageContent } }, 'all', botInstance);
-        totalSuccess += successCount;
-        totalFail += failCount;
-    }
-
-    ctx.reply(`Broadcast completed for all bots.\nTotal Success: ${totalSuccess}\nTotal Failed: ${totalFail}`);
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    await handleBroadcast(ctx, 'all', message);
 }
 async function getUserIdsFromDatabase(botToken) {
     try {
@@ -781,41 +735,60 @@ async function getGroupIdsFromDatabase(botToken) {
         return [];
     }
 }
-async function handleBroadcast(ctx, type, botInstance) {
-    const message = ctx.message.text;
+async function handleBroadcast(ctx, type, message) {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+
+    let targetChats = [];
     let successCount = 0;
     let failCount = 0;
 
-    console.log(`Broadcasting message: "${message}" to ${type} using bot @${botInstance.botInfo.username}`);
+    switch (type) {
+        case 'dm':
+            targetChats = Array.from(userDeployments.keys());
+            break;
+        case 'groups':
+            targetChats = Array.from(activeGroups.keys());
+            break;
+        case 'all':
+            targetChats = [...Array.from(userDeployments.keys()), ...Array.from(activeGroups.keys())];
+            break;
+        default:
+            return ctx.reply('Invalid broadcast type.');
+    }
 
-    if (type === 'dm' || type === 'all') {
-        const userIds = await getUserIdsFromDatabase(botInstance.token);
-        for (const userId of userIds) {
-            try {
-                await botInstance.telegram.sendMessage(userId, message);
-                successCount++;
-            } catch (error) {
-                console.error(`Failed to send message to user ${userId}:`, error);
-                failCount++;
-            }
+    const progress = await ctx.reply('Broadcasting message...');
+
+    for (const chatId of targetChats) {
+        try {
+            await ctx.telegram.sendMessage(chatId, message);
+            successCount++;
+        } catch (error) {
+            console.error(`Failed to send message to chat ${chatId}:`, error);
+            failCount++;
+        }
+
+        if ((successCount + failCount) % 10 === 0) {
+            await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                progress.message_id,
+                null,
+                `Broadcasting: ${successCount + failCount}/${targetChats.length} completed`
+            );
         }
     }
 
-    if (type === 'groups' || type === 'all') {
-        const groupIds = await getGroupIdsFromDatabase(botInstance.token);
-        for (const groupId of groupIds) {
-            try {
-                await botInstance.telegram.sendMessage(groupId, message);
-                successCount++;
-            } catch (error) {
-                console.error(`Failed to send message to group ${groupId}:`, error);
-                failCount++;
-            }
-        }
-    }
-
-    return { successCount, failCount };
+    const senderInfo = ctx.from.username ? `@${ctx.from.username}` : `User ID: ${ctx.from.id}`;
+    
+    await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progress.message_id,
+        null,
+        `Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}\nSent by: ${senderInfo}`
+    );
 }
+
 
 async function getGroupIdsFromDatabase(botToken) {
     try {
