@@ -35,24 +35,22 @@ let ownerMessageSent = false;
 let ownerUsername = null;
 let ownerFirstName = null;
    // Add this function near the top of your file, after your imports and before the bot commands
-   async function getBotGroups(botId, userId) {
+   async function getBotGroups(botId) {
     try {
         const db = await ensureDatabaseInitialized();
         const groups = await db.collection('groups').find({ 
             is_active: true,
-            $or: [
-                { bot_id: botId },
-                { members: userId }
-            ]
-        })
-        .sort({ added_at: -1 }) // Sort by the most recently added
-        .limit(5) // Limit to the 5 most recent groups, adjust as needed
-        .toArray();
+            bot_id: botId
+        }).toArray();
+
+        console.log(`Bot ${botId} has ${groups.length} active groups`);
         return groups;
     } catch (error) {
         console.error('Error fetching bot groups:', error);
         return [];
     }
+}
+}
 }
 async function getLatestGroupsMembersState(botId, userId) {
     try {
@@ -912,6 +910,24 @@ function setupCommands(bot) {
             await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
         }
     });
+    bot.on('new_chat_members', async (ctx) => {
+        if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
+            const db = await database.ensureDatabaseInitialized();
+            await db.collection('groups').updateOne(
+                { group_id: ctx.chat.id },
+                { $set: { 
+                    group_id: ctx.chat.id,
+                    title: ctx.chat.title,
+                    is_active: true,
+                    bot_id: config.botId,
+                    added_at: new Date()
+                }},
+                { upsert: true }
+            );
+            console.log(`Group ${ctx.chat.title} (${ctx.chat.id}) saved to DB`);
+        }
+    });
+    
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
