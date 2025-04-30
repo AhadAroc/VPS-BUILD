@@ -21,7 +21,7 @@ mongoose.connect(mongoURI, {
   tls: true,
   tlsAllowInvalidCertificates: false
 });
-
+const activeGroups = new Map();
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
 // Heroku API key
@@ -83,7 +83,15 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-
+bot.on('new_chat_members', (ctx) => {
+    if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
+        // Bot was added to a new group
+        activeGroups.set(ctx.chat.id, {
+            title: ctx.chat.title,
+            type: ctx.chat.type
+        });
+    }
+});
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
@@ -736,7 +744,7 @@ async function getGroupIdsFromDatabase(botToken) {
     }
 }
 async function handleBroadcast(ctx, type, message) {
-    if (ctx.from.id !== ADMIN_ID) {
+    if (ctx.from?.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
 
@@ -779,7 +787,7 @@ async function handleBroadcast(ctx, type, message) {
         }
     }
 
-    const senderInfo = ctx.from.username ? `@${ctx.from.username}` : `User ID: ${ctx.from.id}`;
+    const senderInfo = ctx.from?.username ? `@${ctx.from.username}` : `User ID: ${ctx.from?.id || 'Unknown'}`;
     
     await ctx.telegram.editMessageText(
         ctx.chat.id,
@@ -789,7 +797,21 @@ async function handleBroadcast(ctx, type, message) {
     );
 }
 
-
+async function updateActiveGroups(bot) {
+    setInterval(() => updateActiveGroups(bot), 24 * 60 * 60 * 1000);
+    for (const [chatId, groupInfo] of activeGroups) {
+        try {
+            const chat = await bot.telegram.getChat(chatId);
+            activeGroups.set(chatId, {
+                title: chat.title,
+                type: chat.type
+            });
+        } catch (error) {
+            console.error(`Failed to update info for group ${chatId}:`, error);
+            activeGroups.delete(chatId); // Remove the group if we can't get its info
+        }
+    }
+}
 async function getGroupIdsFromDatabase(botToken) {
     try {
         // Assuming you have a Group model
