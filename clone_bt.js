@@ -752,25 +752,37 @@ async function handleBroadcast(ctx, type, message) {
     let successCount = 0;
     let failCount = 0;
 
-    switch (type) {
-        case 'dm':
-            targetChats = Array.from(userDeployments.keys());
-            break;
-        case 'groups':
-            targetChats = Array.from(activeGroups.keys());
-            break;
-        case 'all':
-            targetChats = [...Array.from(userDeployments.keys()), ...Array.from(activeGroups.keys())];
-            break;
-        default:
-            return ctx.reply('Invalid broadcast type.');
+    // Fetch all active bots
+    const CloneModel = mongoose.model('Clone');
+    const activeBots = await CloneModel.find({ isActive: true });
+
+    for (const bot of activeBots) {
+        let botTargetChats = [];
+        switch (type) {
+            case 'dm':
+                botTargetChats = await getUserIdsFromDatabase(bot.botToken);
+                break;
+            case 'groups':
+                botTargetChats = await getGroupIdsFromDatabase(bot.botToken);
+                break;
+            case 'all':
+                botTargetChats = [
+                    ...(await getUserIdsFromDatabase(bot.botToken)),
+                    ...(await getGroupIdsFromDatabase(bot.botToken))
+                ];
+                break;
+            default:
+                return ctx.reply('Invalid broadcast type.');
+        }
+        targetChats = [...targetChats, ...botTargetChats];
     }
 
     const progress = await ctx.reply('Broadcasting message...');
 
     for (const chatId of targetChats) {
         try {
-            await ctx.telegram.sendMessage(chatId, message);
+            // Use the Telegram API directly instead of ctx.telegram
+            await bot.telegram.sendMessage(chatId, message);
             successCount++;
         } catch (error) {
             console.error(`Failed to send message to chat ${chatId}:`, error);
