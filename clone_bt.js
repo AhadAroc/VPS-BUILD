@@ -723,8 +723,24 @@ async function handleBroadcastDM(ctx) {
 }
 
 async function handleBroadcastGroups(ctx) {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+
     const message = ctx.message.text.split(' ').slice(1).join(' ');
-    await handleBroadcast(ctx, 'groups', message);
+    if (!message) {
+        return ctx.reply('❌ Please provide a message to broadcast.\nUsage: /broadcast_groups <your message>');
+    }
+
+    await ctx.reply('⏳ Broadcasting to groups... please wait.');
+
+    const { successCount, failCount, groupCount } = await handleBroadcast(ctx, 'groups', message);
+
+    if (groupCount === 0) {
+        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
+    }
+
+    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groupCount}`);
 }
 
 async function handleBroadcastAll(ctx) {
