@@ -807,37 +807,55 @@ async function getBotGroups(botId) {
 }
 
 async function handleBroadcast(ctx, type, message) {
-    let successCount = 0, failCount = 0;
+    let successCount = 0;
+    let failCount = 0;
+    let totalGroups = 0;
 
     for (const botId in activeBots) {
         const botInfo = activeBots[botId];
         const bot = new Telegraf(botInfo.token);
 
-        try {
-            if (type === 'dm') {
+        if (type === 'dm') {
+            try {
                 await bot.telegram.sendMessage(botInfo.createdBy, message);
-            } else if (type === 'groups') {
-                // Assuming you stored group IDs somewhere per bot
-                const groups = await getBotGroups(botId, botInfo.createdBy); // reuse your function
-                for (const group of groups) {
-                    await bot.telegram.sendMessage(group.chat_id, message);
-                }
-            } else if (type === 'all') {
-                await bot.telegram.sendMessage(botInfo.createdBy, message);
-                const groups = await getBotGroups(botId, botInfo.createdBy);
-                for (const group of groups) {
-                    await bot.telegram.sendMessage(group.chat_id, message);
+                console.log(`✅ DM sent to user ${botInfo.createdBy}`);
+                successCount++;
+            } catch (err) {
+                console.error(`❌ Failed DM to user ${botInfo.createdBy}:`, err.description || err);
+                failCount++;
+            }
+        }
+
+        if (type === 'groups' || type === 'all') {
+            const groups = await getBotGroups(botId);
+            console.log(`🔍 Bot @${botInfo.username} has ${groups.length} groups`);
+            totalGroups += groups.length;
+
+            for (const group of groups) {
+                try {
+                    await bot.telegram.sendMessage(group.group_id, message);
+                    console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
+                    successCount++;
+                } catch (err) {
+                    console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+                    failCount++;
                 }
             }
+        }
 
-            successCount++;
-        } catch (err) {
-            console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
-            failCount++;
+        if (type === 'all') {
+            try {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+                console.log(`✅ DM sent to user ${botInfo.createdBy}`);
+                successCount++;
+            } catch (err) {
+                console.error(`❌ Failed DM to user ${botInfo.createdBy}:`, err.description || err);
+                failCount++;
+            }
         }
     }
 
-    ctx.reply(`Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}`);
+    return { successCount, failCount, groupCount: totalGroups };
 }
 
 
