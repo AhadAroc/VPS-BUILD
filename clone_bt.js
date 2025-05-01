@@ -85,21 +85,23 @@ bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
 // Save groups to database when bot is added
-bot.on('new_chat_members', async (ctx) => {
-    if (!ctx.message.new_chat_member) return;
-
-    const newMemberId = ctx.message.new_chat_member.id;
+// Handle bot added/removed from group (more reliable than just new_chat_members)
+bot.on('my_chat_member', async (ctx) => {
     const botInfo = await ctx.telegram.getMe();
+    const status = ctx.myChatMember.new_chat_member.status;
+    const chatId = ctx.chat.id;
+    const chatTitle = ctx.chat.title || 'Unknown';
 
-    if (newMemberId === botInfo.id) {
-        const db = await ensureDatabaseInitialized();  // connects to 'test'
+    const db = await ensureDatabaseInitialized();
 
+    if (status === 'member' || status === 'administrator') {
+        // Bot was added or promoted
         await db.collection('groups').updateOne(
-            { group_id: ctx.chat.id, bot_id: config.botId },
+            { group_id: chatId, bot_id: config.botId },
             {
                 $set: {
-                    group_id: ctx.chat.id,
-                    title: ctx.chat.title || 'Unknown',
+                    group_id: chatId,
+                    title: chatTitle,
                     is_active: true,
                     bot_id: config.botId,
                     added_at: new Date()
@@ -107,8 +109,16 @@ bot.on('new_chat_members', async (ctx) => {
             },
             { upsert: true }
         );
+        console.log(`✅ [@${botInfo.username}] (my_chat_member) Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
+    }
 
-        console.log(`✅ [@${botInfo.username}] Saved group '${ctx.chat.title}' (${ctx.chat.id}) for bot_id ${config.botId}`);
+    if (status === 'left' || status === 'kicked') {
+        // Bot was removed or kicked
+        await db.collection('groups').updateOne(
+            { group_id: chatId, bot_id: config.botId },
+            { $set: { is_active: false } }
+        );
+        console.log(`🚪 [@${botInfo.username}] (my_chat_member) Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
 
@@ -705,14 +715,15 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
-async function ensureDatabaseInitialized() {
+async function ensureDatabaseInitialized(databaseName = 'test') {
     let db = database.getDb();
     if (!db) {
-        console.log('Database not initialized, connecting now...');
-        db = await database.connectToMongoDB();
+        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
+        db = await database.connectToMongoDB(databaseName);
     }
     return db;
 }
+
 
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
