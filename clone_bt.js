@@ -765,11 +765,6 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 // Then define these handler functions:
 // Implement broadcast handlers
-async function handleBroadcastDM(ctx) {
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    await handleBroadcast(ctx, 'dm', message);
-}
-
 async function handleBroadcastGroups(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
@@ -782,13 +777,29 @@ async function handleBroadcastGroups(ctx) {
 
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
-    const { successCount, failCount, groupCount } = await handleBroadcast(ctx, 'groups', message);
+    // Connect to the "test" database
+    const db = await connectToMongoDB('test');
+    const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
-    if (groupCount === 0) {
+    if (groups.length === 0) {
         return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
     }
 
-    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groupCount}`);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const group of groups) {
+        try {
+            await ctx.telegram.sendMessage(group.group_id, message);
+            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
+            successCount++;
+        } catch (err) {
+            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+            failCount++;
+        }
+    }
+
+    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
 }
 
 async function handleBroadcastAll(ctx) {
