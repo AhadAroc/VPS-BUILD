@@ -132,7 +132,7 @@ bot.on('left_chat_member', async (ctx) => {
     const botInfo = await ctx.telegram.getMe();
 
     if (leftMemberId === botInfo.id) {
-        const db = await ensureDatabaseInitialized();
+        const db = await ensureDatabaseInitialized('test');
 
         await db.collection('groups').updateOne(
             { group_id: ctx.chat.id, bot_id: config.botId },
@@ -498,7 +498,7 @@ bot.command('broadcast_all', async (ctx) => {
     }
 
     try {
-        const db = await ensureDatabaseInitialized();
+        const db = await ensureDatabaseInitialized('test');
         await db.collection('broadcast_triggers').insertOne({
             triggered: true,
             message: message,
@@ -901,8 +901,8 @@ async function getGroupIdsFromDatabase(botToken) {
 async function getBotGroups(botId) {
     const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
     try {
-        const db = await ensureDatabaseInitialized();
-        const groups = await db.collection('test').find({ 
+        const db = await ensureDatabaseInitialized('test');
+        const groups = await db.collection('groups').find({ 
             is_active: true,
             bot_id: botId
         }).toArray();
@@ -916,7 +916,7 @@ async function getBotGroups(botId) {
 }
 
 async function handleBroadcast(ctx, type, message) {
-    const db = await ensureDatabaseInitialized(); // Ensure connection to the correct database
+    const db = await ensureDatabaseInitialized('test'); // Ensure connection to the correct database
     let successCount = 0;
     let failCount = 0;
     let totalGroups = 0;
