@@ -52,14 +52,7 @@ let ownerFirstName = null;
     }
 }
 
-async function ensureDatabaseInitialized(databaseName = 'test') {
-    let db = database.getDb();
-    if (!db) {
-        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
-        db = await database.connectToMongoDB(databaseName);
-    }
-    return db;
-}
+
 async function getLatestGroupsMembersState(botId, userId) {
     try {
         const groups = await getBotGroups(botId, userId);
