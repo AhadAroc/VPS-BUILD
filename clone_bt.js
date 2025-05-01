@@ -845,6 +845,7 @@ async function getBotGroups(botId) {
 }
 
 async function handleBroadcast(ctx, type, message) {
+    const db = await ensureDatabaseInitialized(); // Ensure connection to the correct database
     let successCount = 0;
     let failCount = 0;
     let totalGroups = 0;
