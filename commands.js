@@ -38,10 +38,10 @@ let ownerFirstName = null;
    // Add this function near the top of your file, after your imports and before the bot commands
    async function getBotGroups(botId) {
     try {
-        const db = await ensureDatabaseInitialized();
+        const db = await database.connectToMongoDB('test'); // connect explicitly to 'test' DB
         const groups = await db.collection('groups').find({ 
             is_active: true,
-            bot_id: botId
+            bot_id: botId  // make sure bot_id is always set on save!
         }).toArray();
 
         console.log(`Bot ${botId} has ${groups.length} active groups`);
@@ -51,6 +51,7 @@ let ownerFirstName = null;
         return [];
     }
 }
+
 
 async function getLatestGroupsMembersState(botId, userId) {
     try {
