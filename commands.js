@@ -1414,7 +1414,7 @@ bot.on('left_chat_member', async (ctx) => {
 });
 async function checkForBroadcastTrigger() {
     try {
-        const db = await ensureDatabaseInitialized();
+        const db = await ensureDatabaseInitialized(); // Ensure connection to the correct database
         const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
 
         if (trigger) {
@@ -1434,7 +1434,7 @@ async function checkForBroadcastTrigger() {
 async function broadcastAcrossAllBots(ctx, message, type = 'all') {
     console.log('Starting broadcast across all bots');
     
-    const db = await ensureDatabaseInitialized();
+    const db = await ensureDatabaseInitialized(); // Ensure connection to the correct database
     const activeBots = await db.collection('clones').find({ isActive: true }).toArray();
     console.log(`Found ${activeBots.length} active bots`);
 
