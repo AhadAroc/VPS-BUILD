@@ -918,16 +918,16 @@ function setupCommands(bot) {
         const botInfo = await ctx.telegram.getMe();
     
         if (newMemberId === botInfo.id) {
-            const db = await ensureDatabaseInitialized();  // This connects to 'test' DB
+            const db = await ensureDatabaseInitialized();  // connects to 'test'
     
             await db.collection('groups').updateOne(
-                { group_id: ctx.chat.id, bot_id: config.botId },  // Uniqueness per bot
+                { group_id: ctx.chat.id, bot_id: config.botId },
                 {
                     $set: {
                         group_id: ctx.chat.id,
                         title: ctx.chat.title || 'Unknown',
                         is_active: true,
-                        bot_id: config.botId,  // ✅ GUARANTEED SAVED
+                        bot_id: config.botId,
                         added_at: new Date()
                     }
                 },
@@ -937,6 +937,7 @@ function setupCommands(bot) {
             console.log(`✅ [@${botInfo.username}] Saved group '${ctx.chat.title}' (${ctx.chat.id}) for bot_id ${config.botId}`);
         }
     });
+    
     
     bot.on('left_chat_member', async (ctx) => {
         if (!ctx.message.left_chat_member) return;
