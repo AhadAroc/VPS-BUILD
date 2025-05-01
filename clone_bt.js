@@ -701,6 +701,15 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
+async function ensureDatabaseInitialized() {
+    let db = database.getDb();
+    if (!db) {
+        console.log('Database not initialized, connecting now...');
+        db = await database.connectToMongoDB();
+    }
+    return db;
+}
+
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
