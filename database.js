@@ -332,15 +332,13 @@ async function loadActiveGroupsFromDatabase() {
     }
 }
 
-async function ensureDatabaseInitialized(botId = null) {
-    try {
-        // If botId is provided, use a specific database for this bot
-        const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
-        return await connectToMongoDB(dbName);
-    } catch (error) {
-        console.error('Error initializing database:', error);
-        throw error;
+async function ensureDatabaseInitialized(databaseName = 'test') {
+    let db = database.getDb();
+    if (!db) {
+        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
+        db = await database.connectToMongoDB(databaseName);
     }
+    return db;
 }
 async function getReplyForBot(botId, triggerWord) {
     try {
