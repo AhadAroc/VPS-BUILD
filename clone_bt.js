@@ -812,6 +812,42 @@ async function handleBroadcastAll(ctx) {
     }
     await handleBroadcast(ctx, 'all', message);
 }
+async function handleBroadcastDM(ctx) {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast.');
+    }
+
+    await ctx.reply('⏳ Broadcasting to direct messages... please wait.');
+
+    try {
+        const db = await ensureDatabaseInitialized();
+        const users = await db.collection('users').find().toArray();
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const user of users) {
+            try {
+                await ctx.telegram.sendMessage(user.user_id, message);
+                console.log(`✅ Message sent to user ${user.user_id}`);
+                successCount++;
+            } catch (err) {
+                console.error(`❌ Failed to send to user ${user.user_id}:`, err.description || err);
+                failCount++;
+            }
+        }
+
+        ctx.reply(`📢 Broadcast to direct messages completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Users: ${users.length}`);
+    } catch (error) {
+        console.error('Error during DM broadcast:', error);
+        ctx.reply('An error occurred while broadcasting to direct messages.');
+    }
+}
 async function getUserIdsFromDatabase(botToken) {
     try {
         const CloneModel = mongoose.model('Clone');
