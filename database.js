@@ -25,6 +25,21 @@ let client = null;
  * @param {string} question.addedBy - User ID of who added the question
  * @returns {Promise<Object>} - The added question with its ID
  */
+
+
+
+
+
+async function ensureDatabaseInitialized(databaseName = 'test') {
+    let db = database.getDb();
+    if (!db) {
+        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
+        db = await database.connectToMongoDB(databaseName);
+    }
+    return db;
+}
+
+
 async function addQuizQuestion(question) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -332,14 +347,7 @@ async function loadActiveGroupsFromDatabase() {
     }
 }
 
-async function ensureDatabaseInitialized(databaseName = 'test') {
-    let db = database.getDb();
-    if (!db) {
-        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
-        db = await database.connectToMongoDB(databaseName);
-    }
-    return db;
-}
+
 async function getReplyForBot(botId, triggerWord) {
     try {
         // Use the specific database for this bot
