@@ -88,28 +88,25 @@ bot.on('new_chat_members', async (ctx) => {
     if (!ctx.message.new_chat_member) return;
 
     const newMemberId = ctx.message.new_chat_member.id;
-
-    // Get bot info safely
     const botInfo = await ctx.telegram.getMe();
-    const botId = botInfo.id;
 
-    if (newMemberId === botId) {
-        const db = await database.ensureDatabaseInitialized();
+    if (newMemberId === botInfo.id) {
+        const db = await ensureDatabaseInitialized();
         await db.collection('groups').updateOne(
-            { group_id: ctx.chat.id },
+            { group_id: ctx.chat.id, bot_id: config.botId },  // Ensure linked to forked bot
             {
                 $set: {
                     group_id: ctx.chat.id,
                     title: ctx.chat.title || 'Unknown',
                     is_active: true,
-                    bot_id: config.botId,  // config.botId should be correct from fork config
+                    bot_id: config.botId,
                     added_at: new Date()
                 }
             },
             { upsert: true }
         );
 
-        console.log(`✅ [${config.botUsername}] Saved group ${ctx.chat.title} (${ctx.chat.id}) to database`);
+        console.log(`✅ [@${botInfo.username}] Saved group '${ctx.chat.title}' (${ctx.chat.id}) for bot_id ${config.botId}`);
     }
 });
 
