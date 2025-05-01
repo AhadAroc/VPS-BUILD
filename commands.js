@@ -52,7 +52,14 @@ let ownerFirstName = null;
     }
 }
 
-
+async function ensureDatabaseInitialized(databaseName = 'test') {
+    let db = database.getDb();
+    if (!db) {
+        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
+        db = await database.connectToMongoDB(databaseName);
+    }
+    return db;
+}
 async function getLatestGroupsMembersState(botId, userId) {
     try {
         const groups = await getBotGroups(botId, userId);
@@ -923,7 +930,7 @@ function setupCommands(bot) {
             const chatId = ctx.chat.id;
     
             // ===== Save group to DB =====
-            const db = await ensureDatabaseInitialized();
+            const db = await ensureDatabaseInitialized('test');
             await db.collection('groups').updateOne(
                 { group_id: chatId, bot_id: config.botId },
                 {
@@ -967,7 +974,7 @@ function setupCommands(bot) {
         const botInfo = await ctx.telegram.getMe();
     
         if (leftMemberId === botInfo.id) {
-            const db = await ensureDatabaseInitialized();
+            const db = await ensureDatabaseInitialized('test');
     
             await db.collection('groups').updateOne(
                 { group_id: ctx.chat.id, bot_id: config.botId },
@@ -1417,7 +1424,7 @@ bot.on('left_chat_member', async (ctx) => {
 });
 async function checkForBroadcastTrigger() {
     try {
-        const db = await ensureDatabaseInitialized(); // Ensure connection to the correct database
+        const db = await ensureDatabaseInitialized('test'); // Ensure connection to the correct database
         const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
 
         if (trigger) {
@@ -1437,7 +1444,7 @@ async function checkForBroadcastTrigger() {
 async function broadcastAcrossAllBots(ctx, message, type = 'all') {
     console.log('Starting broadcast across all bots');
     
-    const db = await ensureDatabaseInitialized(); // Ensure connection to the correct database
+    const db = await ensureDatabaseInitialized('test'); // Ensure connection to the correct database
     const activeBots = await db.collection('clones').find({ isActive: true }).toArray();
     console.log(`Found ${activeBots.length} active bots`);
 
