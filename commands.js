@@ -912,20 +912,24 @@ function setupCommands(bot) {
         }
     });
     bot.on('new_chat_members', async (ctx) => {
-        if (!ctx.message.new_chat_member) return;
+        const newMembers = ctx.message.new_chat_members;
+        if (!newMembers || newMembers.length === 0) return;
     
-        const newMemberId = ctx.message.new_chat_member.id;
         const botInfo = await ctx.telegram.getMe();
+        const isBotAdded = newMembers.some(member => member.id === botInfo.id);
     
-        if (newMemberId === botInfo.id) {
-            const db = await ensureDatabaseInitialized();  // connects to 'test'
+        if (isBotAdded) {
+            const chatTitle = ctx.chat.title || 'Unknown';
+            const chatId = ctx.chat.id;
     
+            // ===== Save group to DB =====
+            const db = await ensureDatabaseInitialized();
             await db.collection('groups').updateOne(
-                { group_id: ctx.chat.id, bot_id: config.botId },
+                { group_id: chatId, bot_id: config.botId },
                 {
                     $set: {
-                        group_id: ctx.chat.id,
-                        title: ctx.chat.title || 'Unknown',
+                        group_id: chatId,
+                        title: chatTitle,
                         is_active: true,
                         bot_id: config.botId,
                         added_at: new Date()
@@ -934,7 +938,24 @@ function setupCommands(bot) {
                 { upsert: true }
             );
     
-            console.log(`✅ [@${botInfo.username}] Saved group '${ctx.chat.title}' (${ctx.chat.id}) for bot_id ${config.botId}`);
+            console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
+    
+            // ===== Send notification to owner + developers =====
+            const message = `
+    ⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
+    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+    ⌯ اسم المجموعة ⌯: ${chatTitle}
+    ⌯ ايدي المجموعة ⌯: ${chatId}
+            `;
+    
+            const recipients = [ownerId, ...developerIds];
+            for (const recipientId of recipients) {
+                try {
+                    await ctx.telegram.sendMessage(recipientId, message);
+                } catch (error) {
+                    console.error(`Error sending message to ${recipientId}:`, error);
+                }
+            }
         }
     });
     
@@ -1364,29 +1385,7 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ أثناء المعالجة.');
     }
 });
-bot.on('new_chat_members', async (ctx) => {
-    const newMembers = ctx.message.new_chat_members;
-    if (newMembers.some(member => member.id === ctx.botInfo.id)) {
-        const chatTitle = ctx.chat.title || 'Unknown';
-        const chatId = ctx.chat.id;
-        const message = `
-            ⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
-            ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-            ⌯ اسم المجموعة ⌯: ${chatTitle}
-            ⌯ ايدي المجموعة ⌯: ${chatId}
-        `;
 
-        // Send the message to the bot owner and developers
-        const recipients = [ownerId, ...developerIds];
-        for (const recipientId of recipients) {
-            try {
-                await ctx.telegram.sendMessage(recipientId, message);
-            } catch (error) {
-                console.error(`Error sending message to ${recipientId}:`, error);
-            }
-        }
-    }
-});
 bot.on('left_chat_member', async (ctx) => {
     if (ctx.message.left_chat_member.id === ctx.botInfo.id) {
         // The bot was removed from the group
