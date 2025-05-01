@@ -92,7 +92,8 @@ bot.on('my_chat_member', async (ctx) => {
     const chatId = ctx.chat.id;
     const chatTitle = ctx.chat.title || 'Unknown';
 
-    const db = await ensureDatabaseInitialized();
+    const db = await ensureDatabaseInitialized('test');
+
 
     if (status === 'member' || status === 'administrator') {
         // Bot was added or promoted
