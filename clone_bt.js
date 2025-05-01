@@ -902,7 +902,7 @@ async function getBotGroups(botId) {
     const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
     try {
         const db = await ensureDatabaseInitialized();
-        const groups = await db.collection('groups').find({ 
+        const groups = await db.collection('test').find({ 
             is_active: true,
             bot_id: botId
         }).toArray();
