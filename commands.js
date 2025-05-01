@@ -1,5 +1,5 @@
 //ultragayshit 
-const database = require('./database');
+
 const { adminOnly,setupMiddlewares } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
