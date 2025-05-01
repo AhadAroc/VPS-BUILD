@@ -911,6 +911,7 @@ async function handleBroadcast(ctx, type, message) {
         const botInfo = activeBots[botId];
         const bot = new Telegraf(botInfo.token);
 
+        // ===== SEND TO DM =====
         if (type === 'dm') {
             try {
                 await bot.telegram.sendMessage(botInfo.createdBy, message);
@@ -922,6 +923,7 @@ async function handleBroadcast(ctx, type, message) {
             }
         }
 
+        // ===== SEND TO GROUPS =====
         if (type === 'groups' || type === 'all') {
             const groups = await getBotGroups(botId);
             console.log(`🔍 Bot @${botInfo.username} has ${groups.length} groups`);
@@ -929,16 +931,33 @@ async function handleBroadcast(ctx, type, message) {
 
             for (const group of groups) {
                 try {
+                    // Check if bot can access group BEFORE sending
+                    await bot.telegram.getChat(group.group_id);
+
                     await bot.telegram.sendMessage(group.group_id, message);
                     console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
                     successCount++;
-                } catch (err) {
-                    console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+                } catch (error) {
+                    if (error.code === 400 && error.description.includes('chat not found')) {
+                        console.log(`⚠️ Skipping group ${group.title} (${group.group_id}) — bot not in group anymore.`);
+
+                        // OPTIONAL: Mark group as inactive in DB to clean up
+                        await db.collection('groups').updateOne(
+                            { group_id: group.group_id },
+                            { $set: { is_active: false } }
+                        );
+
+                        failCount++;
+                        continue;
+                    }
+
+                    console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, error.description || error);
                     failCount++;
                 }
             }
         }
 
+        // ===== SEND TO DM AGAIN (FOR 'all') =====
         if (type === 'all') {
             try {
                 await bot.telegram.sendMessage(botInfo.createdBy, message);
@@ -953,6 +972,7 @@ async function handleBroadcast(ctx, type, message) {
 
     return { successCount, failCount, groupCount: totalGroups };
 }
+
 
 
 async function updateActiveGroups(bot) {
