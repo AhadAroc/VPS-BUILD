@@ -14,6 +14,9 @@ const mongooseOptions = {
 // MongoDB connection
 let db = null;
 let client = null;
+// --- Native MongoClient helper (for multi-DB clean forked bots) ---
+let _mongoClient = null;
+let _mongoDbs = {};
 /**
  * Add a new quiz question to the database
  * @param {Object} question - The question object
@@ -27,7 +30,27 @@ let client = null;
  */
 
 
+async function getNativeDb(dbName = process.env.DB_NAME) {
+    const uri = process.env.MONGODB_URI;  // You already have in .env
+    if (!_mongoClient) {
+        _mongoClient = new MongoClient(uri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 30000,
+            socketTimeoutMS: 45000,
+            connectTimeoutMS: 30000
+        });
+        await _mongoClient.connect();
+        console.log('✅ Native MongoClient connected to cluster');
+    }
 
+    if (!_mongoDbs[dbName]) {
+        _mongoDbs[dbName] = _mongoClient.db(dbName);
+        console.log(`✅ Native MongoDB database selected: ${dbName}`);
+    }
+
+    return _mongoDbs[dbName];
+}
 
 
 async function ensureDatabaseInitialized(botId = null) {
@@ -678,6 +701,7 @@ module.exports = {
     connectToMongoDB,
     setupDatabase,
     ensureDatabaseInitialized,
+    getDatabaseForBot,
     
     // Reply functions
     getReplies,
