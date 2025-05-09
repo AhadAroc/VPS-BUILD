@@ -84,7 +84,7 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-<<<<<<< HEAD
+
 // Save groups to database when bot is added
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 bot.on('my_chat_member', async (ctx) => {
@@ -146,7 +146,7 @@ bot.on('left_chat_member', async (ctx) => {
 });
 
 
-=======
+
 bot.on('new_chat_members', (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
         // Bot was added to a new group
@@ -156,7 +156,7 @@ bot.on('new_chat_members', (ctx) => {
         });
     }
 });
->>>>>>> 4fa09812db50014b7bdaac31b8ef409e637ffef0
+
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
@@ -511,11 +511,11 @@ bot.command('broadcast_all', async (ctx) => {
     }
 
     try {
-<<<<<<< HEAD
+
         const db = await getDatabaseForBot('replays');
-=======
+
         const db = await ensureDatabaseInitialized();
->>>>>>> 4fa09812db50014b7bdaac31b8ef409e637ffef0
+
         await db.collection('broadcast_triggers').insertOne({
             triggered: true,
             message: message,
@@ -791,7 +791,7 @@ async function handleBroadcastDM(ctx) {
     await handleBroadcast(ctx, 'dm', message);
 }
 
-<<<<<<< HEAD
+
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
     // Connect to the "test" database
@@ -817,11 +817,10 @@ async function handleBroadcastDM(ctx) {
     }
 
     ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
-=======
+
 async function handleBroadcastGroups(ctx) {
     const message = ctx.message.text.split(' ').slice(1).join(' ');
     await handleBroadcast(ctx, 'groups', message);
->>>>>>> 4fa09812db50014b7bdaac31b8ef409e637ffef0
 }
 
 async function handleBroadcastAll(ctx) {
@@ -870,7 +869,7 @@ async function getGroupIdsFromDatabase(botToken) {
     }
 }
 
-<<<<<<< HEAD
+
 async function getBotGroups(botId) {
     const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
     try {
@@ -887,8 +886,8 @@ async function getBotGroups(botId) {
         return [];
     }
 }
-=======
->>>>>>> 4fa09812db50014b7bdaac31b8ef409e637ffef0
+
+
 
 async function handleBroadcast(ctx, type, message) {
     let successCount = 0, failCount = 0;
