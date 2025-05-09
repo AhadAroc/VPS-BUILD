@@ -70,7 +70,27 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-
+async function getBotGroups(botId) {
+    try {
+        const CloneModel = mongoose.model('Clone');
+        const clone = await CloneModel.findOne({ botId: botId });
+        if (!clone) {
+            console.error(`No clone found for bot ID: ${botId}`);
+            return [];
+        }
+        const db = await connectToMongoDB(clone.dbName);
+        const Group = db.model('Group', new mongoose.Schema({
+            groupId: String,
+            title: String,
+            // Add any other fields you store for groups
+        }));
+        const groups = await Group.find().lean();
+        return groups;
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+        return [];
+    }
+}
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -782,23 +802,23 @@ async function handleBroadcast(ctx, type, message) {
         const bot = new Telegraf(botInfo.token);
 
         try {
-            if (type === 'dm') {
+            if (type === 'dm' || type === 'all') {
                 await bot.telegram.sendMessage(botInfo.createdBy, message);
-            } else if (type === 'groups') {
-                // Assuming you stored group IDs somewhere per bot
-                const groups = await getBotGroups(botId, botInfo.createdBy); // reuse your function
+                successCount++;
+            }
+            
+            if (type === 'groups' || type === 'all') {
+                const groups = await getBotGroups(botId);
                 for (const group of groups) {
-                    await bot.telegram.sendMessage(group.chat_id, message);
-                }
-            } else if (type === 'all') {
-                await bot.telegram.sendMessage(botInfo.createdBy, message);
-                const groups = await getBotGroups(botId, botInfo.createdBy);
-                for (const group of groups) {
-                    await bot.telegram.sendMessage(group.chat_id, message);
+                    try {
+                        await bot.telegram.sendMessage(group.groupId, message);
+                        successCount++;
+                    } catch (groupError) {
+                        console.error(`Failed to send broadcast to group ${group.groupId} for bot ${botInfo.username}:`, groupError);
+                        failCount++;
+                    }
                 }
             }
-
-            successCount++;
         } catch (err) {
             console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
             failCount++;
