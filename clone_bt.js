@@ -1,5 +1,4 @@
 const { Telegraf, Markup } = require('telegraf');
-const database = require('./database');
 const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
@@ -84,69 +83,6 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-
-// Save groups to database when bot is added
-// Handle bot added/removed from group (more reliable than just new_chat_members)
-bot.on('my_chat_member', async (ctx) => {
-    const botInfo = await ctx.telegram.getMe();
-    const status = ctx.myChatMember.new_chat_member.status;
-    const chatId = ctx.chat.id;
-    const chatTitle = ctx.chat.title || 'Unknown';
-
-    const db = await getDatabaseForBot('replays');
-
-
-    if (status === 'member' || status === 'administrator') {
-        // Bot was added or promoted
-        await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
-            {
-                $set: {
-                    group_id: chatId,
-                    title: chatTitle,
-                    is_active: true,
-                    bot_id: config.botId,
-                    added_at: new Date()
-                }
-            },
-            { upsert: true }
-        );
-        console.log(`✅ [@${botInfo.username}] (my_chat_member) Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
-    }
-
-    if (status === 'left' || status === 'kicked') {
-        // Bot was removed or kicked
-        await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
-            { $set: { is_active: false } }
-        );
-        console.log(`🚪 [@${botInfo.username}] (my_chat_member) Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
-    }
-});
-
-
-
-// Mark groups inactive when bot is removed
-bot.on('left_chat_member', async (ctx) => {
-    if (!ctx.message.left_chat_member) return;
-
-    const leftMemberId = ctx.message.left_chat_member.id;
-    const botInfo = await ctx.telegram.getMe();
-
-    if (leftMemberId === botInfo.id) {
-        const db = await getDatabaseForBot('replays');
-
-        await db.collection('groups').updateOne(
-            { group_id: ctx.chat.id, bot_id: config.botId },
-            { $set: { is_active: false } }
-        );
-
-        console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${config.botId}`);
-    }
-});
-
-
-
 bot.on('new_chat_members', (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
         // Bot was added to a new group
@@ -156,7 +92,6 @@ bot.on('new_chat_members', (ctx) => {
         });
     }
 });
-
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
@@ -511,11 +446,7 @@ bot.command('broadcast_all', async (ctx) => {
     }
 
     try {
-
-        const db = await getDatabaseForBot('replays');
-
         const db = await ensureDatabaseInitialized();
-
         await db.collection('broadcast_triggers').insertOne({
             triggered: true,
             message: message,
@@ -791,33 +722,6 @@ async function handleBroadcastDM(ctx) {
     await handleBroadcast(ctx, 'dm', message);
 }
 
-
-    await ctx.reply('⏳ Broadcasting to groups... please wait.');
-
-    // Connect to the "test" database
-    const db = await getDatabaseForBot('replays');
-    const groups = await db.collection('groups').find({ is_active: true }).toArray();
-
-    if (groups.length === 0) {
-        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
-    }
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const group of groups) {
-        try {
-            await ctx.telegram.sendMessage(group.group_id, message);
-            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
-            successCount++;
-        } catch (err) {
-            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
-            failCount++;
-        }
-    }
-
-    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
-
 async function handleBroadcastGroups(ctx) {
     const message = ctx.message.text.split(' ').slice(1).join(' ');
     await handleBroadcast(ctx, 'groups', message);
@@ -841,7 +745,7 @@ async function getUserIdsFromDatabase(botToken) {
             console.error(`No clone found for bot token: ${botToken}`);
             return [];
         }
-        const db = await getDatabaseForBot('replays');
+        const db = await connectToMongoDB(clone.dbName);
         const User = db.model('User');
         const users = await User.find().distinct('userId');
         return users;
@@ -859,7 +763,7 @@ async function getGroupIdsFromDatabase(botToken) {
             console.error(`No clone found for bot token: ${botToken}`);
             return [];
         }
-        const db = await getDatabaseForBot('replays');
+        const db = await connectToMongoDB(clone.dbName);
         const Group = db.model('Group');
         const groups = await Group.find().distinct('groupId');
         return groups;
@@ -868,25 +772,6 @@ async function getGroupIdsFromDatabase(botToken) {
         return [];
     }
 }
-
-
-async function getBotGroups(botId) {
-    const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
-    try {
-        const db = await getDatabaseForBot('replays');
-        const groups = await db.collection('groups').find({ 
-            is_active: true,
-            bot_id: botId
-        }).toArray();
-
-        console.log(`Bot ${botId} has ${groups.length} active groups`);
-        return groups;
-    } catch (error) {
-        console.error('Error fetching bot groups:', error);
-        return [];
-    }
-}
-
 
 
 async function handleBroadcast(ctx, type, message) {
@@ -1001,7 +886,7 @@ async function cloneBot(originalBotToken, newBotToken, ownerId) {
 }
 
 async function createCloneDbEntry(botId, botToken, dbName, ownerId) {
-    const db = await getDatabaseForBot('replays');
+    const db = await connectToMongoDB(dbName);
     const CloneModel = mongoose.model('Clone', new mongoose.Schema({
         botId: String,
         botToken: String,
@@ -1041,7 +926,7 @@ async function cleanupDatabase() {
 async function addReplyToBotDatabase(botId, triggerWord, replyContent, replyType = 'text') {
     try {
         const dbName = `bot_${botId}_db`;
-        const db = await getDatabaseForBot('replays');
+        const db = await connectToMongoDB(dbName);
         
         // Create a more comprehensive schema for replies
         const ReplyModel = db.model('Reply', new mongoose.Schema({
