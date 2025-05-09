@@ -19,7 +19,7 @@ let photoMessages = new Map(); // chatId -> Set of message IDs
 // Add this at the top of your file
 const database = require('./database');
 const { isDeveloper } = require('./middlewares');
-const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
+const { loadActiveGroupsFromDatabase, getDatabaseForBot ,} = require('./database'); // Adjust the path as necessary
 const axios = require('axios');
 const subscriptionStatusCache = new Map();
 const config = require('./config');
@@ -923,7 +923,9 @@ function setupCommands(bot) {
             const chatId = ctx.chat.id;
     
             // ===== Save group to DB =====
-            const db = await ensureDatabaseInitialized('test');
+            const { getDatabaseForBot } = require('./database');
+const db = await getDatabaseForBot('test');   // FOR GROUP SAVE ON JOIN
+
             await db.collection('groups').updateOne(
                 { group_id: chatId, bot_id: config.botId },
                 {
