@@ -14,9 +14,7 @@ const mongooseOptions = {
 // MongoDB connection
 let db = null;
 let client = null;
-// --- Native MongoClient helper (for multi-DB clean forked bots) ---
-let _mongoClient = null;
-let _mongoDbs = {};
+
 /**
  * Add a new quiz question to the database
  * @param {Object} question - The question object
@@ -30,8 +28,13 @@ let _mongoDbs = {};
  */
 
 
-async function getNativeDb(dbName = process.env.DB_NAME) {
-    const uri = process.env.MONGODB_URI;  // You already have in .env
+// --- Native MongoClient helper (for clean multi-DB connections) ---
+const { MongoClient } = require('mongodb');
+let _mongoClient = null;
+let _mongoDbs = {};
+
+async function getDatabaseForBot(dbName) {
+    const uri = process.env.MONGODB_URI;  // from .env (has cluster info)
     if (!_mongoClient) {
         _mongoClient = new MongoClient(uri, {
             useNewUrlParser: true,
@@ -51,6 +54,8 @@ async function getNativeDb(dbName = process.env.DB_NAME) {
 
     return _mongoDbs[dbName];
 }
+
+module.exports.getDatabaseForBot = getDatabaseForBot;
 
 
 async function ensureDatabaseInitialized(botId = null) {
