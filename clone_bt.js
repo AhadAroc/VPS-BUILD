@@ -1,6 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
 const database = require('./database');
-const { loadActiveGroupsFromDatabase, getDatabaseForBot ,} = require('./database'); 
 const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
