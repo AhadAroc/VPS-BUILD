@@ -33,7 +33,7 @@ const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
-const { updateActiveGroup } = require('./database');
+const { updateActiveGroup,getDatabaseForBot } = require('./database');
 // Quiz state constants
 const QUIZ_STATE = {
     INACTIVE: 0,
