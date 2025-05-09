@@ -70,27 +70,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-async function getBotGroups(botId) {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        const clone = await CloneModel.findOne({ botId: botId });
-        if (!clone) {
-            console.error(`No clone found for bot ID: ${botId}`);
-            return [];
-        }
-        const db = await connectToMongoDB(clone.dbName);
-        const Group = db.model('Group', new mongoose.Schema({
-            groupId: String,
-            title: String,
-            // Add any other fields you store for groups
-        }));
-        const groups = await Group.find().lean();
-        return groups;
-    } catch (error) {
-        console.error('Error fetching groups:', error);
-        return [];
-    }
-}
+
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -682,6 +662,27 @@ function loadExistingBots() {
         // Call populateUserDeployments after all bots are loaded
         setTimeout(populateUserDeployments, 5000);
     });
+}
+async function getBotGroups(botId) {
+    try {
+        const CloneModel = mongoose.model('Clone');
+        const clone = await CloneModel.findOne({ botId: botId });
+        if (!clone) {
+            console.error(`No clone found for bot ID: ${botId}`);
+            return [];
+        }
+        const db = await connectToMongoDB(clone.dbName);
+        const Group = db.model('Group', new mongoose.Schema({
+            groupId: String,
+            title: String,
+            // Add any other fields you store for groups
+        }));
+        const groups = await Group.find().lean();
+        return groups;
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+        return [];
+    }
 }
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
