@@ -29,7 +29,7 @@ let client = null;
 
 
 // --- Native MongoClient helper (for clean multi-DB connections) ---
-const { MongoClient } = require('mongodb');
+
 let _mongoClient = null;
 let _mongoDbs = {};
 
