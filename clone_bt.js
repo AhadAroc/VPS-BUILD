@@ -1,5 +1,4 @@
 const { Telegraf, Markup } = require('telegraf');
-const database = require('./database');
 const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
@@ -84,67 +83,15 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-// Save groups to database when bot is added
-// Handle bot added/removed from group (more reliable than just new_chat_members)
-bot.on('my_chat_member', async (ctx) => {
-    const botInfo = await ctx.telegram.getMe();
-    const status = ctx.myChatMember.new_chat_member.status;
-    const chatId = ctx.chat.id;
-    const chatTitle = ctx.chat.title || 'Unknown';
-
-    const db = await ensureDatabaseInitialized('test');
-
-
-    if (status === 'member' || status === 'administrator') {
-        // Bot was added or promoted
-        await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
-            {
-                $set: {
-                    group_id: chatId,
-                    title: chatTitle,
-                    is_active: true,
-                    bot_id: config.botId,
-                    added_at: new Date()
-                }
-            },
-            { upsert: true }
-        );
-        console.log(`✅ [@${botInfo.username}] (my_chat_member) Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
-    }
-
-    if (status === 'left' || status === 'kicked') {
-        // Bot was removed or kicked
-        await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
-            { $set: { is_active: false } }
-        );
-        console.log(`🚪 [@${botInfo.username}] (my_chat_member) Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
+bot.on('new_chat_members', (ctx) => {
+    if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
+        // Bot was added to a new group
+        activeGroups.set(ctx.chat.id, {
+            title: ctx.chat.title,
+            type: ctx.chat.type
+        });
     }
 });
-
-
-
-// Mark groups inactive when bot is removed
-bot.on('left_chat_member', async (ctx) => {
-    if (!ctx.message.left_chat_member) return;
-
-    const leftMemberId = ctx.message.left_chat_member.id;
-    const botInfo = await ctx.telegram.getMe();
-
-    if (leftMemberId === botInfo.id) {
-        const db = await ensureDatabaseInitialized('test');
-
-        await db.collection('groups').updateOne(
-            { group_id: ctx.chat.id, bot_id: config.botId },
-            { $set: { is_active: false } }
-        );
-
-        console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${config.botId}`);
-    }
-});
-
-
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
@@ -499,7 +446,7 @@ bot.command('broadcast_all', async (ctx) => {
     }
 
     try {
-        const db = await ensureDatabaseInitialized('test');
+        const db = await ensureDatabaseInitialized();
         await db.collection('broadcast_triggers').insertOne({
             triggered: true,
             message: message,
@@ -716,16 +663,6 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
-async function ensureDatabaseInitialized(databaseName = 'test') {
-    let db = database.getDb();
-    if (!db) {
-        console.log(`Database not initialized, connecting to '${databaseName}' now...`);
-        db = await database.connectToMongoDB(databaseName);
-    }
-    return db;
-}
-
-
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
@@ -780,41 +717,14 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 // Then define these handler functions:
 // Implement broadcast handlers
-async function handleBroadcastGroups(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-
+async function handleBroadcastDM(ctx) {
     const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('❌ Please provide a message to broadcast.\nUsage: /broadcast_groups <your message>');
-    }
+    await handleBroadcast(ctx, 'dm', message);
+}
 
-    await ctx.reply('⏳ Broadcasting to groups... please wait.');
-
-    // Connect to the "test" database
-    const db = await connectToMongoDB('test');
-    const groups = await db.collection('groups').find({ is_active: true }).toArray();
-
-    if (groups.length === 0) {
-        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
-    }
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const group of groups) {
-        try {
-            await ctx.telegram.sendMessage(group.group_id, message);
-            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
-            successCount++;
-        } catch (err) {
-            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
-            failCount++;
-        }
-    }
-
-    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
+async function handleBroadcastGroups(ctx) {
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    await handleBroadcast(ctx, 'groups', message);
 }
 
 async function handleBroadcastAll(ctx) {
@@ -826,44 +736,6 @@ async function handleBroadcastAll(ctx) {
         return ctx.reply('Please provide a message to broadcast.');
     }
     await handleBroadcast(ctx, 'all', message);
-}
-async function handleBroadcastDM(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
-    }
-
-    await ctx.reply('⏳ Broadcasting to direct messages... please wait.');
-
-    try {
-        const { getNativeDb } = require('./database');
-const db = await getNativeDb('test');
-
-        const users = await db.collection('users').find().toArray();
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const user of users) {
-            try {
-                await ctx.telegram.sendMessage(user.user_id, message);
-                console.log(`✅ Message sent to user ${user.user_id}`);
-                successCount++;
-            } catch (err) {
-                console.error(`❌ Failed to send to user ${user.user_id}:`, err.description || err);
-                failCount++;
-            }
-        }
-
-        ctx.reply(`📢 Broadcast to direct messages completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Users: ${users.length}`);
-    } catch (error) {
-        console.error('Error during DM broadcast:', error);
-        ctx.reply('An error occurred while broadcasting to direct messages.');
-    }
 }
 async function getUserIdsFromDatabase(botToken) {
     try {
@@ -901,97 +773,40 @@ async function getGroupIdsFromDatabase(botToken) {
     }
 }
 
-async function getBotGroups(botId) {
-    const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
-    try {
-        const db = await ensureDatabaseInitialized('test');
-        const groups = await db.collection('groups').find({ 
-            is_active: true,
-            bot_id: botId
-        }).toArray();
-
-        console.log(`Bot ${botId} has ${groups.length} active groups`);
-        return groups;
-    } catch (error) {
-        console.error('Error fetching bot groups:', error);
-        return [];
-    }
-}
 
 async function handleBroadcast(ctx, type, message) {
-    const { getDatabaseForBot } = require('./database');
-const db = await getDatabaseForBot('test');   // FOR BROADCAST GROUP FETCH
-
-    let successCount = 0;
-    let failCount = 0;
-    let totalGroups = 0;
+    let successCount = 0, failCount = 0;
 
     for (const botId in activeBots) {
         const botInfo = activeBots[botId];
         const bot = new Telegraf(botInfo.token);
 
-        // ===== SEND TO DM =====
-        if (type === 'dm') {
-            try {
+        try {
+            if (type === 'dm') {
                 await bot.telegram.sendMessage(botInfo.createdBy, message);
-                console.log(`✅ DM sent to user ${botInfo.createdBy}`);
-                successCount++;
-            } catch (err) {
-                console.error(`❌ Failed DM to user ${botInfo.createdBy}:`, err.description || err);
-                failCount++;
-            }
-        }
-
-        // ===== SEND TO GROUPS =====
-        if (type === 'groups' || type === 'all') {
-            const groups = await getBotGroups(botId);
-            console.log(`🔍 Bot @${botInfo.username} has ${groups.length} groups`);
-            totalGroups += groups.length;
-
-            for (const group of groups) {
-                try {
-                    // Check if bot can access group BEFORE sending
-                    await bot.telegram.getChat(group.group_id);
-
-                    await bot.telegram.sendMessage(group.group_id, message);
-                    console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
-                    successCount++;
-                } catch (error) {
-                    if (error.code === 400 && error.description.includes('chat not found')) {
-                        console.log(`⚠️ Skipping group ${group.title} (${group.group_id}) — bot not in group anymore.`);
-
-                        // OPTIONAL: Mark group as inactive in DB to clean up
-                        await db.collection('groups').updateOne(
-                            { group_id: group.group_id },
-                            { $set: { is_active: false } }
-                        );
-
-                        failCount++;
-                        continue;
-                    }
-
-                    console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, error.description || error);
-                    failCount++;
+            } else if (type === 'groups') {
+                // Assuming you stored group IDs somewhere per bot
+                const groups = await getBotGroups(botId, botInfo.createdBy); // reuse your function
+                for (const group of groups) {
+                    await bot.telegram.sendMessage(group.chat_id, message);
+                }
+            } else if (type === 'all') {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+                const groups = await getBotGroups(botId, botInfo.createdBy);
+                for (const group of groups) {
+                    await bot.telegram.sendMessage(group.chat_id, message);
                 }
             }
-        }
 
-        // ===== SEND TO DM AGAIN (FOR 'all') =====
-        if (type === 'all') {
-            try {
-                await bot.telegram.sendMessage(botInfo.createdBy, message);
-                console.log(`✅ DM sent to user ${botInfo.createdBy}`);
-                successCount++;
-            } catch (err) {
-                console.error(`❌ Failed DM to user ${botInfo.createdBy}:`, err.description || err);
-                failCount++;
-            }
+            successCount++;
+        } catch (err) {
+            console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
+            failCount++;
         }
     }
 
-    return { successCount, failCount, groupCount: totalGroups };
+    ctx.reply(`Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}`);
 }
-
 
 
 async function updateActiveGroups(bot) {
