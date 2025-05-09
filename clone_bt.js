@@ -1,5 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 const database = require('./database');
+const { loadActiveGroupsFromDatabase, getDatabaseForBot ,} = require('./database');
 const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
@@ -92,7 +93,7 @@ bot.on('my_chat_member', async (ctx) => {
     const chatId = ctx.chat.id;
     const chatTitle = ctx.chat.title || 'Unknown';
 
-    const db = await ensureDatabaseInitialized('test');
+    const db = await getDatabaseForBot('replays');
 
 
     if (status === 'member' || status === 'administrator') {
@@ -133,7 +134,7 @@ bot.on('left_chat_member', async (ctx) => {
     const botInfo = await ctx.telegram.getMe();
 
     if (leftMemberId === botInfo.id) {
-        const db = await ensureDatabaseInitialized('test');
+        const db = await getDatabaseForBot('replays');
 
         await db.collection('groups').updateOne(
             { group_id: ctx.chat.id, bot_id: config.botId },
@@ -499,7 +500,7 @@ bot.command('broadcast_all', async (ctx) => {
     }
 
     try {
-        const db = await ensureDatabaseInitialized('test');
+        const db = await getDatabaseForBot('replays');
         await db.collection('broadcast_triggers').insertOne({
             triggered: true,
             message: message,
@@ -793,7 +794,7 @@ async function handleBroadcastGroups(ctx) {
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
     // Connect to the "test" database
-    const db = await connectToMongoDB('test');
+    const db = await getDatabaseForBot('replays');
     const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
     if (groups.length === 0) {
@@ -873,7 +874,7 @@ async function getUserIdsFromDatabase(botToken) {
             console.error(`No clone found for bot token: ${botToken}`);
             return [];
         }
-        const db = await connectToMongoDB(clone.dbName);
+        const db = await getDatabaseForBot('replays');
         const User = db.model('User');
         const users = await User.find().distinct('userId');
         return users;
@@ -891,7 +892,7 @@ async function getGroupIdsFromDatabase(botToken) {
             console.error(`No clone found for bot token: ${botToken}`);
             return [];
         }
-        const db = await connectToMongoDB(clone.dbName);
+        const db = await getDatabaseForBot('replays');
         const Group = db.model('Group');
         const groups = await Group.find().distinct('groupId');
         return groups;
@@ -904,7 +905,7 @@ async function getGroupIdsFromDatabase(botToken) {
 async function getBotGroups(botId) {
     const { ensureDatabaseInitialized } = require('./database'); // make sure this is accessible
     try {
-        const db = await ensureDatabaseInitialized('test');
+        const db = await getDatabaseForBot('replays');
         const groups = await db.collection('groups').find({ 
             is_active: true,
             bot_id: botId
@@ -1071,7 +1072,7 @@ async function cloneBot(originalBotToken, newBotToken, ownerId) {
 }
 
 async function createCloneDbEntry(botId, botToken, dbName, ownerId) {
-    const db = await connectToMongoDB(dbName);
+    const db = await getDatabaseForBot('replays');
     const CloneModel = mongoose.model('Clone', new mongoose.Schema({
         botId: String,
         botToken: String,
@@ -1111,7 +1112,7 @@ async function cleanupDatabase() {
 async function addReplyToBotDatabase(botId, triggerWord, replyContent, replyType = 'text') {
     try {
         const dbName = `bot_${botId}_db`;
-        const db = await connectToMongoDB(dbName);
+        const db = await getDatabaseForBot('replays');
         
         // Create a more comprehensive schema for replies
         const ReplyModel = db.model('Reply', new mongoose.Schema({
