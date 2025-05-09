@@ -840,7 +840,9 @@ async function handleBroadcastDM(ctx) {
     await ctx.reply('⏳ Broadcasting to direct messages... please wait.');
 
     try {
-        const db = await ensureDatabaseInitialized();
+        const { getNativeDb } = require('./database');
+const db = await getNativeDb('test');
+
         const users = await db.collection('users').find().toArray();
 
         let successCount = 0;
@@ -917,7 +919,9 @@ async function getBotGroups(botId) {
 }
 
 async function handleBroadcast(ctx, type, message) {
-    const db = await ensureDatabaseInitialized('test'); // Ensure connection to the correct database
+    const { getDatabaseForBot } = require('./database');
+const db = await getDatabaseForBot('test');   // FOR BROADCAST GROUP FETCH
+
     let successCount = 0;
     let failCount = 0;
     let totalGroups = 0;
