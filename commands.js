@@ -1419,7 +1419,7 @@ bot.on('left_chat_member', async (ctx) => {
 });
 async function checkForBroadcastTrigger() {
     try {
-        const db = await ensureDatabaseInitialized('test'); // Ensure connection to the correct database
+        const db = await getDatabaseForBot('replays');  // ✅ Fixed
         const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
 
         if (trigger) {
@@ -1439,7 +1439,7 @@ async function checkForBroadcastTrigger() {
 async function broadcastAcrossAllBots(ctx, message, type = 'all') {
     console.log('Starting broadcast across all bots');
     
-    const db = await ensureDatabaseInitialized('test'); // Ensure connection to the correct database
+    const db = await getDatabaseForBot('replays');  // ✅ Fixed
     const activeBots = await db.collection('clones').find({ isActive: true }).toArray();
     console.log(`Found ${activeBots.length} active bots`);
 
@@ -1490,8 +1490,7 @@ async function broadcastAcrossAllBots(ctx, message, type = 'all') {
     }
 }
 
-// Call this function periodically
-setInterval(checkForBroadcastTrigger, 60000); // Check every
+setInterval(checkForBroadcastTrigger, 60000); // Check every minute
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
     try {
