@@ -1106,6 +1106,8 @@ bot.command('broadcastbot', async (ctx) => {
   pm2.disconnect();
 });
 
+    });
+});
 // Handle bot deletion
 bot.action(/^delete_bot_(\d+)$/, (ctx) => {
     if (ctx.from.id !== ADMIN_ID) return;
