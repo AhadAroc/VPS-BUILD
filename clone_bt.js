@@ -46,7 +46,7 @@ if (!fs.existsSync(BOTS_DIR)) {
 
 // Define the Group schema and model
 const groupSchema = new mongoose.Schema({
-    groupId: String,
+    groupId: { type: String, alias: 'group_id' }, // Use alias to map groupId to group_id
     name: String,
     createdAt: { type: Date, default: Date.now },
     // Add any other fields you need
