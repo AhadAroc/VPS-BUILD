@@ -24,11 +24,27 @@ mongoose.connect(mongoURI, {
 const activeGroups = new Map();
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
-// Heroku API key
-//const HEROKU_API_KEY = 'HRKU-f72294ab-1a52-467d-a9ef-1405ecb9345d';
-//const heroku = new Heroku({ token: HEROKU_API_KEY });
 
-// ... (rest of your existing code)
+// Define the chat schema at the top of your file
+const chatSchema = new mongoose.Schema({
+    botId: { type: String, required: true },
+    chatId: { type: Number, required: true },
+    chatType: String,
+    title: String,
+    username: String,
+    firstName: String,
+    lastName: String,
+    joinedAt: { type: Date, default: Date.now }
+});
+
+// Create the Chat model
+let Chat;
+try {
+    Chat = mongoose.model('Chat');
+} catch (e) {
+    Chat = mongoose.model('Chat', chatSchema);
+}
+
 // ===== Configuration =====
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
 const ADMIN_ID = 7308214106; // Your Telegram Admin ID (Lorsiv)
@@ -43,7 +59,6 @@ const BOTS_DIR = path.join(__dirname, 'active_bots');
 if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
-
 
 const cloneSchema = new mongoose.Schema({
     token: String,
@@ -61,17 +76,9 @@ const cloneSchema = new mongoose.Schema({
     lastName: String,
     joinedAt: { type: Date, default: Date.now },
     // add any other fields you use
-  });
-  // Create the Chat model
-let Chat;
-try {
-    Chat = mongoose.model('Chat');
-} catch (e) {
-    Chat = mongoose.model('Chat', chatSchema);
-}
+});
 
-  const Clone = mongoose.model('Clone', cloneSchema);
-
+const Clone = mongoose.model('Clone', cloneSchema);
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 // MongoDB connection
