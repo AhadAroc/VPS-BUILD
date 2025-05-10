@@ -24,27 +24,11 @@ mongoose.connect(mongoURI, {
 const activeGroups = new Map();
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
+// Heroku API key
+//const HEROKU_API_KEY = 'HRKU-f72294ab-1a52-467d-a9ef-1405ecb9345d';
+//const heroku = new Heroku({ token: HEROKU_API_KEY });
 
-// Define the chat schema at the top of your file
-const chatSchema = new mongoose.Schema({
-    botId: { type: String, required: true },
-    chatId: { type: Number, required: true },
-    chatType: String,
-    title: String,
-    username: String,
-    firstName: String,
-    lastName: String,
-    joinedAt: { type: Date, default: Date.now }
-});
-
-// Create the Chat model
-let Chat;
-try {
-    Chat = mongoose.model('Chat');
-} catch (e) {
-    Chat = mongoose.model('Chat', chatSchema);
-}
-
+// ... (rest of your existing code)
 // ===== Configuration =====
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
 const ADMIN_ID = 7308214106; // Your Telegram Admin ID (Lorsiv)
@@ -60,6 +44,7 @@ if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
 
+
 const cloneSchema = new mongoose.Schema({
     token: String,
     ownerId: Number,
@@ -67,18 +52,11 @@ const cloneSchema = new mongoose.Schema({
     activatedAt: Date,
     expiresAt: Date,
     isActive: { type: Boolean, default: false },
-    botId: { type: String, required: true },
-    chatId: { type: Number, required: true },
-    chatType: String,
-    title: String,
-    username: String,
-    firstName: String,
-    lastName: String,
-    joinedAt: { type: Date, default: Date.now },
     // add any other fields you use
-});
+  });
+  
+  const Clone = mongoose.model('Clone', cloneSchema);
 
-const Clone = mongoose.model('Clone', cloneSchema);
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 // MongoDB connection
@@ -92,10 +70,6 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-// Add this function at the top of your file to check if a message is a command
-function isCommand(text) {
-    return text.startsWith('/');
-}
 
 // Your existing bot code
 bot.start((ctx) => {
@@ -122,29 +96,49 @@ bot.on('new_chat_members', (ctx) => {
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
-    
-    // Skip processing if this is a command
-    if (isCommand(text)) {
-        return;
+
+    // Check if it's a broadcast command
+    if (text.startsWith('/broadcast_')) {
+        if (userId !== ADMIN_ID) {
+            return ctx.reply('⛔ This command is only available to the admin.');
+        }
+        
+        const [command, ...messageParts] = text.split(' ');
+        const broadcastType = command.split('_')[1];
+        const broadcastMessage = messageParts.join(' ');
+
+        if (!broadcastMessage) {
+            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
+        }
+
+        switch (broadcastType) {
+            case 'dm':
+                return handleBroadcastDM(ctx, broadcastMessage);
+            case 'groups':
+                return handleBroadcastGroups(ctx, broadcastMessage);
+            case 'all':
+                return handleBroadcastAll(ctx, broadcastMessage);
+            default:
+                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
+        }
     }
+
+    // If not a broadcast command, treat as token submission
+    const token = text;
 
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
     }
 
-    // Extract the token from the message text
-    const token = text;
-
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('❌ التوكن غير صالح. يرجى التأكد من إرسال توكن صحيح من @BotFather.');
+        return ctx.reply('❌ التوكن غير صالح. يرجى إدخال توكن صحيح.');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
 
     try {
-        // Rest of your code remains the same
         // Verify the token is valid
         const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
         if (response.data && response.data.ok) {
@@ -178,34 +172,7 @@ const { Telegraf, Markup } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
 const mongoose = require('mongoose');
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot', { 
-    useNewUrlParser: true, 
-    useUnifiedTopology: true 
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
-
-// Define a schema for tracking all chats
-const chatSchema = new mongoose.Schema({
-    botId: { type: String, required: true },
-    chatId: { type: Number, required: true },
-    chatType: String,
-    title: String,
-    username: String,
-    firstName: String,
-    lastName: String,
-    joinedAt: { type: Date, default: Date.now }
-});
-
-// Create the Chat model
-let Chat;
-try {
-    Chat = mongoose.model('Chat');
-} catch (e) {
-    Chat = mongoose.model('Chat', chatSchema);
-}
+const { checkAndUpdateActivation } = require('../botUtils');
 
 const bot = new Telegraf(token);
 
@@ -215,36 +182,39 @@ const { setupMiddlewares } = require('../middlewares');
 const { setupActions } = require('../actions');
 const database = require('../database');
 
-// Function to save chat to database
-async function saveChat(ctx) {
+
+// Channel subscription check function
+// Channel subscription check function
+// Channel subscription check function
+// Channel subscription check function
+// Channel subscription check function
+async function isSubscribedToChannel(ctx, userId, channelUsername) {
     try {
-        const chat = ctx.chat;
-        if (!chat) return;
+        // Make sure channelUsername doesn't include the @ symbol
+        const formattedChannelUsername = channelUsername.replace('@', '');
         
-        const chatData = {
-            botId: config.botId,
-            chatId: chat.id,
-            chatType: chat.type,
-            title: chat.title,
-            username: chat.username,
-            firstName: chat.first_name,
-            lastName: chat.last_name,
-            joinedAt: new Date()
-        };
+        // Try to get chat member directly
+        const chatMember = await ctx.telegram.getChatMember('@' + formattedChannelUsername, userId);
         
-        // Use findOneAndUpdate to avoid duplicates
-        await Chat.findOneAndUpdate(
-            { botId: config.botId, chatId: chat.id },
-            chatData,
-            { upsert: true, new: true }
-        );
-        
-        console.log(\`Saved chat: \${chat.id} (\${chat.title || chat.first_name || 'Unknown'})\`);
+        // These statuses mean the user is in the channel
+        return ['creator', 'administrator', 'member'].includes(chatMember.status);
     } catch (error) {
-        console.error('Error saving chat to database:', error);
+        console.error('Error checking channel subscription for user ' + userId + ' in channel @' + channelUsername + ':', error.description || error);
+        
+        // If we get "member list is inaccessible" error, we need a different approach
+        if (error.description && (
+            error.description.includes('member list is inaccessible') || 
+            error.description.includes('Bad Request')
+        )) {
+            // Since we can't check directly, we'll assume the user needs to subscribe
+            // This will show the subscription message to the user
+            return false;
+        }
+        
+        // For other errors, allow access to prevent blocking legitimate users
+        return true;
     }
 }
-
 // Initialize bot
 async function initBot() {
     try {
@@ -256,76 +226,136 @@ async function initBot() {
         setupCommands(bot);
         setupActions(bot);
         
-        // Track all incoming messages to save chat information
-        bot.on('message', async (ctx, next) => {
-            await saveChat(ctx);
-            return next();
-        });
+        // Add your custom protection bot logic here
         
-        // Handle new chat members to track groups
-        bot.on('new_chat_members', async (ctx) => {
-            await saveChat(ctx);
+        // Add middleware to check channel subscription for all commands
+        // Add middleware to check channel subscription for all commands
+// Add middleware to check channel subscription for all commands
+// Add this at the top of your file
+const subscriptionCache = {};
+
+// Modify the middleware to use the cache
+// Modify the middleware to use the cache
+bot.use(async (ctx, next) => {
+    if (!ctx.from) {
+        return next();
+    }
+
+    const userId = ctx.from.id;
+    const sourceChannel = 'Lorisiv';
+
+    // Check if the subscription status is cached
+    if (subscriptionCache[userId]) {
+        if (!subscriptionCache[userId].isSubscribed && !subscriptionCache[userId].messageSent) {
+            subscriptionCache[userId].messageSent = true; // Mark message as sent
+            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+        return next();
+    }
+
+    try {
+        const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
+
+        subscriptionCache[userId] = { isSubscribed, messageSent: false };
+
+        if (!isSubscribed) {
+            subscriptionCache[userId].messageSent = true; // Mark message as sent
+            return ctx.reply('⚠️ يجب عليك الاشتراك في قناة المطور أولاً للاستفادة من خدمات البوت.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 اشترك في القناة', url: 'https://t.me/' + sourceChannel }],
+                        [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                    ]
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error in subscription check middleware:', error);
+        // Assume subscribed on error to avoid blocking users
+        subscriptionCache[userId] = { isSubscribed: true, messageSent: false };
+    }
+
+    return next();
+});
+
+// Add this error handler to handle group migration errors
+bot.catch((err, ctx) => {
+    console.error('Bot error:', err);
+    // Check if this is a group migration error
+    if (err.description && err.description.includes('group chat was upgraded to a supergroup chat')) {
+        const newChatId = err.parameters.migrate_to_chat_id;
+        const oldChatId = ctx.chat.id;
+// Try to send a message to the new supergroup
+        ctx.telegram.sendMessage(newChatId, 'تم رفعي الى ادمن, يرجى تفعيل البوت عنطريق ارسال بدء ')
+            .catch(e => console.error('Error sending message to new supergroup:', e));
+    }
+});
+
+
+
+
+
+        // Handle subscription check callback
+        // Handle subscription check callback
+// Handle subscription check callback
+bot.action('check_subscription', async (ctx) => {
+    const sourceChannel = 'Lorisiv'; // Change to your channel username without @
+    
+    try {
+        await ctx.answerCbQuery('⏳ جاري التحقق من الاشتراك...');
+        
+        const isSubscribed = await isSubscribedToChannel(ctx, ctx.from.id, sourceChannel);
+        
+        if (isSubscribed) {
+            await ctx.answerCbQuery('✅ شكراً للاشتراك! يمكنك الآن استخدام البوت.', { show_alert: true });
+            // Try to delete the subscription message
+            await ctx.deleteMessage().catch(e => console.error('Could not delete message:', e));
             
-            if (ctx.message.new_chat_member && ctx.message.new_chat_member.id === ctx.botInfo.id) {
-                console.log(\`Bot added to group: \${ctx.chat.title} (\${ctx.chat.id})\`);
-            }
-        });
-        
-        // Handle left chat member to remove groups
-        bot.on('left_chat_member', async (ctx) => {
-            if (ctx.message.left_chat_member && ctx.message.left_chat_member.id === ctx.botInfo.id) {
-                try {
-                    await Chat.deleteOne({ botId: config.botId, chatId: ctx.chat.id });
-                    console.log(\`Bot removed from group: \${ctx.chat.title} (\${ctx.chat.id})\`);
-                } catch (error) {
-                    console.error('Error removing chat from database:', error);
+            // Send a welcome message with the "Add to Group" button
+            await ctx.reply('مرحباً بك في البوت! يمكنك الآن استخدام جميع الميزات.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.me.username + '?startgroup=true' }],
+                        [{ text: 'قناة المطور', url: 'https://t.me/Lorisiv' }]
+                    ]
                 }
-            }
-        });
+            });
+        } else {
+            await ctx.answerCbQuery('❌ أنت غير مشترك في القناة بعد. يرجى الاشتراك ثم المحاولة مرة أخرى.', { show_alert: true });
+        }
+    } catch (error) {
+        console.error('Error checking subscription in callback:', error);
+        await ctx.answerCbQuery('⚠️ حدث خطأ أثناء التحقق من الاشتراك. يمكنك المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
         
-        // Process message handler for broadcasts from the main bot
-        process.on('message', async (packet) => {
-            if (packet && packet.topic === 'broadcast' && packet.data && packet.data.action === 'broadcast') {
-                const message = packet.data.message;
-                
-                try {
-                    // Get all chats for this bot from the database
-                    const chats = await Chat.find({ botId: config.botId });
-                    console.log(\`Broadcasting message to \${chats.length} chats\`);
-                    
-                    let successCount = 0;
-                    let failedCount = 0;
-                    
-                    // Send the message to each chat
-                    for (const chat of chats) {
-                        try {
-                            await bot.telegram.sendMessage(chat.chatId, message, { parse_mode: 'HTML' });
-                            successCount++;
-                        } catch (error) {
-                            console.error(\`Error sending message to chat \${chat.chatId}:\`, error);
-                            failedCount++;
-                            
-                            // If the error is that the bot was kicked, remove the chat from the database
-                            if (error.description && (
-                                error.description.includes('bot was kicked') || 
-                                error.description.includes('chat not found') ||
-                                error.description.includes('user is deactivated')
-                            )) {
-                                try {
-                                    await Chat.deleteOne({ botId: config.botId, chatId: chat.chatId });
-                                    console.log(\`Removed inactive chat \${chat.chatId} from database\`);
-                                } catch (dbError) {
-                                    console.error('Error removing inactive chat from database:', dbError);
-                                }
-                            }
-                        }
-                    }
-                    
-                    console.log(\`Broadcast complete. Success: \${successCount}, Failed: \${failedCount}\`);
-                } catch (error) {
-                    console.error('Error broadcasting message:', error);
-                }
+        bot.command('start', async (ctx) => {
+            const userId = ctx.from.id;
+            const cloneId = token; // Using token as cloneId
+            
+            const result = await checkAndUpdateActivation(cloneId, userId);
+            
+            let message = '';
+            if (result.status === 'activated') {
+                message = 'مرحبًا بك في البوت! تم تفعيل البوت لمدة 30 يومًا. ';
+            } else if (result.status === 'active') {
+                message = \`مرحبًا بك مجددًا! \${result.message} \\n\\n\`;
+            } else {
+                message = 'حدث خطأ أثناء تفعيل البوت. يرجى الاتصال بالدعم. ';
             }
+            
+            message += 'الرجاء إضافة البوت في المجموعة الخاصة لغرض الاستخدام.';
+            
+            ctx.reply(message, Markup.inlineKeyboard([
+                Markup.button.url('أضفني إلى مجموعتك', \`https://t.me/\${ctx.me.username}?startgroup=true\`)
+            ]));
         });
         
         // Launch the bot
@@ -402,7 +432,34 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
 });
+// At the top of your file, after initializing the bot
+bot.command('broadcast_dm', handleBroadcastDM);
+bot.command('broadcast_groups', handleBroadcastGroups);
+bot.command('broadcast_all', async (ctx) => {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
 
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast.');
+    }
+
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('broadcast_triggers').insertOne({
+            triggered: true,
+            message: message,
+            type: 'all',
+            createdAt: new Date()
+        });
+
+        ctx.reply('Broadcast triggered. It will be sent shortly across all bots.');
+    } catch (error) {
+        console.error('Error triggering broadcast:', error);
+        ctx.reply('An error occurred while triggering the broadcast.');
+    }
+});
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
@@ -606,7 +663,6 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
-
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
@@ -659,11 +715,98 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 
 
+// Then define these handler functions:
+// Implement broadcast handlers
+async function handleBroadcastDM(ctx) {
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    await handleBroadcast(ctx, 'dm', message);
+}
+
+async function handleBroadcastGroups(ctx) {
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    await handleBroadcast(ctx, 'groups', message);
+}
+
+async function handleBroadcastAll(ctx) {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast.');
+    }
+    await handleBroadcast(ctx, 'all', message);
+}
+async function getUserIdsFromDatabase(botToken) {
+    try {
+        const CloneModel = mongoose.model('Clone');
+        const clone = await CloneModel.findOne({ botToken });
+        if (!clone) {
+            console.error(`No clone found for bot token: ${botToken}`);
+            return [];
+        }
+        const db = await connectToMongoDB(clone.dbName);
+        const User = db.model('User');
+        const users = await User.find().distinct('userId');
+        return users;
+    } catch (error) {
+        console.error('Error fetching user IDs:', error);
+        return [];
+    }
+}
+
+async function getGroupIdsFromDatabase(botToken) {
+    try {
+        const CloneModel = mongoose.model('Clone');
+        const clone = await CloneModel.findOne({ botToken });
+        if (!clone) {
+            console.error(`No clone found for bot token: ${botToken}`);
+            return [];
+        }
+        const db = await connectToMongoDB(clone.dbName);
+        const Group = db.model('Group');
+        const groups = await Group.find().distinct('groupId');
+        return groups;
+    } catch (error) {
+        console.error('Error fetching group IDs:', error);
+        return [];
+    }
+}
 
 
+async function handleBroadcast(ctx, type, message) {
+    let successCount = 0, failCount = 0;
 
+    for (const botId in activeBots) {
+        const botInfo = activeBots[botId];
+        const bot = new Telegraf(botInfo.token);
 
+        try {
+            if (type === 'dm') {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+            } else if (type === 'groups') {
+                // Assuming you stored group IDs somewhere per bot
+                const groups = await getBotGroups(botId, botInfo.createdBy); // reuse your function
+                for (const group of groups) {
+                    await bot.telegram.sendMessage(group.chat_id, message);
+                }
+            } else if (type === 'all') {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+                const groups = await getBotGroups(botId, botInfo.createdBy);
+                for (const group of groups) {
+                    await bot.telegram.sendMessage(group.chat_id, message);
+                }
+            }
 
+            successCount++;
+        } catch (err) {
+            console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
+            failCount++;
+        }
+    }
+
+    ctx.reply(`Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}`);
+}
 
 
 async function updateActiveGroups(bot) {
@@ -956,158 +1099,7 @@ bot.action('admin_delete_bot', (ctx) => {
         ...Markup.inlineKeyboard(buttons)
     });
 });
-// Add this after your other admin commands
-bot.command('broadcast', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ هذا الأمر متاح فقط للمسؤول.');
-    }
-    
-    // Extract the message to broadcast
-    const commandParts = ctx.message.text.split(' ');
-    commandParts.shift(); // Remove the command itself
-    const broadcastMessage = commandParts.join(' ');
-    
-    if (!broadcastMessage) {
-        return ctx.reply('❌ يرجى تقديم رسالة للبث.\nمثال: /broadcast مرحبا بالجميع!');
-    }
-    
-    ctx.reply('⏳ جاري إرسال الرسالة إلى جميع المستخدمين والمجموعات...');
-    
-    const botIds = Object.keys(activeBots);
-    if (botIds.length === 0) {
-        return ctx.reply('🚫 لا يوجد أي بوتات نشطة للبث.');
-    }
-    
-    let totalSuccess = 0;
-    let totalFailed = 0;
-    
-    // Get all chats from the database
-    const chats = await Chat.find({}).lean();
-    console.log(`Found ${chats.length} total chats for broadcasting`);
-    
-    if (chats.length === 0) {
-        return ctx.reply('🚫 لا توجد محادثات مسجلة للبث.');
-    }
-    
-    // Group chats by botId for more efficient processing
-    const chatsByBot = {};
-    chats.forEach(chat => {
-        if (!chatsByBot[chat.botId]) {
-            chatsByBot[chat.botId] = [];
-        }
-        chatsByBot[chat.botId].push(chat);
-    });
-    
-    // Process each bot
-    for (const botId of botIds) {
-        try {
-            const botInfo = activeBots[botId];
-            const botChats = chatsByBot[botId] || [];
-            
-            console.log(`Broadcasting to bot ${botInfo.username} (${botId}): ${botChats.length} chats`);
-            
-            if (botChats.length === 0) {
-                console.log(`No chats found for bot ${botInfo.username}`);
-                continue;
-            }
-            
-            // Create a temporary Telegraf instance to send messages
-            const tempBot = new Telegraf(botInfo.token);
-            
-            let botSuccessCount = 0;
-            let botFailedCount = 0;
-            
-            // Send to each chat
-            for (const chat of botChats) {
-                try {
-                    await tempBot.telegram.sendMessage(chat.chatId, broadcastMessage, { 
-                        parse_mode: 'HTML',
-                        disable_web_page_preview: true
-                    });
-                    botSuccessCount++;
-                    totalSuccess++;
-                    console.log(`Successfully sent to chat ${chat.chatId} (${chat.title || chat.firstName || 'Unknown'})`);
-                } catch (error) {
-                    console.error(`Error sending to chat ${chat.chatId}:`, error.message);
-                    botFailedCount++;
-                    totalFailed++;
-                    
-                    // If the error is that the bot was kicked or chat not found, remove the chat from the database
-                    if (error.description && (
-                        error.description.includes('bot was kicked') || 
-                        error.description.includes('chat not found') ||
-                        error.description.includes('user is deactivated')
-                    )) {
-                        try {
-                            await Chat.deleteOne({ botId: botId, chatId: chat.chatId });
-                            console.log(`Removed inactive chat ${chat.chatId} from database`);
-                        } catch (dbError) {
-                            console.error('Error removing inactive chat from database:', dbError);
-                        }
-                    }
-                }
-            }
-            
-            console.log(`Bot ${botInfo.username}: Success: ${botSuccessCount}, Failed: ${botFailedCount}`);
-        } catch (error) {
-            console.error(`Error broadcasting with bot ${botId}:`, error.message);
-            const botChats = chatsByBot[botId] || [];
-            totalFailed += botChats.length; // Count all chats as failed for this bot
-        }
-    }
-    
-    ctx.reply(`✅ تم إرسال الرسالة!\n\n• نجاح: ${totalSuccess}\n• فشل: ${totalFailed}`);
-});
-// Add a more specific broadcast command that targets a specific bot
-bot.command('broadcastbot', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ هذا الأمر متاح فقط للمسؤول.');
-    }
-    
-    const commandParts = ctx.message.text.split(' ');
-    commandParts.shift(); // Remove the command itself
-    
-    if (commandParts.length < 2) {
-        return ctx.reply('❌ الصيغة غير صحيحة. استخدم: /broadcastbot [معرف البوت] [الرسالة]');
-    }
-    
-    const targetBotId = commandParts.shift();
-    const broadcastMessage = commandParts.join(' ');
-    
-    if (!activeBots[targetBotId]) {
-        return ctx.reply(`❌ البوت برقم ${targetBotId} غير موجود أو غير نشط.`);
-    }
-    
-    ctx.reply(`⏳ جاري إرسال الرسالة إلى البوت ${activeBots[targetBotId].username}...`);
-    
-    // Use PM2 to send message to the specific bot
-    const pm2 = require('pm2');
-    pm2.connect((connectErr) => {
-        if (connectErr) {
-            console.error('Error connecting to PM2:', connectErr);
-            return ctx.reply('❌ حدث خطأ أثناء الاتصال بمدير العمليات.');
-        }
-        
-        pm2.sendDataToProcessName({
-  name: `bot_${targetBotId}`,
-  type: 'process:msg',
-  data: {
-    action: 'broadcast',
-    message: broadcastMessage
-  },
-  topic: 'broadcast'
-}, (err) => {
-  if (err) {
-    console.error(`Error sending message to bot ${targetBotId}:`, err);
-    ctx.reply('❌ حدث خطأ أثناء إرسال الرسالة.');
-  } else {
-    ctx.reply(`✅ تم إرسال الرسالة بنجاح إلى البوت ${activeBots[targetBotId].username}!`);
-  }
-  pm2.disconnect();
-});
 
-    });
-});
 // Handle bot deletion
 bot.action(/^delete_bot_(\d+)$/, (ctx) => {
     if (ctx.from.id !== ADMIN_ID) return;
