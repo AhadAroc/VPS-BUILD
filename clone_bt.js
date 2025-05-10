@@ -158,13 +158,13 @@ const token = config.token;
 const mongoose = require('mongoose');
 const { checkAndUpdateActivation } = require('../botUtils');
 
-const bot = new Telegraf(token);
-
-// Import protection bot functionalities
-const { setupCommands } = require('../commands');
-const { setupMiddlewares } = require('../middlewares');
-const { setupActions } = require('../actions');
-const database = require('../database');
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot', { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true 
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // Define a schema for groups
 const groupSchema = new mongoose.Schema({
@@ -177,8 +177,13 @@ const groupSchema = new mongoose.Schema({
 // Create the Group model
 const Group = mongoose.model('Group', groupSchema);
 
-// Channel subscription check function
-// ... (existing code)
+const bot = new Telegraf(token);
+
+// Import protection bot functionalities
+const { setupCommands } = require('../commands');
+const { setupMiddlewares } = require('../middlewares');
+const { setupActions } = require('../actions');
+const database = require('../database');
 
 // Initialize bot
 async function initBot() {
@@ -191,11 +196,6 @@ async function initBot() {
         setupCommands(bot);
         setupActions(bot);
         
-        // Add your custom protection bot logic here
-        
-        // Add middleware to check channel subscription for all commands
-        // ... (existing code)
-
         // Handle new chat members to track groups
         bot.on('new_chat_members', async (ctx) => {
             if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
@@ -225,51 +225,6 @@ async function initBot() {
                     console.log(\`Bot removed from group: \${ctx.chat.title} (\${ctx.chat.id})\`);
                 } catch (error) {
                     console.error('Error removing group from database:', error);
-                }
-            }
-        });
-        
-        // Process message handler for broadcasts from the main bot
-        process.on('message', async (packet) => {
-            if (packet.topic === 'broadcast' && packet.data && packet.data.action === 'broadcast') {
-                const message = packet.data.message;
-                
-                try {
-                    // Get all groups from the database
-                    const groups = await Group.find({});
-                    console.log(\`Broadcasting message to \${groups.length} groups\`);
-                    
-                    let successCount = 0;
-                    let failedCount = 0;
-                    
-                    // Send the message to each group
-                    for (const group of groups) {
-                        try {
-                            await bot.telegram.sendMessage(group.groupId, message, { parse_mode: 'HTML' });
-                            successCount++;
-                        } catch (error) {
-                            console.error(\`Error sending message to group \${group.groupId}:\`, error);
-                            failedCount++;
-                            
-                            // If the error is that the bot was kicked, remove the group from the database
-                            if (error.description && (
-                                error.description.includes('bot was kicked') || 
-                                error.description.includes('chat not found') ||
-                                error.description.includes('user is deactivated')
-                            )) {
-                                try {
-                                    await Group.deleteOne({ groupId: group.groupId });
-                                    console.log(\`Removed inactive group \${group.groupId} from database\`);
-                                } catch (dbError) {
-                                    console.error('Error removing inactive group from database:', dbError);
-                                }
-                            }
-                        }
-                    }
-                    
-                    console.log(\`Broadcast complete. Success: \${successCount}, Failed: \${failedCount}\`);
-                } catch (error) {
-                    console.error('Error broadcasting message:', error);
                 }
             }
         });
@@ -927,53 +882,54 @@ bot.command('broadcast', async (ctx) => {
     let successCount = 0;
     let failedCount = 0;
     
-    // Use PM2 to send message to all bots
-    const pm2 = require('pm2');
-    pm2.connect(async (connectErr) => {
-        if (connectErr) {
-            console.error('Error connecting to PM2:', connectErr);
-            return ctx.reply('❌ حدث خطأ أثناء الاتصال بمدير العمليات.');
-        }
-        
-        for (const botId of botIds) {
-            try {
-                // Send message to the bot process
-                pm2.sendDataToProcessId({
-                    id: `bot_${botId}`,
-                    type: 'process:msg',
-                    data: {
-                        action: 'broadcast',
-                        message: broadcastMessage
-                    },
-                    topic: 'broadcast'
-                }, (err) => {
-                    if (err) {
-                        console.error(`Error sending message to bot ${botId}:`, err);
-                        failedCount++;
-                    } else {
-                        successCount++;
-                    }
+    // Use a more direct approach with Telegraf instances
+    for (const botId of botIds) {
+        try {
+            const botInfo = activeBots[botId];
+            
+            // Get all groups for this bot from the database
+            const Group = mongoose.model('Group');
+            const groups = await Group.find({}).lean();
+            
+            console.log(`Found ${groups.length} groups for broadcasting`);
+            
+            // Create a temporary Telegraf instance to send messages
+            const tempBot = new Telegraf(botInfo.token);
+            
+            for (const group of groups) {
+                try {
+                    await tempBot.telegram.sendMessage(group.groupId, broadcastMessage, { 
+                        parse_mode: 'HTML',
+                        disable_web_page_preview: true
+                    });
+                    successCount++;
+                } catch (error) {
+                    console.error(`Error sending to group ${group.groupId}:`, error);
+                    failedCount++;
                     
-                    // Check if all bots have been processed
-                    if (successCount + failedCount === botIds.length) {
-                        ctx.reply(`✅ تم إرسال الرسالة بنجاح!\n\n• نجاح: ${successCount}\n• فشل: ${failedCount}`);
-                        pm2.disconnect();
+                    // If the error is that the bot was kicked, remove the group from the database
+                    if (error.description && (
+                        error.description.includes('bot was kicked') || 
+                        error.description.includes('chat not found') ||
+                        error.description.includes('user is deactivated')
+                    )) {
+                        try {
+                            await Group.deleteOne({ groupId: group.groupId });
+                            console.log(`Removed inactive group ${group.groupId} from database`);
+                        } catch (dbError) {
+                            console.error('Error removing inactive group from database:', dbError);
+                        }
                     }
-                });
-            } catch (error) {
-                console.error('Error broadcasting message:', error);
-                failedCount++;
-                
-                // Check if all bots have been processed
-                if (successCount + failedCount === botIds.length) {
-                    ctx.reply(`✅ تم إرسال الرسالة بنجاح!\n\n• نجاح: ${successCount}\n• فشل: ${failedCount}`);
-                    pm2.disconnect();
                 }
             }
+        } catch (error) {
+            console.error(`Error broadcasting to bot ${botId}:`, error);
+            failedCount++;
         }
-    });
+    }
+    
+    ctx.reply(`✅ تم إرسال الرسالة بنجاح!\n\n• نجاح: ${successCount}\n• فشل: ${failedCount}`);
 });
-
 // Add a more specific broadcast command that targets a specific bot
 bot.command('broadcastbot', async (ctx) => {
     if (ctx.from.id !== ADMIN_ID) {
