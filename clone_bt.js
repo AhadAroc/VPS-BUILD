@@ -97,35 +97,7 @@ bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-    // Check if it's a broadcast command
-    if (text.startsWith('/saddam')) {
-        if (userId !== ADMIN_ID) {
-            return ctx.reply('⛔ This command is only available to the admin.');
-        }
-        
-        //const [command, ...messageParts] = text.split(' ');
-        //const broadcastType = command.split('_')[1];
-        //onst broadcastMessage = messageParts.join(' ');
-
-        if (!broadcastMessage) {
-            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
-        }
-
-        switch (broadcastType) {
-            case 'dm':
-                return handleBroadcastDM(ctx, broadcastMessage);
-            case 'groups':
-                return handleBroadcastGroups(ctx, broadcastMessage);
-            case 'all':
-                return handleBroadcastAll(ctx, broadcastMessage);
-            default:
-                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
-        }
-    }
-
-    // If not a broadcast command, treat as token submission
-    const token = text;
-
+   
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
@@ -133,7 +105,7 @@ bot.on('text', async (ctx) => {
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('❌ التوكن غير صالح. يرجى إدخال توكن صحيح.');
+        return ctx.reply('');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
