@@ -97,20 +97,23 @@ bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-   
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
     }
 
+    // Extract the token from the message text
+    const token = text;  // Define the token variable
+
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('');
+        return ctx.reply('❌ التوكن غير صالح. يرجى التأكد من إرسال توكن صحيح من @BotFather.');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
 
     try {
+        // Rest of your code remains the same
         // Verify the token is valid
         const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
         if (response.data && response.data.ok) {
