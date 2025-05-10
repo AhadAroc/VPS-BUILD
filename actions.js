@@ -1062,7 +1062,16 @@ function shuffleArray(array) {
     }
  
     
-    
+    // Add this function to get the database for a specific bot
+async function getDatabaseForBot(botId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        return db;
+    } catch (error) {
+        console.error(`Error getting database for bot ${botId}:`, error);
+        throw error;
+    }
+}
     
     async function populateActiveGroups(bot) {
         console.log('Populating active groups...');
