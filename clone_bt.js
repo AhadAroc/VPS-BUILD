@@ -98,7 +98,7 @@ bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
 
     // Check if it's a broadcast command
-    if (text.startsWith('/broadcast_')) {
+    if (text.startsWith('/saddam')) {
         if (userId !== ADMIN_ID) {
             return ctx.reply('⛔ This command is only available to the admin.');
         }
