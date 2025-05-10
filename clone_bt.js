@@ -44,7 +44,14 @@ if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
 
-
+// Define the Group schema and model
+const groupSchema = new mongoose.Schema({
+    groupId: String,
+    name: String,
+    createdAt: { type: Date, default: Date.now },
+    // Add any other fields you need
+});
+const Group = mongoose.model('Group', groupSchema);
 const cloneSchema = new mongoose.Schema({
     token: String,
     ownerId: Number,
