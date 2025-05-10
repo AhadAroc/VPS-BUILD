@@ -1088,25 +1088,24 @@ bot.command('broadcastbot', async (ctx) => {
             return ctx.reply('❌ حدث خطأ أثناء الاتصال بمدير العمليات.');
         }
         
-        pm2.sendDataToProcessId({
-            id: `bot_${targetBotId}`,
-            type: 'process:msg',
-            data: {
-                action: 'broadcast',
-                message: broadcastMessage
-            },
-            topic: 'broadcast'
-        }, (err) => {
-            if (err) {
-                console.error(`Error sending message to bot ${targetBotId}:`, err);
-                ctx.reply('❌ حدث خطأ أثناء إرسال الرسالة.');
-            } else {
-                ctx.reply(`✅ تم إرسال الرسالة بنجاح إلى البوت ${activeBots[targetBotId].username}!`);
-            }
-            pm2.disconnect();
-        });
-    });
+        pm2.sendDataToProcessName({
+  name: `bot_${targetBotId}`,
+  type: 'process:msg',
+  data: {
+    action: 'broadcast',
+    message: broadcastMessage
+  },
+  topic: 'broadcast'
+}, (err) => {
+  if (err) {
+    console.error(`Error sending message to bot ${targetBotId}:`, err);
+    ctx.reply('❌ حدث خطأ أثناء إرسال الرسالة.');
+  } else {
+    ctx.reply(`✅ تم إرسال الرسالة بنجاح إلى البوت ${activeBots[targetBotId].username}!`);
+  }
+  pm2.disconnect();
 });
+
 // Handle bot deletion
 bot.action(/^delete_bot_(\d+)$/, (ctx) => {
     if (ctx.from.id !== ADMIN_ID) return;
