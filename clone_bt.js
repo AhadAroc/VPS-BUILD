@@ -70,6 +70,10 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
+// Add this function at the top of your file to check if a message is a command
+function isCommand(text) {
+    return text.startsWith('/');
+}
 
 // Your existing bot code
 bot.start((ctx) => {
@@ -96,6 +100,11 @@ bot.on('new_chat_members', (ctx) => {
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
+    
+    // Skip processing if this is a command
+    if (isCommand(text)) {
+        return;
+    }
 
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
@@ -103,7 +112,7 @@ bot.on('text', async (ctx) => {
     }
 
     // Extract the token from the message text
-    const token = text;  // Define the token variable
+    const token = text;
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
