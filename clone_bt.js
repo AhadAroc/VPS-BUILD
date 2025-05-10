@@ -98,15 +98,15 @@ bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-   
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
     }
 
     // Validate token format
+    const token = text; // Define the token variable here
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('');
+        return ctx.reply('❌ هذا ليس توكن صالح. يرجى إرسال التوكن الذي حصلت عليه من @BotFather.');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
