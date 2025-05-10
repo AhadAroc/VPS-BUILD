@@ -52,9 +52,24 @@ const cloneSchema = new mongoose.Schema({
     activatedAt: Date,
     expiresAt: Date,
     isActive: { type: Boolean, default: false },
+    botId: { type: String, required: true },
+    chatId: { type: Number, required: true },
+    chatType: String,
+    title: String,
+    username: String,
+    firstName: String,
+    lastName: String,
+    joinedAt: { type: Date, default: Date.now },
     // add any other fields you use
   });
-  
+  // Create the Chat model
+let Chat;
+try {
+    Chat = mongoose.model('Chat');
+} catch (e) {
+    Chat = mongoose.model('Chat', chatSchema);
+}
+
   const Clone = mongoose.model('Clone', cloneSchema);
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -156,7 +171,6 @@ const { Telegraf, Markup } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
 const mongoose = require('mongoose');
-const { checkAndUpdateActivation } = require('../botUtils');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot', { 
@@ -166,16 +180,25 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot',
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Define a schema for groups
-const groupSchema = new mongoose.Schema({
-    groupId: { type: Number, required: true },
+// Define a schema for tracking all chats
+const chatSchema = new mongoose.Schema({
+    botId: { type: String, required: true },
+    chatId: { type: Number, required: true },
+    chatType: String,
     title: String,
-    type: String,
+    username: String,
+    firstName: String,
+    lastName: String,
     joinedAt: { type: Date, default: Date.now }
 });
 
-// Create the Group model
-const Group = mongoose.model('Group', groupSchema);
+// Create the Chat model
+let Chat;
+try {
+    Chat = mongoose.model('Chat');
+} catch (e) {
+    Chat = mongoose.model('Chat', chatSchema);
+}
 
 const bot = new Telegraf(token);
 
@@ -184,6 +207,36 @@ const { setupCommands } = require('../commands');
 const { setupMiddlewares } = require('../middlewares');
 const { setupActions } = require('../actions');
 const database = require('../database');
+
+// Function to save chat to database
+async function saveChat(ctx) {
+    try {
+        const chat = ctx.chat;
+        if (!chat) return;
+        
+        const chatData = {
+            botId: config.botId,
+            chatId: chat.id,
+            chatType: chat.type,
+            title: chat.title,
+            username: chat.username,
+            firstName: chat.first_name,
+            lastName: chat.last_name,
+            joinedAt: new Date()
+        };
+        
+        // Use findOneAndUpdate to avoid duplicates
+        await Chat.findOneAndUpdate(
+            { botId: config.botId, chatId: chat.id },
+            chatData,
+            { upsert: true, new: true }
+        );
+        
+        console.log(\`Saved chat: \${chat.id} (\${chat.title || chat.first_name || 'Unknown'})\`);
+    } catch (error) {
+        console.error('Error saving chat to database:', error);
+    }
+}
 
 // Initialize bot
 async function initBot() {
@@ -196,35 +249,74 @@ async function initBot() {
         setupCommands(bot);
         setupActions(bot);
         
+        // Track all incoming messages to save chat information
+        bot.on('message', async (ctx, next) => {
+            await saveChat(ctx);
+            return next();
+        });
+        
         // Handle new chat members to track groups
         bot.on('new_chat_members', async (ctx) => {
-            if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
-                // Bot was added to a new group
-                try {
-                    // Save the group to the database
-                    const newGroup = new Group({
-                        groupId: ctx.chat.id,
-                        title: ctx.chat.title,
-                        type: ctx.chat.type
-                    });
-                    
-                    await newGroup.save();
-                    console.log(\`Bot added to group: \${ctx.chat.title} (\${ctx.chat.id})\`);
-                } catch (error) {
-                    console.error('Error saving group to database:', error);
-                }
+            await saveChat(ctx);
+            
+            if (ctx.message.new_chat_member && ctx.message.new_chat_member.id === ctx.botInfo.id) {
+                console.log(\`Bot added to group: \${ctx.chat.title} (\${ctx.chat.id})\`);
             }
         });
         
         // Handle left chat member to remove groups
         bot.on('left_chat_member', async (ctx) => {
-            if (ctx.message.left_chat_member.id === ctx.botInfo.id) {
-                // Bot was removed from a group
+            if (ctx.message.left_chat_member && ctx.message.left_chat_member.id === ctx.botInfo.id) {
                 try {
-                    await Group.deleteOne({ groupId: ctx.chat.id });
+                    await Chat.deleteOne({ botId: config.botId, chatId: ctx.chat.id });
                     console.log(\`Bot removed from group: \${ctx.chat.title} (\${ctx.chat.id})\`);
                 } catch (error) {
-                    console.error('Error removing group from database:', error);
+                    console.error('Error removing chat from database:', error);
+                }
+            }
+        });
+        
+        // Process message handler for broadcasts from the main bot
+        process.on('message', async (packet) => {
+            if (packet && packet.topic === 'broadcast' && packet.data && packet.data.action === 'broadcast') {
+                const message = packet.data.message;
+                
+                try {
+                    // Get all chats for this bot from the database
+                    const chats = await Chat.find({ botId: config.botId });
+                    console.log(\`Broadcasting message to \${chats.length} chats\`);
+                    
+                    let successCount = 0;
+                    let failedCount = 0;
+                    
+                    // Send the message to each chat
+                    for (const chat of chats) {
+                        try {
+                            await bot.telegram.sendMessage(chat.chatId, message, { parse_mode: 'HTML' });
+                            successCount++;
+                        } catch (error) {
+                            console.error(\`Error sending message to chat \${chat.chatId}:\`, error);
+                            failedCount++;
+                            
+                            // If the error is that the bot was kicked, remove the chat from the database
+                            if (error.description && (
+                                error.description.includes('bot was kicked') || 
+                                error.description.includes('chat not found') ||
+                                error.description.includes('user is deactivated')
+                            )) {
+                                try {
+                                    await Chat.deleteOne({ botId: config.botId, chatId: chat.chatId });
+                                    console.log(\`Removed inactive chat \${chat.chatId} from database\`);
+                                } catch (dbError) {
+                                    console.error('Error removing inactive chat from database:', dbError);
+                                }
+                            }
+                        }
+                    }
+                    
+                    console.log(\`Broadcast complete. Success: \${successCount}, Failed: \${failedCount}\`);
+                } catch (error) {
+                    console.error('Error broadcasting message:', error);
                 }
             }
         });
@@ -872,63 +964,92 @@ bot.command('broadcast', async (ctx) => {
         return ctx.reply('❌ يرجى تقديم رسالة للبث.\nمثال: /broadcast مرحبا بالجميع!');
     }
     
-    ctx.reply('⏳ جاري إرسال الرسالة إلى جميع البوتات النشطة...');
+    ctx.reply('⏳ جاري إرسال الرسالة إلى جميع المستخدمين والمجموعات...');
     
     const botIds = Object.keys(activeBots);
     if (botIds.length === 0) {
         return ctx.reply('🚫 لا يوجد أي بوتات نشطة للبث.');
     }
     
-    let successCount = 0;
-    let failedCount = 0;
+    let totalSuccess = 0;
+    let totalFailed = 0;
     
-    // Use a more direct approach with Telegraf instances
+    // Get all chats from the database
+    const chats = await Chat.find({}).lean();
+    console.log(`Found ${chats.length} total chats for broadcasting`);
+    
+    if (chats.length === 0) {
+        return ctx.reply('🚫 لا توجد محادثات مسجلة للبث.');
+    }
+    
+    // Group chats by botId for more efficient processing
+    const chatsByBot = {};
+    chats.forEach(chat => {
+        if (!chatsByBot[chat.botId]) {
+            chatsByBot[chat.botId] = [];
+        }
+        chatsByBot[chat.botId].push(chat);
+    });
+    
+    // Process each bot
     for (const botId of botIds) {
         try {
             const botInfo = activeBots[botId];
+            const botChats = chatsByBot[botId] || [];
             
-            // Get all groups for this bot from the database
-            const Group = mongoose.model('Group');
-            const groups = await Group.find({}).lean();
+            console.log(`Broadcasting to bot ${botInfo.username} (${botId}): ${botChats.length} chats`);
             
-            console.log(`Found ${groups.length} groups for broadcasting`);
+            if (botChats.length === 0) {
+                console.log(`No chats found for bot ${botInfo.username}`);
+                continue;
+            }
             
             // Create a temporary Telegraf instance to send messages
             const tempBot = new Telegraf(botInfo.token);
             
-            for (const group of groups) {
+            let botSuccessCount = 0;
+            let botFailedCount = 0;
+            
+            // Send to each chat
+            for (const chat of botChats) {
                 try {
-                    await tempBot.telegram.sendMessage(group.groupId, broadcastMessage, { 
+                    await tempBot.telegram.sendMessage(chat.chatId, broadcastMessage, { 
                         parse_mode: 'HTML',
                         disable_web_page_preview: true
                     });
-                    successCount++;
+                    botSuccessCount++;
+                    totalSuccess++;
+                    console.log(`Successfully sent to chat ${chat.chatId} (${chat.title || chat.firstName || 'Unknown'})`);
                 } catch (error) {
-                    console.error(`Error sending to group ${group.groupId}:`, error);
-                    failedCount++;
+                    console.error(`Error sending to chat ${chat.chatId}:`, error.message);
+                    botFailedCount++;
+                    totalFailed++;
                     
-                    // If the error is that the bot was kicked, remove the group from the database
+                    // If the error is that the bot was kicked or chat not found, remove the chat from the database
                     if (error.description && (
                         error.description.includes('bot was kicked') || 
                         error.description.includes('chat not found') ||
                         error.description.includes('user is deactivated')
                     )) {
                         try {
-                            await Group.deleteOne({ groupId: group.groupId });
-                            console.log(`Removed inactive group ${group.groupId} from database`);
+                            await Chat.deleteOne({ botId: botId, chatId: chat.chatId });
+                            console.log(`Removed inactive chat ${chat.chatId} from database`);
                         } catch (dbError) {
-                            console.error('Error removing inactive group from database:', dbError);
+                            console.error('Error removing inactive chat from database:', dbError);
                         }
                     }
                 }
             }
+            
+            console.log(`Bot ${botInfo.username}: Success: ${botSuccessCount}, Failed: ${botFailedCount}`);
         } catch (error) {
-            console.error(`Error broadcasting to bot ${botId}:`, error);
-            failedCount++;
+            console.error(`Error broadcasting with bot ${botId}:`, error.message);
+            const botChats = chatsByBot[botId] || [];
+            totalFailed += botChats.length; // Count all chats as failed for this bot
         }
     }
     
-    ctx.reply(`✅ تم إرسال الرسالة بنجاح!\n\n• نجاح: ${successCount}\n• فشل: ${failedCount}`);
+    ctx.reply(`✅ تم إرسال الرسالة!\n\n• نجاح: ${totalSuccess}\n• فشل: ${totalFailed}`);
 });
 // Add a more specific broadcast command that targets a specific bot
 bot.command('broadcastbot', async (ctx) => {
