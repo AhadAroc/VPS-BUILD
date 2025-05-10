@@ -462,7 +462,7 @@ bot.command('broadcast_all', async (ctx) => {
 
         await broadcastCtx.reply('✅ تم إرسال الرسالة لجميع المجموعات في جميع البوتات.');
     });
-});ve Bots
+});
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
     const userId = ctx.from.id;
