@@ -103,9 +103,9 @@ bot.on('text', async (ctx) => {
             return ctx.reply('⛔ This command is only available to the admin.');
         }
         
-        const [command, ...messageParts] = text.split(' ');
-        const broadcastType = command.split('_')[1];
-        const broadcastMessage = messageParts.join(' ');
+        //const [command, ...messageParts] = text.split(' ');
+        //const broadcastType = command.split('_')[1];
+        //onst broadcastMessage = messageParts.join(' ');
 
         if (!broadcastMessage) {
             return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
@@ -432,34 +432,7 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
 });
-// At the top of your file, after initializing the bot
-bot.command('broadcast_dm', handleBroadcastDM);
-bot.command('broadcast_groups', handleBroadcastGroups);
-bot.command('broadcast_all', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
 
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
-    }
-
-    try {
-        const db = await ensureDatabaseInitialized();
-        await db.collection('broadcast_triggers').insertOne({
-            triggered: true,
-            message: message,
-            type: 'all',
-            createdAt: new Date()
-        });
-
-        ctx.reply('Broadcast triggered. It will be sent shortly across all bots.');
-    } catch (error) {
-        console.error('Error triggering broadcast:', error);
-        ctx.reply('An error occurred while triggering the broadcast.');
-    }
-});
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
@@ -663,27 +636,7 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
-async function getBotGroups(botId) {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        const clone = await CloneModel.findOne({ botId: botId });
-        if (!clone) {
-            console.error(`No clone found for bot ID: ${botId}`);
-            return [];
-        }
-        const db = await connectToMongoDB(clone.dbName);
-        const Group = db.model('Group', new mongoose.Schema({
-            groupId: String,
-            title: String,
-            // Add any other fields you store for groups
-        }));
-        const groups = await Group.find().lean();
-        return groups;
-    } catch (error) {
-        console.error('Error fetching groups:', error);
-        return [];
-    }
-}
+
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
@@ -736,98 +689,11 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 
 
-// Then define these handler functions:
-// Implement broadcast handlers
-async function handleBroadcastDM(ctx) {
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    await handleBroadcast(ctx, 'dm', message);
-}
-
-async function handleBroadcastGroups(ctx) {
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    await handleBroadcast(ctx, 'groups', message);
-}
-
-async function handleBroadcastAll(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
-    }
-    await handleBroadcast(ctx, 'all', message);
-}
-async function getUserIdsFromDatabase(botToken) {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        const clone = await CloneModel.findOne({ botToken });
-        if (!clone) {
-            console.error(`No clone found for bot token: ${botToken}`);
-            return [];
-        }
-        const db = await connectToMongoDB(clone.dbName);
-        const User = db.model('User');
-        const users = await User.find().distinct('userId');
-        return users;
-    } catch (error) {
-        console.error('Error fetching user IDs:', error);
-        return [];
-    }
-}
-
-async function getGroupIdsFromDatabase(botToken) {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        const clone = await CloneModel.findOne({ botToken });
-        if (!clone) {
-            console.error(`No clone found for bot token: ${botToken}`);
-            return [];
-        }
-        const db = await connectToMongoDB(clone.dbName);
-        const Group = db.model('Group');
-        const groups = await Group.find().distinct('groupId');
-        return groups;
-    } catch (error) {
-        console.error('Error fetching group IDs:', error);
-        return [];
-    }
-}
 
 
-async function handleBroadcast(ctx, type, message) {
-    let successCount = 0, failCount = 0;
 
-    for (const botId in activeBots) {
-        const botInfo = activeBots[botId];
-        const bot = new Telegraf(botInfo.token);
 
-        try {
-            if (type === 'dm' || type === 'all') {
-                await bot.telegram.sendMessage(botInfo.createdBy, message);
-                successCount++;
-            }
-            
-            if (type === 'groups' || type === 'all') {
-                const groups = await getBotGroups(botId);
-                for (const group of groups) {
-                    try {
-                        await bot.telegram.sendMessage(group.groupId, message);
-                        successCount++;
-                    } catch (groupError) {
-                        console.error(`Failed to send broadcast to group ${group.groupId} for bot ${botInfo.username}:`, groupError);
-                        failCount++;
-                    }
-                }
-            }
-        } catch (err) {
-            console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
-            failCount++;
-        }
-    }
 
-    ctx.reply(`Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}`);
-}
 
 
 async function updateActiveGroups(bot) {
