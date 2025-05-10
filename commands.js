@@ -587,7 +587,40 @@ async function checkUserSubscription(ctx) {
         return false; // treat as not subscribed on error
     }
 }
+// commands.js — Add at bottom or in a helpers file
 
+const broadcastToGroups = async (bot, botId, ctx, mediaType, mediaId, caption) => {
+    try {
+        const db = await database.connectToMongoDB('test');  // connects to test db
+        const groups = await db.collection('groups').find({ 
+            is_active: true, 
+            bot_id: botId 
+        }).toArray();
+
+        console.log(`Broadcasting to ${groups.length} groups for botId ${botId}`);
+
+        for (const group of groups) {
+            try {
+                if (mediaType && mediaId) {
+                    if (mediaType === 'photo') {
+                        await bot.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
+                    } else if (mediaType === 'video') {
+                        await bot.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
+                    }
+                } else if (caption) {
+                    await bot.telegram.sendMessage(group.group_id, caption);
+                }
+            } catch (error) {
+                console.error(`❌ Error sending to group ${group.group_id}:`, error);
+            }
+        }
+
+        if (ctx) await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات.');
+    } catch (error) {
+        console.error('❌ Error in broadcastToGroups:', error);
+        if (ctx) await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
+    }
+};
 async function isSubscribed(ctx, userId) {
     try {
         // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
@@ -2779,40 +2812,7 @@ bot.start(async (ctx) => {
 
    
 
-// commands.js — Add at bottom or in a helpers file
 
-const broadcastToGroups = async (bot, botId, ctx, mediaType, mediaId, caption) => {
-    try {
-        const db = await database.connectToMongoDB('test');  // connects to test db
-        const groups = await db.collection('groups').find({ 
-            is_active: true, 
-            bot_id: botId 
-        }).toArray();
-
-        console.log(`Broadcasting to ${groups.length} groups for botId ${botId}`);
-
-        for (const group of groups) {
-            try {
-                if (mediaType && mediaId) {
-                    if (mediaType === 'photo') {
-                        await bot.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
-                    } else if (mediaType === 'video') {
-                        await bot.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
-                    }
-                } else if (caption) {
-                    await bot.telegram.sendMessage(group.group_id, caption);
-                }
-            } catch (error) {
-                console.error(`❌ Error sending to group ${group.group_id}:`, error);
-            }
-        }
-
-        if (ctx) await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات.');
-    } catch (error) {
-        console.error('❌ Error in broadcastToGroups:', error);
-        if (ctx) await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
-    }
-};
 
 
 
