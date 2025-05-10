@@ -723,8 +723,43 @@ async function handleBroadcastDM(ctx) {
 }
 
 async function handleBroadcastGroups(ctx) {
+    if (ctx.from.id !== ADMIN_ID) {
+        return ctx.reply('⛔ This command is only available to the admin.');
+    }
+
     const message = ctx.message.text.split(' ').slice(1).join(' ');
-    await handleBroadcast(ctx, 'groups', message);
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast.');
+    }
+
+    try {
+        // Assuming you have a Group model and a database entry called "test"
+        const groups = await Group.find({ name: 'test' }).lean();
+        console.log(`Found ${groups.length} groups for broadcasting`);
+
+        if (groups.length === 0) {
+            return ctx.reply('🚫 No registered groups found for broadcasting.');
+        }
+
+        let successCount = 0;
+        let failedCount = 0;
+
+        // Send the message to each group
+        for (const group of groups) {
+            try {
+                await ctx.telegram.sendMessage(group.groupId, message, { parse_mode: 'HTML' });
+                successCount++;
+            } catch (error) {
+                console.error(`Error sending message to group ${group.groupId}:`, error);
+                failedCount++;
+            }
+        }
+
+        ctx.reply(`✅ Message sent!\n\n• Success: ${successCount}\n• Failed: ${failedCount}`);
+    } catch (error) {
+        console.error('Error broadcasting message:', error);
+        ctx.reply('❌ An error occurred while broadcasting.');
+    }
 }
 
 async function handleBroadcastAll(ctx) {
