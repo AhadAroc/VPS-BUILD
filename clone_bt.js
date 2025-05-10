@@ -409,10 +409,31 @@ bot.command('broadcast_all', async (ctx) => {
     const isAdmin = ctx.from.id === ADMIN_ID;  // only main admin allowed
     if (!isAdmin) return ctx.reply('❌ هذا الأمر للمطور فقط.');
 
-    ctx.reply('📢 أرسل الآن نص الرسالة أو صورة أو فيديو للبث لكل البوتات.');
+    const args = ctx.message.text.split(' ').slice(1).join(' ');
 
-    // Listen for next message (1-time listener)
-    bot.on('message', async (broadcastCtx) => {
+    if (args.length > 0) {
+        // Direct message passed with command → broadcast immediately
+        const caption = args;
+        for (const botId in activeBots) {
+            const botInfo = activeBots[botId];
+            const childBotToken = botInfo.token;
+
+            const { Telegraf } = require('telegraf');
+            const childBot = new Telegraf(childBotToken);
+
+            await broadcastToGroups(childBot, botId, null, null, null, caption);
+        }
+
+        return ctx.reply('✅ تم إرسال الرسالة لجميع المجموعات.');
+    }
+
+    // No text passed → ask admin to send message next
+    await ctx.reply('✏️ أرسل الآن نص الرسالة أو صورة أو فيديو للبث.');
+
+    bot.once('message', async (broadcastCtx) => {
+        // Ensure same user sent the follow-up
+        if (broadcastCtx.from.id !== ctx.from.id) return;
+
         const text = broadcastCtx.message.text;
         const photo = broadcastCtx.message.photo;
         const video = broadcastCtx.message.video;
@@ -433,17 +454,15 @@ bot.command('broadcast_all', async (ctx) => {
             const botInfo = activeBots[botId];
             const childBotToken = botInfo.token;
 
-            // Create a temporary bot instance
             const { Telegraf } = require('telegraf');
             const childBot = new Telegraf(childBotToken);
 
             await broadcastToGroups(childBot, botId, null, mediaType, mediaId, caption);
         }
 
-        await broadcastCtx.reply('✅ تم الإرسال لجميع المجموعات في جميع البوتات.');
+        await broadcastCtx.reply('✅ تم إرسال الرسالة لجميع المجموعات في جميع البوتات.');
     });
-});
-// Show Active Bots
+});ve Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
     const userId = ctx.from.id;
