@@ -100,7 +100,7 @@ bot.on('text', async (ctx) => {
 
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
-        return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
+        return ctx.reply('');
     }
 
     // Validate token format
