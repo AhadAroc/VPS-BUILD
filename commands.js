@@ -2782,7 +2782,7 @@ bot.start(async (ctx) => {
 
 
 
-s
+
 }
 
 
