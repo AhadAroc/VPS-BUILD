@@ -98,15 +98,20 @@ bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
+     // Check if this is a broadcast_all command
+    if (text.startsWith('/broadcast_all')) {
+        return; // Skip this handler for broadcast_all commands
+    }
+
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
-        return ctx.reply('');
+        return ctx.reply('⚠️ لديك بالفعل بوت نشط. يمكنك حذفه أولاً إذا كنت ترغب في إنشاء بوت جديد.');
     }
 
     // Validate token format
     const token = text; // Define the token variable here
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('');
+        return ctx.reply('❌ التوكن غير صالح. يرجى التأكد من نسخ التوكن الصحيح من @BotFather.');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
