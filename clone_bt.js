@@ -414,17 +414,39 @@ bot.command('broadcast_all', async (ctx) => {
     if (args.length > 0) {
         // Direct message passed with command → broadcast immediately
         const caption = args;
+        
+        // Check if there are any active bots
+        const botIds = Object.keys(activeBots);
+        if (botIds.length === 0) {
+            return ctx.reply('⚠️ لا توجد بوتات نشطة للبث إليها.');
+        }
+        
+        let successCount = 0;
+        let failCount = 0;
+        
         for (const botId in activeBots) {
-            const botInfo = activeBots[botId];
-            const childBotToken = botInfo.token;
+            try {
+                const botInfo = activeBots[botId];
+                const childBotToken = botInfo.token;
 
-            const { Telegraf } = require('telegraf');
-            const childBot = new Telegraf(childBotToken);
+                if (!childBotToken) {
+                    console.error(`No token found for bot ${botId}`);
+                    failCount++;
+                    continue;
+                }
 
-            await broadcastToGroups(childBot, botId, null, null, null, caption);
+                const { Telegraf } = require('telegraf');
+                const childBot = new Telegraf(childBotToken);
+
+                await broadcastToGroups(childBot, botId, null, null, null, caption);
+                successCount++;
+            } catch (error) {
+                console.error(`Error broadcasting to bot ${botId}:`, error);
+                failCount++;
+            }
         }
 
-        return ctx.reply('✅ تم إرسال الرسالة لجميع المجموعات.');
+        return ctx.reply(`✅ تم إرسال الرسالة لجميع المجموعات.\nنجاح: ${successCount} بوت\nفشل: ${failCount} بوت`);
     }
 
     // No text passed → ask admin to send message next
@@ -440,7 +462,11 @@ bot.command('broadcast_all', async (ctx) => {
 
         let mediaType = null;
         let mediaId = null;
-        let caption = broadcastCtx.message.caption || text;
+        let caption = broadcastCtx.message.caption || text || ""; // Ensure caption is never undefined
+
+        if (!caption && !photo && !video) {
+            return broadcastCtx.reply('❌ لا يمكن إرسال رسالة فارغة. يرجى إرسال نص أو صورة أو فيديو.');
+        }
 
         if (photo) {
             mediaType = 'photo';
@@ -450,17 +476,38 @@ bot.command('broadcast_all', async (ctx) => {
             mediaId = video.file_id;
         }
 
+        // Check if there are any active bots
+        const botIds = Object.keys(activeBots);
+        if (botIds.length === 0) {
+            return broadcastCtx.reply('⚠️ لا توجد بوتات نشطة للبث إليها.');
+        }
+        
+        let successCount = 0;
+        let failCount = 0;
+
         for (const botId in activeBots) {
-            const botInfo = activeBots[botId];
-            const childBotToken = botInfo.token;
+            try {
+                const botInfo = activeBots[botId];
+                const childBotToken = botInfo.token;
 
-            const { Telegraf } = require('telegraf');
-            const childBot = new Telegraf(childBotToken);
+                if (!childBotToken) {
+                    console.error(`No token found for bot ${botId}`);
+                    failCount++;
+                    continue;
+                }
 
-            await broadcastToGroups(childBot, botId, null, mediaType, mediaId, caption);
+                const { Telegraf } = require('telegraf');
+                const childBot = new Telegraf(childBotToken);
+
+                await broadcastToGroups(childBot, botId, null, mediaType, mediaId, caption);
+                successCount++;
+            } catch (error) {
+                console.error(`Error broadcasting to bot ${botId}:`, error);
+                failCount++;
+            }
         }
 
-        await broadcastCtx.reply('✅ تم إرسال الرسالة لجميع المجموعات في جميع البوتات.');
+        await broadcastCtx.reply(`✅ تم إرسال الرسالة لجميع المجموعات في جميع البوتات.\nنجاح: ${successCount} بوت\nفشل: ${failCount} بوت`);
     });
 });
 // Show Active Bots - Modified to only show user's own bots
