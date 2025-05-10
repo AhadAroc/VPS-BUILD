@@ -589,38 +589,40 @@ async function checkUserSubscription(ctx) {
 }
 // commands.js — Add at bottom or in a helpers file
 
-const broadcastToGroups = async (bot, botId, ctx, mediaType, mediaId, caption) => {
+async function broadcastToGroups(bot, botId, groupIds = null, mediaType = null, mediaId = null, text = '') {
     try {
-        const db = await database.connectToMongoDB('test');  // connects to test db
-        const groups = await db.collection('groups').find({ 
-            is_active: true, 
-            bot_id: botId 
-        }).toArray();
+        // If no specific group IDs are provided, get all groups for this bot
+        if (!groupIds) {
+            // You might need to adjust this based on how you store group IDs
+            groupIds = await getGroupIdsFromDatabase(botId);
+        }
 
-        console.log(`Broadcasting to ${groups.length} groups for botId ${botId}`);
+        let successCount = 0;
+        let failCount = 0;
 
-        for (const group of groups) {
+        for (const groupId of groupIds) {
             try {
-                if (mediaType && mediaId) {
-                    if (mediaType === 'photo') {
-                        await bot.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
-                    } else if (mediaType === 'video') {
-                        await bot.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
-                    }
-                } else if (caption) {
-                    await bot.telegram.sendMessage(group.group_id, caption);
+                if (mediaType === 'photo') {
+                    await bot.telegram.sendPhoto(groupId, mediaId, { caption: text });
+                } else if (mediaType === 'video') {
+                    await bot.telegram.sendVideo(groupId, mediaId, { caption: text });
+                } else {
+                    await bot.telegram.sendMessage(groupId, text);
                 }
+                successCount++;
             } catch (error) {
-                console.error(`❌ Error sending to group ${group.group_id}:`, error);
+                console.error(`Failed to send broadcast to group ${groupId}:`, error);
+                failCount++;
             }
         }
 
-        if (ctx) await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات.');
+        console.log(`Broadcast complete: ${successCount} successful, ${failCount} failed`);
+        return { success: successCount, failed: failCount };
     } catch (error) {
-        console.error('❌ Error in broadcastToGroups:', error);
-        if (ctx) await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
+        console.error('Error in broadcastToGroups:', error);
+        return { success: 0, failed: 0, error: error.message };
     }
-};
+}
 async function isSubscribed(ctx, userId) {
     try {
         // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
