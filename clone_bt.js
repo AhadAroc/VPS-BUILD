@@ -106,7 +106,7 @@ bot.on('text', async (ctx) => {
     // Validate token format
     const token = text; // Define the token variable here
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('❌ هذا ليس توكن صالح. يرجى إرسال التوكن الذي حصلت عليه من @BotFather.');
+        return ctx.reply('');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
