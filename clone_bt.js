@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const express = require('express');
+const { broadcastToGroups } = require('./commands');  // Import our helper
 // Add this at the top of your file
 const subscriptionCache = {};
 const mongoURI = process.env.MONGODB_URI;
@@ -97,35 +98,7 @@ bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-    // Check if it's a broadcast command
-    if (text.startsWith('/saddam')) {
-        if (userId !== ADMIN_ID) {
-            return ctx.reply('⛔ This command is only available to the admin.');
-        }
-        
-        //const [command, ...messageParts] = text.split(' ');
-        //const broadcastType = command.split('_')[1];
-        //onst broadcastMessage = messageParts.join(' ');
-
-        if (!broadcastMessage) {
-            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
-        }
-
-        switch (broadcastType) {
-            case 'dm':
-                return handleBroadcastDM(ctx, broadcastMessage);
-            case 'groups':
-                return handleBroadcastGroups(ctx, broadcastMessage);
-            case 'all':
-                return handleBroadcastAll(ctx, broadcastMessage);
-            default:
-                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
-        }
-    }
-
-    // If not a broadcast command, treat as token submission
-    const token = text;
-
+   
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
@@ -133,7 +106,7 @@ bot.on('text', async (ctx) => {
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('❌ التوكن غير صالح. يرجى إدخال توكن صحيح.');
+        return ctx.reply('');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
@@ -432,7 +405,44 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
 });
+bot.command('broadcast_all', async (ctx) => {
+    const isAdmin = ctx.from.id === ADMIN_ID;  // only main admin allowed
+    if (!isAdmin) return ctx.reply('❌ هذا الأمر للمطور فقط.');
 
+    ctx.reply('📢 أرسل الآن نص الرسالة أو صورة أو فيديو للبث لكل البوتات.');
+
+    // Listen for next message (1-time listener)
+    bot.on('message', async (broadcastCtx) => {
+        const text = broadcastCtx.message.text;
+        const photo = broadcastCtx.message.photo;
+        const video = broadcastCtx.message.video;
+
+        let mediaType = null;
+        let mediaId = null;
+        let caption = broadcastCtx.message.caption || text;
+
+        if (photo) {
+            mediaType = 'photo';
+            mediaId = photo[photo.length - 1].file_id;
+        } else if (video) {
+            mediaType = 'video';
+            mediaId = video.file_id;
+        }
+
+        for (const botId in activeBots) {
+            const botInfo = activeBots[botId];
+            const childBotToken = botInfo.token;
+
+            // Create a temporary bot instance
+            const { Telegraf } = require('telegraf');
+            const childBot = new Telegraf(childBotToken);
+
+            await broadcastToGroups(childBot, botId, null, mediaType, mediaId, caption);
+        }
+
+        await broadcastCtx.reply('✅ تم الإرسال لجميع المجموعات في جميع البوتات.');
+    });
+});
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
