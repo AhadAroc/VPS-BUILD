@@ -587,42 +587,7 @@ async function checkUserSubscription(ctx) {
         return false; // treat as not subscribed on error
     }
 }
-// commands.js — Add at bottom or in a helpers file
 
-async function broadcastToGroups(bot, botId, groupIds = null, mediaType = null, mediaId = null, text = '') {
-    try {
-        // If no specific group IDs are provided, get all groups for this bot
-        if (!groupIds) {
-            // You might need to adjust this based on how you store group IDs
-            groupIds = await getGroupIdsFromDatabase(botId);
-        }
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const groupId of groupIds) {
-            try {
-                if (mediaType === 'photo') {
-                    await bot.telegram.sendPhoto(groupId, mediaId, { caption: text });
-                } else if (mediaType === 'video') {
-                    await bot.telegram.sendVideo(groupId, mediaId, { caption: text });
-                } else {
-                    await bot.telegram.sendMessage(groupId, text);
-                }
-                successCount++;
-            } catch (error) {
-                console.error(`Failed to send broadcast to group ${groupId}:`, error);
-                failCount++;
-            }
-        }
-
-        console.log(`Broadcast complete: ${successCount} successful, ${failCount} failed`);
-        return { success: successCount, failed: failCount };
-    } catch (error) {
-        console.error('Error in broadcastToGroups:', error);
-        return { success: 0, failed: 0, error: error.message };
-    }
-}
 async function isSubscribed(ctx, userId) {
     try {
         // Check if we have a cached result that's still valid (cache for 1 minute only to prevent issues)
@@ -2817,12 +2782,9 @@ bot.start(async (ctx) => {
 
 
 
-
-
-
-
+s
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,broadcastToGroups };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
 
