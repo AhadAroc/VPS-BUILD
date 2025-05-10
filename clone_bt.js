@@ -952,7 +952,7 @@ bot.command('broadcast', async (ctx) => {
                     }
                 });
             } catch (error) {
-                console.error(`Failed to send message to bot ${botId}:`, error);
+                console.error('Error broadcasting message:', error);
                 failedCount++;
                 
                 // Check if all bots have been processed
