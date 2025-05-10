@@ -729,12 +729,11 @@ async function handleBroadcastDM(ctx) {
     await handleBroadcast(ctx, 'dm', message);
 }
 
-async function handleBroadcastGroups(ctx) {
+async function handleBroadcastGroups(ctx, message) {
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
 
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
     if (!message) {
         return ctx.reply('Please provide a message to broadcast.');
     }
@@ -743,12 +742,12 @@ async function handleBroadcastGroups(ctx) {
         // Log the current database connection
         console.log('Current database:', mongoose.connection.name);
 
-        // Query the database for groups with the name "test"
-        const groups = await Group.find({ name: 'test' }).lean();
-        console.log(`Found ${groups.length} groups for broadcasting`);
+        // Query the database for active groups
+        const groups = await Group.find({ isActive: true }).lean();
+        console.log(`Found ${groups.length} active groups for broadcasting`);
 
         if (groups.length === 0) {
-            return ctx.reply('🚫 No registered groups found for broadcasting.');
+            return ctx.reply('🚫 No active groups found for broadcasting.');
         }
 
         let successCount = 0;
