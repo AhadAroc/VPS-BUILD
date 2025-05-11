@@ -93,30 +93,34 @@ bot.action('create_bot', (ctx) => {
 });
 bot.on('new_chat_members', async (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
-        // Bot was added to a new group
         const groupId = ctx.chat.id;
         const groupTitle = ctx.chat.title;
         const groupType = ctx.chat.type;
 
-        // Save to activeGroups map
         activeGroups.set(groupId, {
             title: groupTitle,
             type: groupType
         });
 
-        // Save to the 'groups' collection in the 'test' database
         try {
             await Group.updateOne(
-                { groupId: groupId },
-                { name: groupTitle, type: groupType, last_activity: new Date() },
+                { group_id: groupId }, // FIXED key name
+                {
+                    group_id: groupId,   // FIXED key name
+                    title: groupTitle,
+                    type: groupType,
+                    last_activity: new Date(),
+                    is_active: true
+                },
                 { upsert: true }
             );
-            console.log(`Group ${groupTitle} saved to groups collection in test database.`);
+            console.log(`✅ Group ${groupTitle} saved to DB.`);
         } catch (error) {
-            console.error('Error saving group to groups collection in test database:', error);
+            console.error('❌ Error saving group:', error);
         }
     }
 });
+
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
