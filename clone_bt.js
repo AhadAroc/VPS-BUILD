@@ -46,11 +46,12 @@ if (!fs.existsSync(BOTS_DIR)) {
 
 // Define the Group schema and model
 const groupSchema = new mongoose.Schema({
-    group_id: { type: String },
-    name: String,
-    createdAt: { type: Date, default: Date.now },
-    // Add any other fields you need
-}, { collection: 'groups' }); // Specify the collection name here
+  group_id: String,
+  title: String,
+  type: String,
+  is_active: Boolean,
+  last_activity: Date
+}, { collection: 'groups' });
 
 const Group = mongoose.model('Group', groupSchema);
 const cloneSchema = new mongoose.Schema({
@@ -119,6 +120,29 @@ bot.on('new_chat_members', async (ctx) => {
             console.error('❌ Error saving group:', error);
         }
     }
+});
+bot.on('my_chat_member', async (ctx) => {
+  const status = ctx.update.my_chat_member.new_chat_member.status;
+  const chat = ctx.chat;
+
+  if (chat.type.includes('group') && status === 'member') {
+    try {
+      await Group.updateOne(
+        { group_id: chat.id },
+        {
+          group_id: chat.id.toString(),
+          title: chat.title,
+          type: chat.type,
+          is_active: true,
+          last_activity: new Date()
+        },
+        { upsert: true }
+      );
+      console.log(`📌 Group joined (via my_chat_member): ${chat.title}`);
+    } catch (err) {
+      console.error('Error in my_chat_member:', err);
+    }
+  }
 });
 
 // Handle token submission
