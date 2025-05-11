@@ -46,11 +46,12 @@ if (!fs.existsSync(BOTS_DIR)) {
 
 // Define the Group schema and model
 const groupSchema = new mongoose.Schema({
-    groupId: { type: String, alias: 'group_id' }, // Use alias to map groupId to group_id
+    groupId: { type: String, alias: 'group_id' },
     name: String,
     createdAt: { type: Date, default: Date.now },
     // Add any other fields you need
-});
+}, { collection: 'groups' }); // Specify the collection name here
+
 const Group = mongoose.model('Group', groupSchema);
 const cloneSchema = new mongoose.Schema({
     token: String,
@@ -90,35 +91,30 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-bot.on('my_chat_member', async (ctx) => {
-  const chat = ctx.chat;
-
-  if (chat && chat.type.includes('group')) {
-    try {
-      await Group.updateOne(
-        { group_id: chat.id },
-        {
-          group_id: chat.id,
-          title: chat.title,
-          is_active: true,
-          last_activity: new Date()
-        },
-        { upsert: true }
-      );
-
-      console.log(`✅ Saved/updated group: ${chat.title} (${chat.id})`);
-    } catch (err) {
-      console.error('Error saving group:', err);
-    }
-  }
-});
-bot.on('new_chat_members', (ctx) => {
+bot.on('new_chat_members', async (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
         // Bot was added to a new group
-        activeGroups.set(ctx.chat.id, {
-            title: ctx.chat.title,
-            type: ctx.chat.type
+        const groupId = ctx.chat.id;
+        const groupTitle = ctx.chat.title;
+        const groupType = ctx.chat.type;
+
+        // Save to activeGroups map
+        activeGroups.set(groupId, {
+            title: groupTitle,
+            type: groupType
         });
+
+        // Save to the 'groups' collection in the 'test' database
+        try {
+            await Group.updateOne(
+                { groupId: groupId },
+                { name: groupTitle, type: groupType, last_activity: new Date() },
+                { upsert: true }
+            );
+            console.log(`Group ${groupTitle} saved to groups collection in test database.`);
+        } catch (error) {
+            console.error('Error saving group to groups collection in test database:', error);
+        }
     }
 });
 // Handle token submission
@@ -777,20 +773,20 @@ async function handleBroadcastGroups(ctx, message) {
 
         // Send the message to each group
         for (const group of groups) {
-    if (!group.group_id) { // Check for group_id instead of groupId
-        console.error('Group ID is missing for a group:', group);
-        failedCount++;
-        continue;
-    }
+            if (!group.groupId) {
+                console.error('Group ID is missing for a group:', group);
+                failedCount++;
+                continue;
+            }
 
-    try {
-        await ctx.telegram.sendMessage(group.group_id, message, { parse_mode: 'HTML' });
-        successCount++;
-    } catch (error) {
-        console.error(`Error sending message to group ${group.group_id}:`, error);
-        failedCount++;
-    }
-}
+            try {
+                await ctx.telegram.sendMessage(group.groupId, message, { parse_mode: 'HTML' });
+                successCount++;
+            } catch (error) {
+                console.error(`Error sending message to group ${group.groupId}:`, error);
+                failedCount++;
+            }
+        }
 
         ctx.reply(`✅ Message sent!\n\n• Success: ${successCount}\n• Failed: ${failedCount}`);
     } catch (error) {
