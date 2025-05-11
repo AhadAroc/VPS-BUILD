@@ -61,7 +61,8 @@ const cloneSchema = new mongoose.Schema({
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/protectionbot', { 
+mongoose.connect('mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/test?retryWrites=true&w=majority', {
+
     useNewUrlParser: true, 
     useUnifiedTopology: true 
 })
