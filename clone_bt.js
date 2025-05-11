@@ -739,8 +739,10 @@ async function handleBroadcastGroups(ctx, message) {
     }
 
     try {
+        // Log the current database connection
         console.log('Current database:', mongoose.connection.name);
 
+        // Query the database for all groups, regardless of their active status
         const groups = await Group.find().lean();
         console.log(`Found ${groups.length} groups for broadcasting`);
 
@@ -751,35 +753,29 @@ async function handleBroadcastGroups(ctx, message) {
         let successCount = 0;
         let failedCount = 0;
 
+        // Send the message to each group
         for (const group of groups) {
-            if (!group.group_id) {
-                console.error('Group ID is missing for a group:', group);
-                failedCount++;
-                continue;
-            }
+    if (!group.group_id) { // Check for group_id instead of groupId
+        console.error('Group ID is missing for a group:', group);
+        failedCount++;
+        continue;
+    }
 
-            try {
-                await ctx.telegram.sendMessage(group.group_id, message, { parse_mode: 'HTML' });
-                successCount++;
-            } catch (error) {
-                console.error(`Error sending message to group ${group.group_id}:`, error.description || error.message);
-                failedCount++;
+    try {
+        await ctx.telegram.sendMessage(group.group_id, message, { parse_mode: 'HTML' });
+        successCount++;
+    } catch (error) {
+        console.error(`Error sending message to group ${group.group_id}:`, error);
+        failedCount++;
+    }
+}
 
-                // If group is invalid, remove it from the database
-                if (error.description && error.description.includes('chat not found')) {
-                    await Group.deleteOne({ group_id: group.group_id });
-                    console.log(`❌ Removed invalid group ${group.group_id} from the database`);
-                }
-            }
-        }
-
-        ctx.reply(`✅ Broadcast complete:\n• Success: ${successCount}\n• Failed: ${failedCount}`);
+        ctx.reply(`✅ Message sent!\n\n• Success: ${successCount}\n• Failed: ${failedCount}`);
     } catch (error) {
         console.error('Error broadcasting message:', error);
         ctx.reply('❌ An error occurred while broadcasting.');
     }
 }
-
 
 async function handleBroadcastAll(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
