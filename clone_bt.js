@@ -757,10 +757,7 @@ async function handleBroadcastGroups(ctx, message) {
     }
 
     try {
-        // Log the current database connection
-        console.log('Current database:', mongoose.connection.name);
-
-        // Query the database for all groups, regardless of their active status
+        // Ensure the query is executed on the correct database
         const groups = await Group.find().lean();
         console.log(`Found ${groups.length} groups for broadcasting`);
 
