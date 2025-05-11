@@ -755,20 +755,20 @@ async function handleBroadcastGroups(ctx, message) {
 
         // Send the message to each group
         for (const group of groups) {
-            if (!group.groupId) {
-                console.error('Group ID is missing for a group:', group);
-                failedCount++;
-                continue;
-            }
+    if (!group.group_id) { // Check for group_id instead of groupId
+        console.error('Group ID is missing for a group:', group);
+        failedCount++;
+        continue;
+    }
 
-            try {
-                await ctx.telegram.sendMessage(group.groupId, message, { parse_mode: 'HTML' });
-                successCount++;
-            } catch (error) {
-                console.error(`Error sending message to group ${group.groupId}:`, error);
-                failedCount++;
-            }
-        }
+    try {
+        await ctx.telegram.sendMessage(group.group_id, message, { parse_mode: 'HTML' });
+        successCount++;
+    } catch (error) {
+        console.error(`Error sending message to group ${group.group_id}:`, error);
+        failedCount++;
+    }
+}
 
         ctx.reply(`✅ Message sent!\n\n• Success: ${successCount}\n• Failed: ${failedCount}`);
     } catch (error) {
