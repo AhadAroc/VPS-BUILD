@@ -1332,13 +1332,76 @@ bot.on('new_chat_members', async (ctx) => {
         `;
 
         // Send the message to the bot owner and developers
-        const recipients = [ownerId, ...developerIds];
+        const recipients = [];
+        
+        // Only add valid recipient IDs
+        if (ownerId && typeof ownerId === 'number') {
+            recipients.push(ownerId);
+        }
+        
+        if (Array.isArray(developerIds)) {
+            for (const devId of developerIds) {
+                if (devId && typeof devId === 'number') {
+                    recipients.push(devId);
+                }
+            }
+        }
+        
+        // Send notifications to valid recipients
         for (const recipientId of recipients) {
             try {
                 await ctx.telegram.sendMessage(recipientId, message);
+                console.log(`Notification sent to ${recipientId}`);
             } catch (error) {
                 console.error(`Error sending message to ${recipientId}:`, error);
             }
+        }
+        
+        // Also save the group to the database
+        try {
+            // First, check if the database is connected
+            if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+                console.log('MongoDB connection not ready, reconnecting...');
+                await mongoose.connect(mongoURI, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                    ssl: true,
+                    tls: true,
+                    tlsAllowInvalidCertificates: false
+                });
+            }
+            
+            // Log the group data we're trying to save
+            console.log(`Saving group to database: ID=${chatId}, Title=${chatTitle}, Type=${ctx.chat.type}`);
+            
+            // Connect directly to the 'test' database
+            const testDb = mongoose.connection.useDb('test');
+            
+            // Create a model specifically for the 'groups' collection in the 'test' database
+            const TestGroup = testDb.model('Group', new mongoose.Schema({
+                group_id: String,
+                title: String,
+                type: String,
+                is_active: Boolean,
+                last_activity: Date
+            }), 'groups');
+            
+            // Save the group data
+            await TestGroup.updateOne(
+                { group_id: chatId.toString() },
+                {
+                    group_id: chatId.toString(),
+                    title: chatTitle,
+                    type: ctx.chat.type,
+                    last_activity: new Date(),
+                    is_active: true
+                },
+                { upsert: true }
+            );
+            
+            console.log(`✅ Group ${chatTitle} saved to test > groups collection.`);
+        } catch (error) {
+            console.error('❌ Error saving group:', error);
         }
     }
 });
@@ -1360,14 +1423,28 @@ bot.on('left_chat_member', async (ctx) => {
         `;
 
         try {
-            if (ownerId) {
+            // Check if ownerId is set before trying to send a message
+            if (ownerId && typeof ownerId === 'number') {
                 await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
                 console.log(`Notification sent to owner (ID: ${ownerId})`);
             } else {
-                console.warn('Owner ID is not set. Cannot send notification.');
+                console.warn('Owner ID is not set or invalid. Cannot send notification.');
+            }
+            
+            // Also notify developers if they are defined
+            if (Array.isArray(developerIds) && developerIds.length > 0) {
+                for (const devId of developerIds) {
+                    if (devId && typeof devId === 'number') {
+                        try {
+                            await ctx.telegram.sendMessage(devId, message, { parse_mode: 'Markdown' });
+                        } catch (devError) {
+                            console.error(`Failed to send notification to developer ${devId}:`, devError);
+                        }
+                    }
+                }
             }
         } catch (error) {
-            console.error('Error sending removal message to owner:', error);
+            console.error('Error sending removal message:', error);
         }
     }
 });
