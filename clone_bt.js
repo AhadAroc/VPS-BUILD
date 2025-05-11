@@ -44,16 +44,7 @@ if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
 
-// Define the Group schema and model
-const groupSchema = new mongoose.Schema({
-  group_id: String,
-  title: String,
-  type: String,
-  is_active: Boolean,
-  last_activity: Date
-}, { collection: 'groups' });
 
-const Group = mongoose.model('Group', groupSchema);
 const cloneSchema = new mongoose.Schema({
     token: String,
     ownerId: Number,
@@ -92,101 +83,21 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
-bot.on('new_chat_members', async (ctx) => {
+bot.on('new_chat_members', (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
-        const groupId = ctx.chat.id.toString(); // Convert to string to ensure consistency
-        const groupTitle = ctx.chat.title;
-        const groupType = ctx.chat.type;
-
-        activeGroups.set(groupId, {
-            title: groupTitle,
-            type: groupType
+        // Bot was added to a new group
+        activeGroups.set(ctx.chat.id, {
+            title: ctx.chat.title,
+            type: ctx.chat.type
         });
-
-        try {
-            // First, check if the database is connected
-            if (!mongoose.connection || mongoose.connection.readyState !== 1) {
-                console.log('MongoDB connection not ready, reconnecting...');
-                await mongoose.connect(mongoURI, {
-                    useNewUrlParser: true,
-                    useUnifiedTopology: true,
-                    ssl: true,
-                    tls: true,
-                    tlsAllowInvalidCertificates: false
-                });
-            }
-            
-            // Log the group data we're trying to save
-            console.log(`Saving group to database: ID=${groupId}, Title=${groupTitle}, Type=${groupType}`);
-            
-            // Connect directly to the 'test' database
-            const testDb = mongoose.connection.useDb('test');
-            
-            // Create a model specifically for the 'groups' collection in the 'test' database
-            const TestGroup = testDb.model('Group', new mongoose.Schema({
-                group_id: String,
-                title: String,
-                type: String,
-                is_active: Boolean,
-                last_activity: Date
-            }), 'groups');
-            
-            // Save the group data
-            await TestGroup.updateOne(
-                { group_id: groupId },
-                {
-                    group_id: groupId,
-                    title: groupTitle,
-                    type: groupType,
-                    last_activity: new Date(),
-                    is_active: true
-                },
-                { upsert: true }
-            );
-            
-            console.log(`✅ Group ${groupTitle} saved to test > groups collection.`);
-        } catch (error) {
-            console.error('❌ Error saving group:', error);
-        }
     }
 });
-
-
-
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-    // Check if it's a broadcast command
-    if (text.startsWith('/broadcast_')) {
-        if (userId !== ADMIN_ID) {
-            return ctx.reply('⛔ This command is only available to the admin.');
-        }
-        
-        const [command, ...messageParts] = text.split(' ');
-        const broadcastType = command.split('_')[1];
-        const broadcastMessage = messageParts.join(' ');
-
-        if (!broadcastMessage) {
-            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
-        }
-
-        switch (broadcastType) {
-            case 'dm':
-                return handleBroadcastDM(ctx, broadcastMessage);
-            case 'groups':
-                return handleBroadcastGroups(ctx, broadcastMessage);
-            case 'all':
-                return handleBroadcastAll(ctx, broadcastMessage);
-            default:
-                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
-        }
-    }
-
-    // If not a broadcast command, treat as token submission
-    const token = text;
-
+   
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
@@ -194,7 +105,7 @@ bot.on('text', async (ctx) => {
 
     // Validate token format
     if (!token.match(/^\d+:[A-Za-z0-9_-]{35,}$/)) {
-        return ctx.reply('❌ التوكن غير صالح. يرجى إدخال توكن صحيح.');
+        return ctx.reply('');
     }
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
@@ -493,34 +404,7 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
 });
-// At the top of your file, after initializing the bot
-bot.command('broadcast_dm', handleBroadcastDM);
-bot.command('broadcast_groups', handleBroadcastGroups);
-bot.command('broadcast_all', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
 
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
-    }
-
-    try {
-        const db = await ensureDatabaseInitialized();
-        await db.collection('broadcast_triggers').insertOne({
-            triggered: true,
-            message: message,
-            type: 'all',
-            createdAt: new Date()
-        });
-
-        ctx.reply('Broadcast triggered. It will be sent shortly across all bots.');
-    } catch (error) {
-        console.error('Error triggering broadcast:', error);
-        ctx.reply('An error occurred while triggering the broadcast.');
-    }
-});
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
@@ -724,6 +608,7 @@ function loadExistingBots() {
         setTimeout(populateUserDeployments, 5000);
     });
 }
+
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
@@ -776,138 +661,11 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 
 
-// Then define these handler functions:
-// Implement broadcast handlers
-async function handleBroadcastDM(ctx) {
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    await handleBroadcast(ctx, 'dm', message);
-}
-
-async function handleBroadcastGroups(ctx, message) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
-    }
-
-    try {
-        // Ensure the query is executed on the correct database
-        const groups = await Group.find().lean();
-        console.log(`Found ${groups.length} groups for broadcasting`);
-
-        if (groups.length === 0) {
-            return ctx.reply('🚫 No groups found for broadcasting.');
-        }
-
-        let successCount = 0;
-        let failedCount = 0;
-
-        // Send the message to each group
-        for (const group of groups) {
-            if (!group.groupId) {
-                console.error('Group ID is missing for a group:', group);
-                failedCount++;
-                continue;
-            }
-
-            try {
-                await ctx.telegram.sendMessage(group.groupId, message, { parse_mode: 'HTML' });
-                successCount++;
-            } catch (error) {
-                console.error(`Error sending message to group ${group.groupId}:`, error);
-                failedCount++;
-            }
-        }
-
-        ctx.reply(`✅ Message sent!\n\n• Success: ${successCount}\n• Failed: ${failedCount}`);
-    } catch (error) {
-        console.error('Error broadcasting message:', error);
-        ctx.reply('❌ An error occurred while broadcasting.');
-    }
-}
-
-async function handleBroadcastAll(ctx) {
-    if (ctx.from.id !== ADMIN_ID) {
-        return ctx.reply('⛔ This command is only available to the admin.');
-    }
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
-    }
-    await handleBroadcast(ctx, 'all', message);
-}
-async function getUserIdsFromDatabase(botToken) {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        const clone = await CloneModel.findOne({ botToken });
-        if (!clone) {
-            console.error(`No clone found for bot token: ${botToken}`);
-            return [];
-        }
-        const db = await connectToMongoDB(clone.dbName);
-        const User = db.model('User');
-        const users = await User.find().distinct('userId');
-        return users;
-    } catch (error) {
-        console.error('Error fetching user IDs:', error);
-        return [];
-    }
-}
-
-async function getGroupIdsFromDatabase(botToken) {
-    try {
-        const CloneModel = mongoose.model('Clone');
-        const clone = await CloneModel.findOne({ botToken });
-        if (!clone) {
-            console.error(`No clone found for bot token: ${botToken}`);
-            return [];
-        }
-        const db = await connectToMongoDB(clone.dbName);
-        const Group = db.model('Group');
-        const groups = await Group.find().distinct('groupId');
-        return groups;
-    } catch (error) {
-        console.error('Error fetching group IDs:', error);
-        return [];
-    }
-}
 
 
-async function handleBroadcast(ctx, type, message) {
-    let successCount = 0, failCount = 0;
 
-    for (const botId in activeBots) {
-        const botInfo = activeBots[botId];
-        const bot = new Telegraf(botInfo.token);
 
-        try {
-            if (type === 'dm') {
-                await bot.telegram.sendMessage(botInfo.createdBy, message);
-            } else if (type === 'groups') {
-                // Assuming you stored group IDs somewhere per bot
-                const groups = await getBotGroups(botId, botInfo.createdBy); // reuse your function
-                for (const group of groups) {
-                    await bot.telegram.sendMessage(group.chat_id, message);
-                }
-            } else if (type === 'all') {
-                await bot.telegram.sendMessage(botInfo.createdBy, message);
-                const groups = await getBotGroups(botId, botInfo.createdBy);
-                for (const group of groups) {
-                    await bot.telegram.sendMessage(group.chat_id, message);
-                }
-            }
 
-            successCount++;
-        } catch (err) {
-            console.error(`Failed to send broadcast to bot ${botInfo.username}:`, err);
-            failCount++;
-        }
-    }
-
-    ctx.reply(`Broadcast completed.\nSuccessful: ${successCount}\nFailed: ${failCount}`);
-}
 
 
 async function updateActiveGroups(bot) {
