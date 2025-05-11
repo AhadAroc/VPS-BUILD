@@ -104,7 +104,26 @@ bot.on('new_chat_members', async (ctx) => {
         });
 
         try {
-            await Group.updateOne(
+            // First, check if the database is connected
+            if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+                console.log('MongoDB connection not ready, reconnecting...');
+                await mongoose.connect(mongoURI, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                    ssl: true,
+                    tls: true,
+                    tlsAllowInvalidCertificates: false
+                });
+            }
+            
+            // Log the group data we're trying to save
+            console.log(`Saving group to database: ID=${groupId}, Title=${groupTitle}, Type=${groupType}`);
+            
+            // Make sure we're using the correct collection in the test database
+            const db = mongoose.connection.useDb('test');
+            const GroupModel = db.model('Group', groupSchema, 'groups');
+            
+            await GroupModel.updateOne(
                 { group_id: groupId }, // FIXED key name
                 {
                     group_id: groupId,   // FIXED key name
@@ -121,29 +140,7 @@ bot.on('new_chat_members', async (ctx) => {
         }
     }
 });
-bot.on('my_chat_member', async (ctx) => {
-  const chat = ctx.chat;
-  const status = ctx.update.my_chat_member.new_chat_member.status;
 
-  if (chat && chat.type.includes('group') && status === 'member') {
-    try {
-      await Group.updateOne(
-        { group_id: chat.id.toString() },
-        {
-          group_id: chat.id.toString(),
-          title: chat.title,
-          type: chat.type,
-          is_active: true,
-          last_activity: new Date()
-        },
-        { upsert: true }
-      );
-      console.log(`✅ Group saved to test > groups: ${chat.title}`);
-    } catch (err) {
-      console.error('❌ Failed to save group:', err);
-    }
-  }
-});
 
 
 // Handle token submission
