@@ -97,7 +97,9 @@ bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-   
+    // Extract the token from the message text
+    const token = text;  // This line is missing, causing the error
+
     // Check if user already has a deployed bot
     if (userDeployments.has(userId)) {
         return ctx.reply('❌ عذراً، يمكنك تنصيب بوت واحد فقط في الوقت الحالي.');
@@ -136,7 +138,7 @@ module.exports = {
             
             fs.writeFileSync(configPath, configContent);
             
-            // Create a custom bot file for this instance
+            
             // Create a custom bot file for this instance
 const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
 const botFileContent = `
