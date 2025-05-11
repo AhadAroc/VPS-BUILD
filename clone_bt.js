@@ -90,6 +90,28 @@ bot.start((ctx) => {
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
 });
+bot.on('my_chat_member', async (ctx) => {
+  const chat = ctx.chat;
+
+  if (chat && chat.type.includes('group')) {
+    try {
+      await Group.updateOne(
+        { group_id: chat.id },
+        {
+          group_id: chat.id,
+          title: chat.title,
+          is_active: true,
+          last_activity: new Date()
+        },
+        { upsert: true }
+      );
+
+      console.log(`✅ Saved/updated group: ${chat.title} (${chat.id})`);
+    } catch (err) {
+      console.error('Error saving group:', err);
+    }
+  }
+});
 bot.on('new_chat_members', (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
         // Bot was added to a new group
