@@ -19,9 +19,10 @@ let photoMessages = new Map(); // chatId -> Set of message IDs
 // Add this at the top of your file
 const database = require('./database');
 const { isDeveloper } = require('./middlewares');
-const { loadActiveGroupsFromDatabase } = require('./database'); // Adjust the path as necessary
+const { loadActiveGroupsFromDatabase, getDatabaseForBot ,} = require('./database'); // Adjust the path as necessary
 const axios = require('axios');
 const subscriptionStatusCache = new Map();
+const config = require('./config');
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
@@ -35,25 +36,23 @@ let ownerMessageSent = false;
 let ownerUsername = null;
 let ownerFirstName = null;
    // Add this function near the top of your file, after your imports and before the bot commands
-   async function getBotGroups(botId, userId) {
+   async function getBotGroups(botId) {
     try {
-        const db = await ensureDatabaseInitialized();
+        const db = await database.connectToMongoDB('test'); // connect explicitly to 'test' DB
         const groups = await db.collection('groups').find({ 
             is_active: true,
-            $or: [
-                { bot_id: botId },
-                { members: userId }
-            ]
-        })
-        .sort({ added_at: -1 }) // Sort by the most recently added
-        .limit(5) // Limit to the 5 most recent groups, adjust as needed
-        .toArray();
+            bot_id: botId  // make sure bot_id is always set on save!
+        }).toArray();
+
+        console.log(`Bot ${botId} has ${groups.length} active groups`);
         return groups;
     } catch (error) {
         console.error('Error fetching bot groups:', error);
         return [];
     }
 }
+
+
 async function getLatestGroupsMembersState(botId, userId) {
     try {
         const groups = await getBotGroups(botId, userId);
@@ -912,6 +911,75 @@ function setupCommands(bot) {
             await ctx.answerCbQuery('حدث خطأ أثناء التحقق من الاشتراك.');
         }
     });
+    bot.on('new_chat_members', async (ctx) => {
+        const newMembers = ctx.message.new_chat_members;
+        if (!newMembers || newMembers.length === 0) return;
+    
+        const botInfo = await ctx.telegram.getMe();
+        const isBotAdded = newMembers.some(member => member.id === botInfo.id);
+    
+        if (isBotAdded) {
+            const chatTitle = ctx.chat.title || 'Unknown';
+            const chatId = ctx.chat.id;
+    
+            // ===== Save group to DB =====
+            const { getDatabaseForBot } = require('./database');
+const db = await getDatabaseForBot('test');   // FOR GROUP SAVE ON JOIN
+
+            await db.collection('groups').updateOne(
+                { group_id: chatId, bot_id: config.botId },
+                {
+                    $set: {
+                        group_id: chatId,
+                        title: chatTitle,
+                        is_active: true,
+                        bot_id: config.botId,
+                        added_at: new Date()
+                    }
+                },
+                { upsert: true }
+            );
+    
+            console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
+    
+            // ===== Send notification to owner + developers =====
+            const message = `
+    ⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
+    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+    ⌯ اسم المجموعة ⌯: ${chatTitle}
+    ⌯ ايدي المجموعة ⌯: ${chatId}
+            `;
+    
+            const recipients = [ownerId, ...developerIds];
+            for (const recipientId of recipients) {
+                try {
+                    await ctx.telegram.sendMessage(recipientId, message);
+                } catch (error) {
+                    console.error(`Error sending message to ${recipientId}:`, error);
+                }
+            }
+        }
+    });
+    
+    
+    bot.on('left_chat_member', async (ctx) => {
+        if (!ctx.message.left_chat_member) return;
+    
+        const leftMemberId = ctx.message.left_chat_member.id;
+        const botInfo = await ctx.telegram.getMe();
+    
+        if (leftMemberId === botInfo.id) {
+            const db = await ensureDatabaseInitialized('test');
+    
+            await db.collection('groups').updateOne(
+                { group_id: ctx.chat.id, bot_id: config.botId },
+                { $set: { is_active: false } }
+            );
+    
+            console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${config.botId}`);
+        }
+    });
+    
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
         const chatId = ctx.chat.id;
@@ -1319,92 +1387,7 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ أثناء المعالجة.');
     }
 });
-bot.on('new_chat_members', async (ctx) => {
-    const newMembers = ctx.message.new_chat_members;
-    if (newMembers.some(member => member.id === ctx.botInfo.id)) {
-        const chatTitle = ctx.chat.title || 'Unknown';
-        const chatId = ctx.chat.id;
-        const message = `
-            ⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
-            ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-            ⌯ اسم المجموعة ⌯: ${chatTitle}
-            ⌯ ايدي المجموعة ⌯: ${chatId}
-        `;
 
-        // Send the message to the bot owner and developers
-        const recipients = [];
-        
-        // Only add valid recipient IDs
-        if (ownerId && typeof ownerId === 'number') {
-            recipients.push(ownerId);
-        }
-        
-        if (Array.isArray(developerIds)) {
-            for (const devId of developerIds) {
-                if (devId && typeof devId === 'number') {
-                    recipients.push(devId);
-                }
-            }
-        }
-        
-        // Send notifications to valid recipients
-        for (const recipientId of recipients) {
-            try {
-                await ctx.telegram.sendMessage(recipientId, message);
-                console.log(`Notification sent to ${recipientId}`);
-            } catch (error) {
-                console.error(`Error sending message to ${recipientId}:`, error);
-            }
-        }
-        
-        // Also save the group to the database
-        try {
-            // First, check if the database is connected
-            if (!mongoose.connection || mongoose.connection.readyState !== 1) {
-                console.log('MongoDB connection not ready, reconnecting...');
-                await mongoose.connect(mongoURI, {
-                    useNewUrlParser: true,
-                    useUnifiedTopology: true,
-                    ssl: true,
-                    tls: true,
-                    tlsAllowInvalidCertificates: false
-                });
-            }
-            
-            // Log the group data we're trying to save
-            console.log(`Saving group to database: ID=${chatId}, Title=${chatTitle}, Type=${ctx.chat.type}`);
-            
-            // Connect directly to the 'test' database
-            const testDb = mongoose.connection.useDb('test');
-            
-            // Create a model specifically for the 'groups' collection in the 'test' database
-            const TestGroup = testDb.model('Group', new mongoose.Schema({
-                group_id: String,
-                title: String,
-                type: String,
-                is_active: Boolean,
-                last_activity: Date
-            }), 'groups');
-            
-            // Save the group data
-            await TestGroup.updateOne(
-                { group_id: chatId.toString() },
-                {
-                    group_id: chatId.toString(),
-                    title: chatTitle,
-                    type: ctx.chat.type,
-                    last_activity: new Date(),
-                    is_active: true
-                },
-                { upsert: true }
-            );
-            
-            console.log(`✅ Group ${chatTitle} saved to test > groups collection.`);
-        } catch (error) {
-            console.error('❌ Error saving group:', error);
-        }
-    }
-});
 bot.on('left_chat_member', async (ctx) => {
     if (ctx.message.left_chat_member.id === ctx.botInfo.id) {
         // The bot was removed from the group
@@ -1423,106 +1406,18 @@ bot.on('left_chat_member', async (ctx) => {
         `;
 
         try {
-            // Check if ownerId is set before trying to send a message
-            if (ownerId && typeof ownerId === 'number') {
+            if (ownerId) {
                 await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
                 console.log(`Notification sent to owner (ID: ${ownerId})`);
             } else {
-                console.warn('Owner ID is not set or invalid. Cannot send notification.');
-            }
-            
-            // Also notify developers if they are defined
-            if (Array.isArray(developerIds) && developerIds.length > 0) {
-                for (const devId of developerIds) {
-                    if (devId && typeof devId === 'number') {
-                        try {
-                            await ctx.telegram.sendMessage(devId, message, { parse_mode: 'Markdown' });
-                        } catch (devError) {
-                            console.error(`Failed to send notification to developer ${devId}:`, devError);
-                        }
-                    }
-                }
+                console.warn('Owner ID is not set. Cannot send notification.');
             }
         } catch (error) {
-            console.error('Error sending removal message:', error);
+            console.error('Error sending removal message to owner:', error);
         }
     }
 });
-async function checkForBroadcastTrigger() {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const trigger = await db.collection('broadcast_triggers').findOne({ triggered: true });
 
-        if (trigger) {
-            console.log('Found broadcast trigger:', trigger);
-            await broadcastAcrossAllBots(null, trigger.message, trigger.type);
-            
-            // Mark the trigger as processed
-            await db.collection('broadcast_triggers').updateOne(
-                { _id: trigger._id },
-                { $set: { triggered: false, processedAt: new Date() } }
-            );
-        }
-    } catch (error) {
-        console.error('Error checking for broadcast trigger:', error);
-    }
-}
-async function broadcastAcrossAllBots(ctx, message, type = 'all') {
-    console.log('Starting broadcast across all bots');
-    
-    const db = await ensureDatabaseInitialized();
-    const activeBots = await db.collection('clones').find({ isActive: true }).toArray();
-    console.log(`Found ${activeBots.length} active bots`);
-
-    let totalSuccess = 0;
-    let totalFail = 0;
-
-    for (const bot of activeBots) {
-        console.log(`Processing bot: ${bot.botToken}`);
-        try {
-            const botInstance = new Telegraf(bot.botToken);
-            
-            let targetChats;
-            switch (type) {
-                case 'dm':
-                    targetChats = await getUserIdsFromDatabase(bot.botToken);
-                    break;
-                case 'groups':
-                    targetChats = await getGroupIdsFromDatabase(bot.botToken);
-                    break;
-                case 'all':
-                default:
-                    targetChats = [
-                        ...(await getUserIdsFromDatabase(bot.botToken)),
-                        ...(await getGroupIdsFromDatabase(bot.botToken))
-                    ];
-                    break;
-            }
-
-            console.log(`Found ${targetChats.length} target chats for bot ${bot.botToken}`);
-
-            for (const chatId of targetChats) {
-                try {
-                    await botInstance.telegram.sendMessage(chatId, message);
-                    totalSuccess++;
-                } catch (error) {
-                    console.error(`Failed to send message to chat ${chatId} for bot ${bot.botToken}:`, error);
-                    totalFail++;
-                }
-            }
-        } catch (error) {
-            console.error(`Error broadcasting with bot ${bot.botToken}:`, error);
-        }
-    }
-
-    console.log(`Broadcast completed. Success: ${totalSuccess}, Failed: ${totalFail}`);
-    if (ctx) {
-        ctx.reply(`Broadcast completed.\nSuccess: ${totalSuccess}\nFailed: ${totalFail}`);
-    }
-}
-
-// Call this function periodically
-setInterval(checkForBroadcastTrigger, 60000); // Check every
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
     try {
