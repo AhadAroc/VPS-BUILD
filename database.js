@@ -14,6 +14,7 @@ const mongooseOptions = {
 // MongoDB connection
 let db = null;
 let client = null;
+
 /**
  * Add a new quiz question to the database
  * @param {Object} question - The question object
@@ -25,6 +26,49 @@ let client = null;
  * @param {string} question.addedBy - User ID of who added the question
  * @returns {Promise<Object>} - The added question with its ID
  */
+
+
+// --- Native MongoClient helper (for clean multi-DB connections) ---
+
+let _mongoClient = null;
+let _mongoDbs = {};
+
+async function getDatabaseForBot(dbName) {
+    const uri = process.env.MONGODB_URI;  // from .env (has cluster info)
+    if (!_mongoClient) {
+        _mongoClient = new MongoClient(uri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 30000,
+            socketTimeoutMS: 45000,
+            connectTimeoutMS: 30000
+        });
+        await _mongoClient.connect();
+        console.log('✅ Native MongoClient connected to cluster');
+    }
+
+    if (!_mongoDbs[dbName]) {
+        _mongoDbs[dbName] = _mongoClient.db(dbName);
+        console.log(`✅ Native MongoDB database selected: ${dbName}`);
+    }
+
+    return _mongoDbs[dbName];
+}
+
+module.exports.getDatabaseForBot = getDatabaseForBot;
+
+
+async function ensureDatabaseInitialized(botId = null) {
+    try {
+        const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
+        return await connectToMongoDB(dbName);
+    } catch (error) {
+        console.error('Error initializing database:', error);
+        throw error;
+    }
+}
+
+
 async function addQuizQuestion(question) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -332,16 +376,7 @@ async function loadActiveGroupsFromDatabase() {
     }
 }
 
-async function ensureDatabaseInitialized(botId = null) {
-    try {
-        // If botId is provided, use a specific database for this bot
-        const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
-        return await connectToMongoDB(dbName);
-    } catch (error) {
-        console.error('Error initializing database:', error);
-        throw error;
-    }
-}
+
 async function getReplyForBot(botId, triggerWord) {
     try {
         // Use the specific database for this bot
@@ -671,6 +706,7 @@ module.exports = {
     connectToMongoDB,
     setupDatabase,
     ensureDatabaseInitialized,
+    getDatabaseForBot,
     
     // Reply functions
     getReplies,
