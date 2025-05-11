@@ -87,17 +87,16 @@ bot.action('create_bot', (ctx) => {
 });
 // Save groups to database when bot is added
 // Handle bot added/removed from group (more reliable than just new_chat_members)
+// Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
     const botInfo = await ctx.telegram.getMe();
     const status = ctx.myChatMember.new_chat_member.status;
     const chatId = ctx.chat.id;
     const chatTitle = ctx.chat.title || 'Unknown';
 
-    const db = await ensureDatabaseInitialized('test');
-
+    const db = await database.setupDatabase();
 
     if (status === 'member' || status === 'administrator') {
-        // Bot was added or promoted
         await db.collection('groups').updateOne(
             { group_id: chatId, bot_id: config.botId },
             {
@@ -111,18 +110,18 @@ bot.on('my_chat_member', async (ctx) => {
             },
             { upsert: true }
         );
-        console.log(`✅ [@${botInfo.username}] (my_chat_member) Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
+        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId})`);
     }
 
     if (status === 'left' || status === 'kicked') {
-        // Bot was removed or kicked
         await db.collection('groups').updateOne(
             { group_id: chatId, bot_id: config.botId },
             { $set: { is_active: false } }
         );
-        console.log(`🚪 [@${botInfo.username}] (my_chat_member) Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
+        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
+
 
 
 
