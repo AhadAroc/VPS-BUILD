@@ -94,7 +94,7 @@ bot.action('create_bot', (ctx) => {
 });
 bot.on('new_chat_members', async (ctx) => {
     if (ctx.message.new_chat_member.id === ctx.botInfo.id) {
-        const groupId = ctx.chat.id;
+        const groupId = ctx.chat.id.toString(); // Convert to string to ensure consistency
         const groupTitle = ctx.chat.title;
         const groupType = ctx.chat.type;
 
@@ -119,14 +119,23 @@ bot.on('new_chat_members', async (ctx) => {
             // Log the group data we're trying to save
             console.log(`Saving group to database: ID=${groupId}, Title=${groupTitle}, Type=${groupType}`);
             
-            // Make sure we're using the correct collection in the test database
-            const db = mongoose.connection.useDb('test');
-            const GroupModel = db.model('Group', groupSchema, 'groups');
+            // Connect directly to the 'test' database
+            const testDb = mongoose.connection.useDb('test');
             
-            await GroupModel.updateOne(
-                { group_id: groupId }, // FIXED key name
+            // Create a model specifically for the 'groups' collection in the 'test' database
+            const TestGroup = testDb.model('Group', new mongoose.Schema({
+                group_id: String,
+                title: String,
+                type: String,
+                is_active: Boolean,
+                last_activity: Date
+            }), 'groups');
+            
+            // Save the group data
+            await TestGroup.updateOne(
+                { group_id: groupId },
                 {
-                    group_id: groupId,   // FIXED key name
+                    group_id: groupId,
                     title: groupTitle,
                     type: groupType,
                     last_activity: new Date(),
@@ -134,7 +143,8 @@ bot.on('new_chat_members', async (ctx) => {
                 },
                 { upsert: true }
             );
-            console.log(`✅ Group ${groupTitle} saved to DB.`);
+            
+            console.log(`✅ Group ${groupTitle} saved to test > groups collection.`);
         } catch (error) {
             console.error('❌ Error saving group:', error);
         }
