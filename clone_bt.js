@@ -122,13 +122,13 @@ bot.on('new_chat_members', async (ctx) => {
     }
 });
 bot.on('my_chat_member', async (ctx) => {
-  const status = ctx.update.my_chat_member.new_chat_member.status;
   const chat = ctx.chat;
+  const status = ctx.update.my_chat_member.new_chat_member.status;
 
-  if (chat.type.includes('group') && status === 'member') {
+  if (chat && chat.type.includes('group') && status === 'member') {
     try {
       await Group.updateOne(
-        { group_id: chat.id },
+        { group_id: chat.id.toString() },
         {
           group_id: chat.id.toString(),
           title: chat.title,
@@ -138,12 +138,13 @@ bot.on('my_chat_member', async (ctx) => {
         },
         { upsert: true }
       );
-      console.log(`📌 Group joined (via my_chat_member): ${chat.title}`);
+      console.log(`✅ Group saved to test > groups: ${chat.title}`);
     } catch (err) {
-      console.error('Error in my_chat_member:', err);
+      console.error('❌ Failed to save group:', err);
     }
   }
 });
+
 
 // Handle token submission
 bot.on('text', async (ctx) => {
