@@ -933,7 +933,7 @@ async function getBotGroups(botId) {
 
 async function handleBroadcast(ctx, type, message) {
     const { getDatabaseForBot } = require('./database');
-    const db = await getDatabaseForBot('test');   // FOR BROADCAST GROUP FETCH
+const db = await getDatabaseForBot('test');   // FOR BROADCAST GROUP FETCH
 
     let successCount = 0;
     let failCount = 0;
@@ -944,7 +944,7 @@ async function handleBroadcast(ctx, type, message) {
         const bot = new Telegraf(botInfo.token);
 
         // ===== SEND TO DM =====
-        if (type === 'dm' || type === 'all') {
+        if (type === 'dm') {
             try {
                 await bot.telegram.sendMessage(botInfo.createdBy, message);
                 console.log(`✅ DM sent to user ${botInfo.createdBy}`);
@@ -958,36 +958,52 @@ async function handleBroadcast(ctx, type, message) {
         // ===== SEND TO GROUPS =====
         if (type === 'groups' || type === 'all') {
             const groups = await getBotGroups(botId);
-            console.log(`🔍 Bot @${botInfo.username} has ${groups.length} active groups`);
+            console.log(`🔍 Bot @${botInfo.username} has ${groups.length} groups`);
             totalGroups += groups.length;
 
             for (const group of groups) {
                 try {
+                    // Check if bot can access group BEFORE sending
+                    await bot.telegram.getChat(group.group_id);
+
                     await bot.telegram.sendMessage(group.group_id, message);
                     console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
                     successCount++;
                 } catch (error) {
-                    if (error.description?.includes('chat not found') || error.description?.includes('bot was kicked')) {
-                        console.log(`⚠️ Marking group ${group.title} (${group.group_id}) inactive — bot not in group anymore.`);
+                    if (error.code === 400 && error.description.includes('chat not found')) {
+                        console.log(`⚠️ Skipping group ${group.title} (${group.group_id}) — bot not in group anymore.`);
 
+                        // OPTIONAL: Mark group as inactive in DB to clean up
                         await db.collection('groups').updateOne(
-                            { group_id: group.group_id, bot_id: botId }, // <-- CORRECT FIX
+                            { group_id: group.group_id },
                             { $set: { is_active: false } }
                         );
 
                         failCount++;
-                    } else {
-                        console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, error.description || error);
-                        failCount++;
+                        continue;
                     }
+
+                    console.error(`❌ Failed to send to saddam ${group.title} (${group.group_id}):`, error.description || error);
+                    failCount++;
                 }
+            }
+        }
+
+        // ===== SEND TO DM AGAIN (FOR 'all') =====
+        if (type === 'all') {
+            try {
+                await bot.telegram.sendMessage(botInfo.createdBy, message);
+                console.log(`✅ DM sent to user ${botInfo.createdBy}`);
+                successCount++;
+            } catch (err) {
+                console.error(`❌ Failed DM to user ${botInfo.createdBy}:`, err.description || err);
+                failCount++;
             }
         }
     }
 
     return { successCount, failCount, groupCount: totalGroups };
 }
-
 
 
 
