@@ -88,6 +88,7 @@ bot.action('create_bot', (ctx) => {
 // Save groups to database when bot is added
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
+// Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
     const botInfo = await ctx.telegram.getMe();
     const status = ctx.myChatMember.new_chat_member.status;
@@ -95,33 +96,37 @@ bot.on('my_chat_member', async (ctx) => {
     const chatTitle = ctx.chat.title || 'Unknown';
 
     const db = await database.setupDatabase();
+    
+    // Get the bot_id from the bot's username or ID
+    // This is critical - we need to ensure bot_id is always set
+    const botId = botInfo.id;
 
     if (status === 'member' || status === 'administrator') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
+            { group_id: chatId },
             {
                 $set: {
                     group_id: chatId,
                     title: chatTitle,
                     is_active: true,
-                    bot_id: config.botId,
-                    added_at: new Date()
+                    bot_id: botId,  // Always set the bot_id
+                    added_at: new Date(),
+                    updated_at: new Date()
                 }
             },
             { upsert: true }
         );
-        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId})`);
+        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) with bot_id ${botId}`);
     }
 
     if (status === 'left' || status === 'kicked') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
-            { $set: { is_active: false } }
+            { group_id: chatId, bot_id: botId },  // Include bot_id in the query
+            { $set: { is_active: false, updated_at: new Date() } }
         );
-        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
+        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive for bot_id ${botId}`);
     }
 });
-
 
 
 
@@ -134,13 +139,20 @@ bot.on('left_chat_member', async (ctx) => {
 
     if (leftMemberId === botInfo.id) {
         const db = await ensureDatabaseInitialized('test');
+        const botId = botInfo.id;  // Get the bot's ID
 
         await db.collection('groups').updateOne(
-            { group_id: ctx.chat.id, bot_id: config.botId },
-            { $set: { is_active: false } }
+            { group_id: ctx.chat.id },
+            { 
+                $set: { 
+                    is_active: false,
+                    bot_id: botId,  // Ensure bot_id is set even when marking inactive
+                    updated_at: new Date()
+                } 
+            }
         );
 
-        console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${config.botId}`);
+        console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${botId}`);
     }
 });
 
@@ -725,7 +737,39 @@ async function ensureDatabaseInitialized(databaseName = 'test') {
     return db;
 }
 
+// Function to fix null bot_ids in the database
+async function fixNullBotIds() {
+    try {
+        const db = await database.setupDatabase();
+        
+        // Get all groups with null bot_id
+        const nullBotIdGroups = await db.collection('groups').find({ bot_id: null }).toArray();
+        console.log(`Found ${nullBotIdGroups.length} groups with null bot_id`);
+        
+        if (nullBotIdGroups.length > 0) {
+            // Update them with a default bot_id (you can use your main bot's ID)
+            const result = await db.collection('groups').updateMany(
+                { bot_id: null },
+                { $set: { bot_id: parseInt(BOT_TOKEN.split(':')[0]) } }
+            );
+            
+            console.log(`Updated ${result.modifiedCount} groups with null bot_id`);
+        }
+    } catch (error) {
+        console.error('Error fixing null bot_ids:', error);
+    }
+}
 
+// Call this function during startup
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+    // Load existing bots after server starts
+    loadExistingBots();
+    // Clean up the database
+    cleanupDatabase();
+    // Fix null bot_ids
+    fixNullBotIds();
+});
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
