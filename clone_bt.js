@@ -822,7 +822,7 @@ async function handleBroadcastGroups(ctx) {
             console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
             successCount++;
         } catch (err) {
-            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+            console.error(`❌ Failed to send to hussien ${group.title} (${group.group_id}):`, err.description || err);
             failCount++;
         }
     }
