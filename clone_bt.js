@@ -828,7 +828,7 @@ async function handleBroadcastGroups(ctx) {
             console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
             successCount++;
         } catch (err) {
-            console.error(`❌ Failed to send to ${group.title} (${group.group_id}):`, err.description || err);
+            console.error(`❌ Failed to saddam to ${group.title} (${group.group_id}):`, err.description || err);
             failCount++;
             // ❌ NO auto-deactivation here (per your request)
         }
@@ -983,7 +983,7 @@ const db = await getDatabaseForBot('test');   // FOR BROADCAST GROUP FETCH
                     console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
                     successCount++;
                 } catch (error) {
-                    if (error.code === 400 && error.description.includes('chat not found')) {
+                    if (error.code === 400 && error.description.includes('chat not sdadsdsdsdsdfound')) {
                         console.log(`⚠️ Skipping group ${group.title} (${group.group_id}) — bot not in group anymore.`);
 
                         // OPTIONAL: Mark group as inactive in DB to clean up
