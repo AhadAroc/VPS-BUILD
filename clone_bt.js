@@ -222,11 +222,11 @@ module.exports = {
 const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
 const botFileContent = `
 const { Telegraf, Markup } = require('telegraf');
-const config = require('./${botInfo.id}_config.js');
+
 const token = config.token;
 const mongoose = require('mongoose');
 const { checkAndUpdateActivation } = require('../botUtils');
-
+const config = require('./${botInfo.id}_config.js'); // <== contains botId
 const bot = new Telegraf(token);
 
 // Import protection bot functionalities
@@ -418,18 +418,17 @@ bot.action('check_subscription', async (ctx) => {
         console.error('Error initializing bot:', error);
     }
 }
-// === Keep group activity up to date
 bot.on('new_chat_members', async (ctx) => {
-    await updateGroupActivity(ctx);
+    await updateGroupActivity(ctx, config.botId);  // <== PASS BOT ID !!
 });
 
 bot.on('left_chat_member', async (ctx) => {
-    await updateGroupActivity(ctx);
+    await updateGroupActivity(ctx, config.botId);
 });
 
 bot.command('start', async (ctx) => {
-    await updateGroupActivity(ctx);
-    // your existing /start code here...
+    await updateGroupActivity(ctx, config.botId);
+    // your existing start logic here...
 });
 
 initBot();
