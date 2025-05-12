@@ -793,6 +793,8 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 // Then define these handler functions:
 // Implement broadcast handlers
 async function handleBroadcastGroups(ctx) {
+    const config = require('./config'); // load MAIN BOT config
+
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
@@ -806,10 +808,15 @@ async function handleBroadcastGroups(ctx) {
 
     // Connect to the "test" database
     const db = await connectToMongoDB('test');
-    const groups = await db.collection('groups').find({ is_active: true }).toArray();
+
+    // ✅ Pull only groups where bot_id = this bot's id AND is_active = true
+    const groups = await db.collection('groups').find({ 
+        is_active: true, 
+        bot_id: config.botId 
+    }).toArray();
 
     if (groups.length === 0) {
-        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
+        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bot is added to groups and groups are saved to the database.');
     }
 
     let successCount = 0;
@@ -821,13 +828,20 @@ async function handleBroadcastGroups(ctx) {
             console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
             successCount++;
         } catch (err) {
-            console.error(`❌ Failed to send to hussien ${group.title} (${group.group_id}):`, err.description || err);
+            console.error(`❌ Failed to send to ${group.title} (${group.group_id}):`, err.description || err);
             failCount++;
+            // ❌ NO auto-deactivation here (per your request)
         }
     }
 
-    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
+    ctx.reply(`📢 Broadcast to groups completed.
+
+✅ Successful: ${successCount}
+❌ Failed: ${failCount}
+
+Total Groups: ${groups.length}`);
 }
+
 
 async function handleBroadcastAll(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
