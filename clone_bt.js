@@ -222,11 +222,11 @@ module.exports = {
 const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
 const botFileContent = `
 const { Telegraf, Markup } = require('telegraf');
-
+const config = require('./${botInfo.id}_config.js'); // <== contains botId
 const token = config.token;
 const mongoose = require('mongoose');
 const { checkAndUpdateActivation } = require('../botUtils');
-const config = require('./${botInfo.id}_config.js'); // <== contains botId
+
 const bot = new Telegraf(token);
 
 // Import protection bot functionalities
