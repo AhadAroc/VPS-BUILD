@@ -760,16 +760,7 @@ async function fixNullBotIds() {
     }
 }
 
-// Call this function during startup
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-    // Load existing bots after server starts
-    loadExistingBots();
-    // Clean up the database
-    cleanupDatabase();
-    // Fix null bot_ids
-    fixNullBotIds();
-});
+
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
