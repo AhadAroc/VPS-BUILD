@@ -222,7 +222,7 @@ module.exports = {
 const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
 const botFileContent = `
 const { Telegraf, Markup } = require('telegraf');
-const config = require('./${botInfo.id}_config.js'); // <== contains botId
+const config = require('./${botInfo.id}_config.js');
 const token = config.token;
 const mongoose = require('mongoose');
 const { checkAndUpdateActivation } = require('../botUtils');
@@ -230,7 +230,7 @@ const { checkAndUpdateActivation } = require('../botUtils');
 const bot = new Telegraf(token);
 
 // Import protection bot functionalities
-const { setupCommands,updateGroupActivity } = require('../commands');
+const { setupCommands } = require('../commands');
 const { setupMiddlewares } = require('../middlewares');
 const { setupActions } = require('../actions');
 const database = require('../database');
@@ -418,18 +418,6 @@ bot.action('check_subscription', async (ctx) => {
         console.error('Error initializing bot:', error);
     }
 }
-bot.on('new_chat_members', async (ctx) => {
-    await updateGroupActivity(ctx, config.botId);  // <== PASS BOT ID !!
-});
-
-bot.on('left_chat_member', async (ctx) => {
-    await updateGroupActivity(ctx, config.botId);
-});
-
-bot.command('start', async (ctx) => {
-    await updateGroupActivity(ctx, config.botId);
-    // your existing start logic here...
-});
 
 initBot();
 
@@ -793,8 +781,6 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 // Then define these handler functions:
 // Implement broadcast handlers
 async function handleBroadcastGroups(ctx) {
-    const config = require('./config'); // load MAIN BOT config
-
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
@@ -808,15 +794,10 @@ async function handleBroadcastGroups(ctx) {
 
     // Connect to the "test" database
     const db = await connectToMongoDB('test');
-
-    // ✅ Pull only groups where bot_id = this bot's id AND is_active = true
-    const groups = await db.collection('groups').find({ 
-        is_active: true, 
-        bot_id: config.botId 
-    }).toArray();
+    const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
     if (groups.length === 0) {
-        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bot is added to groups and groups are saved to the database.');
+        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
     }
 
     let successCount = 0;
@@ -828,20 +809,13 @@ async function handleBroadcastGroups(ctx) {
             console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
             successCount++;
         } catch (err) {
-            console.error(`❌ Failed to send to ${group.title} (${group.group_id}):`, err.description || err);
+            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
             failCount++;
-            // ❌ NO auto-deactivation here (per your request)
         }
     }
 
-    ctx.reply(`📢 Broadcast to groups completed.
-
-✅ Successful: ${successCount}
-❌ Failed: ${failCount}
-
-Total Groups: ${groups.length}`);
+    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
 }
-
 
 async function handleBroadcastAll(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
@@ -996,7 +970,7 @@ const db = await getDatabaseForBot('test');   // FOR BROADCAST GROUP FETCH
                         continue;
                     }
 
-                    console.error(`❌ Failed to send to saddam ${group.title} (${group.group_id}):`, error.description || error);
+                    console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, error.description || error);
                     failCount++;
                 }
             }
