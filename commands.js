@@ -126,6 +126,34 @@ async function isVIP(ctx, userId) {
         return false;
     }
 }
+async function updateGroupActivity(ctx) {
+    try {
+        const chatId = ctx.chat.id;
+        const chatTitle = ctx.chat.title || 'Unknown';
+        const config = require('./config'); // Ensure this points to correct botId
+        const botId = config.botId; // 👈 VERY IMPORTANT
+
+        const db = await ensureDatabaseInitialized('test');
+        await db.collection('groups').updateOne(
+            { group_id: chatId, bot_id: botId },
+            {
+                $set: {
+                    group_id: chatId,
+                    title: chatTitle,
+                    is_active: true,
+                    bot_id: botId,
+                    updated_at: new Date()
+                }
+            },
+            { upsert: true }
+        );
+
+        console.log(`🔄 Synced group ${chatTitle} (${chatId}) for bot_id ${botId}`);
+    } catch (error) {
+        console.error('❌ Error in updateGroupActivity:', error);
+    }
+}
+
 
 // Add this middleware function
 async function photoRestrictionMiddleware(ctx, next) {
@@ -2786,5 +2814,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
 
