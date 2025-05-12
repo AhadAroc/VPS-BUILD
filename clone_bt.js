@@ -816,6 +816,7 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 // Then define these handler functions:
 // Implement broadcast handlers
 // Implement broadcast handlers
+// Implement broadcast handlers
 async function handleBroadcastGroups(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
@@ -828,63 +829,64 @@ async function handleBroadcastGroups(ctx) {
 
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
-    // Connect to the "test" database
-    const db = await connectToMongoDB('test');
-    
-    // Get all active groups with their bot_id
-    const groups = await db.collection('groups').find({ is_active: true }).toArray();
-
-    if (groups.length === 0) {
-        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
-    }
-
-    let successCount = 0;
-    let failCount = 0;
-
-    // Group the groups by bot_id
-    const groupsByBot = {};
-    for (const group of groups) {
-        const botId = group.bot_id;
-        if (!groupsByBot[botId]) {
-            groupsByBot[botId] = [];
-        }
-        groupsByBot[botId].push(group);
-    }
-
-    // For each bot, send messages to its groups
-    for (const botId in groupsByBot) {
-        // Get the bot token from activeBots
-        const botInfo = activeBots[botId];
-        if (!botInfo) {
-            console.log(`⚠️ Bot ID ${botId} not found in active bots. Skipping ${groupsByBot[botId].length} groups.`);
-            failCount += groupsByBot[botId].length;
-            continue;
-        }
-
-        // Create a new Telegraf instance with this bot's token
-        const botInstance = new Telegraf(botInfo.token);
+    try {
+        // Connect to the "test" database
+        const db = await connectToMongoDB('test');
         
-        // Send messages to all groups for this bot
-        for (const group of groupsByBot[botId]) {
+        // Get all active groups
+        const groups = await db.collection('groups').find({ is_active: true }).toArray();
+
+        if (groups.length === 0) {
+            return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
+        }
+
+        console.log(`Found ${groups.length} active groups to broadcast to`);
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        // Process each group
+        for (const group of groups) {
             try {
-                await botInstance.telegram.sendMessage(group.group_id, message);
-                console.log(`✅ Message sent to group ${group.title} (${group.group_id}) via bot @${botInfo.username}`);
+                // Get the bot_id from the group or use a default
+                const botId = group.bot_id || parseInt(BOT_TOKEN.split(':')[0]);
+                
+                // Get the bot info from activeBots
+                const botInfo = activeBots[botId];
+                
+                if (!botInfo) {
+                    console.log(`⚠️ Bot ID ${botId} not found in active bots for group ${group.title || 'Unknown'} (${group.group_id})`);
+                    failCount++;
+                    continue;
+                }
+                
+                // Create a temporary bot instance with the correct token
+                const tempBot = new Telegraf(botInfo.token);
+                
+                // Send the message to the group
+                await tempBot.telegram.sendMessage(group.group_id, message);
+                
+                console.log(`✅ Message sent to group ${group.title || 'Unknown'} (${group.group_id}) via bot @${botInfo.username}`);
                 successCount++;
-            } catch (err) {
-                console.error(`❌ Failed to send to group ${group.title} (${group.group_id}) via bot @${botInfo.username}:`, err.description || err);
+                
+                // Stop the temporary bot to free resources
+                tempBot.stop();
+                
+            } catch (error) {
+                console.error(`❌ Failed to send to group ${group.title || 'Unknown'} (${group.group_id}):`, error.description || error);
                 
                 // If the bot can't access the group, mark it as inactive
-                if (err.description && (
-                    err.description.includes('chat not found') || 
-                    err.description.includes('bot was kicked') ||
-                    err.description.includes('bot is not a member')
+                if (error.description && (
+                    error.description.includes('chat not found') || 
+                    error.description.includes('bot was kicked') ||
+                    error.description.includes('bot is not a member')
                 )) {
                     try {
                         await db.collection('groups').updateOne(
                             { group_id: group.group_id },
                             { $set: { is_active: false, updated_at: new Date() } }
                         );
-                        console.log(`🚫 Marked group ${group.title} (${group.group_id}) as inactive`);
+                        console.log(`🚫 Marked group ${group.title || 'Unknown'} (${group.group_id}) as inactive`);
                     } catch (dbErr) {
                         console.error(`Error updating group status:`, dbErr);
                     }
@@ -893,9 +895,14 @@ async function handleBroadcastGroups(ctx) {
                 failCount++;
             }
         }
-    }
 
-    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
+        // Send the final report
+        return ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
+        
+    } catch (error) {
+        console.error('Error in broadcast to groups:', error);
+        return ctx.reply('❌ An error occurred while broadcasting to groups.');
+    }
 }
 
 async function handleBroadcastAll(ctx) {
