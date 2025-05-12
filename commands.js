@@ -126,32 +126,28 @@ async function isVIP(ctx, userId) {
         return false;
     }
 }
-async function updateGroupActivity(ctx) {
-    try {
-        const chatId = ctx.chat.id;
-        const chatTitle = ctx.chat.title || 'Unknown';
-        const config = require('./config'); // Ensure this points to correct botId
-        const botId = config.botId; // 👈 VERY IMPORTANT
+async function updateGroupActivity(ctx, botId) {
+    const chatId = ctx.chat.id;
+    const chatTitle = ctx.chat.title || 'Unknown';
 
-        const db = await ensureDatabaseInitialized('test');
-        await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: botId },
-            {
-                $set: {
-                    group_id: chatId,
-                    title: chatTitle,
-                    is_active: true,
-                    bot_id: botId,
-                    updated_at: new Date()
-                }
-            },
-            { upsert: true }
-        );
+    console.log(`🛠️ [updateGroupActivity] Chat: ${chatTitle} (${chatId}) | botId: ${botId}`);
 
-        console.log(`🔄 Synced group ${chatTitle} (${chatId}) for bot_id ${botId}`);
-    } catch (error) {
-        console.error('❌ Error in updateGroupActivity:', error);
-    }
+    const db = await ensureDatabaseInitialized('test');
+    await db.collection('groups').updateOne(
+        { group_id: chatId, bot_id: botId },
+        {
+            $set: {
+                group_id: chatId,
+                title: chatTitle,
+                is_active: true,
+                bot_id: botId,   // <== MAKE SURE THIS IS NOT NULL!
+                updated_at: new Date()
+            }
+        },
+        { upsert: true }
+    );
+
+    console.log(`✅ Group ${chatTitle} (${chatId}) marked as active for bot ${botId}`);
 }
 
 
