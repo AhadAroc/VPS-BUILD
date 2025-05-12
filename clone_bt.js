@@ -815,6 +815,7 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 // Then define these handler functions:
 // Implement broadcast handlers
+// Implement broadcast handlers
 async function handleBroadcastGroups(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
@@ -829,6 +830,8 @@ async function handleBroadcastGroups(ctx) {
 
     // Connect to the "test" database
     const db = await connectToMongoDB('test');
+    
+    // Get all active groups with their bot_id
     const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
     if (groups.length === 0) {
@@ -838,14 +841,57 @@ async function handleBroadcastGroups(ctx) {
     let successCount = 0;
     let failCount = 0;
 
+    // Group the groups by bot_id
+    const groupsByBot = {};
     for (const group of groups) {
-        try {
-            await ctx.telegram.sendMessage(group.group_id, message);
-            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
-            successCount++;
-        } catch (err) {
-            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
-            failCount++;
+        const botId = group.bot_id;
+        if (!groupsByBot[botId]) {
+            groupsByBot[botId] = [];
+        }
+        groupsByBot[botId].push(group);
+    }
+
+    // For each bot, send messages to its groups
+    for (const botId in groupsByBot) {
+        // Get the bot token from activeBots
+        const botInfo = activeBots[botId];
+        if (!botInfo) {
+            console.log(`⚠️ Bot ID ${botId} not found in active bots. Skipping ${groupsByBot[botId].length} groups.`);
+            failCount += groupsByBot[botId].length;
+            continue;
+        }
+
+        // Create a new Telegraf instance with this bot's token
+        const botInstance = new Telegraf(botInfo.token);
+        
+        // Send messages to all groups for this bot
+        for (const group of groupsByBot[botId]) {
+            try {
+                await botInstance.telegram.sendMessage(group.group_id, message);
+                console.log(`✅ Message sent to group ${group.title} (${group.group_id}) via bot @${botInfo.username}`);
+                successCount++;
+            } catch (err) {
+                console.error(`❌ Failed to send to group ${group.title} (${group.group_id}) via bot @${botInfo.username}:`, err.description || err);
+                
+                // If the bot can't access the group, mark it as inactive
+                if (err.description && (
+                    err.description.includes('chat not found') || 
+                    err.description.includes('bot was kicked') ||
+                    err.description.includes('bot is not a member')
+                )) {
+                    try {
+                        await db.collection('groups').updateOne(
+                            { group_id: group.group_id },
+                            { $set: { is_active: false, updated_at: new Date() } }
+                        );
+                        console.log(`🚫 Marked group ${group.title} (${group.group_id}) as inactive`);
+                    } catch (dbErr) {
+                        console.error(`Error updating group status:`, dbErr);
+                    }
+                }
+                
+                failCount++;
+            }
         }
     }
 
