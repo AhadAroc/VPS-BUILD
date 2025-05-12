@@ -806,11 +806,20 @@ async function handleBroadcastGroups(ctx) {
 
     for (const group of groups) {
         try {
+            // Check if bot can access group BEFORE sending
+            await ctx.telegram.getChat(group.group_id);
+
             await ctx.telegram.sendMessage(group.group_id, message);
             console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
             successCount++;
         } catch (err) {
             console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+
+            // Additional logging for "chat not found" error
+            if (err.code === 400 && err.description.includes('chat not found')) {
+                console.log(`⚠️ Group ${group.title} (${group.group_id}) might have been removed or the bot is not in the group anymore.`);
+            }
+
             failCount++;
         }
     }
