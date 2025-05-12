@@ -230,7 +230,7 @@ const { checkAndUpdateActivation } = require('../botUtils');
 const bot = new Telegraf(token);
 
 // Import protection bot functionalities
-const { setupCommands } = require('../commands');
+const { setupCommands,updateGroupActivity } = require('../commands');
 const { setupMiddlewares } = require('../middlewares');
 const { setupActions } = require('../actions');
 const database = require('../database');
@@ -418,6 +418,19 @@ bot.action('check_subscription', async (ctx) => {
         console.error('Error initializing bot:', error);
     }
 }
+// === Keep group activity up to date
+bot.on('new_chat_members', async (ctx) => {
+    await updateGroupActivity(ctx);
+});
+
+bot.on('left_chat_member', async (ctx) => {
+    await updateGroupActivity(ctx);
+});
+
+bot.command('start', async (ctx) => {
+    await updateGroupActivity(ctx);
+    // your existing /start code here...
+});
 
 initBot();
 
