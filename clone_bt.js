@@ -88,7 +88,6 @@ bot.action('create_bot', (ctx) => {
 // Save groups to database when bot is added
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
-// Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
     const botInfo = await ctx.telegram.getMe();
     const status = ctx.myChatMember.new_chat_member.status;
@@ -96,37 +95,33 @@ bot.on('my_chat_member', async (ctx) => {
     const chatTitle = ctx.chat.title || 'Unknown';
 
     const db = await database.setupDatabase();
-    
-    // Get the bot_id from the bot's username or ID
-    // This is critical - we need to ensure bot_id is always set
-    const botId = botInfo.id;
 
     if (status === 'member' || status === 'administrator') {
         await db.collection('groups').updateOne(
-            { group_id: chatId },
+            { group_id: chatId, bot_id: config.botId },
             {
                 $set: {
                     group_id: chatId,
                     title: chatTitle,
                     is_active: true,
-                    bot_id: botId,  // Always set the bot_id
-                    added_at: new Date(),
-                    updated_at: new Date()
+                    bot_id: config.botId,
+                    added_at: new Date()
                 }
             },
             { upsert: true }
         );
-        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) with bot_id ${botId}`);
+        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId})`);
     }
 
     if (status === 'left' || status === 'kicked') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: botId },  // Include bot_id in the query
-            { $set: { is_active: false, updated_at: new Date() } }
+            { group_id: chatId, bot_id: config.botId },
+            { $set: { is_active: false } }
         );
-        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive for bot_id ${botId}`);
+        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
+
 
 
 
@@ -139,20 +134,13 @@ bot.on('left_chat_member', async (ctx) => {
 
     if (leftMemberId === botInfo.id) {
         const db = await ensureDatabaseInitialized('test');
-        const botId = botInfo.id;  // Get the bot's ID
 
         await db.collection('groups').updateOne(
-            { group_id: ctx.chat.id },
-            { 
-                $set: { 
-                    is_active: false,
-                    bot_id: botId,  // Ensure bot_id is set even when marking inactive
-                    updated_at: new Date()
-                } 
-            }
+            { group_id: ctx.chat.id, bot_id: config.botId },
+            { $set: { is_active: false } }
         );
 
-        console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${botId}`);
+        console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${config.botId}`);
     }
 });
 
@@ -737,29 +725,6 @@ async function ensureDatabaseInitialized(databaseName = 'test') {
     return db;
 }
 
-// Function to fix null bot_ids in the database
-async function fixNullBotIds() {
-    try {
-        const db = await database.setupDatabase();
-        
-        // Get all groups with null bot_id
-        const nullBotIdGroups = await db.collection('groups').find({ bot_id: null }).toArray();
-        console.log(`Found ${nullBotIdGroups.length} groups with null bot_id`);
-        
-        if (nullBotIdGroups.length > 0) {
-            // Update them with a default bot_id (you can use your main bot's ID)
-            const result = await db.collection('groups').updateMany(
-                { bot_id: null },
-                { $set: { bot_id: parseInt(BOT_TOKEN.split(':')[0]) } }
-            );
-            
-            console.log(`Updated ${result.modifiedCount} groups with null bot_id`);
-        }
-    } catch (error) {
-        console.error('Error fixing null bot_ids:', error);
-    }
-}
-
 
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
@@ -815,8 +780,6 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 
 // Then define these handler functions:
 // Implement broadcast handlers
-// Implement broadcast handlers
-// Implement broadcast handlers
 async function handleBroadcastGroups(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
@@ -829,90 +792,30 @@ async function handleBroadcastGroups(ctx) {
 
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
-    try {
-        // Connect to the "test" database
-        const db = await connectToMongoDB('test');
+    // Connect to the "test" database
+    const db = await connectToMongoDB('test');
+    const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
-        // Get all active groups
-        const allGroups = await db.collection('groups').find({ is_active: true }).toArray();
-
-        // ✅ Filter ONLY real groups (group_id < 0)
-        const groups = allGroups.filter(group => group.group_id < 0);
-
-        if (groups.length === 0) {
-            return ctx.reply('⚠️ No valid groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
-        }
-
-        console.log(`Found ${groups.length} valid active groups to broadcast to`);
-
-        let successCount = 0;
-        let failCount = 0;
-
-        // Process each group
-        for (const group of groups) {
-            try {
-                // Get the bot_id from the group or use a default
-                const botId = group.bot_id || parseInt(BOT_TOKEN.split(':')[0]);
-
-                // Get the bot info from activeBots
-                const botInfo = activeBots[botId];
-
-                if (!botInfo) {
-                    console.log(`⚠️ Bot ID ${botId} not found in active bots for group ${group.title || 'Unknown'} (${group.group_id})`);
-                    failCount++;
-                    continue;
-                }
-
-                // Create a temporary bot instance with the correct token
-                const tempBot = new Telegraf(botInfo.token);
-
-                // Send the message to the group
-                await tempBot.telegram.sendMessage(group.group_id, message);
-
-                console.log(`✅ Message sent to group ${group.title || 'Unknown'} (${group.group_id}) via bot @${botInfo.username}`);
-                successCount++;
-
-                // Stop the temporary bot to free resources
-                tempBot.stop();
-
-            } catch (error) {
-                console.error(`❌ Failed to send to group ${group.title || 'Unknown'} (${group.group_id}):`, error.description || error);
-
-                // If the bot can't access the group, mark it as inactive
-                if (error.description && (
-                    error.description.includes('chat not found') ||
-                    error.description.includes('bot was kicked') ||
-                    error.description.includes('bot is not a member')
-                )) {
-                    try {
-                        await db.collection('groups').updateOne(
-                            { group_id: group.group_id },
-                            { $set: { is_active: false, updated_at: new Date() } }
-                        );
-                        console.log(`🚫 Marked group ${group.title || 'Unknown'} (${group.group_id}) as inactive`);
-                    } catch (dbErr) {
-                        console.error(`Error updating group status:`, dbErr);
-                    }
-                }
-
-                failCount++;
-            }
-        }
-
-        // Send the final report
-        return ctx.reply(`📢 Broadcast to groups completed.
-
-✅ Successful: ${successCount}
-❌ Failed: ${failCount}
-
-Total Groups: ${groups.length}`);
-
-    } catch (error) {
-        console.error('Error in broadcast to groups:', error);
-        return ctx.reply('❌ An error occurred while broadcasting to groups.');
+    if (groups.length === 0) {
+        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
     }
-}
 
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const group of groups) {
+        try {
+            await ctx.telegram.sendMessage(group.group_id, message);
+            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
+            successCount++;
+        } catch (err) {
+            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+            failCount++;
+        }
+    }
+
+    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
+}
 
 async function handleBroadcastAll(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
