@@ -793,6 +793,8 @@ const { createClonedDatabase, connectToMongoDB } = require('./database');
 // Then define these handler functions:
 // Implement broadcast handlers
 async function handleBroadcastGroups(ctx) {
+    const config = require('./config'); // load MAIN BOT config
+
     if (ctx.from.id !== ADMIN_ID) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
@@ -802,55 +804,42 @@ async function handleBroadcastGroups(ctx) {
         return ctx.reply('❌ Please provide a message to broadcast.\nUsage: /broadcast_groups <your message>');
     }
 
-    await ctx.reply('⏳ Broadcasting to ALL bot groups... please wait.');
+    await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
+    // Connect to the "test" database
     const db = await connectToMongoDB('test');
 
-    let totalSuccess = 0;
-    let totalFail = 0;
-    let totalGroups = 0;
+    // ✅ Pull only groups where bot_id = this bot's id AND is_active = true
+    const groups = await db.collection('groups').find({ 
+        is_active: true, 
+        bot_id: config.botId 
+    }).toArray();
 
-    for (const botId in activeBots) {
-        const botInfo = activeBots[botId];
-        const bot = new Telegraf(botInfo.token);
-
-        // Fetch groups only for THIS bot
-        const groups = await db.collection('groups').find({ 
-            is_active: true, 
-            bot_id: parseInt(botId, 10)   // make sure botId is number
-        }).toArray();
-
-        console.log(`🤖 Bot @${botInfo.username} (${botId}) has ${groups.length} active groups`);
-        totalGroups += groups.length;
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const group of groups) {
-            try {
-                await bot.telegram.sendMessage(group.group_id, message);
-                console.log(`✅ [@${botInfo.username}] Sent to ${group.title} (${group.group_id})`);
-                successCount++;
-            } catch (err) {
-                console.error(`❌ [@${botInfo.username}] Failed to send to ${group.title} (${group.group_id}):`, err.description || err);
-                failCount++;
-                // ❌ NO auto-deactivation (per your request)
-            }
-        }
-
-        await bot.stop();  // Clean up Telegraf instance
-
-        totalSuccess += successCount;
-        totalFail += failCount;
+    if (groups.length === 0) {
+        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bot is added to groups and groups are saved to the database.');
     }
 
-    ctx.reply(`📢 Universal broadcast completed.
+    let successCount = 0;
+    let failCount = 0;
 
-✅ Successful sends: ${totalSuccess}
-❌ Failed sends: ${totalFail}
+    for (const group of groups) {
+        try {
+            await ctx.telegram.sendMessage(group.group_id, message);
+            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
+            successCount++;
+        } catch (err) {
+            console.error(`❌ Failed to saddam to ${group.title} (${group.group_id}):`, err.description || err);
+            failCount++;
+            // ❌ NO auto-deactivation here (per your request)
+        }
+    }
 
-🗂️ Total groups scanned: ${totalGroups}
-🤖 Total bots used: ${Object.keys(activeBots).length}`);
+    ctx.reply(`📢 Broadcast to groups completed.
+
+✅ Successful: ${successCount}
+❌ Failed: ${failCount}
+
+Total Groups: ${groups.length}`);
 }
 
 
