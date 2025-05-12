@@ -832,16 +832,19 @@ async function handleBroadcastGroups(ctx) {
     try {
         // Connect to the "test" database
         const db = await connectToMongoDB('test');
-        
+
         // Get all active groups
-        const groups = await db.collection('groups').find({ is_active: true }).toArray();
+        const allGroups = await db.collection('groups').find({ is_active: true }).toArray();
+
+        // ✅ Filter ONLY real groups (group_id < 0)
+        const groups = allGroups.filter(group => group.group_id < 0);
 
         if (groups.length === 0) {
-            return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
+            return ctx.reply('⚠️ No valid groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
         }
 
-        console.log(`Found ${groups.length} active groups to broadcast to`);
-        
+        console.log(`Found ${groups.length} valid active groups to broadcast to`);
+
         let successCount = 0;
         let failCount = 0;
 
@@ -850,34 +853,34 @@ async function handleBroadcastGroups(ctx) {
             try {
                 // Get the bot_id from the group or use a default
                 const botId = group.bot_id || parseInt(BOT_TOKEN.split(':')[0]);
-                
+
                 // Get the bot info from activeBots
                 const botInfo = activeBots[botId];
-                
+
                 if (!botInfo) {
                     console.log(`⚠️ Bot ID ${botId} not found in active bots for group ${group.title || 'Unknown'} (${group.group_id})`);
                     failCount++;
                     continue;
                 }
-                
+
                 // Create a temporary bot instance with the correct token
                 const tempBot = new Telegraf(botInfo.token);
-                
+
                 // Send the message to the group
                 await tempBot.telegram.sendMessage(group.group_id, message);
-                
+
                 console.log(`✅ Message sent to group ${group.title || 'Unknown'} (${group.group_id}) via bot @${botInfo.username}`);
                 successCount++;
-                
+
                 // Stop the temporary bot to free resources
                 tempBot.stop();
-                
+
             } catch (error) {
                 console.error(`❌ Failed to send to group ${group.title || 'Unknown'} (${group.group_id}):`, error.description || error);
-                
+
                 // If the bot can't access the group, mark it as inactive
                 if (error.description && (
-                    error.description.includes('chat not found') || 
+                    error.description.includes('chat not found') ||
                     error.description.includes('bot was kicked') ||
                     error.description.includes('bot is not a member')
                 )) {
@@ -891,19 +894,25 @@ async function handleBroadcastGroups(ctx) {
                         console.error(`Error updating group status:`, dbErr);
                     }
                 }
-                
+
                 failCount++;
             }
         }
 
         // Send the final report
-        return ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
-        
+        return ctx.reply(`📢 Broadcast to groups completed.
+
+✅ Successful: ${successCount}
+❌ Failed: ${failCount}
+
+Total Groups: ${groups.length}`);
+
     } catch (error) {
         console.error('Error in broadcast to groups:', error);
         return ctx.reply('❌ An error occurred while broadcasting to groups.');
     }
 }
+
 
 async function handleBroadcastAll(ctx) {
     if (ctx.from.id !== ADMIN_ID) {
