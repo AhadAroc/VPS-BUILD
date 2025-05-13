@@ -484,6 +484,22 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         console.error('❌ خطأ أثناء التحقق أو التنصيب:', error);
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
+    try {
+    const db = await connectToMongoDB('test');
+    await db.collection('groups').insertOne({
+        bot_name: botInfo.first_name,
+        bot_id: botInfo.id,
+        bot_username: botInfo.username,
+        bot_token: token,
+        expiry_date: expiryDate,
+        added_at: new Date(),
+        is_active: true
+    });
+    console.log(`✅ Bot ${botInfo.username} saved to DB.`);
+} catch (err) {
+    console.error('❌ Failed to save bot to DB:', err);
+}
+
 });
 // At the top of your file, after initializing the bot
 bot.command('broadcast_dm', handleBroadcastDM);
