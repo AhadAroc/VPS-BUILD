@@ -89,24 +89,23 @@ bot.action('create_bot', (ctx) => {
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
-    let botId = config.botId;
-    let botUsername = config.botUsername;
+    let botId, botUsername;
 
-    // Fallback to Telegram API if config is missing
+    // First, try to get bot info from the context
+    if (ctx.me) {
+        botId = ctx.me.id;
+        botUsername = ctx.me.username;
+    }
+
+    // If not available in context, fallback to Telegram API
     if (!botId || !botUsername) {
         try {
             const botInfo = await ctx.telegram.getMe();
             botId = botInfo.id;
             botUsername = botInfo.username;
-
-            // Update config with the fetched botId and botUsername
-            config.botId = botId;
-            config.botUsername = botUsername;
-
-            console.warn(`⚠️ config.js is missing botId or username. Fallback used: bot_id = ${botId}, @${botUsername}`);
         } catch (err) {
             console.error('❌ Failed to get bot info via getMe():', err);
-            return; // Abort if both config and getMe fail
+            return; // abort if we can't get bot info
         }
     }
 
@@ -116,9 +115,7 @@ bot.on('my_chat_member', async (ctx) => {
 
     const db = await database.setupDatabase();
 
-    // Only act on group joins/leaves
     if (status === 'member' || status === 'administrator') {
-        // Update or insert the group document
         await db.collection('groups').updateOne(
             { group_id: chatId },
             {
@@ -127,7 +124,7 @@ bot.on('my_chat_member', async (ctx) => {
                     title: chatTitle,
                     is_active: true,
                     bot_id: botId,
-                    bot_username: botUsername, // optional for easier lookup
+                    bot_username: botUsername,
                     updated_at: new Date()
                 },
                 $setOnInsert: { added_at: new Date() }
@@ -138,7 +135,6 @@ bot.on('my_chat_member', async (ctx) => {
     }
 
     if (status === 'left' || status === 'kicked') {
-        // Mark the group as inactive if the bot leaves or gets kicked
         await db.collection('groups').updateOne(
             { group_id: chatId },
             { $set: { is_active: false, updated_at: new Date() } }
@@ -146,7 +142,6 @@ bot.on('my_chat_member', async (ctx) => {
         console.log(`🚪 [@${botUsername}] Left or kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
-
 
 
 
