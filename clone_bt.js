@@ -496,8 +496,23 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         is_active: true
     });
     console.log(`✅ Bot ${botInfo.username} saved to DB.`);
+
+    // Only send the success message if the database operation succeeds
+    ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
+
+- اسم البوت: ${botInfo.first_name}
+- ايدي البوت: ${botInfo.id}
+- معرف البوت: @${botInfo.username}
+- توكن البوت: <code>${token}</code>
+
+~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
+- يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
+        parse_mode: 'HTML',
+        disable_web_page_preview: true 
+    });
 } catch (err) {
     console.error('❌ Failed to save bot to DB:', err);
+    ctx.reply('❌ حدث خطأ أثناء حفظ معلومات البوت. يرجى المحاولة مرة أخرى لاحقًا.');
 }
 
 });
