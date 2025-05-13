@@ -96,17 +96,46 @@ bot.on('my_chat_member', async (ctx) => {
 
     const db = await database.setupDatabase();
 
+    // 🔁 Step 1: Fix all null bot_id entries for this bot
+    try {
+        const botEntry = await db.collection('groups').findOne({
+            bot_id: botInfo.id,
+            type: 'bot_info'
+        });
+
+        if (botEntry) {
+            const updateResult = await db.collection('groups').updateMany(
+                { bot_id: null },
+                {
+                    $set: {
+                        bot_id: botEntry.bot_id,
+                        bot_name: botEntry.bot_name,
+                        bot_username: botEntry.bot_username,
+                        bot_token: botEntry.bot_token
+                    }
+                }
+            );
+            console.log(`🔧 Fixed ${updateResult.modifiedCount} group(s) with missing bot_id.`);
+        } else {
+            console.warn(`⚠️ No bot_info found for bot_id ${botInfo.id}`);
+        }
+    } catch (err) {
+        console.error('❌ Failed to fix null bot_id entries:', err);
+    }
+
+    // ✅ Step 2: Save current group state
     if (status === 'member' || status === 'administrator') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
+            { group_id: chatId },
             {
                 $set: {
                     group_id: chatId,
                     title: chatTitle,
                     is_active: true,
-                    bot_id: config.botId,
-                    added_at: new Date()
-                }
+                    bot_id: botInfo.id,
+                    updated_at: new Date()
+                },
+                $setOnInsert: { added_at: new Date() }
             },
             { upsert: true }
         );
@@ -115,12 +144,13 @@ bot.on('my_chat_member', async (ctx) => {
 
     if (status === 'left' || status === 'kicked') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: config.botId },
-            { $set: { is_active: false } }
+            { group_id: chatId },
+            { $set: { is_active: false, updated_at: new Date() } }
         );
         console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
+
 
 
 
