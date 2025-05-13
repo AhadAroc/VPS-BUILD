@@ -89,15 +89,8 @@ bot.action('create_bot', (ctx) => {
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
-    
-let botId, botUsername;
-try {
-  const { botId: id, botUsername: username } = require('./config.js');
-  botId = id;
-  botUsername = username;
-} catch (err) {
-  console.error('❌ Failed to load bot_config.js:', err);
-}
+    let botId = config.botId;
+    let botUsername = config.botUsername;
 
     // Fallback to Telegram API if config is missing
     if (!botId || !botUsername) {
@@ -228,24 +221,7 @@ bot.on('text', async (ctx) => {
         const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
         if (response.data && response.data.ok) {
             const botInfo = response.data.result;
-           // Save to reusable bot config
-const sharedBotConfigPath = path.join(__dirname, 'config', 'bot_config.js');
-
-const sharedBotConfigContent = `
-module.exports = {
-    botId: ${botInfo.id},
-    botUsername: '${botInfo.username}',
-    botName: '${botInfo.first_name}',
-    token: '${token}',
-    expiryDate: '${expiryDate.toISOString()}',
-    createdAt: '${now.toISOString()}',
-    createdBy: ${ctx.from.id}
-};
-`;
-
-fs.writeFileSync(sharedBotConfigPath, sharedBotConfigContent);
-console.log(`✅ Saved bot config to ${sharedBotConfigPath}`);
- 
+            
             // Calculate expiry date
             const now = new Date();
             const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
@@ -774,7 +750,49 @@ async function ensureDatabaseInitialized(databaseName = 'test') {
     return db;
 }
 
+async function fixNullBotIds() {
+  const db = await connectToMongoDB('test');
+  const groups = await db.collection('groups').find({ bot_id: null }).toArray();
 
+  if (groups.length === 0) return console.log('✅ No null bot_id entries found.');
+
+  const configFiles = fs.readdirSync(botsDir).filter(f => f.endsWith('_config.js'));
+
+  for (const group of groups) {
+    let fixed = false;
+
+    for (const file of configFiles) {
+      const configPath = path.join(botsDir, file);
+      const config = require(configPath);
+      const tempBot = new Telegraf(config.token);
+
+      try {
+        const chatMember = await tempBot.telegram.getChatMember(group.group_id, config.botId);
+
+        // If the bot is in the group, update it
+        if (['member', 'administrator', 'creator'].includes(chatMember.status)) {
+          await db.collection('groups').updateOne(
+            { group_id: group.group_id },
+            { $set: { bot_id: config.botId, bot_username: config.botUsername } }
+          );
+          console.log(`✅ Updated group ${group.group_id} with bot ${config.botUsername}`);
+          fixed = true;
+          break;
+        }
+      } catch (err) {
+        // silently fail if the bot isn't in that group
+      } finally {
+        tempBot.stop();
+      }
+    }
+
+    if (!fixed) {
+      console.warn(`⚠️ Could not find matching bot for group ${group.group_id}`);
+    }
+  }
+}
+
+fixNullBotIds();
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
