@@ -854,12 +854,10 @@ async function handleBroadcastGroups(ctx) {
 
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
-    // Connect to the "test" database
     const db = await connectToMongoDB('test');
     const groups = await db.collection('groups').find({ is_active: true }).toArray();
-
     if (groups.length === 0) {
-        return ctx.reply('⚠️ No groups found to broadcast to.\nEnsure the bots are added to groups and groups are saved to the database.');
+        return ctx.reply('⚠️ No groups found to broadcast to.');
     }
 
     let successCount = 0;
@@ -867,16 +865,36 @@ async function handleBroadcastGroups(ctx) {
 
     for (const group of groups) {
         try {
-            await ctx.telegram.sendMessage(group.group_id, message);
-            console.log(`✅ Message sent to group ${group.title} (${group.group_id})`);
+            let botId = group.bot_id;
+
+            // 🧠 Fallback if bot_id is null or invalid
+            if (!botId || isNaN(botId)) {
+                const fallbackBot = await db.collection('groups').findOne({ type: 'bot_info', is_active: true });
+                if (fallbackBot) {
+                    botId = fallbackBot.bot_id;
+                    group.bot_token = fallbackBot.bot_token;
+                    group.bot_username = fallbackBot.bot_username;
+                } else {
+                    console.warn(`⚠️ No fallback bot found for group ${group.group_id}`);
+                    failCount++;
+                    continue;
+                }
+            }
+
+            const Telegraf = require('telegraf').Telegraf;
+            const tempBot = new Telegraf(group.bot_token);
+
+            await tempBot.telegram.sendMessage(group.group_id, message);
+            console.log(`✅ Message sent to ${group.title} (${group.group_id}) via @${group.bot_username}`);
+            tempBot.stop();
             successCount++;
         } catch (err) {
-            console.error(`❌ Failed to send to group ${group.title} (${group.group_id}):`, err.description || err);
+            console.error(`❌ Failed to send to ${group.title || 'Unknown'} (${group.group_id}):`, err.description || err);
             failCount++;
         }
     }
 
-    ctx.reply(`📢 Broadcast to groups completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Groups: ${groups.length}`);
+    ctx.reply(`📢 Broadcast completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n📊 Total Groups: ${groups.length}`);
 }
 
 async function handleBroadcastAll(ctx) {
