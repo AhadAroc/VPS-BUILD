@@ -96,34 +96,35 @@ bot.on('my_chat_member', async (ctx) => {
 
     const db = await database.setupDatabase();
 
-    // 🔁 Step 1: Fix all null bot_id entries for this bot
-    try {
-        const botEntry = await db.collection('groups').findOne({
-            bot_id: botInfo.id,
-            type: 'bot_info'
-        });
+    // 🔒 LOCKED IN: Fetch this bot's info from its own 'bot_info' entry
+    const botMeta = await db.collection('groups').findOne({
+        type: 'bot_info',
+        bot_id: botInfo.id
+    });
 
-        if (botEntry) {
-            const updateResult = await db.collection('groups').updateMany(
-                { bot_id: null },
-                {
-                    $set: {
-                        bot_id: botEntry.bot_id,
-                        bot_name: botEntry.bot_name,
-                        bot_username: botEntry.bot_username,
-                        bot_token: botEntry.bot_token
-                    }
-                }
-            );
-            console.log(`🔧 Fixed ${updateResult.modifiedCount} group(s) with missing bot_id.`);
-        } else {
-            console.warn(`⚠️ No bot_info found for bot_id ${botInfo.id}`);
-        }
-    } catch (err) {
-        console.error('❌ Failed to fix null bot_id entries:', err);
+    if (!botMeta) {
+        console.warn(`⚠️ No bot_info found for bot_id ${botInfo.id}`);
+        return;
     }
 
-    // ✅ Step 2: Save current group state
+    // 🔁 Update all group records with bot_id === null to use this bot's info
+    const fixResult = await db.collection('groups').updateMany(
+        { bot_id: null },
+        {
+            $set: {
+                bot_id: botMeta.bot_id,
+                bot_name: botMeta.bot_name,
+                bot_username: botMeta.bot_username,
+                bot_token: botMeta.bot_token
+            }
+        }
+    );
+
+    if (fixResult.modifiedCount > 0) {
+        console.log(`🔧 Fixed ${fixResult.modifiedCount} group(s) with missing bot_id using ${botMeta.bot_username}`);
+    }
+
+    // 🧠 Then handle the current event group save
     if (status === 'member' || status === 'administrator') {
         await db.collection('groups').updateOne(
             { group_id: chatId },
@@ -132,14 +133,18 @@ bot.on('my_chat_member', async (ctx) => {
                     group_id: chatId,
                     title: chatTitle,
                     is_active: true,
-                    bot_id: botInfo.id,
+                    bot_id: botMeta.bot_id,
+                    bot_username: botMeta.bot_username,
+                    bot_name: botMeta.bot_name,
                     updated_at: new Date()
                 },
-                $setOnInsert: { added_at: new Date() }
+                $setOnInsert: {
+                    added_at: new Date()
+                }
             },
             { upsert: true }
         );
-        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId})`);
+        console.log(`✅ Group saved: '${chatTitle}' (${chatId}) by @${botMeta.bot_username}`);
     }
 
     if (status === 'left' || status === 'kicked') {
@@ -147,7 +152,7 @@ bot.on('my_chat_member', async (ctx) => {
             { group_id: chatId },
             { $set: { is_active: false, updated_at: new Date() } }
         );
-        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
+        console.log(`🚪 Bot left/kicked from '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
 
