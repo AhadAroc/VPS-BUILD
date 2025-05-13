@@ -88,28 +88,9 @@ bot.action('create_bot', (ctx) => {
 // Save groups to database when bot is added
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
+
 bot.on('my_chat_member', async (ctx) => {
-    let botId = config.botId;
-    let botUsername = config.botUsername;
-
-    // Fallback to Telegram API if config is missing
-    if (!botId || !botUsername) {
-        try {
-            const botInfo = await ctx.telegram.getMe();
-            botId = botInfo.id;
-            botUsername = botInfo.username;
-
-            // Optional: Cache it to config.js or a temp global variable
-            config.botId = botId;
-            config.botUsername = botUsername;
-
-            console.warn(`⚠️ config.js is missing botId or username. Fallback used: bot_id = ${botId}, @${botUsername}`);
-        } catch (err) {
-            console.error('❌ Failed to get bot info via getMe():', err);
-            return; // abort if both config and getMe fail
-        }
-    }
-
+    const botInfo = await ctx.telegram.getMe();
     const status = ctx.myChatMember.new_chat_member.status;
     const chatId = ctx.chat.id;
     const chatTitle = ctx.chat.title || 'Unknown';
@@ -118,33 +99,29 @@ bot.on('my_chat_member', async (ctx) => {
 
     if (status === 'member' || status === 'administrator') {
         await db.collection('groups').updateOne(
-            { group_id: chatId },
+            { group_id: chatId, bot_id: config.botId },
             {
                 $set: {
                     group_id: chatId,
                     title: chatTitle,
                     is_active: true,
-                    bot_id: botId,
-                    bot_username: botUsername,
-                    updated_at: new Date()
-                },
-                $setOnInsert: { added_at: new Date() }
+                    bot_id: config.botId,
+                    added_at: new Date()
+                }
             },
             { upsert: true }
         );
-        console.log(`✅ [@${botUsername}] Saved group '${chatTitle}' (${chatId})`);
+        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId})`);
     }
 
     if (status === 'left' || status === 'kicked') {
         await db.collection('groups').updateOne(
-            { group_id: chatId },
-            { $set: { is_active: false, updated_at: new Date() } }
+            { group_id: chatId, bot_id: config.botId },
+            { $set: { is_active: false } }
         );
-        console.log(`🚪 [@${botUsername}] Left or kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
+        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
-
-
 
 
 
@@ -750,49 +727,7 @@ async function ensureDatabaseInitialized(databaseName = 'test') {
     return db;
 }
 
-async function fixNullBotIds() {
-  const db = await connectToMongoDB('test');
-  const groups = await db.collection('groups').find({ bot_id: null }).toArray();
 
-  if (groups.length === 0) return console.log('✅ No null bot_id entries found.');
-
-  const configFiles = fs.readdirSync(botsDir).filter(f => f.endsWith('_config.js'));
-
-  for (const group of groups) {
-    let fixed = false;
-
-    for (const file of configFiles) {
-      const configPath = path.join(botsDir, file);
-      const config = require(configPath);
-      const tempBot = new Telegraf(config.token);
-
-      try {
-        const chatMember = await tempBot.telegram.getChatMember(group.group_id, config.botId);
-
-        // If the bot is in the group, update it
-        if (['member', 'administrator', 'creator'].includes(chatMember.status)) {
-          await db.collection('groups').updateOne(
-            { group_id: group.group_id },
-            { $set: { bot_id: config.botId, bot_username: config.botUsername } }
-          );
-          console.log(`✅ Updated group ${group.group_id} with bot ${config.botUsername}`);
-          fixed = true;
-          break;
-        }
-      } catch (err) {
-        // silently fail if the bot isn't in that group
-      } finally {
-        tempBot.stop();
-      }
-    }
-
-    if (!fixed) {
-      console.warn(`⚠️ Could not find matching bot for group ${group.group_id}`);
-    }
-  }
-}
-
-fixNullBotIds();
 async function checkAndUpdateActivation(cloneId, userId) {
     const clone = await Clone.findOne({ token: cloneId });
     
