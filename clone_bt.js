@@ -88,39 +88,55 @@ bot.action('create_bot', (ctx) => {
 // Save groups to database when bot is added
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
-// Save groups when forked bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
-    const botInfo = await ctx.telegram.getMe();
+    let botId = config.botId;
+    let botUsername = config.botUsername;
+
+    // Fallback to Telegram API if config is missing
+    if (!botId || !botUsername) {
+        try {
+            const botInfo = await ctx.telegram.getMe();
+            botId = botInfo.id;
+            botUsername = botInfo.username;
+            console.warn(`⚠️ config.js is missing botId or username. Fallback used: bot_id = ${botId}, @${botUsername}`);
+        } catch (err) {
+            console.error('❌ Failed to get bot info via getMe():', err);
+            return; // abort if both config and getMe fail
+        }
+    }
+
     const status = ctx.myChatMember.new_chat_member.status;
     const chatId = ctx.chat.id;
     const chatTitle = ctx.chat.title || 'Unknown';
 
+    // Only act on group joins/leaves
     const db = await database.setupDatabase();
 
     if (status === 'member' || status === 'administrator') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: botInfo.id },
+            { group_id: chatId, bot_id: botId },
             {
                 $set: {
                     group_id: chatId,
                     title: chatTitle,
                     is_active: true,
-                    bot_id: botInfo.id, //this should be upadted with the actual bot id fetched from bot info so it doesn't return null or maybe instead of this we just implment whenever a bot is
-                    //forked we will save the bot id and feed it to the broadcast to groups function addtionaly this is helpful for getting the general groups but the not the bot id 
-                    added_at: new Date()
-                }
+                    bot_id: botId,
+                    bot_username: botUsername, // optional for easier lookup
+                    updated_at: new Date()
+                },
+                $setOnInsert: { added_at: new Date() }
             },
             { upsert: true }
         );
-        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId})`);
+        console.log(`✅ [@${botUsername}] Saved group '${chatTitle}' (${chatId})`);
     }
 
     if (status === 'left' || status === 'kicked') {
         await db.collection('groups').updateOne(
-            { group_id: chatId, bot_id: botInfo.id },
-            { $set: { is_active: false } }
+            { group_id: chatId, bot_id: botId },
+            { $set: { is_active: false, updated_at: new Date() } }
         );
-        console.log(`🚪 [@${botInfo.username}] Left/kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
+        console.log(`🚪 [@${botUsername}] Left or kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
 
