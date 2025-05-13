@@ -486,6 +486,7 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
     }
     try {
     const db = await connectToMongoDB('test');
+      const botInfo = response.data.result;
     const result = await db.collection('groups').insertOne({
         bot_name: botInfo.first_name,
         bot_id: botInfo.id,
