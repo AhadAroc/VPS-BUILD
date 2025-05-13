@@ -457,11 +457,13 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
                         createdBy: ctx.from.id
                     };
 
-                    // Store user deployment
                     userDeployments.set(userId, botInfo.id);
 
                     // Create database entry
                     createCloneDbEntry(botInfo.id, token, expiryDate);
+                    
+                    // Store bot information in groups collection
+                    storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
 
                     ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
@@ -484,39 +486,7 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         console.error('❌ خطأ أثناء التحقق أو التنصيب:', error);
         ctx.reply('❌ حدث خطأ أثناء التحقق من التوكن أو تنصيب البوت.');
     }
-    try {
-    const db = await connectToMongoDB('test');
-      const botInfo = response.data.result;
-    const result = await db.collection('groups').insertOne({
-        bot_name: botInfo.first_name,
-        bot_id: botInfo.id,
-        bot_username: botInfo.username,
-        bot_token: token,
-        expiry_date: expiryDate,
-        added_at: new Date(),
-        is_active: true
-    });
-
-    console.log(`✅ Bot ${botInfo.username} saved to DB with ID: ${result.insertedId}`);
-
-    // Send the success message to the user
-    ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
-
-- اسم البوت: ${botInfo.first_name}
-- ايدي البوت: ${botInfo.id}
-- معرف البوت: @${botInfo.username}
-- توكن البوت: <code>${token}</code>
-
-~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
-- يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
-        parse_mode: 'HTML',
-        disable_web_page_preview: true 
-    });
-} catch (err) {
-    console.error('❌ Failed to save bot to DB:', err);
-    ctx.reply('❌ حدث خطأ أثناء حفظ معلومات البوت. يرجى المحاولة مرة أخرى لاحقًا.');
-}
-
+    
 });
 // At the top of your file, after initializing the bot
 bot.command('broadcast_dm', handleBroadcastDM);
@@ -748,6 +718,30 @@ function loadExistingBots() {
         // Call populateUserDeployments after all bots are loaded
         setTimeout(populateUserDeployments, 5000);
     });
+}
+// Store bot information in groups collection
+async function storeGroupInfo(botId, botName, botUsername, botToken, ownerId) {
+    try {
+        const db = await ensureDatabaseInitialized('test');
+        
+        // Create a document for the groups collection
+        await db.collection('groups').insertOne({
+            bot_id: parseInt(botId),
+            bot_name: botName,
+            bot_username: botUsername,
+            bot_token: botToken,
+            owner_id: ownerId,
+            is_active: true,
+            created_at: new Date(),
+            group_id: null,  // Will be populated when bot is added to a group
+            title: null,     // Will be populated when bot is added to a group
+            type: 'bot_info' // Indicates this is a bot info entry
+        });
+        
+        console.log(`Bot information stored in groups collection for bot ${botId}`);
+    } catch (error) {
+        console.error(`Error storing bot information in groups collection for bot ${botId}:`, error);
+    }
 }
 async function ensureDatabaseInitialized(databaseName = 'test') {
     let db = database.getDb();
