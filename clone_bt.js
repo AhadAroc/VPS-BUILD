@@ -447,43 +447,65 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 `;
 
             fs.writeFileSync(botFilePath, botFileContent);
-            
-            // Start the bot using PM2
-            const pm2 = require('pm2');
-            pm2.connect((err) => {
-                if (err) {
-                    console.error(err);
-                    return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
-                }
 
-                pm2.start({
-                    script: botFilePath,
-                    name: `bot_${botInfo.id}`,
-                    autorestart: true,
-                }, (err) => {
-                    if (err) {
-                        console.error(err);
-                        return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
-                    }
+// Start the bot using PM2
+const pm2 = require('pm2');
+pm2.connect((err) => {
+    if (err) {
+        console.error(err);
+        return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+    }
 
-                    // Store bot details
-                    activeBots[botInfo.id] = {
-                        name: botInfo.first_name,
+    pm2.start({
+        script: botFilePath,
+        name: `bot_${botInfo.id}`,
+        autorestart: true,
+    }, async (err) => { // ✅ async added here
+        if (err) {
+            console.error(err);
+            return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+        }
+
+        // Store bot details in memory
+        activeBots[botInfo.id] = {
+            name: botInfo.first_name,
+            username: botInfo.username,
+            token: token,
+            expiry: expiryDate.toISOString(),
+            configPath: configPath,
+            botFilePath: botFilePath,
+            createdBy: ctx.from.id
+        };
+
+        userDeployments.set(userId, botInfo.id);
+        createCloneDbEntry(botInfo.id, token, expiryDate);
+
+        // ✅ NEW: Save to MongoDB
+        try {
+            const db = await connectToMongoDB('test'); // or your actual DB name
+            await db.collection('bots').updateOne(
+                { bot_id: botInfo.id },
+                {
+                    $set: {
+                        bot_id: botInfo.id,
                         username: botInfo.username,
+                        name: botInfo.first_name || 'Unnamed',
                         token: token,
-                        expiry: expiryDate.toISOString(),
-                        configPath: configPath,
-                        botFilePath: botFilePath,
-                        createdBy: ctx.from.id
-                    };
+                        created_by: ctx.from.id,
+                        created_at: new Date(),
+                        expires_at: expiryDate,
+                        active: true
+                    }
+                },
+                { upsert: true }
+            );
+            console.log(`✅ Bot info saved to DB: @${botInfo.username} (${botInfo.id})`);
+        } catch (dbErr) {
+            console.error('❌ Failed to save bot info to DB:', dbErr);
+        }
 
-                    // Store user deployment
-                    userDeployments.set(userId, botInfo.id);
-
-                    // Create database entry
-                    createCloneDbEntry(botInfo.id, token, expiryDate);
-
-                    ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
+        // Confirmation message
+        ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
 - اسم البوت: ${botInfo.first_name}
 - ايدي البوت: ${botInfo.id}
@@ -492,8 +514,8 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 ~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
 - يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
-                        parse_mode: 'HTML',
-                        disable_web_page_preview: true 
+            parse_mode: 'HTML',
+            disable_web_page_preview: true 
                     });
                 });
             });
