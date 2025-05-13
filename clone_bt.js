@@ -89,17 +89,16 @@ bot.action('create_bot', (ctx) => {
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
-    let botId;
-let botUsername;
-
+    
+let botId, botUsername;
 try {
-    const botInfo = await ctx.telegram.getMe();
-    botId = botInfo.id;
-    botUsername = botInfo.username;
+  const { botId: id, botUsername: username } = require('./config.js');
+  botId = id;
+  botUsername = username;
 } catch (err) {
-    console.error('❌ Could not get bot info via getMe():', err);
-    return; // Abort if it fails
+  console.error('❌ Failed to load bot_config.js:', err);
 }
+
     // Fallback to Telegram API if config is missing
     if (!botId || !botUsername) {
         try {
@@ -229,7 +228,24 @@ bot.on('text', async (ctx) => {
         const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
         if (response.data && response.data.ok) {
             const botInfo = response.data.result;
-            
+           // Save to reusable bot config
+const sharedBotConfigPath = path.join(__dirname, 'config', 'bot_config.js');
+
+const sharedBotConfigContent = `
+module.exports = {
+    botId: ${botInfo.id},
+    botUsername: '${botInfo.username}',
+    botName: '${botInfo.first_name}',
+    token: '${token}',
+    expiryDate: '${expiryDate.toISOString()}',
+    createdAt: '${now.toISOString()}',
+    createdBy: ${ctx.from.id}
+};
+`;
+
+fs.writeFileSync(sharedBotConfigPath, sharedBotConfigContent);
+console.log(`✅ Saved bot config to ${sharedBotConfigPath}`);
+ 
             // Calculate expiry date
             const now = new Date();
             const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
