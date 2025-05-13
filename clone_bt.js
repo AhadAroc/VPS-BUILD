@@ -99,14 +99,14 @@ bot.on('my_chat_member', async (ctx) => {
             botId = botInfo.id;
             botUsername = botInfo.username;
 
-            // Optional: Cache it to config.js or a temp global variable
+            // Update config with the fetched botId and botUsername
             config.botId = botId;
             config.botUsername = botUsername;
 
             console.warn(`⚠️ config.js is missing botId or username. Fallback used: bot_id = ${botId}, @${botUsername}`);
         } catch (err) {
             console.error('❌ Failed to get bot info via getMe():', err);
-            return; // abort if both config and getMe fail
+            return; // Abort if both config and getMe fail
         }
     }
 
@@ -116,7 +116,9 @@ bot.on('my_chat_member', async (ctx) => {
 
     const db = await database.setupDatabase();
 
+    // Only act on group joins/leaves
     if (status === 'member' || status === 'administrator') {
+        // Update or insert the group document
         await db.collection('groups').updateOne(
             { group_id: chatId },
             {
@@ -125,7 +127,7 @@ bot.on('my_chat_member', async (ctx) => {
                     title: chatTitle,
                     is_active: true,
                     bot_id: botId,
-                    bot_username: botUsername,
+                    bot_username: botUsername, // optional for easier lookup
                     updated_at: new Date()
                 },
                 $setOnInsert: { added_at: new Date() }
@@ -136,6 +138,7 @@ bot.on('my_chat_member', async (ctx) => {
     }
 
     if (status === 'left' || status === 'kicked') {
+        // Mark the group as inactive if the bot leaves or gets kicked
         await db.collection('groups').updateOne(
             { group_id: chatId },
             { $set: { is_active: false, updated_at: new Date() } }
@@ -143,6 +146,7 @@ bot.on('my_chat_member', async (ctx) => {
         console.log(`🚪 [@${botUsername}] Left or kicked from group '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
+
 
 
 
