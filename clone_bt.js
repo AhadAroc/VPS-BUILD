@@ -89,23 +89,24 @@ bot.action('create_bot', (ctx) => {
 // Handle bot added/removed from group (more reliable than just new_chat_members)
 // Save groups when bot is added or removed
 bot.on('my_chat_member', async (ctx) => {
-    let botId, botUsername;
+    let botId = config.botId;
+    let botUsername = config.botUsername;
 
-    // First, try to get bot info from the context
-    if (ctx.me) {
-        botId = ctx.me.id;
-        botUsername = ctx.me.username;
-    }
-
-    // If not available in context, fallback to Telegram API
+    // Fallback to Telegram API if config is missing
     if (!botId || !botUsername) {
         try {
             const botInfo = await ctx.telegram.getMe();
             botId = botInfo.id;
             botUsername = botInfo.username;
+
+            // Optional: Cache it to config.js or a temp global variable
+            config.botId = botId;
+            config.botUsername = botUsername;
+
+            console.warn(`⚠️ config.js is missing botId or username. Fallback used: bot_id = ${botId}, @${botUsername}`);
         } catch (err) {
             console.error('❌ Failed to get bot info via getMe():', err);
-            return; // abort if we can't get bot info
+            return; // abort if both config and getMe fail
         }
     }
 
