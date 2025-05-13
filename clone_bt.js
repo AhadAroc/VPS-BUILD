@@ -486,7 +486,7 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
     }
     try {
     const db = await connectToMongoDB('test');
-    await db.collection('groups').insertOne({
+    const result = await db.collection('groups').insertOne({
         bot_name: botInfo.first_name,
         bot_id: botInfo.id,
         bot_username: botInfo.username,
@@ -495,9 +495,10 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
         added_at: new Date(),
         is_active: true
     });
-    console.log(`✅ Bot ${botInfo.username} saved to DB.`);
 
-    // Only send the success message if the database operation succeeds
+    console.log(`✅ Bot ${botInfo.username} saved to DB with ID: ${result.insertedId}`);
+
+    // Send the success message to the user
     ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
 - اسم البوت: ${botInfo.first_name}
