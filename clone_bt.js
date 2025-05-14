@@ -4,6 +4,7 @@ const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { execSync } = require('child_process');
 
+const FormData = require('form-data');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
@@ -161,7 +162,17 @@ bot.on('my_chat_member', async (ctx) => {
 });
 
 
+async function downloadTelegramFile(bot, fileId) {
+    const fileInfo = await bot.telegram.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${bot.token}/${fileInfo.file_path}`;
 
+    const response = await axios.get(fileUrl, { responseType: 'stream' });
+
+    // Optionally write to disk:
+    // response.data.pipe(fs.createWriteStream('file.jpg'));
+
+    return response.data; // This is a stream
+}
 
 
 // Mark groups inactive when bot is removed
@@ -950,9 +961,10 @@ if (!broadcast) {
             if (broadcast.type === 'text') {
     await tempBot.telegram.sendMessage(group.group_id, broadcast.content);
 } else if (broadcast.type === 'photo') {
-    await tempBot.telegram.sendPhoto(group.group_id, broadcast.content.file_id, {
-        caption: broadcast.content.caption
-    });
+    const stream = await downloadTelegramFile(ctx.bot, broadcast.content.file_id);
+await tempBot.telegram.sendPhoto(group.group_id, { source: stream }, {
+    caption: broadcast.content.caption
+});
 } else if (broadcast.type === 'video') {
     await tempBot.telegram.sendVideo(group.group_id, broadcast.content.file_id, {
         caption: broadcast.content.caption
