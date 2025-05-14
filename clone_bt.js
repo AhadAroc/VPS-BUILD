@@ -2,6 +2,7 @@ const { Telegraf, Markup } = require('telegraf');
 const database = require('./database');
 const { fork } = require('child_process');
 const { exec } = require('child_process');
+const { execSync } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
@@ -72,7 +73,21 @@ mongoose.connect('mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/test?ret
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
+function getRunningForkedBotsCount() {
+    const output = execSync(`pm2 jlist`).toString();
+    const allProcesses = JSON.parse(output);
 
+    // Filter only the forked bot processes (e.g. bot_123456)
+    const forkedBots = allProcesses.filter(proc => /^bot_\d+$/.test(proc.name));
+    return forkedBots.length;
+}
+
+const MAX_BOTS = 10;
+
+if (getRunningForkedBotsCount() >= MAX_BOTS) {
+    console.log(`🚫 Cannot start new bot. Max limit (${MAX_BOTS}) reached.`);
+    process.exit(1); // Or return if inside a function
+}
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
