@@ -920,32 +920,63 @@ async function handleBroadcastDM(ctx) {
     await ctx.reply('⏳ Broadcasting to direct messages... please wait.');
 
     try {
-        // Use the correct database connection method
         const db = await ensureDatabaseInitialized('test');
-
-        // Get all users from the database
         const users = await db.collection('users').find().toArray();
+        if (users.length === 0) {
+            return ctx.reply('⚠️ No users found in the database.');
+        }
 
         let successCount = 0;
         let failCount = 0;
 
         for (const user of users) {
             try {
-                await ctx.telegram.sendMessage(user.user_id, message);
-                console.log(`✅ Message sent to user ${user.user_id}`);
+                let botToken;
+                let botUsername;
+
+                // 🧠 Step 1: Try to get user's assigned bot_id
+                const groupEntry = await db.collection('groups').findOne({
+                    owner_id: user.user_id,
+                    type: 'bot_info'
+                });
+
+                if (groupEntry && groupEntry.bot_token) {
+                    botToken = groupEntry.bot_token;
+                    botUsername = groupEntry.bot_username;
+                } else {
+                    // 🔁 Fallback to any available bot_info
+                    const fallbackBot = await db.collection('groups').findOne({ type: 'bot_info', is_active: true });
+                    if (!fallbackBot) {
+                        console.warn(`⚠️ No bot token found for user ${user.user_id}`);
+                        failCount++;
+                        continue;
+                    }
+
+                    botToken = fallbackBot.bot_token;
+                    botUsername = fallbackBot.bot_username;
+                }
+
+                // 📨 Send via the correct bot
+                const Telegraf = require('telegraf').Telegraf;
+                const tempBot = new Telegraf(botToken);
+
+                await tempBot.telegram.sendMessage(user.user_id, message);
+                console.log(`✅ DM sent to user ${user.user_id} via @${botUsername}`);
+                tempBot.stop();
                 successCount++;
             } catch (err) {
-                console.error(`❌ Failed to send to user ${user.user_id}:`, err.description || err);
+                console.error(`❌ Failed DM to ${user.user_id}:`, err.description || err);
                 failCount++;
             }
         }
 
-        ctx.reply(`📢 Broadcast to direct messages completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n\nTotal Users: ${users.length}`);
+        ctx.reply(`📢 DM broadcast completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n📊 Total Users: ${users.length}`);
     } catch (error) {
         console.error('Error during DM broadcast:', error);
         ctx.reply('An error occurred while broadcasting to direct messages.');
     }
 }
+
 async function getUserIdsFromDatabase(botToken) {
     try {
         const CloneModel = mongoose.model('Clone');
