@@ -919,7 +919,25 @@ if (!broadcast) {
             const Telegraf = require('telegraf').Telegraf;
             const tempBot = new Telegraf(group.bot_token);
 
-            await tempBot.telegram.sendMessage(group.group_id, message);
+            if (broadcast.type === 'text') {
+    await tempBot.telegram.sendMessage(group.group_id, broadcast.content);
+} else if (broadcast.type === 'photo') {
+    await tempBot.telegram.sendPhoto(group.group_id, broadcast.content.file_id, {
+        caption: broadcast.content.caption
+    });
+} else if (broadcast.type === 'video') {
+    await tempBot.telegram.sendVideo(group.group_id, broadcast.content.file_id, {
+        caption: broadcast.content.caption
+    });
+} else if (broadcast.type === 'document') {
+    await tempBot.telegram.sendDocument(group.group_id, broadcast.content.file_id, {
+        caption: broadcast.content.caption
+    });
+} else {
+    console.warn(`⚠️ Unsupported message type for group ${group.group_id}`);
+    failCount++;
+    continue;
+}
             console.log(`✅ Message sent to ${group.title} (${group.group_id}) via @${group.bot_username}`);
             tempBot.stop();
             successCount++;
