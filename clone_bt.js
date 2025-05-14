@@ -162,16 +162,12 @@ bot.on('my_chat_member', async (ctx) => {
 });
 
 
-async function downloadTelegramFile(bot, fileId) {
-    const fileInfo = await bot.telegram.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${bot.token}/${fileInfo.file_path}`;
+async function downloadTelegramFile(ctx, fileId) {
+    const fileInfo = await ctx.telegram.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${ctx.botInfo.token}/${fileInfo.file_path}`;
 
     const response = await axios.get(fileUrl, { responseType: 'stream' });
-
-    // Optionally write to disk:
-    // response.data.pipe(fs.createWriteStream('file.jpg'));
-
-    return response.data; // This is a stream
+    return response.data;
 }
 
 
@@ -961,7 +957,7 @@ if (!broadcast) {
             if (broadcast.type === 'text') {
     await tempBot.telegram.sendMessage(group.group_id, broadcast.content);
 } else if (broadcast.type === 'photo') {
-    const stream = await downloadTelegramFile(ctx.bot, broadcast.content.file_id);
+    const stream = await downloadTelegramFile(ctx, broadcast.content.file_id);
 await tempBot.telegram.sendPhoto(group.group_id, { source: stream }, {
     caption: broadcast.content.caption
 });
