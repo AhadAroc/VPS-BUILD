@@ -920,8 +920,8 @@ async function handleBroadcastDM(ctx) {
     await ctx.reply('⏳ Broadcasting to direct messages... please wait.');
 
     try {
-        const { getNativeDb } = require('./database');
-const db = await getNativeDb('test');
+        // Use the correct database connection method
+        const db = await ensureDatabaseInitialized('test');
 
         const users = await db.collection('users').find().toArray();
 
