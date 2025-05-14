@@ -923,6 +923,7 @@ async function handleBroadcastDM(ctx) {
         // Use the correct database connection method
         const db = await ensureDatabaseInitialized('test');
 
+        // Get all users from the database
         const users = await db.collection('users').find().toArray();
 
         let successCount = 0;
