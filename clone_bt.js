@@ -3,6 +3,7 @@ const database = require('./database');
 const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { execSync } = require('child_process');
+
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
@@ -29,7 +30,9 @@ const crypto = require('crypto');
 // Heroku API key
 //const HEROKU_API_KEY = 'HRKU-f72294ab-1a52-467d-a9ef-1405ecb9345d';
 //const heroku = new Heroku({ token: HEROKU_API_KEY });
-
+// Add this near the top of your file with other constants
+const MAX_BOTS_PER_USER = 1;  // Maximum bots per user
+const MAX_TOTAL_BOTS = 10;    // Maximum total bots on the server
 // ... (rest of your existing code)
 // ===== Configuration =====
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
@@ -73,21 +76,7 @@ mongoose.connect('mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/test?ret
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-function getRunningForkedBotsCount() {
-    const output = execSync(`pm2 jlist`).toString();
-    const allProcesses = JSON.parse(output);
 
-    // Filter only the forked bot processes (e.g. bot_123456)
-    const forkedBots = allProcesses.filter(proc => /^bot_\d+$/.test(proc.name));
-    return forkedBots.length;
-}
-
-const MAX_BOTS = 10;
-
-if (getRunningForkedBotsCount() >= MAX_BOTS) {
-    console.log(`🚫 Cannot start new bot. Max limit (${MAX_BOTS}) reached.`);
-    process.exit(1); // Or return if inside a function
-}
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
@@ -224,6 +213,11 @@ bot.on('text', async (ctx) => {
             default:
                 return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
         }
+    }
+// Check total bot limit
+    const totalActiveBots = Object.keys(activeBots).length;
+    if (totalActiveBots >= MAX_TOTAL_BOTS) {
+        return ctx.reply('⚠️ عذراً، تم الوصول إلى الحد الأقصى للبوتات على الخادم. يرجى المحاولة لاحقاً.');
     }
 
     // If not a broadcast command, treat as token submission
