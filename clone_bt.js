@@ -183,6 +183,31 @@ bot.on('left_chat_member', async (ctx) => {
     }
 });
 
+function extractBroadcastContent(ctx) {
+    const msg = ctx.message;
+
+    if (msg.text && msg.text.startsWith('/broadcast')) {
+        const textParts = msg.text.split(' ').slice(1);
+        if (textParts.length === 0) return null;
+        return { type: 'text', content: textParts.join(' ') };
+    }
+
+    if (msg.photo) {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        const caption = msg.caption || '';
+        return { type: 'photo', content: { file_id: fileId, caption } };
+    }
+
+    if (msg.document) {
+        return { type: 'document', content: { file_id: msg.document.file_id, caption: msg.caption || '' } };
+    }
+
+    if (msg.video) {
+        return { type: 'video', content: { file_id: msg.video.file_id, caption: msg.caption || '' } };
+    }
+
+    return null;
+}
 
 // Handle token submission
 bot.on('text', async (ctx) => {
@@ -856,10 +881,11 @@ async function handleBroadcastGroups(ctx) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
 
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('❌ Please provide a message to broadcast.\nUsage: /broadcast_groups <your message>');
-    }
+    const broadcast = extractBroadcastContent(ctx);
+if (!broadcast) {
+    return ctx.reply('❌ Please provide a message, photo, or video to broadcast.');
+}
+
 
     await ctx.reply('⏳ Broadcasting to groups... please wait.');
 
