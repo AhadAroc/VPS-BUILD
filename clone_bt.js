@@ -697,6 +697,34 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
         });
     });
 });
+
+bot.on('message', async (ctx) => {
+    const msg = ctx.message;
+
+    // Only admins can use broadcast
+    if (ctx.from.id !== ADMIN_ID) return;
+
+    // Check if the caption or text starts with a broadcast command
+    const rawText = msg.caption || msg.text || '';
+    if (!rawText.startsWith('/broadcast_')) return;
+
+    const broadcast = extractBroadcastContent(ctx);
+    if (!broadcast) return ctx.reply('❌ Please provide a message, photo, or video to broadcast.');
+
+    const [cmd] = rawText.split(' ');
+
+    if (cmd === '/broadcast_groups') {
+        return handleBroadcastGroups(ctx);
+    } else if (cmd === '/broadcast_dm') {
+        return handleBroadcastDM(ctx);
+    } else if (cmd === '/broadcast_all') {
+        return handleBroadcastAll(ctx);
+    } else {
+        return ctx.reply('❌ Unknown broadcast command.');
+    }
+});
+
+
 // Populate userDeployments map - Fixed version
 function populateUserDeployments() {
     Object.entries(activeBots).forEach(([botId, botInfo]) => {
