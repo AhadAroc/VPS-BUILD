@@ -987,22 +987,79 @@ const db = await getDatabaseForBot('test');   // FOR GROUP SAVE ON JOIN
     
     
     bot.on('left_chat_member', async (ctx) => {
-        if (!ctx.message.left_chat_member) return;
-    
-        const leftMemberId = ctx.message.left_chat_member.id;
-        const botInfo = await ctx.telegram.getMe();
-    
-        if (leftMemberId === botInfo.id) {
+    if (!ctx.message.left_chat_member) return;
+
+    const leftMemberId = ctx.message.left_chat_member.id;
+    const botInfo = await ctx.telegram.getMe();
+
+    // Check if the bot itself was kicked
+    if (leftMemberId === botInfo.id) {
+        const chatId = ctx.chat.id;
+        const chatTitle = ctx.chat.title || 'Unknown';
+
+        try {
             const db = await ensureDatabaseInitialized('test');
-    
+
+            // 🔍 Get group data for archive (optional)
+            const groupData = await db.collection('groups').findOne({
+                group_id: chatId,
+                bot_id: botInfo.id
+            });
+
+            // ✅ Archive the group data before marking inactive (optional but safe)
+            if (groupData) {
+                await db.collection('groups_archive').insertOne({
+                    ...groupData,
+                    archived_at: new Date()
+                });
+            }
+
+            // 🛑 Mark the group as inactive (soft delete)
             await db.collection('groups').updateOne(
-                { group_id: ctx.chat.id, bot_id: config.botId },
-                { $set: { is_active: false } }
+                { group_id: chatId, bot_id: botInfo.id },
+                {
+                    $set: {
+                        is_active: false,
+                        removed_at: new Date(),
+                        cleanup: true
+                    }
+                }
             );
-    
-            console.log(`🚪 [@${botInfo.username}] Left group '${ctx.chat.title}' (${ctx.chat.id}) — marked inactive for bot_id ${config.botId}`);
+
+            // 🧹 Clean up junk data
+            await db.collection('quiz_scores').deleteMany({ chatId: chatId });
+            await db.collection('custom_questions').deleteMany({ chatId: chatId });
+            await db.collection('quiz_settings').deleteMany({ chatId: chatId });
+
+            console.log(`🚪 [@${botInfo.username}] Left group '${chatTitle}' (${chatId}) — marked inactive and cleaned up.`);
+
+            // 📩 Notify the owner (optional)
+            const botMeta = await db.collection('groups').findOne({ bot_id: botInfo.id, type: 'bot_info' });
+            const ownerId = botMeta?.owner_id;
+
+            if (ownerId) {
+                const message = `
+🚫 تم طرد البوت من المجموعة
+┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+👥 *اسم المجموعة:* ${chatTitle}
+🆔 *ايدي المجموعة:* ${chatId}
+✅ *تم حذف جميع بيانات المجموعة*
+📦 *تم أرشفة المجموعة قبل الحذف*
+                `;
+                try {
+                    await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
+                    console.log(`📬 Notification sent to owner (ID: ${ownerId})`);
+                } catch (notifyError) {
+                    console.error('⚠️ Failed to notify owner:', notifyError);
+                }
+            }
+
+        } catch (error) {
+            console.error('❌ Error cleaning up group data:', error);
         }
-    });
+    }
+});
+
     
     // Listen for photo messages
     bot.on('photo', async (ctx, next) => {
@@ -1412,35 +1469,7 @@ bot.hears('بدء', async (ctx) => {
     }
 });
 
-bot.on('left_chat_member', async (ctx) => {
-    if (ctx.message.left_chat_member.id === ctx.botInfo.id) {
-        // The bot was removed from the group
-        const chatId = ctx.chat.id;
-        const chatTitle = ctx.chat.title || 'Unknown';
 
-        // Log or handle the removal
-        console.log(`Bot was removed from group: ${chatTitle} (${chatId})`);
-
-        // Optionally, send a message to the owner or log the event
-        const message = `
-            🚫 تم إزالة البوت من المجموعة
-            ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-            👥 *اسم المجموعة:* ${chatTitle}
-            🆔 *ايدي المجموعة:* ${chatId}
-        `;
-
-        try {
-            if (ownerId) {
-                await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
-                console.log(`Notification sent to owner (ID: ${ownerId})`);
-            } else {
-                console.warn('Owner ID is not set. Cannot send notification.');
-            }
-        } catch (error) {
-            console.error('Error sending removal message to owner:', error);
-        }
-    }
-});
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
