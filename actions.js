@@ -3258,19 +3258,11 @@ if (await isDeveloper(ctx, userId)) {
         }
 
         // If we reach here, it's an unsupported message type
-          // Your message type handling logic
         await ctx.reply('');
+
     } catch (error) {
         console.error('Error in message handler:', error);
-
-        const userId = ctx.from?.id;
-
-        const alreadyWarned = await warningsCollection.findOne({ userId });
-
-        if (!alreadyWarned) {
-            await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
-            await warningsCollection.insertOne({ userId, warnedAt: new Date() });
-        }
+        await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
     }
 
     await next();
