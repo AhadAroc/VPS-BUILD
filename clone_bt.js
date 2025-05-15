@@ -199,12 +199,27 @@ async function downloadAndSendPhoto(ctx, fileId, botToken, chatId, caption, temp
         return false;
     }
 }
-async function downloadTelegramFile(ctx, fileId) {
-    const fileInfo = await ctx.telegram.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${ctx.botInfo.token}/${fileInfo.file_path}`;
+async function downloadTelegramFile(ctx, fileId, botToken) {
+    try {
+        const fileInfo = await ctx.telegram.getFile(fileId);
+        const fileUrl = `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
+        const fileName = `temp_${Date.now()}.jpg`; // You can change extension based on type if needed
+        const filePath = path.join(__dirname, fileName);
 
-    const response = await axios.get(fileUrl, { responseType: 'stream' });
-    return response.data;
+        const writer = fs.createWriteStream(filePath);
+        const response = await axios({ method: 'get', url: fileUrl, responseType: 'stream' });
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+
+        return filePath;
+    } catch (err) {
+        console.error('❌ downloadTelegramFile error:', err.message);
+        return null;
+    }
 }
 
 
