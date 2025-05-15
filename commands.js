@@ -347,41 +347,24 @@ async function showHelp(ctx) {
 }
 
 async function getLeaderboard(groupId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-
-        const leaderboard = await db.collection('quiz_scores')
-            .aggregate([
-                { $match: { chatId: groupId } }, // 🔍 filter by group/chat ID
-                {
-                    $group: {
-                        _id: "$userId",
-                        totalScore: { $sum: "$score" },
-                        username: { $first: "$username" },
-                        firstName: { $first: "$firstName" }
-                    }
-                },
-                { $sort: { totalScore: -1 } },
-                { $limit: 10 }
-            ])
-            .toArray();
-
-        if (!leaderboard.length) {
-            return "ℹ️ لا يوجد مشاركون بعد في هذه المجموعة.";
-        }
-
-        let leaderboardText = "🏆 قائمة المتصدرين في هذه المجموعة:\n\n";
-        leaderboard.forEach((entry, index) => {
-            const name = entry.firstName || entry.username || 'مستخدم مجهول';
-            leaderboardText += `${index + 1}. ${name}: ${entry.totalScore} نقطة\n`;
-        });
-
-        return leaderboardText;
-    } catch (error) {
-        console.error('Error fetching group leaderboard:', error);
-        return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
-    }
+    const db = await ensureDatabaseInitialized();
+    return db.collection('quiz_scores')
+        .aggregate([
+            { $match: { chatId: groupId } },
+            {
+                $group: {
+                    _id: "$userId",
+                    totalScore: { $sum: "$score" },
+                    username: { $first: "$username" },
+                    firstName: { $first: "$firstName" }
+                }
+            },
+            { $sort: { totalScore: -1 } },
+            { $limit: 10 }
+        ])
+        .toArray();
 }
+
 
 async function showQuizMenu(ctx) {
     try {
