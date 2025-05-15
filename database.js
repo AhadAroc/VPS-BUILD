@@ -474,7 +474,7 @@ async function saveQuizScore(chatId, userId, firstName, lastName, username, poin
 
 async function getLeaderboard(chatId, limit = 10) {
     try {
-        const db = await getDb();
+        const db = await ensureDatabaseInitialized();
         
         console.log(`Fetching leaderboard for chat ${chatId}`);
         

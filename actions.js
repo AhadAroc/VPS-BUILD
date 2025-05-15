@@ -1889,22 +1889,24 @@ bot.action('show_leaderboard', async (ctx) => {
 
         // Get the chat ID from the callback context
         const chatId = ctx.chat?.id || ctx.callbackQuery.message.chat.id;
+        
+        console.log(`Fetching leaderboard for chat ID: ${chatId}`);
 
         // Fetch leaderboard data for this specific group
         const leaderboardData = await database.getLeaderboard(chatId);
         
-        // Add debug logging to see what's being returned
-        console.log(`Leaderboard data for chat ${chatId}:`, leaderboardData);
-
+        console.log(`Leaderboard data received, entries: ${leaderboardData.length}`);
+        
         let leaderboardText = "🏆 قائمة المتصدرين في هذه المجموعة:\n\n";
 
         if (leaderboardData && leaderboardData.length > 0) {
+            // Add medals for top 3
             const medals = ['🥇', '🥈', '🥉'];
-
+            
             leaderboardData.forEach((entry, index) => {
                 const name = entry.firstName || entry.username || 'مستخدم مجهول';
                 const prefix = index < 3 ? medals[index] : `${index + 1}.`;
-                leaderboardText += `${prefix} ${name}: ${entry.score} نقطة\n`;
+                leaderboardText += `${prefix} ${name}: ${entry.totalScore} نقطة\n`;
             });
         } else {
             leaderboardText += "لا توجد نتائج بعد.";
@@ -1916,15 +1918,13 @@ bot.action('show_leaderboard', async (ctx) => {
             ]
         };
 
-        // Edit the appropriate message type
+        // Edit the message with the leaderboard
         if (ctx.callbackQuery.message.photo) {
             await ctx.editMessageCaption(leaderboardText, {
-                parse_mode: 'Markdown',
                 reply_markup: replyMarkup
             });
         } else {
             await ctx.editMessageText(leaderboardText, {
-                parse_mode: 'Markdown',
                 reply_markup: replyMarkup
             });
         }
