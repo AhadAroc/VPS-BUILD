@@ -616,7 +616,8 @@ async function endQuiz(ctx, chatId) {
                     firstName = chatMember.user.first_name || 'مستخدم';
                     
                     // Save the score to the database
-                    await database.saveQuizScore(userId, userName, firstName, score);
+                    await database.saveQuizScore(chatId, userId, firstName, '', userName, score);
+
                     
                 } catch (error) {
                     console.error('Error getting chat member or saving score:', error);
@@ -1891,16 +1892,19 @@ bot.action('show_leaderboard', async (ctx) => {
 
         // Fetch leaderboard data for this specific group
         const leaderboardData = await database.getLeaderboard(chatId);
+        
+        // Add debug logging to see what's being returned
+        console.log(`Leaderboard data for chat ${chatId}:`, leaderboardData);
 
         let leaderboardText = "🏆 قائمة المتصدرين في هذه المجموعة:\n\n";
 
-        if (leaderboardData.length > 0) {
+        if (leaderboardData && leaderboardData.length > 0) {
             const medals = ['🥇', '🥈', '🥉'];
 
             leaderboardData.forEach((entry, index) => {
                 const name = entry.firstName || entry.username || 'مستخدم مجهول';
                 const prefix = index < 3 ? medals[index] : `${index + 1}.`;
-                leaderboardText += `${prefix} ${name}: ${entry.totalScore} نقطة\n`;
+                leaderboardText += `${prefix} ${name}: ${entry.score} نقطة\n`;
             });
         } else {
             leaderboardText += "لا توجد نتائج بعد.";
