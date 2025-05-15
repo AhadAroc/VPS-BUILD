@@ -461,22 +461,33 @@ async function saveQuizScore(userId, username, firstName, score) {
     }
 }
 
-async function getLeaderboard() {
+async function getLeaderboard(chatId) {
     try {
-        return await db.collection('quiz_scores')
+        const db = await getDb();
+        
+        // Find all quiz scores for this specific chat ID
+        const scores = await db.collection('quiz_scores')
             .aggregate([
-                { $group: { 
-                    _id: "$userId", 
-                    totalScore: { $sum: "$score" },
-                    username: { $first: "$username" },
-                    firstName: { $first: "$firstName" }
+                { $match: { chatId: chatId } }, // Filter by the specific chat ID
+                { $group: {
+                    _id: { userId: "$userId", firstName: "$firstName", username: "$username" },
+                    totalScore: { $sum: "$score" }
+                }},
+                { $project: {
+                    _id: 0,
+                    userId: "$_id.userId",
+                    firstName: "$_id.firstName",
+                    username: "$_id.username",
+                    totalScore: 1
                 }},
                 { $sort: { totalScore: -1 } },
-                { $limit: 10 }
+                { $limit: 10 } // Show top 10 users
             ])
             .toArray();
+            
+        return scores;
     } catch (error) {
-        console.error('Error fetching leaderboard:', error);
+        console.error('Error getting leaderboard:', error);
         return [];
     }
 }
