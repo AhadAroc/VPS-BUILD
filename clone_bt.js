@@ -199,23 +199,34 @@ async function downloadAndSendPhoto(ctx, fileId, botToken, chatId, caption, temp
         return false;
     }
 }
-async function downloadTelegramFile(ctx, fileId, botToken) {
+async function downloadTelegramFile(fileId, botToken, ext = 'jpg') {
     try {
-        const fileInfo = await ctx.telegram.getFile(fileId);
-        const fileUrl = `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
-        const fileName = `temp_${Date.now()}.jpg`; // You can change extension based on type if needed
-        const filePath = path.join(__dirname, fileName);
+        // Step 1: Use Telegram's HTTP API to get file_path
+        const fileInfoUrl = `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`;
+        const fileInfoRes = await axios.get(fileInfoUrl);
 
-        const writer = fs.createWriteStream(filePath);
-        const response = await axios({ method: 'get', url: fileUrl, responseType: 'stream' });
+        if (!fileInfoRes.data.ok) {
+            throw new Error('Failed to get file info');
+        }
+
+        const filePath = fileInfoRes.data.result.file_path;
+
+        // Step 2: Build download URL
+        const fileUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
+
+        // Step 3: Download the file
+        const fileName = `temp_${Date.now()}.${ext}`;
+        const localPath = path.join(__dirname, fileName);
+        const writer = fs.createWriteStream(localPath);
+        const response = await axios({ url: fileUrl, method: 'GET', responseType: 'stream' });
+
         response.data.pipe(writer);
-
         await new Promise((resolve, reject) => {
             writer.on('finish', resolve);
             writer.on('error', reject);
         });
 
-        return filePath;
+        return localPath;
     } catch (err) {
         console.error('❌ downloadTelegramFile error:', err.message);
         return null;
@@ -988,49 +999,50 @@ async function handleBroadcastGroups(ctx) {
         try {
             let botId = group.bot_id;
 
-            // 🧠 Fallback if bot_id is missing
+            // Fallback to first available bot
             if (!botId || isNaN(botId)) {
                 const fallbackBot = await db.collection('groups').findOne({ type: 'bot_info', is_active: true });
-                if (fallbackBot) {
-                    botId = fallbackBot.bot_id;
-                    group.bot_token = fallbackBot.bot_token;
-                    group.bot_username = fallbackBot.bot_username;
-                } else {
+                if (!fallbackBot) {
                     console.warn(`⚠️ No fallback bot found for group ${group.group_id}`);
                     failCount++;
                     continue;
                 }
+                botId = fallbackBot.bot_id;
+                group.bot_token = fallbackBot.bot_token;
+                group.bot_username = fallbackBot.bot_username;
             }
 
             const tempBot = new Telegraf(group.bot_token);
 
             if (broadcast.type === 'text') {
                 await tempBot.telegram.sendMessage(group.group_id, broadcast.content);
-            } else if (broadcast.type === 'photo') {
-                const filePath = await downloadTelegramFile(ctx, broadcast.content.file_id, group.bot_token);
-                if (!filePath) throw new Error('Failed to download photo.');
-                await tempBot.telegram.sendPhoto(group.group_id, { source: fs.createReadStream(filePath) }, {
-                    caption: broadcast.content.caption
-                });
-                fs.unlink(filePath, () => {});
-            } else if (broadcast.type === 'video') {
-                const filePath = await downloadTelegramFile(ctx, broadcast.content.file_id, group.bot_token);
-                if (!filePath) throw new Error('Failed to download video.');
-                await tempBot.telegram.sendVideo(group.group_id, { source: fs.createReadStream(filePath) }, {
-                    caption: broadcast.content.caption
-                });
-                fs.unlink(filePath, () => {});
-            } else if (broadcast.type === 'document') {
-                const filePath = await downloadTelegramFile(ctx, broadcast.content.file_id, group.bot_token);
-                if (!filePath) throw new Error('Failed to download document.');
-                await tempBot.telegram.sendDocument(group.group_id, { source: fs.createReadStream(filePath) }, {
-                    caption: broadcast.content.caption
-                });
-                fs.unlink(filePath, () => {});
             } else {
-                console.warn(`⚠️ Unsupported message type for group ${group.group_id}`);
-                failCount++;
-                continue;
+                // Determine extension
+                const ext =
+                    broadcast.type === 'photo' ? 'jpg' :
+                    broadcast.type === 'video' ? 'mp4' :
+                    broadcast.type === 'document' ? 'pdf' : 'dat';
+
+                const filePath = await downloadTelegramFile(broadcast.content.file_id, group.bot_token, ext);
+                if (!filePath) throw new Error(`Failed to download ${broadcast.type}.`);
+
+                const mediaOptions = { caption: broadcast.content.caption };
+                const fileStream = { source: fs.createReadStream(filePath) };
+
+                if (broadcast.type === 'photo') {
+                    await tempBot.telegram.sendPhoto(group.group_id, fileStream, mediaOptions);
+                } else if (broadcast.type === 'video') {
+                    await tempBot.telegram.sendVideo(group.group_id, fileStream, mediaOptions);
+                } else if (broadcast.type === 'document') {
+                    await tempBot.telegram.sendDocument(group.group_id, fileStream, mediaOptions);
+                } else {
+                    console.warn(`⚠️ Unsupported message type for group ${group.group_id}`);
+                    fs.unlink(filePath, () => {});
+                    failCount++;
+                    continue;
+                }
+
+                fs.unlink(filePath, () => {});
             }
 
             console.log(`✅ Message sent to ${group.title} (${group.group_id}) via @${group.bot_username}`);
