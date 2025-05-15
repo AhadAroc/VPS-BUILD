@@ -7,7 +7,7 @@ const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 // Declare ownerId at the top of your file
 let ownerId = null;
-
+const warnedUsers = new Set(); // store user or chat IDs that have been warned
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -3258,16 +3258,20 @@ if (await isDeveloper(ctx, userId)) {
         }
 
         // If we reach here, it's an unsupported message type
-        await ctx.reply('');
-
+         await ctx.reply('');
     } catch (error) {
         console.error('Error in message handler:', error);
-        await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
+
+        const userId = ctx.from?.id;
+
+        if (!warnedUsers.has(userId)) {
+            warnedUsers.add(userId);
+            await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
+        }
     }
 
     await next();
 });
-
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
