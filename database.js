@@ -472,31 +472,30 @@ async function saveQuizScore(chatId, userId, firstName, lastName, username, poin
     }
 }
 
-async function getLeaderboard(chatId) {
+async function getLeaderboard(chatId, limit = 10) {
     try {
         const db = await getDb();
         
-        // Find all quiz scores for this specific chat ID
-        const scores = await db.collection('quiz_scores')
+        console.log(`Fetching leaderboard for chat ${chatId}`);
+        
+        // Get top scores for this chat
+        const leaderboard = await db.collection('quiz_scores')
             .aggregate([
-                { $match: { chatId: chatId } }, // Filter by the specific chat ID
+                { $match: { chatId: chatId } },
                 { $group: {
-                    _id: { userId: "$userId", firstName: "$firstName", username: "$username" },
+                    _id: "$userId",
+                    firstName: { $first: "$firstName" },
+                    lastName: { $first: "$lastName" },
+                    username: { $first: "$username" },
                     totalScore: { $sum: "$score" }
                 }},
-                { $project: {
-                    _id: 0,
-                    userId: "$_id.userId",
-                    firstName: "$_id.firstName",
-                    username: "$_id.username",
-                    totalScore: 1
-                }},
                 { $sort: { totalScore: -1 } },
-                { $limit: 10 } // Show top 10 users
+                { $limit: limit }
             ])
             .toArray();
-            
-        return scores;
+        
+        console.log(`Retrieved leaderboard for chat ${chatId}, found ${leaderboard.length} entries`);
+        return leaderboard;
     } catch (error) {
         console.error('Error getting leaderboard:', error);
         return [];
