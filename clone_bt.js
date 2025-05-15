@@ -1108,11 +1108,11 @@ async function handleBroadcastGroups(ctx) {
 
     // Keep the file on the server (don't delete it)
     // If you want to delete it after broadcasting, uncomment the following:
-    // if (savedFilePath) {
-    //     fs.unlink(savedFilePath, (err) => {
-    //         if (err) console.error('Failed to delete temp file:', err);
-    //     });
-    // }
+     if (savedFilePath) {
+         fs.unlink(savedFilePath, (err) => {
+           if (err) console.error('Failed to delete temp file:', err);
+        });
+     }
 
     ctx.reply(`📢 Broadcast completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n📊 Total Groups: ${groups.length}`);
 }
@@ -1132,9 +1132,9 @@ async function handleBroadcastDM(ctx) {
         return ctx.reply('⛔ This command is only available to the admin.');
     }
 
-    const message = ctx.message.text.split(' ').slice(1).join(' ');
-    if (!message) {
-        return ctx.reply('Please provide a message to broadcast.');
+    const broadcast = extractBroadcastContent(ctx);
+    if (!broadcast) {
+        return ctx.reply('❌ Please provide a message, photo, or video to broadcast.');
     }
 
     await ctx.reply('⏳ Broadcasting to direct messages... please wait.');
@@ -1146,6 +1146,32 @@ async function handleBroadcastDM(ctx) {
             return ctx.reply('⚠️ No users found in the database.');
         }
 
+        // Download and save the media file once if it's not a text message
+        let savedFilePath = null;
+        let fileType = null;
+        
+        if (broadcast.type !== 'text') {
+            const botToken = ctx.telegram.token;
+            const fileId = broadcast.content.file_id;
+            
+            // Determine file extension based on type
+            const ext = 
+                broadcast.type === 'photo' ? 'jpg' :
+                broadcast.type === 'video' ? 'mp4' :
+                broadcast.type === 'document' ? 'pdf' : 'dat';
+            
+            fileType = broadcast.type;
+            
+            // Download the file to server
+            savedFilePath = await downloadTelegramFile(fileId, botToken, ext);
+            
+            if (!savedFilePath) {
+                return ctx.reply('❌ Failed to download media file. Broadcast canceled.');
+            }
+            
+            console.log(`✅ Media file saved to: ${savedFilePath}`);
+        }
+
         let successCount = 0;
         let failCount = 0;
 
@@ -1154,7 +1180,7 @@ async function handleBroadcastDM(ctx) {
                 let botToken;
                 let botUsername;
 
-                // 🧠 Step 1: Try to get user's assigned bot_id
+                // Try to get user's assigned bot_id
                 const groupEntry = await db.collection('groups').findOne({
                     owner_id: user.user_id,
                     type: 'bot_info'
@@ -1164,7 +1190,7 @@ async function handleBroadcastDM(ctx) {
                     botToken = groupEntry.bot_token;
                     botUsername = groupEntry.bot_username;
                 } else {
-                    // 🔁 Fallback to any available bot_info
+                    // Fallback to any available bot_info
                     const fallbackBot = await db.collection('groups').findOne({ type: 'bot_info', is_active: true });
                     if (!fallbackBot) {
                         console.warn(`⚠️ No bot token found for user ${user.user_id}`);
@@ -1176,11 +1202,25 @@ async function handleBroadcastDM(ctx) {
                     botUsername = fallbackBot.bot_username;
                 }
 
-                // 📨 Send via the correct bot
-                const Telegraf = require('telegraf').Telegraf;
+                // Send via the correct bot
                 const tempBot = new Telegraf(botToken);
 
-                await tempBot.telegram.sendMessage(user.user_id, message);
+                if (broadcast.type === 'text') {
+                    await tempBot.telegram.sendMessage(user.user_id, broadcast.content);
+                } else {
+                    // Send the saved file from the server
+                    const mediaOptions = { caption: broadcast.content.caption || '' };
+                    const fileStream = { source: fs.createReadStream(savedFilePath) };
+                    
+                    if (fileType === 'photo') {
+                        await tempBot.telegram.sendPhoto(user.user_id, fileStream, mediaOptions);
+                    } else if (fileType === 'video') {
+                        await tempBot.telegram.sendVideo(user.user_id, fileStream, mediaOptions);
+                    } else if (fileType === 'document') {
+                        await tempBot.telegram.sendDocument(user.user_id, fileStream, mediaOptions);
+                    }
+                }
+
                 console.log(`✅ DM sent to user ${user.user_id} via @${botUsername}`);
                 tempBot.stop();
                 successCount++;
@@ -1188,6 +1228,13 @@ async function handleBroadcastDM(ctx) {
                 console.error(`❌ Failed DM to ${user.user_id}:`, err.description || err);
                 failCount++;
             }
+        }
+
+        // Clean up the saved file after broadcasting
+        if (savedFilePath) {
+            fs.unlink(savedFilePath, (err) => {
+                if (err) console.error('Failed to delete temp file:', err);
+            });
         }
 
         ctx.reply(`📢 DM broadcast completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n📊 Total Users: ${users.length}`);
