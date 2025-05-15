@@ -965,15 +965,15 @@ async function showDevPanel(ctx) {
         const message = 'مرحبا عزيزي المطور\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
         const keyboard = {
             inline_keyboard: [
-                [{ text: '• الردود •', callback_data: 'dev_replies' }],
-                [{ text: '• الإذاعة •', callback_data: 'dev_broadcast' }],
-                [{ text: 'السورس', callback_data: 'dev_source' }],
-                [{ text: '• اسم البوت •', callback_data: 'dev_bot_name' }],
-                [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
-                [{ text: 'المطورين', callback_data: 'dev_developers' }],
-                [{ text: 'قريبا', callback_data: 'dev_welcome' }],
-                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
-                [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
+                 [{ text: '📲 الردود ', callback_data: 'dev_replies' }],
+                    [{ text: '🎙️ الإذاعة ', callback_data: 'dev_broadcast' }],
+                    [{ text: '🧑‍💻 السورس', callback_data: 'dev_source' }],
+                    [{ text: '🔤 اسم البوت ', callback_data: 'dev_bot_name' }],
+                    [{ text: '📊 الاحصائيات', callback_data: 'dev_statistics' }],
+                    [{ text: '💻 المطورين', callback_data: 'dev_developers' }],
+                    [{ text: '👀 قريبا', callback_data: 'dev_welcome' }],
+                    [{ text: ' ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
             ]
         };
 
@@ -1062,16 +1062,7 @@ function shuffleArray(array) {
     }
  
     
-    // Add this function to get the database for a specific bot
-async function getDatabaseForBot(botId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        return db;
-    } catch (error) {
-        console.error(`Error getting database for bot ${botId}:`, error);
-        throw error;
-    }
-}
+    
     
     async function populateActiveGroups(bot) {
         console.log('Populating active groups...');
@@ -3271,7 +3262,18 @@ if (await isDeveloper(ctx, userId)) {
 
     } catch (error) {
         console.error('Error in message handler:', error);
-        await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
+        
+        // Only send the error message once per chat
+        const chatId = ctx.chat.id;
+        if (!errorMessageSent.has(chatId)) {
+            await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
+            errorMessageSent.set(chatId, true);
+            
+            // Optional: Clear the flag after some time (e.g., 1 hour)
+            setTimeout(() => {
+                errorMessageSent.delete(chatId);
+            }, 3600000); // 1 hour in milliseconds
+        }
     }
 
     await next();
