@@ -576,12 +576,7 @@ async function checkUserSubscription(ctx) {
 
         if (subscribed) {
             subscriptionStatusCache.set(userId, true);
-
-            if (ctx.chat?.type === 'private') {
-                await showDevPanel(ctx);
-            } else {
-                await showMainMenu(ctx);
-            }
+            // Don't show menus here - just return true
             return true; // ✅ Subscribed
         } else {
             const subscriptionMessage = '⚠️ لاستخدام البوت، يرجى الاشتراك في القنوات التالية:';
