@@ -447,7 +447,7 @@ async function setupDatabase() {
 // Add a new function for quiz-related operations
 async function saveQuizScore(chatId, userId, firstName, lastName, username, points) {
     try {
-        const db = await getDb();
+        const db = await ensureDatabaseInitialized();
         
         // Update or insert the user's score
         await db.collection('quiz_scores').updateOne(
