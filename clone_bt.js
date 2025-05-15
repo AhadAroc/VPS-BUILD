@@ -201,26 +201,19 @@ async function downloadAndSendPhoto(ctx, fileId, botToken, chatId, caption, temp
 }
 async function downloadTelegramFile(fileId, botToken, ext = 'jpg') {
     try {
-        // Step 1: Use Telegram's HTTP API to get file_path
         const fileInfoUrl = `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`;
         const fileInfoRes = await axios.get(fileInfoUrl);
-
-        if (!fileInfoRes.data.ok) {
-            throw new Error('Failed to get file info');
-        }
+        if (!fileInfoRes.data.ok) throw new Error('Failed to get file info');
 
         const filePath = fileInfoRes.data.result.file_path;
-
-        // Step 2: Build download URL
         const fileUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
-
-        // Step 3: Download the file
         const fileName = `temp_${Date.now()}.${ext}`;
         const localPath = path.join(__dirname, fileName);
-        const writer = fs.createWriteStream(localPath);
-        const response = await axios({ url: fileUrl, method: 'GET', responseType: 'stream' });
 
-        response.data.pipe(writer);
+        const writer = fs.createWriteStream(localPath);
+        const streamRes = await axios({ url: fileUrl, method: 'GET', responseType: 'stream' });
+        streamRes.data.pipe(writer);
+
         await new Promise((resolve, reject) => {
             writer.on('finish', resolve);
             writer.on('error', reject);
