@@ -445,16 +445,27 @@ async function setupDatabase() {
     }
 }
 // Add a new function for quiz-related operations
-async function saveQuizScore(userId, username, firstName, score) {
+async function saveQuizScore(chatId, userId, firstName, lastName, username, points) {
     try {
-        const result = await db.collection('quiz_scores').insertOne({
-            userId,
-            username,
-            firstName,
-            score,
-            timestamp: new Date()
-        });
-        return result;
+        const db = await getDb();
+        
+        // Update or insert the user's score
+        await db.collection('quiz_scores').updateOne(
+            { chatId: chatId, userId: userId },
+            { 
+                $inc: { score: points },
+                $set: { 
+                    firstName: firstName,
+                    lastName: lastName,
+                    username: username,
+                    lastUpdated: new Date()
+                }
+            },
+            { upsert: true }
+        );
+        
+        console.log(`Saved quiz score for user ${userId} in chat ${chatId}: +${points} points`);
+        return true;
     } catch (error) {
         console.error('Error saving quiz score:', error);
         throw error;
