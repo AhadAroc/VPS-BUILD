@@ -3262,18 +3262,7 @@ if (await isDeveloper(ctx, userId)) {
 
     } catch (error) {
         console.error('Error in message handler:', error);
-        
-        // Only send the error message once per chat
-        const chatId = ctx.chat.id;
-        if (!errorMessageSent.has(chatId)) {
-            await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
-            errorMessageSent.set(chatId, true);
-            
-            // Optional: Clear the flag after some time (e.g., 1 hour)
-            setTimeout(() => {
-                errorMessageSent.delete(chatId);
-            }, 3600000); // 1 hour in milliseconds
-        }
+        await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
     }
 
     await next();
