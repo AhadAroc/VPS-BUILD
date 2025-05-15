@@ -1933,7 +1933,7 @@ bot.action('show_leaderboard', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء عرض قائمة المتصدرين.');
         await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض قائمة المتصدرين. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
-});
+})
 
 
  // Register session middleware
