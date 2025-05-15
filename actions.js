@@ -7,7 +7,7 @@ const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 // Declare ownerId at the top of your file
 let ownerId = null;
-const warnedUsers = new Set(); // store user or chat IDs that have been warned
+
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -1885,23 +1885,21 @@ const { getLeaderboard } = require('./database');
 bot.action('show_leaderboard', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        const leaderboardData = await database.getLeaderboard();
-        
-        let leaderboardText = "🏆 قائمة المتصدرين:\n\n";
-        
+
+        // Get the chat ID from the callback context
+        const chatId = ctx.chat?.id || ctx.callbackQuery.message.chat.id;
+
+        // Fetch leaderboard data for this specific group
+        const leaderboardData = await database.getLeaderboard(chatId);
+
+        let leaderboardText = "🏆 قائمة المتصدرين في هذه المجموعة:\n\n";
+
         if (leaderboardData.length > 0) {
-            // Add medal emojis for top 3
             const medals = ['🥇', '🥈', '🥉'];
-            
+
             leaderboardData.forEach((entry, index) => {
                 const name = entry.firstName || entry.username || 'مستخدم مجهول';
-                let prefix = `${index + 1}.`;
-                
-                // Add medal for top 3
-                if (index < 3) {
-                    prefix = medals[index];
-                }
-                
+                const prefix = index < 3 ? medals[index] : `${index + 1}.`;
                 leaderboardText += `${prefix} ${name}: ${entry.totalScore} نقطة\n`;
             });
         } else {
@@ -1914,14 +1912,13 @@ bot.action('show_leaderboard', async (ctx) => {
             ]
         };
 
+        // Edit the appropriate message type
         if (ctx.callbackQuery.message.photo) {
-            // If the original message was a photo, edit the caption
             await ctx.editMessageCaption(leaderboardText, {
                 parse_mode: 'Markdown',
                 reply_markup: replyMarkup
             });
         } else {
-            // If it was a text message, edit the text
             await ctx.editMessageText(leaderboardText, {
                 parse_mode: 'Markdown',
                 reply_markup: replyMarkup
@@ -1933,6 +1930,7 @@ bot.action('show_leaderboard', async (ctx) => {
         await ctx.reply('عذرًا، حدث خطأ أثناء محاولة عرض قائمة المتصدرين. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 });
+
 
  // Register session middleware
 //bot.use(Scenes.session());
@@ -3258,20 +3256,16 @@ if (await isDeveloper(ctx, userId)) {
         }
 
         // If we reach here, it's an unsupported message type
-         await ctx.reply('');
+        await ctx.reply('');
+
     } catch (error) {
         console.error('Error in message handler:', error);
-
-        const userId = ctx.from?.id;
-
-        if (!warnedUsers.has(userId)) {
-            warnedUsers.add(userId);
-            await ctx.reply('يرجى رفعي لادمن لغرض التشغيل 🫶');
-        }
+        await ctx.reply('');
     }
 
     await next();
 });
+
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
