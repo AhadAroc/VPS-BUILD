@@ -2699,6 +2699,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const userState = pendingReplies.get(userId);
         const text = ctx.message.text?.trim();
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+        const userAnswer = ctx.message.text.trim().toLowerCase();
         if (ctx.session.awaitingBotName) {
             const newBotName = ctx.message.text.trim();
             const chatId = ctx.chat.id;
@@ -3046,6 +3047,66 @@ if (reply) {
             
         } catch (error) {
             console.error('Error in text handler:', error);
+        }
+         // Check if there's an active quiz in this chat
+        if (!activeQuizzes.has(chatId) || activeQuizzes.get(chatId).state !== QUIZ_STATE.ACTIVE) {
+            return; // No active quiz, so continue with other handlers
+        }
+        
+        const quiz = activeQuizzes.get(chatId);
+        const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
+        
+        if (!currentQuestion) {
+            return; // No current question
+        }
+        
+        // Check if this user has already attempted this question
+        if (quiz.attempts.has(`${userId}_${quiz.currentQuestionIndex}`)) {
+            return; // User already attempted this question
+        }
+        
+        // Mark that this user has attempted this question
+        quiz.attempts.set(`${userId}_${quiz.currentQuestionIndex}`, true);
+        
+        // Check if the answer is correct (case insensitive comparison)
+        const correctAnswer = currentQuestion.answer.toLowerCase();
+        const isCorrect = userAnswer === correctAnswer;
+        
+        if (isCorrect) {
+            // Update user's score
+            const currentScore = quiz.scores.get(userId) || 0;
+            quiz.scores.set(userId, currentScore + 1);
+            
+            // Get user info for the leaderboard
+            const firstName = ctx.from.first_name || '';
+            const lastName = ctx.from.last_name || '';
+            const username = ctx.from.username || '';
+            
+            // Save the score to the database
+            try {
+                await database.saveQuizScore(chatId, userId, firstName, lastName, username, 1);
+            } catch (dbError) {
+                console.error('Error saving quiz score:', dbError);
+            }
+            
+            // Clear any pending timeouts for this question
+            while (quiz.timeouts.length) {
+                clearTimeout(quiz.timeouts.pop());
+            }
+            
+            // Send congratulatory message
+            await ctx.reply(`🎉 إجابة صحيحة من ${firstName}! (+1 نقطة)`);
+            
+            // Move to the next question
+            quiz.currentQuestionIndex++;
+            
+            // Check if we've reached the end of the quiz
+            if (quiz.currentQuestionIndex >= quiz.questions.length) {
+                await endQuiz(ctx, chatId);
+            } else {
+                // Ask the next question after a short delay
+                setTimeout(() => askNextQuestion(chatId, ctx.telegram), 2000);
+            }
         }
     });
 
