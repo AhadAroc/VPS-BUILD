@@ -346,23 +346,31 @@ async function showHelp(ctx) {
     }
 }
 
-async function getLeaderboard() {
+async function getLeaderboard(groupId) {
     try {
         const db = await ensureDatabaseInitialized();
+
         const leaderboard = await db.collection('quiz_scores')
             .aggregate([
-                { $group: { 
-                    _id: "$userId", 
-                    totalScore: { $sum: "$score" },
-                    username: { $first: "$username" },
-                    firstName: { $first: "$firstName" }
-                }},
+                { $match: { chatId: groupId } }, // 🔍 filter by group/chat ID
+                {
+                    $group: {
+                        _id: "$userId",
+                        totalScore: { $sum: "$score" },
+                        username: { $first: "$username" },
+                        firstName: { $first: "$firstName" }
+                    }
+                },
                 { $sort: { totalScore: -1 } },
                 { $limit: 10 }
             ])
             .toArray();
 
-        let leaderboardText = "🏆 قائمة المتصدرين:\n\n";
+        if (!leaderboard.length) {
+            return "ℹ️ لا يوجد مشاركون بعد في هذه المجموعة.";
+        }
+
+        let leaderboardText = "🏆 قائمة المتصدرين في هذه المجموعة:\n\n";
         leaderboard.forEach((entry, index) => {
             const name = entry.firstName || entry.username || 'مستخدم مجهول';
             leaderboardText += `${index + 1}. ${name}: ${entry.totalScore} نقطة\n`;
@@ -370,10 +378,11 @@ async function getLeaderboard() {
 
         return leaderboardText;
     } catch (error) {
-        console.error('Error fetching leaderboard:', error);
+        console.error('Error fetching group leaderboard:', error);
         return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
     }
 }
+
 async function showQuizMenu(ctx) {
     try {
         const userId = ctx.from.id;
@@ -1793,14 +1802,14 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
             const message = 'مرحبا عزيزي المطور\nإليك ازرار التحكم بالاقسام\nتستطيع التحكم بجميع الاقسام فقط اضغط على القسم الذي تريده';
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '• الردود •', callback_data: 'dev_replies' }],
-                    [{ text: '• الإذاعة •', callback_data: 'dev_broadcast' }],
-                    [{ text: 'السورس', callback_data: 'dev_source' }],
-                    [{ text: '• اسم البوت •', callback_data: 'dev_bot_name' }],
-                    [{ text: 'الاحصائيات', callback_data: 'dev_statistics' }],
-                    [{ text: 'المطورين', callback_data: 'dev_developers' }],
-                    [{ text: 'قريبا', callback_data: 'dev_welcome' }],
-                    [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                     [{ text: '📲 الردود ', callback_data: 'dev_replies' }],
+                    [{ text: '🎙️ الإذاعة ', callback_data: 'dev_broadcast' }],
+                    [{ text: '🧑‍💻 السورس', callback_data: 'dev_source' }],
+                    [{ text: '🔤 اسم البوت ', callback_data: 'dev_bot_name' }],
+                    [{ text: '📊 الاحصائيات', callback_data: 'dev_statistics' }],
+                    [{ text: '💻 المطورين', callback_data: 'dev_developers' }],
+                    [{ text: '👀 قريبا', callback_data: 'dev_welcome' }],
+                    [{ text: ' ctrlsrc', url: 'https://t.me/ctrlsrc' }],
                     [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
                 ]
             };
