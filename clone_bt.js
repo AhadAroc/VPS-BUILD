@@ -1033,6 +1033,32 @@ async function handleBroadcastGroups(ctx) {
         return ctx.reply('⚠️ No groups found to broadcast to.');
     }
 
+    // Download and save the media file once if it's not a text message
+    let savedFilePath = null;
+    let fileType = null;
+    
+    if (broadcast.type !== 'text') {
+        const botToken = ctx.telegram.token;
+        const fileId = broadcast.content.file_id;
+        
+        // Determine file extension based on type
+        const ext = 
+            broadcast.type === 'photo' ? 'jpg' :
+            broadcast.type === 'video' ? 'mp4' :
+            broadcast.type === 'document' ? 'pdf' : 'dat';
+        
+        fileType = broadcast.type;
+        
+        // Download the file to server
+        savedFilePath = await downloadTelegramFile(fileId, botToken, ext);
+        
+        if (!savedFilePath) {
+            return ctx.reply('❌ Failed to download media file. Broadcast canceled.');
+        }
+        
+        console.log(`✅ Media file saved to: ${savedFilePath}`);
+    }
+
     let successCount = 0;
     let failCount = 0;
 
@@ -1058,35 +1084,17 @@ async function handleBroadcastGroups(ctx) {
             if (broadcast.type === 'text') {
                 await tempBot.telegram.sendMessage(group.group_id, broadcast.content);
             } else {
-                const ext =
-                    broadcast.type === 'photo' ? 'jpg' :
-                    broadcast.type === 'video' ? 'mp4' :
-                    broadcast.type === 'document' ? 'pdf' : 'dat';
-
-                const fileSaveResult = await downloadAndSaveTelegramFile(broadcast.content.file_id, group.bot_token);
-                if (!fileSaveResult || !fileSaveResult.filePath) throw new Error('Failed to download media.');
-
-                const filePath = fileSaveResult.filePath;
+                // Send the saved file from the server
                 const mediaOptions = { caption: broadcast.content.caption || '' };
-                const fileStream = { source: fs.createReadStream(filePath) };
-
-                if (broadcast.type === 'photo') {
+                const fileStream = { source: fs.createReadStream(savedFilePath) };
+                
+                if (fileType === 'photo') {
                     await tempBot.telegram.sendPhoto(group.group_id, fileStream, mediaOptions);
-                } else if (broadcast.type === 'video') {
+                } else if (fileType === 'video') {
                     await tempBot.telegram.sendVideo(group.group_id, fileStream, mediaOptions);
-                } else if (broadcast.type === 'document') {
+                } else if (fileType === 'document') {
                     await tempBot.telegram.sendDocument(group.group_id, fileStream, mediaOptions);
-                } else {
-                    console.warn(`⚠️ Unsupported message type for group ${group.group_id}`);
-                    fs.unlink(filePath, () => {});
-                    failCount++;
-                    continue;
                 }
-
-                // Delete the temporary file after sending
-                fs.unlink(filePath, (err) => {
-                    if (err) console.error('Failed to delete temp file:', err);
-                });
             }
 
             console.log(`✅ Message sent to ${group.title} (${group.group_id}) via @${group.bot_username}`);
@@ -1097,6 +1105,14 @@ async function handleBroadcastGroups(ctx) {
             failCount++;
         }
     }
+
+    // Keep the file on the server (don't delete it)
+    // If you want to delete it after broadcasting, uncomment the following:
+    // if (savedFilePath) {
+    //     fs.unlink(savedFilePath, (err) => {
+    //         if (err) console.error('Failed to delete temp file:', err);
+    //     });
+    // }
 
     ctx.reply(`📢 Broadcast completed.\n\n✅ Successful: ${successCount}\n❌ Failed: ${failCount}\n📊 Total Groups: ${groups.length}`);
 }
