@@ -561,7 +561,7 @@ async function checkUserRank(ctx) {
             }
         }
 
-        // Send the rank information
+        // Send the rank informationرفع مميز
         await ctx.replyWithHTML(`<b>رتبتك:</b> ${rank}`);
     } catch (error) {
         console.error('Error in checkUserRank:', error);
@@ -1662,7 +1662,28 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
    
 }
 
+async function demoteFromVIP(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const targetUser = ctx.message.reply_to_message ? ctx.message.reply_to_message.from : null;
 
+        if (!targetUser) {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم الذي تريد تنزيله من قائمة المميزين.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const result = await db.collection('vip_users').deleteOne({ user_id: targetUser.id });
+
+        if (result.deletedCount > 0) {
+            await ctx.reply(`✅ تم تنزيل المستخدم @${targetUser.username || targetUser.first_name} من قائمة المميزين.`);
+        } else {
+            await ctx.reply('❌ لم يتم العثور على المستخدم في قائمة المميزين.');
+        }
+    } catch (error) {
+        console.error('Error in demoteFromVIP:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من قائمة المميزين.');
+    }
+}
     async function updateActiveGroups(ctx) {
         try {
             const userId = ctx.from.id;
