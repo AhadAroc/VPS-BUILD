@@ -1552,13 +1552,19 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 
 async function isVIP(ctx, userId) {
     try {
+
         const db = await getDatabaseForBot('replays');
         const user = await db.collection('vip_users').findOne({ user_id: userId });
         console.log('User data for VIP check:', user);
         return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
+
+        const db = await ensureDatabaseInitialized(); // Ensure this function is defined and returns a database connection
+        const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
+        return !!vipUser; // Returns true if the user is found in the vip_users collection
+
     } catch (error) {
         console.error('Error checking VIP status:', error);
-        return false;
+        return false; // Return false in case of any error
     }
 }
 async function setUserAsVIP(userId) {
