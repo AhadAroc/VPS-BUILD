@@ -401,7 +401,7 @@ async function showQuizMenu(ctx) {
         
         // Check if the user is an admin, owner, or VIP
         const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId); // Ensure this function checks the 'vip_users' collection
 
         if (!isAdmin && !isVIPUser) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
@@ -2315,7 +2315,7 @@ async function listImportantUsers(ctx) {
                 case 'مميز':
                 case 'vip':
                     collection = 'vip_users';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى من مسابقات (VIP).`;
+                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
                     break;
                 case 'ادمن':
                 case 'admin':
