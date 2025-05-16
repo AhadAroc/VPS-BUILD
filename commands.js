@@ -157,7 +157,9 @@ async function photoRestrictionMiddleware(ctx, next) {
         const chatId = ctx.chat.id;
         if (photoRestrictionStatus.get(chatId)) {
             const userId = ctx.from.id;
-            if (await isAdminOrOwner(ctx, userId) || await isVIP(ctx, userId)) {
+            
+            // Check if the user is an admin, VIP, or important
+            if (await isAdminOrOwner(ctx, userId) || await isVIP(ctx, userId) || await isImportant(ctx, userId)) {
                 return next();
             } else {
                 try {
