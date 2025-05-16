@@ -546,6 +546,11 @@ async function checkUserRank(ctx) {
                     if (isSecDev) {
                         rank = 'مطور ثانوي';
                     } else {
+                        // Check if the user is an important person
+                        const isImportant = await isImportant(ctx, userId);
+                        if (isImportant) {
+                            rank = 'مميز (Important)';
+                        }
                         // Check if user is VIP
                         const isVipUser = await isVIP(ctx, userId);
                         if (isVipUser) {
@@ -1239,8 +1244,16 @@ bot.command('ترقية_مطور', async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
 // Add these command handlers to your bot setup
-bot.command('رفع_مميز', promoteToVIP);
-bot.hears(/^رفع مميز/, promoteToVIP);
+bot.command('رفع_مميز', promoteToImportant);
+bot.hears(/^رفع مميز/, promoteToImportant);
+bot.command('تنزيل_مميز', demoteFromImportant);
+bot.hears(/^تنزيل مميز/, demoteFromImportant);
+
+// Update command handlers for listing important users
+bot.command('لستة_مميز', listImportantUsers);
+bot.hears('لستة مميز', listImportantUsers);
+bot.command('قائمة_المميزين', listImportantUsers);
+bot.hears('قائمة المميزين', listImportantUsers);
 bot.hears(/^ترقية مطور/, async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
@@ -1490,7 +1503,7 @@ bot.hears('بدء', async (ctx) => {
     }
 });
 
-async function promoteToVIP(ctx) {
+async function promoteToImportant(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
@@ -1517,24 +1530,24 @@ async function promoteToVIP(ctx) {
 
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is already a VIP
-        const existingVIP = await db.collection('vip_users').findOne({ user_id: userId });
-        if (existingVIP) {
-            return ctx.reply('هذا المستخدم مميز (VIP) بالفعل.');
+        // Check if the user is already an important person
+        const existingImportant = await db.collection('important_users').findOne({ user_id: userId });
+        if (existingImportant) {
+            return ctx.reply('هذا المستخدم مميز (Important) بالفعل.');
         }
 
-        // Add the user to the VIP collection
-        await db.collection('vip_users').insertOne({
+        // Add the user to the important collection
+        await db.collection('important_users').insertOne({
             user_id: userId,
             promoted_at: new Date(),
             promoted_by: ctx.from.id
         });
 
-        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز (VIP) بنجاح.`);
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز (Important) بنجاح.`);
 
     } catch (error) {
-        console.error('Error in promoteToVIP:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مميز (VIP).');
+        console.error('Error in promoteToImportant:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مميز (Important).');
     }
 }
 
@@ -2000,7 +2013,7 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
 
 
     
-async function demoteFromVIP(ctx) {
+async function demoteFromImportant(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
@@ -2027,23 +2040,51 @@ async function demoteFromVIP(ctx) {
 
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is a VIP
-        const existingVIP = await db.collection('vip_users').findOne({ user_id: userId });
-        if (!existingVIP) {
-            return ctx.reply('هذا المستخدم ليس مميز (VIP) بالفعل.');
+        // Check if the user is an important person
+        const existingImportant = await db.collection('important_users').findOne({ user_id: userId });
+        if (!existingImportant) {
+            return ctx.reply('هذا المستخدم ليس مميز (Important) بالفعل.');
         }
 
-        // Remove the user from the VIP collection
-        await db.collection('vip_users').deleteOne({ user_id: userId });
+        // Remove the user from the important collection
+        await db.collection('important_users').deleteOne({ user_id: userId });
 
-        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من مميز (VIP) بنجاح.`);
+        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من مميز (Important) بنجاح.`);
 
     } catch (error) {
-        console.error('Error in demoteFromVIP:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من مميز (VIP).');
+        console.error('Error in demoteFromImportant:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من مميز (Important).');
     }
 }
 
+// Add this function to list important users
+async function listImportantUsers(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const importantUsers = await db.collection('important_users').find().toArray();
+
+        if (importantUsers.length === 0) {
+            return ctx.reply('لا يوجد مستخدمين مميزين (Important) حاليًا.');
+        }
+
+        let message = '📋 قائمة المستخدمين المميزين (Important):\n\n';
+        for (const user of importantUsers) {
+            const userMention = user.username ? 
+                `@${user.username}` : 
+                `[المستخدم](tg://user?id=${user.user_id})`;
+            message += `• ${userMention} (ID: ${user.user_id})\n`;
+        }
+
+        await ctx.replyWithMarkdown(message);
+    } catch (error) {
+        console.error('Error listing important users:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
+    }
+}
 
   
     
