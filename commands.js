@@ -1235,9 +1235,7 @@ bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 // Text handler for "ترقية ثانوي" (without underscore)
 bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
 
-// Add these command handlers to your bot setup
-bot.command('تنزيل_مميز', demoteFromVIP);
-bot.hears(/^تنزيل مميز/, demoteFromVIP);
+
 
 // Additional handler for flexibility
 bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
