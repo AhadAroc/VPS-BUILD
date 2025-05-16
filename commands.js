@@ -100,6 +100,7 @@ async function getLatestGroupsMembersState(botId, userId) {
                     ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
                     👥 *اسم المجموعة:* ${ctx.chat.title || 'Unknown'}
                     🆔 *ايدي المجموعة:* ${ctx.chat.id}
+                    ⌯ رابط المجموعة ⌯: ${groupLink}
                 `;
                 try {
                     await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
@@ -548,7 +549,7 @@ async function checkUserRank(ctx) {
                         // Check if user is VIP
                         const isVipUser = await isVIP(ctx, userId);
                         if (isVipUser) {
-                            rank = 'امن مسابقا ت';
+                            rank = 'ادمن مسابقات';
                         }
                     }
                 }
@@ -940,54 +941,64 @@ function setupCommands(bot) {
         }
     });
     bot.on('new_chat_members', async (ctx) => {
-        const newMembers = ctx.message.new_chat_members;
-        if (!newMembers || newMembers.length === 0) return;
-    
-        const botInfo = await ctx.telegram.getMe();
-        const isBotAdded = newMembers.some(member => member.id === botInfo.id);
-    
-        if (isBotAdded) {
-            const chatTitle = ctx.chat.title || 'Unknown';
-            const chatId = ctx.chat.id;
-    
-            // ===== Save group to DB =====
-            const { getDatabaseForBot } = require('./database');
-const db = await getDatabaseForBot('test');   // FOR GROUP SAVE ON JOIN
+    const newMembers = ctx.message.new_chat_members;
+    if (!newMembers || newMembers.length === 0) return;
 
-            await db.collection('groups').updateOne(
-                { group_id: chatId, bot_id: config.botId },
-                {
-                    $set: {
-                        group_id: chatId,
-                        title: chatTitle,
-                        is_active: true,
-                        bot_id: config.botId,
-                        added_at: new Date()
-                    }
-                },
-                { upsert: true }
-            );
-    
-            console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
-    
-            // ===== Send notification to owner + developers =====
-            const message = `
-    ⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
-    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-    ⌯ اسم المجموعة ⌯: ${chatTitle}
-    ⌯ ايدي المجموعة ⌯: ${chatId}
-            `;
-    
-            const recipients = [ownerId, ...developerIds];
-            for (const recipientId of recipients) {
-                try {
-                    await ctx.telegram.sendMessage(recipientId, message);
-                } catch (error) {
-                    console.error(`Error sending message to ${recipientId}:`, error);
+    const botInfo = await ctx.telegram.getMe();
+    const isBotAdded = newMembers.some(member => member.id === botInfo.id);
+
+    if (isBotAdded) {
+        const chatTitle = ctx.chat.title || 'Unknown';
+        const chatId = ctx.chat.id;
+
+        // ===== Save group to DB =====
+        const { getDatabaseForBot } = require('./database');
+        const db = await getDatabaseForBot('test'); // FOR GROUP SAVE ON JOIN
+
+        await db.collection('groups').updateOne(
+            { group_id: chatId, bot_id: config.botId },
+            {
+                $set: {
+                    group_id: chatId,
+                    title: chatTitle,
+                    is_active: true,
+                    bot_id: config.botId,
+                    added_at: new Date()
                 }
+            },
+            { upsert: true }
+        );
+
+        console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) for bot_id ${config.botId}`);
+
+        // ===== Get group link =====
+        let groupLink = 'Unavailable';
+        try {
+            const chat = await ctx.telegram.getChat(chatId);
+            groupLink = chat.invite_link || 'Unavailable';
+        } catch (error) {
+            console.error('Error fetching group link:', error);
+        }
+
+        // ===== Send notification to owner + developers =====
+        const message = `
+⌯ تم إضافة/تفعيل البوت إلى المجموعة ⌯
+┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+⌯ اسم المجموعة ⌯: ${chatTitle}
+⌯ ايدي المجموعة ⌯: ${chatId}
+⌯ رابط المجموعة ⌯: ${groupLink}
+        `;
+
+        const recipients = [ownerId, ...developerIds];
+        for (const recipientId of recipients) {
+            try {
+                await ctx.telegram.sendMessage(recipientId, message);
+            } catch (error) {
+                console.error(`Error sending message to ${recipientId}:`, error);
             }
         }
-    });
+    }
+});
     
     
     bot.on('left_chat_member', async (ctx) => {
@@ -1270,8 +1281,8 @@ bot.command('ترقية_مميز', (ctx) => promoteUser(ctx, 'مميز'));
 bot.command('تنزيل_مميز', demoteUser);
 
 // Add hears handlers for promoting and demoting VIP users
-bot.hears(/^رفع امن مسابقات/, (ctx) => promoteUser(ctx, 'مميز'));
-bot.hears(/^تنزيل امن مسابقات/, demoteUser);
+bot.hears(/^رفع ادمن مسابقات/, (ctx) => promoteUser(ctx, 'مميز'));
+bot.hears(/^تنزيل ادمن مسابقات/, demoteUser);
 
 bot.command('معرفي', (ctx) => showUserId(ctx));
 
@@ -1473,7 +1484,53 @@ bot.hears('بدء', async (ctx) => {
     }
 });
 
+async function promoteToVIP(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
+        } else {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته إلى مميز.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        
+        // Check if the user is already a VIP
+        const existingVIP = await db.collection('vip_users').findOne({ user_id: userId });
+        if (existingVIP) {
+            return ctx.reply('هذا المستخدم مميز (VIP) بالفعل.');
+        }
+
+        // Add the user to the VIP collection
+        await db.collection('vip_users').insertOne({
+            user_id: userId,
+            promoted_at: new Date(),
+            promoted_by: ctx.from.id
+        });
+
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز (VIP) بنجاح.`);
+
+    } catch (error) {
+        console.error('Error in promoteToVIP:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مميز (VIP).');
+    }
+}
 
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
@@ -2277,7 +2334,7 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
                     });
                     break;
                 case 'vip_users':
-                    successMessage = `✅ تم إزالة رتبة امن المسابقات (VIP) من المستخدم ${userMention}.`;
+                    successMessage = `✅ تم إزالة رتبة ادمن المسابقات (VIP) من المستخدم ${userMention}.`;
                     // Reset user permissions to default
                     await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
                         can_send_messages: true,
