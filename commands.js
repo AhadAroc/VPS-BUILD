@@ -651,6 +651,54 @@ async function isSubscribed(ctx, userId) {
         };
     }
 }
+async function checkUserRank(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        let rank = 'عضو عادي'; // Default rank
+
+        // Check if user is the owner
+        if (ctx.from.username === 'Lorisiv') {
+            rank = 'المطور الأساسي';
+        } else {
+            // Check if user is an admin or owner of the group
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            if (isAdmin) {
+                const chatMember = await ctx.telegram.getChatMember(chatId, userId);
+                rank = chatMember.status === 'creator' ? 'المالك' : 'مشرف';
+            } else {
+                // Check if user is a developer
+                const isDev = await isDeveloper(ctx, userId);
+                if (isDev) {
+                    rank = 'مطور';
+                } else {
+                    // Check if user is a secondary developer
+                    const isSecDev = await isSecondaryDeveloper(ctx, userId);
+                    if (isSecDev) {
+                        rank = 'مطور ثانوي';
+                    } else {
+                        // Check if the user is an important person
+                        const isImportant = await isImportant(ctx, userId);
+                        if (isImportant) {
+                            rank = 'مميز (Important)';
+                        }
+                        // Check if user is VIP
+                        const isVipUser = await isVIP(ctx, userId);
+                        if (isVipUser) {
+                            rank = 'ادمن مسابقات';
+                        }
+                    }
+                }
+            }
+        }
+
+        // Send the rank informationرفع مميز
+        await ctx.replyWithHTML(`<b>رتبتك:</b> ${rank}`);
+    } catch (error) {
+        console.error('Error in checkUserRank:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
+    }
+}
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
     bot.use(async (ctx, next) => {
@@ -1769,54 +1817,7 @@ async function demoteFromVIP(ctx) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور.');
         }
     }
-    async function checkUserRank(ctx) {
-    try {
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-        let rank = 'عضو عادي'; // Default rank
-
-        // Check if user is the owner
-        if (ctx.from.username === 'Lorisiv') {
-            rank = 'المطور الأساسي';
-        } else {
-            // Check if user is an admin or owner of the group
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            if (isAdmin) {
-                const chatMember = await ctx.telegram.getChatMember(chatId, userId);
-                rank = chatMember.status === 'creator' ? 'المالك' : 'مشرف';
-            } else {
-                // Check if user is a developer
-                const isDev = await isDeveloper(ctx, userId);
-                if (isDev) {
-                    rank = 'مطور';
-                } else {
-                    // Check if user is a secondary developer
-                    const isSecDev = await isSecondaryDeveloper(ctx, userId);
-                    if (isSecDev) {
-                        rank = 'مطور ثانوي';
-                    } else {
-                        // Check if the user is an important person
-                        const isImportant = await isImportant(ctx, userId);
-                        if (isImportant) {
-                            rank = 'مميز (Important)';
-                        }
-                        // Check if user is VIP
-                        const isVipUser = await isVIP(ctx, userId);
-                        if (isVipUser) {
-                            rank = 'ادمن مسابقات';
-                        }
-                    }
-                }
-            }
-        }
-
-        // Send the rank informationرفع مميز
-        await ctx.replyWithHTML(`<b>رتبتك:</b> ${rank}`);
-    } catch (error) {
-        console.error('Error in checkUserRank:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
-    }
-}
+    
     async function showDevPanel(ctx) {
         try {
             if (ctx.chat.type !== 'private') {
