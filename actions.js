@@ -1848,7 +1848,26 @@ bot.action('show_commands', async (ctx) => {
             '🔹 */نكتة* – إرسال نكتة\n' +
             '🔹 */طرد* – طرد مستخدم\n';
 
-        // Second part of the message
+        // Send the first part with a "Next" button
+        await ctx.editMessageCaption(commandsPart1, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
+                    [{ text: '🔙 رجوع', callback_data: 'back' }]
+                ]
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in show_commands action:', error);
+        ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
+
+// Handle the "Next" button to show the second part
+bot.action('show_commands_part2', async (ctx) => {
+    try {
         const commandsPart2 = 
             '🔹 */مسح الصور* – حذف آخر الصور المرسلة\n' +
             '🔹 */منع الصور* – منع إرسال الصور\n' +
@@ -1861,24 +1880,17 @@ bot.action('show_commands', async (ctx) => {
             '🔹 */منع متحركة* – منع إرسال الصور المتحركة\n' +
             '🔹 */تفعيل متحركة* – السماح بإرسال الصور المتحركة';
 
-        // Send the first part
-        await ctx.editMessageCaption(commandsPart1, {
+        await ctx.editMessageCaption(commandsPart2, {
             parse_mode: 'Markdown',
             reply_markup: {
-                inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back' }]]
-            }
-        });
-
-        // Send the second part
-        await ctx.reply(commandsPart2, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back' }]]
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+                ]
             }
         });
 
     } catch (error) {
-        console.error('Error in show_commands action:', error);
+        console.error('Error in show_commands_part2 action:', error);
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
