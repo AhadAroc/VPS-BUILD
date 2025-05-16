@@ -663,42 +663,33 @@ async function checkUserRank(ctx) {
         } else {
             // Check if user is an admin or owner of the group
             const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isDev = await isDeveloper(ctx, userId);
+            const isSecDev = await isSecondaryDeveloper(ctx, userId);
+            const isImportantUser = await isImportant(ctx, userId);
+            const isVipUser = await isVIP(ctx, userId);
+
             if (isAdmin) {
                 const chatMember = await ctx.telegram.getChatMember(chatId, userId);
                 rank = chatMember.status === 'creator' ? 'المالك' : 'مشرف';
-            } else {
-                // Check if user is a developer
-                const isDev = await isDeveloper(ctx, userId);
-                if (isDev) {
-                    rank = 'مطور';
-                } else {
-                    // Check if user is a secondary developer
-                    const isSecDev = await isSecondaryDeveloper(ctx, userId);
-                    if (isSecDev) {
-                        rank = 'مطور ثانوي';
-                    } else {
-                        // Check if the user is an important person
-                        const isImportant = await isImportant(ctx, userId);
-                        if (isImportant) {
-                            rank = 'مميز (Important)';
-                        }
-                        // Check if user is VIP
-                        const isVipUser = await isVIP(ctx, userId);
-                        if (isVipUser) {
-                            rank = 'ادمن مسابقات';
-                        }
-                    }
-                }
+            } else if (isDev) {
+                rank = 'مطور';
+            } else if (isSecDev) {
+                rank = 'مطور ثانوي';
+            } else if (isImportantUser) {
+                rank = 'مميز (Important)';
+            } else if (isVipUser) {
+                rank = 'ادمن مسابقات';
             }
         }
 
-        // Send the rank informationرفع مميز
+        // Send the rank information
         await ctx.replyWithHTML(`<b>رتبتك:</b> ${rank}`);
     } catch (error) {
         console.error('Error in checkUserRank:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
     }
 }
+
 // Add this function to check if a user is important
 async function isImportant(ctx, userId) {
     try {
