@@ -187,9 +187,12 @@ async function linkRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.entities && ctx.message.entities.some(e => e.type === 'url')) {
         const chatId = ctx.chat.id;
         if (linkRestrictionStatus.get(chatId)) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            const isVipUser = await isVIP(ctx, ctx.from.id);
-            if (!isAdmin && !isVipUser) {
+            const userId = ctx.from.id;
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVipUser = await isVIP(ctx, userId);
+            const isImportantUser = await isImportant(ctx, userId);
+
+            if (!isAdmin && !isVipUser && !isImportantUser) {
                 try {
                     await ctx.deleteMessage();
                     await ctx.reply('❌ عذرًا، تم منع مشاركة الروابط للأعضاء العاديين في هذه المجموعة.');
@@ -206,9 +209,12 @@ async function videoRestrictionMiddleware(ctx, next) {
     if (ctx.message && (ctx.message.video || (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('video/')))) {
         const chatId = ctx.chat.id;
         if (videoRestrictionStatus.get(chatId)) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            const isVipUser = await isVIP(ctx, ctx.from.id);
-            if (!isAdmin && !isVipUser) {
+            const userId = ctx.from.id;
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVipUser = await isVIP(ctx, userId);
+            const isImportantUser = await isImportant(ctx, userId);
+
+            if (!isAdmin && !isVipUser && !isImportantUser) {
                 try {
                     await ctx.deleteMessage();
                     await ctx.reply('❌ عذرًا، تم تعطيل إرسال الفيديوهات للأعضاء العاديين في هذه المجموعة.');
@@ -225,8 +231,11 @@ async function gifRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.animation) {
         const chatId = ctx.chat.id;
         if (gifRestrictionStatus.get(chatId)) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            if (!isAdmin) {
+            const userId = ctx.from.id;
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isImportantUser = await isImportant(ctx, userId);
+
+            if (!isAdmin && !isImportantUser) {
                 try {
                     await ctx.deleteMessage();
                     await ctx.reply('❌ عذرًا، تم تعطيل إرسال الصور المتحركة للأعضاء العاديين في هذه المجموعة.');
