@@ -699,6 +699,17 @@ async function checkUserRank(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
     }
 }
+// Add this function to check if a user is important
+async function isImportant(ctx, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const importantUser = await db.collection('important_users').findOne({ user_id: userId });
+        return !!importantUser;
+    } catch (error) {
+        console.error('Error checking important status:', error);
+        return false;
+    }
+}
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
     bot.use(async (ctx, next) => {
