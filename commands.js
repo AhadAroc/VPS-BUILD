@@ -1996,7 +1996,49 @@ async function updateActiveGroup(chatId, chatTitle, userId) {
 
 
     
+async function demoteFromVIP(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
+        } else {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لتنزيله من مميز.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        
+        // Check if the user is a VIP
+        const existingVIP = await db.collection('vip_users').findOne({ user_id: userId });
+        if (!existingVIP) {
+            return ctx.reply('هذا المستخدم ليس مميز (VIP) بالفعل.');
+        }
+
+        // Remove the user from the VIP collection
+        await db.collection('vip_users').deleteOne({ user_id: userId });
+
+        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من مميز (VIP) بنجاح.`);
+
+    } catch (error) {
+        console.error('Error in demoteFromVIP:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من مميز (VIP).');
+    }
+}
 
 
   
@@ -2822,7 +2864,9 @@ async function getGroupLink(ctx) {
 
 
 
-
+// Add these command handlers to your bot setup
+bot.command('تنزيل_مميز', demoteFromVIP);
+bot.hears(/^تنزيل مميز/, demoteFromVIP);
 
 
 
