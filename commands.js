@@ -119,9 +119,8 @@ async function getLatestGroupsMembersState(botId, userId) {
 async function isVIP(ctx, userId) {
     try {
         const db = await ensureDatabaseInitialized();
-        const user = await db.collection('vip_users').findOne({ user_id: userId });
-        console.log('User data for VIP check:', user);
-        return !!user; // Returns true if the user is found in the vip_users collection, false otherwise
+        const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
+        return !!vipUser;
     } catch (error) {
         console.error('Error checking VIP status:', error);
         return false;
@@ -157,12 +156,13 @@ async function photoRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.photo) {
         const chatId = ctx.chat.id;
         if (photoRestrictionStatus.get(chatId)) {
-            const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-            const isVipUser = await isVIP(ctx, ctx.from.id);
-            if (!isAdmin && !isVipUser) {
+            const userId = ctx.from.id;
+            if (await isAdminOrOwner(ctx, userId) || await isVIP(ctx, userId)) {
+                return next();
+            } else {
                 try {
                     await ctx.deleteMessage();
-                    await ctx.reply('❌ عذرًا، تم تعطيل إرسال الصور للأعضاء العاديين في هذه المجموعة.');
+                    await ctx.reply('❌ عذرًا، مشاركة الصور مقيدة للأعضاء العاديين في هذه المجموعة.');
                 } catch (error) {
                     console.error('Error in photoRestrictionMiddleware:', error);
                 }
@@ -1234,7 +1234,9 @@ bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 bot.command('ترقية_مطور', async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
-
+// Add these command handlers to your bot setup
+bot.command('رفع_مميز', promoteToVIP);
+bot.hears(/^رفع مميز/, promoteToVIP);
 bot.hears(/^ترقية مطور/, async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
