@@ -452,61 +452,63 @@ async function isPremiumUser(userId) {
 async function showQuizMenu(ctx) {
     try {
         const userId = ctx.from.id;
-        
-        // Check if the user is an admin, owner, or VIP
+
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-        if (!isAdmin && !isVIPUser) {
+
+        if (!isAdmin && !isVIPUser && !isPremium) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
-        const keyboard = {
-    inline_keyboard: [
-        [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
-        [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
-        [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
-        [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
-        ...(isPremium ? [[{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }]] : []),
-        [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
-    ]
-}
+        // Start building keyboard
+        const keyboard = [
+            [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
+            [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
+            [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
+            [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }]
+        ];
 
-        const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
+        // ✅ Only add this button if premium
+        if (isPremium) {
+            keyboard.push([{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }]);
+        }
+
+        // Always add the back button
+        keyboard.push([{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]);
+
+        const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c';
         const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
-        
+
         if (ctx.callbackQuery) {
-            // If it's a callback query, we need to edit the existing message
             if (ctx.callbackQuery.message.photo) {
-                // If the current message is a photo, edit the media
                 await ctx.editMessageMedia(
                     {
                         type: 'photo',
                         media: photoUrl,
                         caption: caption
                     },
-                    { reply_markup: keyboard }
+                    { reply_markup: { inline_keyboard: keyboard } }
                 );
             } else {
-                // If it's a text message, edit the text
-                await ctx.editMessageText(caption, { reply_markup: keyboard });
+                await ctx.editMessageText(caption, { reply_markup: { inline_keyboard: keyboard } });
             }
         } else {
-            // This is a direct command, send a new message with photo
             await ctx.replyWithPhoto(
                 { url: photoUrl },
                 {
                     caption: caption,
-                    reply_markup: keyboard
+                    reply_markup: { inline_keyboard: keyboard }
                 }
             );
         }
+
     } catch (error) {
         console.error('Error in showQuizMenu:', error);
-        // If editing fails, send a new message
         await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المسابقات. الرجاء المحاولة مرة أخرى.');
     }
 }
+
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
         const db = await ensureDatabaseInitialized();
