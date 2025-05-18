@@ -421,6 +421,7 @@ async function isPremiumUser(userId) {
     try {
         const db = await database.connectToMongoDB('test'); // or your DB selector
         const user = await db.collection('premium_users').findOne({ userId });
+        const isPremium = await isPremiumUser(userId);
         if (!user) return false;
 
         const now = new Date();
@@ -445,7 +446,7 @@ async function isPremiumUser(userId) {
         return false;
     }
 }
-const isPremium = await isPremiumUser(userId);
+
 
 
 async function showQuizMenu(ctx) {
