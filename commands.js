@@ -23,6 +23,8 @@ const { loadActiveGroupsFromDatabase, getDatabaseForBot ,} = require('./database
 const axios = require('axios');
 const subscriptionStatusCache = new Map();
 const config = require('./config');
+const isPremium = await isPremiumUser(userId);
+
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
