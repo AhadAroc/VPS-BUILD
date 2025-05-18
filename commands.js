@@ -24,7 +24,7 @@ const axios = require('axios');
 const subscriptionStatusCache = new Map();
 const config = require('./config');
 
-
+const mongoose = require('mongoose');
 
 const premiumUserSchema = new mongoose.Schema({
   userId: { type: Number, required: true, unique: true },
