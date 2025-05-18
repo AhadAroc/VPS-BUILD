@@ -419,31 +419,41 @@ async function getLeaderboard(groupId) {
 }
 async function isPremiumUser(userId) {
     try {
-        // Use the PremiumUser model directly since we already have it defined
-        const user = await PremiumUser.findOne({ userId });
-        if (!user) return false;
-
+        // Connect to the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Find the user in the premium_users collection
+        const premiumUser = await db.collection('premium_users').findOne({ userId: parseInt(userId) });
+        
+        // If user not found, they're not premium
+        if (!premiumUser) return false;
+        
+        // Check if their premium subscription is still valid
         const now = new Date();
-        if (new Date(user.expiresAt) > now) return true;
-
-        // Optional: auto mark as notified if expired
-        if (!user.notified) {
+        if (new Date(premiumUser.expiresAt) > now) {
+            return true; // User is premium and subscription is valid
+        }
+        
+        // If subscription expired, notify the user (if not already notified)
+        if (!premiumUser.notified) {
             try {
-                // Use the bot instance from this file
+                // Send notification about expired premium status
                 await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
-                await PremiumUser.updateOne(
-                    { userId },
+                
+                // Mark as notified in the database
+                await db.collection('premium_users').updateOne(
+                    { userId: parseInt(userId) },
                     { $set: { notified: true } }
                 );
             } catch (err) {
-                console.error("❌ Failed to notify expired user:", err.message);
+                console.error("❌ Failed to notify expired premium user:", err.message);
             }
         }
-
-        return false;
+        
+        return false; // Subscription expired
     } catch (err) {
         console.error("❌ isPremiumUser error:", err.message);
-        return false;
+        return false; // Return false on error
     }
 }
 
