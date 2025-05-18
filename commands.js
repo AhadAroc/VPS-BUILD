@@ -415,30 +415,35 @@ async function getLeaderboard(groupId) {
         return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
     }
 }
-async function hasPremiumAccess(userId) {
-  const db = await database.setupDatabase();
-  const user = await db.collection("premium_users").findOne({ userId });
-
-  if (!user) return false;
-
-  const now = new Date();
-  if (new Date(user.expiresAt) > now) return true;
-
-  // Notify user if not already notified
-  if (!user.notified) {
+async function isPremiumUser(userId) {
     try {
-      await bot.telegram.sendMessage(userId, '⚠️ Your premium subscription has expired. Please contact admin to renew.');
-      await db.collection("premium_users").updateOne(
-        { userId },
-        { $set: { notified: true } }
-      );
-    } catch (err) {
-      console.error("Notification failed:", err.message);
-    }
-  }
+        const db = await database.connectToMongoDB('test'); // or your DB selector
+        const user = await db.collection('premium_users').findOne({ userId });
+        if (!user) return false;
 
-  return false;
+        const now = new Date();
+        if (new Date(user.expiresAt) > now) return true;
+
+        // Optional: auto mark as notified if expired
+        if (!user.notified) {
+            try {
+                await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
+                await db.collection('premium_users').updateOne(
+                    { userId },
+                    { $set: { notified: true } }
+                );
+            } catch (err) {
+                console.error("❌ Failed to notify expired user:", err.message);
+            }
+        }
+
+        return false;
+    } catch (err) {
+        console.error("❌ isPremiumUser error:", err.message);
+        return false;
+    }
 }
+
 
 async function showQuizMenu(ctx) {
     try {
@@ -447,21 +452,21 @@ async function showQuizMenu(ctx) {
         // Check if the user is an admin, owner, or VIP
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
-
+        const isPremium = await isPremiumUser(userId);
         if (!isAdmin && !isVIPUser) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
         const keyboard = {
-            inline_keyboard: [
-                [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
-                [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
-                [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
-                [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
-                [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
-                [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
-            ]
-        };
+    inline_keyboard: [
+        [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
+        [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
+        [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
+        [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
+        ...(isPremium ? [[{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }]] : []),
+        [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+    ]
+}
 
         const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
         const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
