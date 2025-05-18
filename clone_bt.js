@@ -33,7 +33,7 @@ const crypto = require('crypto');
 //const heroku = new Heroku({ token: HEROKU_API_KEY });
 // Add this near the top of your file with other constants
 const MAX_BOTS_PER_USER = 1;  // Maximum bots per user
-const MAX_TOTAL_BOTS = 75;    // Maximum total bots on the server
+const MAX_TOTAL_BOTS = 10;    // Maximum total bots on the server
 // ... (rest of your existing code)
 // ===== Configuration =====
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
@@ -49,6 +49,13 @@ const BOTS_DIR = path.join(__dirname, 'active_bots');
 if (!fs.existsSync(BOTS_DIR)) {
     fs.mkdirSync(BOTS_DIR, { recursive: true });
 }
+const premiumUserSchema = new mongoose.Schema({
+  userId: { type: Number, required: true, unique: true },
+  expiresAt: { type: Date, required: true },
+  notified: { type: Boolean, default: false }
+});
+
+const PremiumUser = mongoose.model('PremiumUser', premiumUserSchema);
 
 
 const cloneSchema = new mongoose.Schema({
@@ -696,6 +703,29 @@ bot.command('broadcast_all', async (ctx) => {
         ctx.reply('An error occurred while triggering the broadcast.');
     }
 });
+bot.command("add", async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ Only the owner can use this command.");
+
+  const args = ctx.message.text.split(" ");
+  if (args.length !== 3) return ctx.reply("Usage: /add @username YYYY-MM-DD");
+
+  const username = args[1].replace("@", "");
+  const expiresAt = new Date(args[2]);
+
+  const user = ctx.message.entities?.find(e => e.type === 'mention' || e.type === 'text_mention');
+  const userId = user?.user?.id;
+  if (!userId) return ctx.reply("❌ Could not extract user ID.");
+
+  const db = await database.setupDatabase();
+  await db.collection("premium_users").updateOne(
+    { userId },
+    { $set: { userId, expiresAt, notified: false } },
+    { upsert: true }
+  );
+
+  ctx.reply(`✅ Premium access granted to @${username} until ${expiresAt.toDateString()}`);
+});
+
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
 bot.action('show_active_bots', async (ctx) => {
@@ -819,17 +849,23 @@ bot.on('message', async (ctx) => {
     const rawText = msg.caption || msg.text || '';
     if (!rawText.startsWith('/broadcast_')) return;
 
+    // Extract the command and the actual message
+    const [cmd, ...messageParts] = rawText.split(' ');
+    const message = messageParts.join(' ');
+
+    if (!message) {
+        return ctx.reply('❌ Please provide a message to broadcast.');
+    }
+
     const broadcast = extractBroadcastContent(ctx);
     if (!broadcast) return ctx.reply('❌ Please provide a message, photo, or video to broadcast.');
 
-    const [cmd] = rawText.split(' ');
-
     if (cmd === '/broadcast_groups') {
-        return handleBroadcastGroups(ctx);
+        return handleBroadcastGroups(ctx, message);
     } else if (cmd === '/broadcast_dm') {
-        return handleBroadcastDM(ctx);
+        return handleBroadcastDM(ctx, message);
     } else if (cmd === '/broadcast_all') {
-        return handleBroadcastAll(ctx);
+        return handleBroadcastAll(ctx, message);
     } else {
         return ctx.reply('❌ Unknown broadcast command.');
     }
