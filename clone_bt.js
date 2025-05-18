@@ -167,6 +167,28 @@ bot.on('my_chat_member', async (ctx) => {
         console.log(`🚪 Bot left/kicked from '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
+bot.command("add", async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ Only the owner can use this command.");
+
+  const args = ctx.message.text.split(" ");
+  if (args.length !== 3) return ctx.reply("Usage: /add @username YYYY-MM-DD");
+
+  const username = args[1].replace("@", "");
+  const expiresAt = new Date(args[2]);
+
+  const user = ctx.message.entities?.find(e => e.type === 'mention' || e.type === 'text_mention');
+  const userId = user?.user?.id;
+  if (!userId) return ctx.reply("❌ Could not extract user ID.");
+
+  const db = await database.setupDatabase();
+  await db.collection("premium_users").updateOne(
+    { userId },
+    { $set: { userId, expiresAt, notified: false } },
+    { upsert: true }
+  );
+
+  ctx.reply(`✅ Premium access granted to @${username} until ${expiresAt.toDateString()}`);
+});
 async function saveFile(fileLink, fileName) {
     try {
         const mediaDir = path.join(__dirname, 'media');
@@ -703,28 +725,7 @@ bot.command('broadcast_all', async (ctx) => {
         ctx.reply('An error occurred while triggering the broadcast.');
     }
 });
-bot.command("add", async (ctx) => {
-  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ Only the owner can use this command.");
 
-  const args = ctx.message.text.split(" ");
-  if (args.length !== 3) return ctx.reply("Usage: /add @username YYYY-MM-DD");
-
-  const username = args[1].replace("@", "");
-  const expiresAt = new Date(args[2]);
-
-  const user = ctx.message.entities?.find(e => e.type === 'mention' || e.type === 'text_mention');
-  const userId = user?.user?.id;
-  if (!userId) return ctx.reply("❌ Could not extract user ID.");
-
-  const db = await database.setupDatabase();
-  await db.collection("premium_users").updateOne(
-    { userId },
-    { $set: { userId, expiresAt, notified: false } },
-    { upsert: true }
-  );
-
-  ctx.reply(`✅ Premium access granted to @${username} until ${expiresAt.toDateString()}`);
-});
 
 // Show Active Bots
 // Show Active Bots - Modified to only show user's own bots
