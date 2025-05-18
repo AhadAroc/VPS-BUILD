@@ -175,35 +175,45 @@ bot.command('add', async (ctx) => {
 
   const identifier = args[1];
   const dateStr = args[2];
+
+  // Validate date
   const expiresAt = new Date(`${dateStr}T23:59:59Z`);
+  if (isNaN(expiresAt.getTime())) {
+    return ctx.reply("❌ التاريخ غير صالح. استخدم الصيغة: YYYY-MM-DD");
+  }
 
   let userId;
 
   try {
     if (/^\d+$/.test(identifier)) {
-      // It's a raw user ID
+      // Raw numeric ID
       userId = parseInt(identifier);
     } else if (identifier.startsWith("@")) {
-      // Try to resolve @username to userId
-      const user = await ctx.telegram.getChat(identifier);
-      userId = user.id;
+      try {
+        const user = await ctx.telegram.getChat(identifier);
+        userId = user.id;
+      } catch (error) {
+        console.error("getChat error:", error.message);
+        return ctx.reply("❌ لم أتمكن من العثور على المستخدم. هل تحدث مع البوت؟");
+      }
     } else {
       return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
     }
 
-    const db = await database.setupDatabase();
-    await db.collection("premium_users").updateOne(
+    // ✅ Use Mongoose model (not raw .collection())
+    await PremiumUser.updateOne(
       { userId },
       { $set: { userId, expiresAt, notified: false } },
       { upsert: true }
     );
 
-    ctx.reply(`✅ تم منح الصلاحية المميزة للمستخدم (${userId}) حتى ${dateStr}`);
+    return ctx.reply(`✅ تم منح الصلاحية المميزة للمستخدم (${userId}) حتى ${dateStr}`);
   } catch (err) {
     console.error("❌ Error in /add:", err.message);
-    ctx.reply("❌ حدث خطأ أثناء استخراج المعرف أو حفظ البيانات.");
+    return ctx.reply("❌ حدث خطأ أثناء الحفظ أو المعالجة.");
   }
 });
+
 
 async function saveFile(fileLink, fileName) {
     try {
