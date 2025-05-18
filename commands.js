@@ -23,7 +23,7 @@ const { loadActiveGroupsFromDatabase, getDatabaseForBot ,} = require('./database
 const axios = require('axios');
 const subscriptionStatusCache = new Map();
 const config = require('./config');
-const isPremium = await isPremiumUser(userId);
+
 
 // MongoDB connection for storing scores
 let mongoClient = null;
@@ -445,6 +445,7 @@ async function isPremiumUser(userId) {
         return false;
     }
 }
+const isPremium = await isPremiumUser(userId);
 
 
 async function showQuizMenu(ctx) {
