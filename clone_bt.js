@@ -167,28 +167,44 @@ bot.on('my_chat_member', async (ctx) => {
         console.log(`🚪 Bot left/kicked from '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
-bot.command("add", async (ctx) => {
-  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ Only the owner can use this command.");
+bot.command('add', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
 
   const args = ctx.message.text.split(" ");
-  if (args.length !== 3) return ctx.reply("Usage: /add @username YYYY-MM-DD");
+  if (args.length !== 3) return ctx.reply("❌ الصيغة: /add @username أو userId YYYY-MM-DD");
 
-  const username = args[1].replace("@", "");
-  const expiresAt = new Date(args[2]);
+  const identifier = args[1];
+  const dateStr = args[2];
+  const expiresAt = new Date(`${dateStr}T23:59:59Z`);
 
-  const user = ctx.message.entities?.find(e => e.type === 'mention' || e.type === 'text_mention');
-  const userId = user?.user?.id;
-  if (!userId) return ctx.reply("❌ Could not extract user ID.");
+  let userId;
 
-  const db = await database.setupDatabase();
-  await db.collection("premium_users").updateOne(
-    { userId },
-    { $set: { userId, expiresAt, notified: false } },
-    { upsert: true }
-  );
+  try {
+    if (/^\d+$/.test(identifier)) {
+      // It's a raw user ID
+      userId = parseInt(identifier);
+    } else if (identifier.startsWith("@")) {
+      // Try to resolve @username to userId
+      const user = await ctx.telegram.getChat(identifier);
+      userId = user.id;
+    } else {
+      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
+    }
 
-  ctx.reply(`✅ Premium access granted to @${username} until ${expiresAt.toDateString()}`);
+    const db = await database.setupDatabase();
+    await db.collection("premium_users").updateOne(
+      { userId },
+      { $set: { userId, expiresAt, notified: false } },
+      { upsert: true }
+    );
+
+    ctx.reply(`✅ تم منح الصلاحية المميزة للمستخدم (${userId}) حتى ${dateStr}`);
+  } catch (err) {
+    console.error("❌ Error in /add:", err.message);
+    ctx.reply("❌ حدث خطأ أثناء استخراج المعرف أو حفظ البيانات.");
+  }
 });
+
 async function saveFile(fileLink, fileName) {
     try {
         const mediaDir = path.join(__dirname, 'media');
