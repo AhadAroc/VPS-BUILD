@@ -452,63 +452,61 @@ async function isPremiumUser(userId) {
 async function showQuizMenu(ctx) {
     try {
         const userId = ctx.from.id;
-
+        
+        // Check if the user is an admin, owner, or VIP
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-
-        if (!isAdmin && !isVIPUser && !isPremium) {
+        if (!isAdmin && !isVIPUser) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
-        // Start building keyboard
-        const keyboard = [
-            [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
-            [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
-            [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
-            [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }]
-        ];
+              const keyboard = {
+    inline_keyboard: [
+        [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
+        [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
+        [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
+        [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
+        [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
+        [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+    ]
+}
 
-        // ✅ Only add this button if premium
-        if (isPremium) {
-            keyboard.push([{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }]);
-        }
-
-        // Always add the back button
-        keyboard.push([{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]);
-
-        const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c';
+        const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
         const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
-
+        
         if (ctx.callbackQuery) {
+            // If it's a callback query, we need to edit the existing message
             if (ctx.callbackQuery.message.photo) {
+                // If the current message is a photo, edit the media
                 await ctx.editMessageMedia(
                     {
                         type: 'photo',
                         media: photoUrl,
                         caption: caption
                     },
-                    { reply_markup: { inline_keyboard: keyboard } }
+                    { reply_markup: keyboard }
                 );
             } else {
-                await ctx.editMessageText(caption, { reply_markup: { inline_keyboard: keyboard } });
+                // If it's a text message, edit the text
+                await ctx.editMessageText(caption, { reply_markup: keyboard });
             }
         } else {
+            // This is a direct command, send a new message with photo
             await ctx.replyWithPhoto(
                 { url: photoUrl },
                 {
                     caption: caption,
-                    reply_markup: { inline_keyboard: keyboard }
+                    reply_markup: keyboard
                 }
             );
         }
-
     } catch (error) {
         console.error('Error in showQuizMenu:', error);
+        // If editing fails, send a new message
         await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المسابقات. الرجاء المحاولة مرة أخرى.');
     }
 }
-
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -1491,13 +1489,38 @@ bot.action('list_secondary_devs', async (ctx) => {
     await listSecondaryDevelopers(ctx);
 });
 
-  bot.action('add_custom_questions', async (ctx) => {
+ bot.action('add_custom_questions', async (ctx) => {
     try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
         await ctx.answerCbQuery();
-        await startAddingCustomQuestions(ctx);
+        const userId = ctx.from.id;
+        
+        // Check if the user is premium
+        const isPremium = await isPremiumUser(userId);
+        
+        if (isPremium) {
+            // User is premium, allow adding custom questions
+            await startAddingCustomQuestions(ctx);
+        } else {
+            // User is not premium, show subscription message
+            const subscriptionMessage = '⭐ هذه الميزة متاحة فقط للمستخدمين المميزين (Premium).\n\nيرجى التواصل مع المطور للحصول على اشتراك مميز.';
+            
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '💬 التواصل مع المطور', url: 'https://t.me/Lorisiv' }],
+                    [{ text: '🔙 العودة', callback_data: 'back_to_quiz_menu' }]
+                ]
+            };
+            
+            if (ctx.callbackQuery.message.photo) {
+                await ctx.editMessageCaption(subscriptionMessage, {
+                    reply_markup: keyboard
+                });
+            } else {
+                await ctx.editMessageText(subscriptionMessage, {
+                    reply_markup: keyboard
+                });
+            }
+        }
     } catch (error) {
         console.error('Error handling add_custom_questions action:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
