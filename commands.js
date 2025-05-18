@@ -318,6 +318,27 @@ async function showMainMenu(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض القائمة الرئيسية.');
     }
 }
+setInterval(async () => {
+  const db = await database.setupDatabase();
+  const now = new Date();
+  const expiredUsers = await db.collection("premium_users").find({
+    expiresAt: { $lt: now },
+    notified: false
+  }).toArray();
+
+  for (const user of expiredUsers) {
+    try {
+      await bot.telegram.sendMessage(user.userId, '⚠️ Your premium subscription has expired.');
+    } catch (err) {
+      console.error("Failed to notify:", err.message);
+    }
+
+    await db.collection("premium_users").updateOne(
+      { userId: user.userId },
+      { $set: { notified: true } }
+    );
+  }
+}, 60 * 60 * 1000); // Every hour
 
 async function showHelp(ctx) {
     try {
@@ -394,6 +415,30 @@ async function getLeaderboard(groupId) {
         return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
     }
 }
+async function hasPremiumAccess(userId) {
+  const db = await database.setupDatabase();
+  const user = await db.collection("premium_users").findOne({ userId });
+
+  if (!user) return false;
+
+  const now = new Date();
+  if (new Date(user.expiresAt) > now) return true;
+
+  // Notify user if not already notified
+  if (!user.notified) {
+    try {
+      await bot.telegram.sendMessage(userId, '⚠️ Your premium subscription has expired. Please contact admin to renew.');
+      await db.collection("premium_users").updateOne(
+        { userId },
+        { $set: { notified: true } }
+      );
+    } catch (err) {
+      console.error("Notification failed:", err.message);
+    }
+  }
+
+  return false;
+}
 
 async function showQuizMenu(ctx) {
     try {
@@ -401,7 +446,7 @@ async function showQuizMenu(ctx) {
         
         // Check if the user is an admin, owner, or VIP
         const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId); // Ensure this function checks the 'vip_users' collection
+        const isVIPUser = await isVIP(ctx, userId);
 
         if (!isAdmin && !isVIPUser) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
