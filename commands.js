@@ -419,9 +419,8 @@ async function getLeaderboard(groupId) {
 }
 async function isPremiumUser(userId) {
     try {
-        const db = await database.connectToMongoDB('test'); // or your DB selector
-        const user = await db.collection('premium_users').findOne({ userId });
-       
+        // Use the PremiumUser model directly since we already have it defined
+        const user = await PremiumUser.findOne({ userId });
         if (!user) return false;
 
         const now = new Date();
@@ -430,8 +429,9 @@ async function isPremiumUser(userId) {
         // Optional: auto mark as notified if expired
         if (!user.notified) {
             try {
+                // Use the bot instance from this file
                 await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
-                await db.collection('premium_users').updateOne(
+                await PremiumUser.updateOne(
                     { userId },
                     { $set: { notified: true } }
                 );
