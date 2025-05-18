@@ -419,29 +419,26 @@ async function getLeaderboard(groupId) {
 }
 async function isPremiumUser(userId) {
     try {
-        // Connect to the database
-        const db = await ensureDatabaseInitialized();
+        // Use the PremiumUser model directly
+        const user = await PremiumUser.findOne({ userId: parseInt(userId) });
         
-        // Find the user in the premium_users collection
-        const premiumUser = await db.collection('premium_users').findOne({ userId: parseInt(userId) });
-        
-        // If user not found, they're not premium
-        if (!premiumUser) return false;
+        // If no user found, they're not premium
+        if (!user) return false;
         
         // Check if their premium subscription is still valid
         const now = new Date();
-        if (new Date(premiumUser.expiresAt) > now) {
+        if (new Date(user.expiresAt) > now) {
             return true; // User is premium and subscription is valid
         }
         
         // If subscription expired, notify the user (if not already notified)
-        if (!premiumUser.notified) {
+        if (!user.notified) {
             try {
                 // Send notification about expired premium status
                 await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
                 
                 // Mark as notified in the database
-                await db.collection('premium_users').updateOne(
+                await PremiumUser.updateOne(
                     { userId: parseInt(userId) },
                     { $set: { notified: true } }
                 );
