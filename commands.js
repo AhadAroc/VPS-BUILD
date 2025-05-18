@@ -25,6 +25,16 @@ const subscriptionStatusCache = new Map();
 const config = require('./config');
 
 
+
+const premiumUserSchema = new mongoose.Schema({
+  userId: { type: Number, required: true, unique: true },
+  expiresAt: { type: Date, required: true },
+  notified: { type: Boolean, default: false }
+});
+
+// Avoid re-registering the model if it's already defined
+const PremiumUser = mongoose.models.PremiumUser || mongoose.model('PremiumUser', premiumUserSchema);
+
 // MongoDB connection for storing scores
 let mongoClient = null;
 const knownUsers = new Map();
