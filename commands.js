@@ -161,7 +161,81 @@ async function updateGroupActivity(ctx, botId) {
 
     console.log(`✅ Group ${chatTitle} (${chatId}) marked as active for bot ${botId}`);
 }
+async function reportMessage(ctx) {
+    try {
+        // Check if the message is a reply
+        if (!ctx.message.reply_to_message) {
+            await ctx.reply('❌ يجب الرد على الرسالة التي تريد الإبلاغ عنها.');
+            return;
+        }
 
+        const reportedMessage = ctx.message.reply_to_message;
+        const reportedUserId = reportedMessage.from.id;
+        const reportedUserName = reportedMessage.from.first_name || 'مستخدم';
+        const reportedUserUsername = reportedMessage.from.username ? `@${reportedMessage.from.username}` : 'غير متوفر';
+        const reporterName = ctx.from.first_name || 'مستخدم';
+        const reporterUsername = ctx.from.username ? `@${ctx.from.username}` : 'غير متوفر';
+        
+        // Get the message content
+        let messageContent = '';
+        if (reportedMessage.text) {
+            messageContent = reportedMessage.text.length > 100 
+                ? reportedMessage.text.substring(0, 100) + '...' 
+                : reportedMessage.text;
+        } else if (reportedMessage.photo) {
+            messageContent = '[صورة]';
+        } else if (reportedMessage.video) {
+            messageContent = '[فيديو]';
+        } else if (reportedMessage.document) {
+            messageContent = '[مستند]';
+        } else if (reportedMessage.animation) {
+            messageContent = '[صورة متحركة]';
+        } else {
+            messageContent = '[محتوى آخر]';
+        }
+
+        // Get all admins of the group
+        const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+        
+        // Create the report message
+        const reportMessage = `
+⚠️ *تقرير عن رسالة مخالفة* ⚠️
+
+👤 *المستخدم المُبلغ عنه:* ${reportedUserName} (${reportedUserUsername})
+🆔 *معرف المستخدم:* \`${reportedUserId}\`
+📝 *محتوى الرسالة:* "${messageContent}"
+
+🚨 *تم الإبلاغ بواسطة:* ${reporterName} (${reporterUsername})
+⏰ *وقت الإبلاغ:* ${new Date().toLocaleString('ar-SA')}
+
+*رابط الرسالة:* [اضغط هنا](https://t.me/c/${ctx.chat.id.toString().slice(4)}/${reportedMessage.message_id})
+`;
+
+        // Send notification to all admins
+        let adminMentions = '';
+        for (const admin of admins) {
+            if (!admin.user.is_bot) {
+                adminMentions += `[​](tg://user?id=${admin.user.id})`;
+            }
+        }
+
+        // Send the report with admin mentions
+        await ctx.reply(reportMessage + '\n' + adminMentions, {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+            reply_to_message_id: reportedMessage.message_id
+        });
+
+        // Confirm to the reporter
+        await ctx.reply('✅ تم إرسال البلاغ إلى مشرفي المجموعة. شكراً لمساعدتك في الحفاظ على قواعد المجموعة.', {
+            reply_to_message_id: ctx.message.message_id
+        });
+
+    } catch (error) {
+        console.error('Error in reportMessage:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة الإبلاغ عن الرسالة.');
+    }
+}
 
 // Add this middleware function
 async function photoRestrictionMiddleware(ctx, next) {
@@ -1427,6 +1501,12 @@ bot.use(videoRestrictionMiddleware);
 bot.use(gifRestrictionMiddleware);
 bot.use(documentRestrictionMiddleware);
 
+// Add these command handlers in your setupCommands function
+bot.command('report', reportMessage);
+bot.command('ابلاغ', reportMessage);
+bot.hears(/^ابلاغ$/, reportMessage);
+bot.hears(/^تبليغ$/, reportMessage);
+bot.command('تبليغ', reportMessage);
 
 bot.hears('الاوامر', (ctx) => {
     ctx.reply(getCommandList());
