@@ -175,6 +175,8 @@ async function reportMessage(ctx) {
         const reportedUserUsername = reportedMessage.from.username ? `@${reportedMessage.from.username}` : 'غير متوفر';
         const reporterName = ctx.from.first_name || 'مستخدم';
         const reporterUsername = ctx.from.username ? `@${ctx.from.username}` : 'غير متوفر';
+        const groupName = ctx.chat.title || 'مجموعة';
+        const groupId = ctx.chat.id;
         
         // Get the message content
         let messageContent = '';
@@ -197,8 +199,8 @@ async function reportMessage(ctx) {
         // Get all admins of the group
         const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
         
-        // Create the report message
-        const reportMessage = `
+        // Create the report message for the group
+        const groupReportMessage = `
 ⚠️ *تقرير عن رسالة مخالفة* ⚠️
 
 👤 *المستخدم المُبلغ عنه:* ${reportedUserName} (${reportedUserUsername})
@@ -211,16 +213,46 @@ async function reportMessage(ctx) {
 *رابط الرسالة:* [اضغط هنا](https://t.me/c/${ctx.chat.id.toString().slice(4)}/${reportedMessage.message_id})
 `;
 
+        // Create the DM report message with more details
+        const dmReportMessage = `
+⚠️ *تقرير عن رسالة مخالفة* ⚠️
+
+👥 *المجموعة:* ${groupName}
+🆔 *معرف المجموعة:* \`${groupId}\`
+
+👤 *المستخدم المُبلغ عنه:* ${reportedUserName} (${reportedUserUsername})
+🆔 *معرف المستخدم:* \`${reportedUserId}\`
+📝 *محتوى الرسالة:* "${messageContent}"
+
+🚨 *تم الإبلاغ بواسطة:* ${reporterName} (${reporterUsername})
+🆔 *معرف المُبلغ:* \`${ctx.from.id}\`
+⏰ *وقت الإبلاغ:* ${new Date().toLocaleString('ar-SA')}
+
+*رابط الرسالة:* [اضغط هنا](https://t.me/c/${ctx.chat.id.toString().slice(4)}/${reportedMessage.message_id})
+`;
+
         // Send notification to all admins
         let adminMentions = '';
         for (const admin of admins) {
             if (!admin.user.is_bot) {
                 adminMentions += `[​](tg://user?id=${admin.user.id})`;
+                
+                // Send DM to each admin
+                try {
+                    await ctx.telegram.sendMessage(admin.user.id, dmReportMessage, {
+                        parse_mode: 'Markdown',
+                        disable_web_page_preview: true
+                    });
+                    console.log(`Report DM sent to admin ${admin.user.id}`);
+                } catch (dmError) {
+                    // If sending DM fails (e.g., admin hasn't started the bot), just log it
+                    console.log(`Couldn't send report DM to admin ${admin.user.id}: ${dmError.message}`);
+                }
             }
         }
 
-        // Send the report with admin mentions
-        await ctx.reply(reportMessage + '\n' + adminMentions, {
+        // Send the report with admin mentions in the group
+        await ctx.reply(groupReportMessage + '\n' + adminMentions, {
             parse_mode: 'Markdown',
             disable_web_page_preview: true,
             reply_to_message_id: reportedMessage.message_id
