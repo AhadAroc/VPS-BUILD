@@ -163,6 +163,17 @@ async function updateGroupActivity(ctx, botId) {
 }
 async function reportMessage(ctx) {
     try {
+        const userId = ctx.from.id;
+        
+        // Check if the user is a premium user
+        const isPremium = await isPremiumUser(userId);
+        
+        // Only allow premium users to use this command
+        if (!isPremium) {
+            await ctx.reply('❌ عذرًا، هذا الأمر متاح فقط للمشتركين في الخدمة المدفوعة. يرجى الترقية للاستفادة من هذه الميزة.');
+            return;
+        }
+
         // Check if the message is a reply
         if (!ctx.message.reply_to_message) {
             await ctx.reply('❌ يجب الرد على الرسالة التي تريد الإبلاغ عنها.');
@@ -207,7 +218,7 @@ async function reportMessage(ctx) {
 🆔 *معرف المستخدم:* \`${reportedUserId}\`
 📝 *محتوى الرسالة:* "${messageContent}"
 
-🚨 *تم الإبلاغ بواسطة:* ${reporterName} (${reporterUsername})
+🚨 *تم الإبلاغ بواسطة:* ${reporterName} (${reporterUsername}) [مستخدم مميز]
 ⏰ *وقت الإبلاغ:* ${new Date().toLocaleString('ar-SA')}
 
 *رابط الرسالة:* [اضغط هنا](https://t.me/c/${ctx.chat.id.toString().slice(4)}/${reportedMessage.message_id})
@@ -224,7 +235,7 @@ async function reportMessage(ctx) {
 🆔 *معرف المستخدم:* \`${reportedUserId}\`
 📝 *محتوى الرسالة:* "${messageContent}"
 
-🚨 *تم الإبلاغ بواسطة:* ${reporterName} (${reporterUsername})
+🚨 *تم الإبلاغ بواسطة:* ${reporterName} (${reporterUsername}) [مستخدم مميز]
 🆔 *معرف المُبلغ:* \`${ctx.from.id}\`
 ⏰ *وقت الإبلاغ:* ${new Date().toLocaleString('ar-SA')}
 
@@ -268,7 +279,6 @@ async function reportMessage(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء محاولة الإبلاغ عن الرسالة.');
     }
 }
-
 // Add this middleware function
 async function photoRestrictionMiddleware(ctx, next) {
     if (ctx.message && ctx.message.photo) {
