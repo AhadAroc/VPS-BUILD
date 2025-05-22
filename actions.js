@@ -2343,9 +2343,15 @@ bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
 });
 
 // Action handler for editing mute warnings
-bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
+bot.action(/^edit_warning_mute:(\d+):-?\d+$/, async (ctx) => {
+    if (!ctx.match) {
+        console.error('No ctx.match found');
+        return ctx.answerCbQuery('⚠️ حدث خطأ داخلي. لا توجد بيانات.', { show_alert: true });
+    }
+
     const [botId, chatId] = ctx.match.slice(1);
-    console.log('[ACTION] Handling edit_warning_mute', { botId, chatId }); // Add logging
+    console.log('[ACTION] Handling edit_warning_mute', { botId, chatId });
+
     await ctx.answerCbQuery();
 
     const options = [1, 2, 3, 4, 5].map(num => ({
@@ -2356,16 +2362,21 @@ bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
     const messageText = 'اختر عدد التحذيرات قبل الكتم:';
     const replyMarkup = {
         reply_markup: {
-            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+            inline_keyboard: [
+                options.map(opt => [opt]), // Make each option a separate row
+                [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]
+            ]
         }
     };
 
-    if (ctx.callbackQuery.message.photo) {
+    const msg = ctx.callbackQuery.message;
+    if (msg.photo) {
         await ctx.editMessageCaption(messageText, replyMarkup);
     } else {
         await ctx.editMessageText(messageText, replyMarkup);
     }
 });
+
 
 // Action handler for editing restrict media warnings
 bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
