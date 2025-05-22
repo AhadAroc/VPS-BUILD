@@ -2216,14 +2216,15 @@ bot.action('dev_broadcast', async (ctx) => {
 });
 
 
-// Add action handlers for editing warning settings
-bot.action(/^edit_warning_kick:(\d+):(\d+)$/, async (ctx) => {
-    const [botId, chatId] = ctx.match.slice(1);
+bot.action("edit_warning_kick", async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply('أدخل عدد التحذيرات قبل الطرد:');
-    // Store the state for the user
-    userStates.set(ctx.from.id, { action: 'edit_warning_kick', botId, chatId });
+
+    // Example: you'll need to get botId/chatId from somewhere else,
+    // because there's no :botId:chatId in callback_data anymore
+    userStates.set(ctx.from.id, { action: 'edit_warning_kick' });
 });
+
 
 bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
