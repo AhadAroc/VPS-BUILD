@@ -1831,10 +1831,10 @@ bot.action('show_commands', async (ctx) => {
         const commandsPart1 = 
             '📜 *قائمة الأوامر:*\n\n' +
             '🔹 */ معرفي , رتبتي* –  ظهور رتبتك - ظهور الايدي و معرفك\n' +
-            '🔹 */رفع ادمن مسابقات* – رفع ادمن مسابقات\n' +
-            '🔹 */تنزيل ادمن مسابقات* – تنزيل ادمن مسابقات\n' +
-             '🔹 */رفع مميز* – رفع مستخدم إلى مميز\n' +
-            '🔹 */تنزيل مميز* – تنزيل مستخدم من مميز\n'+
+            '🔹 */رفع امن مسابقات* – رفع ادمن مسابقات\n' +
+            '🔹 */تنزيل امن مسابقات* – تنزيل ادمن مسابقات\n' +
+            '🔹 */رفع مميز* – رفع مستخدم إلى مميز\n' +
+            '🔹 */تنزيل مميز* – تنزيل مستخدم من مميز\n' +
             '🔹 */لستة مميز* – عرض قائمة المميزين\n' +
             '🔹 */ترقية ادمن* – ترقية إلى أدمن\n' +
             '🔹 */تنزيل* – إزالة رتبة الأدمن\n' +
@@ -1848,13 +1848,16 @@ bot.action('show_commands', async (ctx) => {
             '🔹 */مسح* – حذف آخر رسالة\n' +
             '🔹 */تثبيت* – تثبيت رسالة\n' +
             '🔹 */نكتة* – إرسال نكتة\n' +
-            '🔹 */طرد* – طرد مستخدم\n';
+            '🔹 */طرد* – طرد مستخدم\n' +
+            '🔹 */تحذير* – إصدار تحذير لمستخدم\n' +
+            '🔹 */تحذيرات* – عرض عدد التحذيرات لمستخدم\n';
 
         // Send the first part with a "Next" button
         await ctx.editMessageCaption(commandsPart1, {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
+                    [{ text: '⚠️ إدارة التحذيرات', callback_data: 'manage_warnings' }],
                     [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
                     [{ text: '🔙 رجوع', callback_data: 'back' }]
                 ]
@@ -1894,6 +1897,42 @@ bot.action('show_commands_part2', async (ctx) => {
     } catch (error) {
         console.error('Error in show_commands_part2 action:', error);
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
+// Add a new action handler for managing warnings
+bot.action('manage_warnings', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const botId = ctx.botInfo.id;
+        const chatId = ctx.chat.id;
+
+        // Check if the user has the required permissions
+        if (!await hasRequiredPermissions(ctx, userId)) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        }
+
+        // Fetch current warning settings for this bot and group
+        const warningSettings = await getWarningSettings(botId, chatId);
+
+        // Display the current settings and options to change them
+        const message = `⚠️ إعدادات التحذيرات الحالية:\n\n` +
+                        `عدد التحذيرات قبل الطرد: ${warningSettings.kick || 'غير محدد'}\n` +
+                        `عدد التحذيرات قبل الكتم: ${warningSettings.mute || 'غير محدد'}\n` +
+                        `عدد التحذيرات قبل منع الوسائط: ${warningSettings.restrictMedia || 'غير محدد'}`;
+
+        await ctx.editMessageText(message, {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
+                    [{ text: 'تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
+                    [{ text: 'تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
+                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error managing warnings:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إدارة التحذيرات.');
     }
 });
 const { getLeaderboard } = require('./database');
@@ -2171,7 +2210,28 @@ bot.action('dev_broadcast', async (ctx) => {
 });
 
 
+// Add action handlers for editing warning settings
+bot.action(/^edit_warning_kick:(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId] = ctx.match.slice(1);
+    await ctx.answerCbQuery();
+    await ctx.reply('أدخل عدد التحذيرات قبل الطرد:');
+    // Store the state for the user
+    userStates.set(ctx.from.id, { action: 'edit_warning_kick', botId, chatId });
+});
 
+bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId] = ctx.match.slice(1);
+    await ctx.answerCbQuery();
+    await ctx.reply('أدخل عدد التحذيرات قبل الكتم:');
+    userStates.set(ctx.from.id, { action: 'edit_warning_mute', botId, chatId });
+});
+
+bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId] = ctx.match.slice(1);
+    await ctx.answerCbQuery();
+    await ctx.reply('أدخل عدد التحذيرات قبل منع الوسائط:');
+    userStates.set(ctx.from.id, { action: 'edit_warning_restrict_media', botId, chatId });
+});
 
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
         try {
@@ -2547,6 +2607,31 @@ bot.action(/^count_(\d+)$/, async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء إعداد المسابقة. يرجى المحاولة مرة أخرى.');
     }
 });
+// Add this function to fetch warning settings from the database
+async function getWarningSettings(botId, chatId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const settings = await db.collection('warning_settings').findOne({ bot_id: botId, chat_id: chatId });
+        return settings || {};
+    } catch (error) {
+        console.error('Error fetching warning settings:', error);
+        return {};
+    }
+}
+
+// Add this function to update warning settings in the database
+async function updateWarningSettings(botId, chatId, settings) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('warning_settings').updateOne(
+            { bot_id: botId, chat_id: chatId },
+            { $set: settings },
+            { upsert: true }
+        );
+    } catch (error) {
+        console.error('Error updating warning settings:', error);
+    }
+}
 
 // Add this function to fetch custom questions
 async function getCustomQuestionsForChat(chatId) {
@@ -2752,7 +2837,33 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                 ctx.session.awaitingBotName = false;
             }
         }
-        // ... rest of your logic
+         if (!state) return;
+
+    
+    if (isNaN(count) || count < 1) {
+        return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
+    }
+
+    let updateField;
+    switch (action) {
+        case 'edit_warning_kick':
+            updateField = { kick: count };
+            break;
+        case 'edit_warning_mute':
+            updateField = { mute: count };
+            break;
+        case 'edit_warning_restrict_media':
+            updateField = { restrictMedia: count };
+            break;
+        default:
+            return;
+    }
+
+    await updateWarningSettings(botId, chatId, updateField);
+    await ctx.reply('✅ تم تحديث الإعدادات بنجاح.');
+    userStates.delete(userId);
+return;
+    
     
 
 if (isBroadcasting && text) {
