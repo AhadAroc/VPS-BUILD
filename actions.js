@@ -1931,8 +1931,10 @@ bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
     }
 });
 
+// Add action handlers for editing warning settings with predefined options
 bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
+    console.log('[ACTION] Handling edit_warning_mute', { botId, chatId }); // Add logging
     await ctx.answerCbQuery();
 
     const options = [1, 2, 3, 4, 5].map(num => ({
@@ -1956,6 +1958,7 @@ bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
 
 bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
+    console.log('[ACTION] Handling edit_warning_restrict_media', { botId, chatId }); // Add logging
     await ctx.answerCbQuery();
 
     const options = [1, 2, 3, 4, 5].map(num => ({
