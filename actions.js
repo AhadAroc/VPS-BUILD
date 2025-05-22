@@ -1920,30 +1920,21 @@ bot.action('manage_warnings', async (ctx) => {
                         `عدد التحذيرات قبل الكتم: ${warningSettings.mute || 'غير محدد'}\n` +
                         `عدد التحذيرات قبل منع الوسائط: ${warningSettings.restrictMedia || 'غير محدد'}`;
 
-        // Check if the message to be edited is a text message
-        if (ctx.callbackQuery.message.text) {
-            await ctx.editMessageText(message, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
-                        [{ text: 'تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
-                        [{ text: 'تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
-                        [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
-                    ]
-                }
-            });
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: 'تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
+                [{ text: 'تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
+                [{ text: 'تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
+                [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+            ]
+        };
+
+        // Check if the message to be edited is a photo with a caption
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
         } else {
-            // If not a text message, send a new message
-            await ctx.reply(message, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
-                        [{ text: 'تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
-                        [{ text: 'تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
-                        [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
-                    ]
-                }
-            });
+            // If it's a text message, edit the text
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
         }
     } catch (error) {
         console.error('Error managing warnings:', error);
