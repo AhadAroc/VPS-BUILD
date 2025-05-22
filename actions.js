@@ -1899,10 +1899,6 @@ bot.action('show_commands_part2', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-bot.on('callback_query', async (ctx) => {
-    console.log('[DEBUG] Callback query triggered:', ctx.callbackQuery.data);
-    await ctx.answerCbQuery('✅ Callback caught!');
-});
 
 // Add a new action handler for managing warnings
 bot.action('manage_warnings', async (ctx) => {
