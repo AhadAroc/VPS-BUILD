@@ -2319,8 +2319,10 @@ bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
     });
 });
 
+// Action handler for editing mute warnings
 bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
+    console.log('[ACTION] Handling edit_warning_mute', { botId, chatId }); // Add logging
     await ctx.answerCbQuery();
 
     const options = [1, 2, 3, 4, 5].map(num => ({
@@ -2328,15 +2330,24 @@ bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
         callback_data: `set_warning_mute:${botId}:${chatId}:${num}`
     }));
 
-    await ctx.editMessageText('اختر عدد التحذيرات قبل الكتم:', {
+    const messageText = 'اختر عدد التحذيرات قبل الكتم:';
+    const replyMarkup = {
         reply_markup: {
             inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
         }
-    });
+    };
+
+    if (ctx.callbackQuery.message.photo) {
+        await ctx.editMessageCaption(messageText, replyMarkup);
+    } else {
+        await ctx.editMessageText(messageText, replyMarkup);
+    }
 });
 
+// Action handler for editing restrict media warnings
 bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
+    console.log('[ACTION] Handling edit_warning_restrict_media', { botId, chatId }); // Add logging
     await ctx.answerCbQuery();
 
     const options = [1, 2, 3, 4, 5].map(num => ({
@@ -2344,11 +2355,18 @@ bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
         callback_data: `set_warning_restrict_media:${botId}:${chatId}:${num}`
     }));
 
-    await ctx.editMessageText('اختر عدد التحذيرات قبل منع الوسائط:', {
+    const messageText = 'اختر عدد التحذيرات قبل منع الوسائط:';
+    const replyMarkup = {
         reply_markup: {
             inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
         }
-    });
+    };
+
+    if (ctx.callbackQuery.message.photo) {
+        await ctx.editMessageCaption(messageText, replyMarkup);
+    } else {
+        await ctx.editMessageText(messageText, replyMarkup);
+    }
 });
 
 // Add handlers for setting the warning counts
