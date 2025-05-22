@@ -1899,6 +1899,11 @@ bot.action('show_commands_part2', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
+bot.on('callback_query', async (ctx) => {
+    console.log('[DEBUG] Callback query triggered:', ctx.callbackQuery.data);
+    await ctx.answerCbQuery('✅ Callback caught!');
+});
+
 // Add a new action handler for managing warnings
 bot.action('manage_warnings', async (ctx) => {
     try {
@@ -2216,15 +2221,14 @@ bot.action('dev_broadcast', async (ctx) => {
 });
 
 
-bot.action("edit_warning_kick", async (ctx) => {
+// Add action handlers for editing warning settings
+bot.action(/^edit_warning_kick:(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId] = ctx.match.slice(1);
     await ctx.answerCbQuery();
     await ctx.reply('أدخل عدد التحذيرات قبل الطرد:');
-
-    // Example: you'll need to get botId/chatId from somewhere else,
-    // because there's no :botId:chatId in callback_data anymore
-    userStates.set(ctx.from.id, { action: 'edit_warning_kick' });
+    // Store the state for the user
+    userStates.set(ctx.from.id, { action: 'edit_warning_kick', botId, chatId });
 });
-
 
 bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
