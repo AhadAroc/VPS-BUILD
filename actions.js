@@ -2022,6 +2022,27 @@ bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
         await ctx.editMessageText(messageText, replyMarkup);
     }
 });
+bot.action('edit_mute_settings', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    await ctx.reply('🚫 إعدادات الكتم هنا (لم تتم إضافتها بعد).');
+    // Or your actual mute settings logic here
+  } catch (error) {
+    console.error('Error in mute settings:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ أثناء تحميل إعدادات الكتم.', { show_alert: true });
+  }
+});
+
+bot.action('edit_media_settings', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    await ctx.reply('🖼 إعدادات الوسائط هنا (لم تتم إضافتها بعد).');
+    // Or your actual media settings logic here
+  } catch (error) {
+    console.error('Error in media settings:', error);
+    await ctx.answerCbQuery('❌ حدث خطأ أثناء تحميل إعدادات الوسائط.', { show_alert: true });
+  }
+});
 
 const { getLeaderboard } = require('./database');
 
