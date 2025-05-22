@@ -2359,13 +2359,13 @@ bot.action(/^edit_warning_mute:(\d+):-?\d+$/, async (ctx) => {
         callback_data: `set_warning_mute:${botId}:${chatId}:${num}`
     }));
 
+    const inlineKeyboard = options.map(btn => [btn]);
+    inlineKeyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
+
     const messageText = 'اختر عدد التحذيرات قبل الكتم:';
     const replyMarkup = {
         reply_markup: {
-            inline_keyboard: [
-                options.map(opt => [opt]), // Make each option a separate row
-                [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]
-            ]
+            inline_keyboard: inlineKeyboard
         }
     };
 
@@ -2376,6 +2376,7 @@ bot.action(/^edit_warning_mute:(\d+):-?\d+$/, async (ctx) => {
         await ctx.editMessageText(messageText, replyMarkup);
     }
 });
+
 
 
 // Action handler for editing restrict media warnings
