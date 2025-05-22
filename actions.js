@@ -1899,86 +1899,6 @@ bot.action('show_commands_part2', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-// Add action handlers for editing warning settings with predefined options
-bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
-    const dataParts = ctx.callbackQuery.data.split(':');
-    const botId = dataParts[1];
-    const chatId = dataParts[2];
-
-    console.log('[ACTION] Handling edit_warning_kick', { botId, chatId });
-
-    await ctx.answerCbQuery();
-
-    // Define options for the number of warnings
-    const options = [1, 2, 3, 4, 5].map(num => ({
-        text: `${num} تحذير`,
-        callback_data: `set_warning_kick:${botId}:${chatId}:${num}`
-    }));
-
-    const messageText = 'اختر عدد التحذيرات قبل الطرد:';
-    const replyMarkup = {
-        reply_markup: {
-            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
-        }
-    };
-
-    // Check if the message to be edited is a photo with a caption
-    if (ctx.callbackQuery.message.photo) {
-        await ctx.editMessageCaption(messageText, replyMarkup);
-    } else {
-        // If it's a text message, edit the text
-        await ctx.editMessageText(messageText, replyMarkup);
-    }
-});
-
-// Add action handlers for editing warning settings with predefined options
-bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
-    const [botId, chatId] = ctx.match.slice(1);
-    console.log('[ACTION] Handling edit_warning_mute', { botId, chatId }); // Add logging
-    await ctx.answerCbQuery();
-
-    const options = [1, 2, 3, 4, 5].map(num => ({
-        text: `${num} تحذير`,
-        callback_data: `set_warning_mute:${botId}:${chatId}:${num}`
-    }));
-
-    const messageText = 'اختر عدد التحذيرات قبل الكتم:';
-    const replyMarkup = {
-        reply_markup: {
-            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
-        }
-    };
-
-    if (ctx.callbackQuery.message.photo) {
-        await ctx.editMessageCaption(messageText, replyMarkup);
-    } else {
-        await ctx.editMessageText(messageText, replyMarkup);
-    }
-});
-
-bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
-    const [botId, chatId] = ctx.match.slice(1);
-    console.log('[ACTION] Handling edit_warning_restrict_media', { botId, chatId }); // Add logging
-    await ctx.answerCbQuery();
-
-    const options = [1, 2, 3, 4, 5].map(num => ({
-        text: `${num} تحذير`,
-        callback_data: `set_warning_restrict_media:${botId}:${chatId}:${num}`
-    }));
-
-    const messageText = 'اختر عدد التحذيرات قبل منع الوسائط:';
-    const replyMarkup = {
-        reply_markup: {
-            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
-        }
-    };
-
-    if (ctx.callbackQuery.message.photo) {
-        await ctx.editMessageCaption(messageText, replyMarkup);
-    } else {
-        await ctx.editMessageText(messageText, replyMarkup);
-    }
-});
 // Add a new action handler for managing warnings
 bot.action('manage_warnings', async (ctx) => {
     try {
@@ -2021,6 +1941,88 @@ bot.action('manage_warnings', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء إدارة التحذيرات.');
     }
 });
+// Add action handlers for editing warning settings with predefined options
+bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
+    const dataParts = ctx.callbackQuery.data.split(':');
+    const botId = dataParts[1];
+    const chatId = dataParts[2];
+
+    console.log('[ACTION] Handling edit_warning_kick', { botId, chatId });
+
+    await ctx.answerCbQuery();
+
+    // Define options for the number of warnings
+    const options = [1, 2, 3, 4, 5].map(num => ({
+        text: `${num} تحذير`,
+        callback_data: `set_warning_kick:${botId}:${chatId}:${num}`
+    }));
+
+    const messageText = 'اختر عدد التحذيرات قبل الطرد:';
+    const replyMarkup = {
+        reply_markup: {
+            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+        }
+    };
+
+    // Check if the message to be edited is a photo with a caption
+    if (ctx.callbackQuery.message.photo) {
+        await ctx.editMessageCaption(messageText, replyMarkup);
+    } else {
+        // If it's a text message, edit the text
+        await ctx.editMessageText(messageText, replyMarkup);
+    }
+});
+
+// Action handler for editing mute warnings
+bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId] = ctx.match.slice(1);
+    console.log('[ACTION] Handling edit_warning_mute', { botId, chatId }); // Add logging
+    await ctx.answerCbQuery();
+
+    const options = [1, 2, 3, 4, 5].map(num => ({
+        text: `${num} تحذير`,
+        callback_data: `set_warning_mute:${botId}:${chatId}:${num}`
+    }));
+
+    const messageText = 'اختر عدد التحذيرات قبل الكتم:';
+    const replyMarkup = {
+        reply_markup: {
+            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+        }
+    };
+
+    if (ctx.callbackQuery.message.photo) {
+        await ctx.editMessageCaption(messageText, replyMarkup);
+    } else {
+        await ctx.editMessageText(messageText, replyMarkup);
+    }
+});
+
+// Action handler for editing restrict media warnings
+bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId] = ctx.match.slice(1);
+    console.log('[ACTION] Handling edit_warning_restrict_media', { botId, chatId }); // Add logging
+    await ctx.answerCbQuery();
+
+    const options = [1, 2, 3, 4, 5].map(num => ({
+        text: `${num} تحذير`,
+        callback_data: `set_warning_restrict_media:${botId}:${chatId}:${num}`
+    }));
+
+    const messageText = 'اختر عدد التحذيرات قبل منع الوسائط:';
+    const replyMarkup = {
+        reply_markup: {
+            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+        }
+    };
+
+    if (ctx.callbackQuery.message.photo) {
+        await ctx.editMessageCaption(messageText, replyMarkup);
+    } else {
+        await ctx.editMessageText(messageText, replyMarkup);
+    }
+});
+
 const { getLeaderboard } = require('./database');
 
 // ... other code ...
