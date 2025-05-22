@@ -2221,7 +2221,7 @@ bot.action('dev_broadcast', async (ctx) => {
 });
 
 
-// Add action handlers for editing warning settings
+// Add action handlers for editing warning settings with predefined options
 bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
     const dataParts = ctx.callbackQuery.data.split(':');
     const botId = dataParts[1];
@@ -2230,28 +2230,72 @@ bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
     console.log('[ACTION] Handling edit_warning_kick', { botId, chatId });
 
     await ctx.answerCbQuery();
-    await ctx.reply('أدخل عدد التحذيرات قبل الطرد:');
 
-    userStates.set(ctx.from.id, {
-        action: 'edit_warning_kick',
-        botId,
-        chatId
+    // Define options for the number of warnings
+    const options = [1, 2, 3, 4, 5].map(num => ({
+        text: `${num} تحذير`,
+        callback_data: `set_warning_kick:${botId}:${chatId}:${num}`
+    }));
+
+    await ctx.editMessageText('اختر عدد التحذيرات قبل الطرد:', {
+        reply_markup: {
+            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+        }
     });
 });
-
 
 bot.action(/^edit_warning_mute:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
     await ctx.answerCbQuery();
-    await ctx.reply('أدخل عدد التحذيرات قبل الكتم:');
-    userStates.set(ctx.from.id, { action: 'edit_warning_mute', botId, chatId });
+
+    const options = [1, 2, 3, 4, 5].map(num => ({
+        text: `${num} تحذير`,
+        callback_data: `set_warning_mute:${botId}:${chatId}:${num}`
+    }));
+
+    await ctx.editMessageText('اختر عدد التحذيرات قبل الكتم:', {
+        reply_markup: {
+            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+        }
+    });
 });
 
 bot.action(/^edit_warning_restrict_media:(\d+):(\d+)$/, async (ctx) => {
     const [botId, chatId] = ctx.match.slice(1);
     await ctx.answerCbQuery();
-    await ctx.reply('أدخل عدد التحذيرات قبل منع الوسائط:');
-    userStates.set(ctx.from.id, { action: 'edit_warning_restrict_media', botId, chatId });
+
+    const options = [1, 2, 3, 4, 5].map(num => ({
+        text: `${num} تحذير`,
+        callback_data: `set_warning_restrict_media:${botId}:${chatId}:${num}`
+    }));
+
+    await ctx.editMessageText('اختر عدد التحذيرات قبل منع الوسائط:', {
+        reply_markup: {
+            inline_keyboard: [options, [{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]]
+        }
+    });
+});
+
+// Add handlers for setting the warning counts
+bot.action(/^set_warning_kick:(\d+):(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId, count] = ctx.match.slice(1);
+    await updateWarningSettings(botId, chatId, { kick: parseInt(count) });
+    await ctx.answerCbQuery('✅ تم تحديث عدد التحذيرات قبل الطرد.');
+    await ctx.editMessageText('تم تحديث عدد التحذيرات قبل الطرد بنجاح.');
+});
+
+bot.action(/^set_warning_mute:(\d+):(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId, count] = ctx.match.slice(1);
+    await updateWarningSettings(botId, chatId, { mute: parseInt(count) });
+    await ctx.answerCbQuery('✅ تم تحديث عدد التحذيرات قبل الكتم.');
+    await ctx.editMessageText('تم تحديث عدد التحذيرات قبل الكتم بنجاح.');
+});
+
+bot.action(/^set_warning_restrict_media:(\d+):(\d+):(\d+)$/, async (ctx) => {
+    const [botId, chatId, count] = ctx.match.slice(1);
+    await updateWarningSettings(botId, chatId, { restrictMedia: parseInt(count) });
+    await ctx.answerCbQuery('✅ تم تحديث عدد التحذيرات قبل منع الوسائط.');
+    await ctx.editMessageText('تم تحديث عدد التحذيرات قبل منع الوسائط بنجاح.');
 });
 
     bot.action(/^list_general_replies:(\d+)$/, async (ctx) => {
