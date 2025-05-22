@@ -2846,29 +2846,34 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
          if (!state) return;
 
     
-    if (isNaN(count) || count < 1) {
-        return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
-    }
+  if (isNaN(count) || count < 1) {
+    return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
+}
 
-    let updateField;
-    switch (action) {
-        case 'edit_warning_kick':
-            updateField = { kick: count };
-            break;
-        case 'edit_warning_mute':
-            updateField = { mute: count };
-            break;
-        case 'edit_warning_restrict_media':
-            updateField = { restrictMedia: count };
-            break;
-        default:
-            return;
-    }
+let updateField;
+switch (action) {
+    case 'edit_warning_kick':
+        updateField = { kick: count };
+        break;
+    case 'edit_warning_mute':
+        updateField = { mute: count };
+        break;
+    case 'edit_warning_restrict_media':
+        updateField = { restrictMedia: count };
+        break;
+    default:
+        return;
+}
 
+try {
     await updateWarningSettings(botId, chatId, updateField);
     await ctx.reply('✅ تم تحديث الإعدادات بنجاح.');
-    userStates.delete(userId);
-return;
+} catch (error) {
+    console.error('Error updating warning settings:', error);
+    await ctx.reply('❌ حدث خطأ أثناء تحديث الإعدادات.');
+}
+
+userStates.delete(userId);
     
     
 
