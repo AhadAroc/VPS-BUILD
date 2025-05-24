@@ -1922,9 +1922,9 @@ bot.action('manage_warnings', async (ctx) => {
 
         const replyMarkup = {
             inline_keyboard: [
-                [{ text: 'تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
-                [{ text: 'تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
-                [{ text: 'تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
+                [{ text: '⚙️ تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
+                [{ text: '⚙️ تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
+                [{ text: '⚙️ تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
                 [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
             ]
         };
@@ -1941,6 +1941,44 @@ bot.action('manage_warnings', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء إدارة التحذيرات.');
     }
 });
+async function getWarningSettings(botId, chatId) {
+    const db = await ensureDatabaseInitialized();
+    const settings = await db.collection('warning_settings').findOne({ bot_id: botId, chat_id: chatId });
+    return settings || { kick: 5, mute: 3, restrictMedia: 2 }; // Default values
+}
+
+async function updateWarningSettings(botId, chatId, updateField) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection('warning_settings').updateOne(
+        { bot_id: botId, chat_id: chatId },
+        { $set: updateField },
+        { upsert: true }
+    );
+}
+
+async function getWarningState(chatId, userId) {
+    const db = await ensureDatabaseInitialized();
+    const state = await db.collection('warnings').findOne({ chat_id: chatId, user_id: userId });
+    return state || { count: 0, last_warned_at: new Date() };
+}
+
+async function updateWarningState(chatId, userId, state) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection('warnings').updateOne(
+        { chat_id: chatId, user_id: userId },
+        { $set: state },
+        { upsert: true }
+    );
+}
+
+async function resetWarnings(chatId, userId) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection('warnings').updateOne(
+        { chat_id: chatId, user_id: userId },
+        { $set: { count: 0, last_warned_at: new Date() } },
+        { upsert: true }
+    );
+}
 // Add action handlers for editing warning settings with predefined options
 bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
     const dataParts = ctx.callbackQuery.data.split(':');
