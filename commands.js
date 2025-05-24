@@ -1535,7 +1535,124 @@ bot.command('رتبتي', checkUserRank);
 // Also add handlers for text commands without the underscore
 bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
 bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
+// Add this handler for the warning command
+bot.hears('تحذير', async (ctx) => {
+    try {
+        // Check if this is a reply to another message
+        if (!ctx.message.reply_to_message) {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم لتحذيره.');
+        }
 
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        const targetUserId = ctx.message.reply_to_message.from.id;
+        const targetUserName = ctx.message.reply_to_message.from.first_name || 'المستخدم';
+
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        if (!isAdmin) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين.');
+        }
+
+        // Initialize user warnings if not already done
+        const db = await ensureDatabaseInitialized();
+        
+        // Get current warning count for this user in this chat
+        const userWarning = await db.collection('warnings').findOne({
+            chat_id: chatId,
+            user_id: targetUserId
+        });
+
+        // Define warning state object
+        const warningState = userWarning || {
+            chat_id: chatId,
+            user_id: targetUserId,
+            count: 0,
+            last_warned_at: new Date()
+        };
+
+        // Increment warning count
+        warningState.count += 1;
+        warningState.last_warned_at = new Date();
+
+        // Update or insert the warning record
+        await db.collection('warnings').updateOne(
+            { chat_id: chatId, user_id: targetUserId },
+            { $set: warningState },
+            { upsert: true }
+        );
+
+        // Get warning settings for this chat
+        const settings = await db.collection('warning_settings').findOne({ chat_id: chatId }) || {
+            kick: 5,
+            mute: 3,
+            restrictMedia: 2
+        };
+
+        // Check if action needs to be taken based on warning count
+        let actionTaken = '';
+        if (warningState.count >= settings.kick) {
+            // Kick user
+            try {
+                await ctx.telegram.kickChatMember(chatId, targetUserId, {
+                    until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute (minimum allowed)
+                });
+                actionTaken = '🚫 تم طرد المستخدم من المجموعة بسبب تجاوز عدد التحذيرات المسموح بها.';
+                
+                // Reset warnings after kick
+                await db.collection('warnings').updateOne(
+                    { chat_id: chatId, user_id: targetUserId },
+                    { $set: { count: 0 } }
+                );
+            } catch (error) {
+                console.error('Error kicking user:', error);
+                actionTaken = '❌ فشل طرد المستخدم. تأكد من أن البوت لديه صلاحيات كافية.';
+            }
+        } else if (warningState.count >= settings.mute) {
+            // Mute user
+            try {
+                await ctx.telegram.restrictChatMember(chatId, targetUserId, {
+                    until_date: Math.floor(Date.now() / 1000) + 3600, // Mute for 1 hour
+                    permissions: {
+                        can_send_messages: false,
+                        can_send_media_messages: false,
+                        can_send_polls: false,
+                        can_send_other_messages: false,
+                        can_add_web_page_previews: false
+                    }
+                });
+                actionTaken = '🔇 تم كتم المستخدم لمدة ساعة بسبب تجاوز عدد التحذيرات.';
+            } catch (error) {
+                console.error('Error muting user:', error);
+                actionTaken = '❌ فشل كتم المستخدم. تأكد من أن البوت لديه صلاحيات كافية.';
+            }
+        } else if (warningState.count >= settings.restrictMedia) {
+            // Restrict media
+            try {
+                await ctx.telegram.restrictChatMember(chatId, targetUserId, {
+                    until_date: Math.floor(Date.now() / 1000) + 1800, // Restrict for 30 minutes
+                    permissions: {
+                        can_send_messages: true,
+                        can_send_media_messages: false,
+                        can_send_polls: false,
+                        can_send_other_messages: false,
+                        can_add_web_page_previews: false
+                    }
+                });
+                actionTaken = '📵 تم منع المستخدم من إرسال الوسائط لمدة 30 دقيقة بسبب تجاوز عدد التحذيرات.';
+            } catch (error) {
+                console.error('Error restricting user media:', error);
+                actionTaken = '❌ فشل تقييد وسائط المستخدم. تأكد من أن البوت لديه صلاحيات كافية.';
+            }
+        }
+
+        // Send warning message
+        await ctx.reply(`⚠️ تحذير للمستخدم ${targetUserName}!\n\n📊 عدد التحذيرات: ${warningState.count}/${settings.kick}\n\n${actionTaken}`);
+    } catch (error) {
+        console.error('Error in warning command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة تحذير المستخدم.');
+    }
+});
 // Make sure to use this middleware
 bot.use(photoRestrictionMiddleware);
 bot.use(linkRestrictionMiddleware);
