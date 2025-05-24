@@ -1583,11 +1583,10 @@ bot.hears('تحذير', async (ctx) => {
         );
 
         // Get warning settings for this chat
-        const settings = await db.collection('warning_settings').findOne({ chat_id: chatId }) || {
-            kick: 5,
-            mute: 3,
-            restrictMedia: 2
-        };
+        const botId = ctx.botInfo.id;
+const settings = await db.collection('warning_settings').findOne({ bot_id: botId, chat_id: chatId }) || {
+    kick: 5, mute: 3, restrictMedia: 2
+};
 
         // Check if action needs to be taken based on warning count
         let actionTaken = '';
