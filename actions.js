@@ -1951,44 +1951,50 @@ bot.action('manage_warnings', async (ctx) => {
 // Add new action handlers for curfew options
 
 
-bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
+bot.action('manage_warnings', async (ctx) => {
     try {
-        const type = ctx.match[1];
-        let typeText;
-        switch (type) {
-            case 'media':
-                typeText = 'الوسائط';
-                break;
-            case 'messages':
-                typeText = 'الرسائل';
-                break;
-            case 'overall':
-                typeText = 'الشامل';
-                break;
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+
+        // Check if the user has the required permissions
+        if (!await hasRequiredPermissions(ctx, userId)) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
-        const message = `اختر مدة الحظر ${typeText}:`;
 
-        const durations = [1, 2, 3, 6, 12, 24];
-        const keyboard = durations.map(hours => [{
-            text: `${hours} ساعة`,
-            callback_data: `set_curfew:${type}:${hours}`
-        }]);
+        // Check if any curfew is active
+        const mediaCurfewActive = await isCurfewActive(chatId, 'media');
+        const messagesCurfewActive = await isCurfewActive(chatId, 'messages');
+        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
 
-        keyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
+        // Display the curfew options
+        const message = `🕰️ إعدادات حظر التجول:\n\n` +
+                        `اختر نوع الحظر:`;
 
         const replyMarkup = {
-            reply_markup: { inline_keyboard: keyboard }
+            inline_keyboard: [
+                [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
+                [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
+                [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
+            ]
         };
 
-        // Check if the message has a photo
+        // Add disable button if any curfew is active
+        if (mediaCurfewActive || messagesCurfewActive || overallCurfewActive) {
+            replyMarkup.inline_keyboard.push([{ text: '❌ إلغاء الحظر الحالي', callback_data: 'disable_current_curfew' }]);
+        }
+
+        replyMarkup.inline_keyboard.push([{ text: '🔙 رجوع', callback_data: 'show_commands' }]);
+
+        // Check if the message to be edited is a photo with a caption
         if (ctx.callbackQuery.message.photo) {
-            await ctx.editMessageCaption(message, replyMarkup);
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
         } else {
-            await ctx.editMessageText(message, replyMarkup);
+            // If it's a text message, edit the text
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
         }
     } catch (error) {
-        console.error('Error in curfew action:', error);
-        await ctx.answerCbQuery('❌ حدث خطأ أثناء تحميل إعدادات الحظر.', { show_alert: true });
+        console.error('Error managing curfew:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
     }
 });
 bot.action('disable_current_curfew', async (ctx) => {
