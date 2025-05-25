@@ -1936,35 +1936,7 @@ bot.action('manage_warnings', async (ctx) => {
     }
 });
 // Add new action handlers for curfew options
-// Add new action handlers for curfew options
-bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
-    const type = ctx.match[1];
-    let typeText;
-    switch (type) {
-        case 'media':
-            typeText = 'الوسائط';
-            break;
-        case 'messages':
-            typeText = 'الرسائل';
-            break;
-        case 'overall':
-            typeText = 'الشامل';
-            break;
-    }
-    const message = `اختر مدة الحظر ${typeText}:`;
 
-    const durations = [1, 2, 3, 6, 12, 24];
-    const keyboard = durations.map(hours => [{
-        text: `${hours} ساعة`,
-        callback_data: `set_curfew:${type}:${hours}`
-    }]);
-
-    keyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
-
-    await ctx.editMessageText(message, {
-        reply_markup: { inline_keyboard: keyboard }
-    });
-});
 
 bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
     try {
