@@ -503,8 +503,7 @@ async function loadActiveCurfews() {
 // Call this function when your bot starts
 loadActiveCurfews();
 
-// Add the curfew middleware to your bot
-bot.use(curfewMiddleware);
+
 // Add this function to check subscription status directly
 async function checkSubscriptionStatus(ctx, userId) {
     try {
@@ -1956,7 +1955,8 @@ bot.action('show_commands', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-
+// Add the curfew middleware to your bot
+bot.use(curfewMiddleware);
 // Handle the "Next" button to show the second part
 bot.action('show_commands_part2', async (ctx) => {
     try {
