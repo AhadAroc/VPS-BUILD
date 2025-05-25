@@ -43,7 +43,7 @@ const QUIZ_STATE = {
 };
 
 
-const {isAdminOrOwner,isVIP} = require('./commands');    
+const {isAdminOrOwner,isVIP,isPremiumUser} = require('./commands');    
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');    
