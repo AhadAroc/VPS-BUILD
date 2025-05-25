@@ -1906,27 +1906,89 @@ bot.action('show_commands', async (ctx) => {
     }
 });
 
-// Modify the action handlers for premium features
 bot.action('explain_warnings', async (ctx) => {
     const userId = ctx.from.id;
     const isPremium = await isPremiumUser(userId);
+    const isSpecificUser = userId === 7308214106;
 
-    if (!isPremium) {
+    if (!isPremium && !isSpecificUser) {
         return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
     }
 
-    // Existing code for explaining warnings...
+    try {
+        const warningExplanation = 
+            '*📌 شرح نظام التحذيرات:*\n\n' +
+            '1️⃣ *الاستخدام:* يستخدم المشرفون أمر "تحذير" بالرد على رسالة المستخدم المخالف.\n\n' +
+            '2️⃣ *آلية العمل:*\n' +
+            '   • كل تحذير يزيد من عداد تحذيرات المستخدم.\n' +
+            '   • يتم تخزين التحذيرات لكل مستخدم في كل مجموعة بشكل منفصل.\n' +
+            '   • يمكن ضبط إعدادات التحذيرات لكل مجموعة.\n\n' +
+            // ... (rest of the explanation)
+            '⚠️ استخدم هذا النظام بحكمة للحفاظ على نظام المجموعة وتجنب إساءة استخدامه!';
+
+        await ctx.editMessageCaption(warningExplanation, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error in explain_warnings action:', error);
+        ctx.answerCbQuery('❌ حدث خطأ أثناء عرض شرح نظام التحذيرات. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
 });
 
 bot.action('manage_warnings', async (ctx) => {
-    const userId = ctx.from.id;
-    const isPremium = await isPremiumUser(userId);
+    try {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
 
-    if (!isPremium) {
-        return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+        // Check if the user has the required permissions or is the specific user
+        const hasPermissions = await hasRequiredPermissions(ctx, userId);
+        const isPremium = await isPremiumUser(userId);
+        const isSpecificUser = userId === 7308214106;
+
+        if (!hasPermissions && !isPremium && !isSpecificUser) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والمستخدمين المميزين فقط.', { show_alert: true });
+        }
+
+        // Check if any curfew is active
+        const mediaCurfewActive = await isCurfewActive(chatId, 'media');
+        const messagesCurfewActive = await isCurfewActive(chatId, 'messages');
+        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
+
+        // Display the curfew options
+        const message = `🕰️ إعدادات حظر التجول:\n\n` +
+                        `اختر نوع الحظر:`;
+
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
+                [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
+                [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
+            ]
+        };
+
+        // Add disable button if any curfew is active
+        if (mediaCurfewActive || messagesCurfewActive || overallCurfewActive) {
+            replyMarkup.inline_keyboard.push([{ text: '❌ إلغاء الحظر الحالي', callback_data: 'disable_current_curfew' }]);
+        }
+
+        replyMarkup.inline_keyboard.push([{ text: '🔙 رجوع', callback_data: 'show_commands' }]);
+
+        // Check if the message to be edited is a photo with a caption
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
+        } else {
+            // If it's a text message, edit the text
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
+        }
+    } catch (error) {
+        console.error('Error managing curfew:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
     }
-
-    // Existing code for managing warnings...
 });
 // Handle the "Next" button to show the second part
 bot.action('show_commands_part2', async (ctx) => {
