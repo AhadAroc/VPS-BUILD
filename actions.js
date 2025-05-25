@@ -1903,7 +1903,6 @@ bot.action('show_commands_part2', async (ctx) => {
 bot.action('manage_warnings', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const botId = ctx.botInfo.id;
         const chatId = ctx.chat.id;
 
         // Check if the user has the required permissions
@@ -1911,20 +1910,14 @@ bot.action('manage_warnings', async (ctx) => {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
-        // Fetch current warning settings for this bot and group
-        const warningSettings = await getWarningSettings(botId, chatId);
-
-        // Display the current settings and options to change them
-        const message = `⚠️ إعدادات التحذيرات الحالية:\n\n` +
-                        `عدد التحذيرات قبل الطرد: ${warningSettings.kick || 'غير محدد'}\n` +
-                        `عدد التحذيرات قبل الكتم: ${warningSettings.mute || 'غير محدد'}\n` +
-                        `عدد التحذيرات قبل منع الوسائط: ${warningSettings.restrictMedia || 'غير محدد'}`;
+        // Display the curfew options
+        const message = `🕰️ إعدادات حظر التجول:\n\n` +
+                        `اختر نوع الحظر ومدته:`;
 
         const replyMarkup = {
             inline_keyboard: [
-                [{ text: '⚙️ تعديل إعدادات الطرد', callback_data: `edit_warning_kick:${botId}:${chatId}` }],
-                [{ text: '⚙️ تعديل إعدادات الكتم', callback_data: `edit_warning_mute:${botId}:${chatId}` }],
-                [{ text: '⚙️ تعديل إعدادات منع الوسائط', callback_data: `edit_warning_restrict_media:${botId}:${chatId}` }],
+                [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
+                [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
                 [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
             ]
         };
@@ -1937,48 +1930,52 @@ bot.action('manage_warnings', async (ctx) => {
             await ctx.editMessageText(message, { reply_markup: replyMarkup });
         }
     } catch (error) {
-        console.error('Error managing warnings:', error);
-        await ctx.reply('❌ حدث خطأ أثناء إدارة التحذيرات.');
+        console.error('Error managing curfew:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
     }
 });
-async function getWarningSettings(botId, chatId) {
-    const db = await ensureDatabaseInitialized();
-    const settings = await db.collection('warning_settings').findOne({ bot_id: botId, chat_id: chatId });
-    return settings || { kick: 5, mute: 3, restrictMedia: 2 }; // Default values
-}
 
-async function updateWarningSettings(botId, chatId, updateField) {
-    const db = await ensureDatabaseInitialized();
-    await db.collection('warning_settings').updateOne(
-        { bot_id: botId, chat_id: chatId },
-        { $set: updateField },
-        { upsert: true }
-    );
-}
+// Add new action handlers for curfew options
+bot.action(/^curfew_(media|messages)$/, async (ctx) => {
+    const type = ctx.match[1];
+    const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
+    const message = `اختر مدة حظر ${typeText}:`;
 
-async function getWarningState(chatId, userId) {
-    const db = await ensureDatabaseInitialized();
-    const state = await db.collection('warnings').findOne({ chat_id: chatId, user_id: userId });
-    return state || { count: 0, last_warned_at: new Date() };
-}
+    const durations = [1, 2, 3, 6, 12];
+    const keyboard = durations.map(hours => [{
+        text: `${hours} ساعة`,
+        callback_data: `set_curfew:${type}:${hours}`
+    }]);
 
-async function updateWarningState(chatId, userId, state) {
-    const db = await ensureDatabaseInitialized();
-    await db.collection('warnings').updateOne(
-        { chat_id: chatId, user_id: userId },
-        { $set: state },
-        { upsert: true }
-    );
-}
+    keyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
 
-async function resetWarnings(chatId, userId) {
-    const db = await ensureDatabaseInitialized();
-    await db.collection('warnings').updateOne(
-        { chat_id: chatId, user_id: userId },
-        { $set: { count: 0, last_warned_at: new Date() } },
-        { upsert: true }
-    );
-}
+    await ctx.editMessageText(message, {
+        reply_markup: { inline_keyboard: keyboard }
+    });
+});
+
+bot.action(/^set_curfew:(media|messages):(\d+)$/, async (ctx) => {
+    try {
+        const [type, hours] = ctx.match.slice(1);
+        const chatId = ctx.chat.id;
+        const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
+
+        // Here you would implement the logic to set the curfew
+        // For example, storing it in a database and setting up a scheduled task
+
+        await setCurfew(chatId, type, parseInt(hours));
+
+        await ctx.answerCbQuery(`✅ تم تفعيل حظر ${typeText} لمدة ${hours} ساعة.`);
+        await ctx.editMessageText(`تم تفعيل حظر ${typeText} لمدة ${hours} ساعة. سيتم رفع الحظر تلقائياً بعد انتهاء المدة.`, {
+            reply_markup: {
+                inline_keyboard: [[{ text: '🔙 رجوع للإعدادات', callback_data: 'manage_warnings' }]]
+            }
+        });
+    } catch (error) {
+        console.error('Error setting curfew:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء تفعيل حظر التجول.', { show_alert: true });
+    }
+});
 // Add action handlers for editing warning settings with predefined options
 bot.action(/edit_warning_kick:\d+:-?\d+/, async (ctx) => {
     const dataParts = ctx.callbackQuery.data.split(':');
