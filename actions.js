@@ -26,6 +26,8 @@ cloudinary.config({
   api_key: '248273337268518',
   api_secret: 'SihooJWz6cMi5bNDAU26Tmf-tIw' // Replace with your actual API secret
 });
+// Store active curfews in memory
+const activeCurfews = new Map();
 // Add this to your global variables
 const quizSettings = new Map();
 const { isDeveloper,isSubscribed } = require('./middlewares');
@@ -417,7 +419,92 @@ async function setupCyclingReply(ctx, triggerWord, texts) {
     }
 }
 
+// Function to set a curfew
+async function setCurfew(chatId, type, hours) {
+    const db = await ensureDatabaseInitialized();
+    const endTime = new Date(Date.now() + hours * 60 * 60 * 1000);
 
+    await db.collection('curfews').updateOne(
+        { chatId, type },
+        { $set: { endTime } },
+        { upsert: true }
+    );
+
+    // Set up the curfew in memory
+    activeCurfews.set(`${chatId}:${type}`, endTime);
+
+    // Schedule the curfew to be lifted
+    setTimeout(() => liftCurfew(chatId, type), hours * 60 * 60 * 1000);
+}
+
+// Function to lift a curfew
+async function liftCurfew(chatId, type) {
+    const db = await ensureDatabaseInitialized();
+    await db.collection('curfews').deleteOne({ chatId, type });
+
+    // Remove the curfew from memory
+    activeCurfews.delete(`${chatId}:${type}`);
+
+    // Notify the group that the curfew has been lifted
+    bot.telegram.sendMessage(chatId, `✅ تم رفع حظر ${type === 'media' ? 'الوسائط' : 'الرسائل'}.`);
+}
+
+// Function to check if a curfew is active
+function isCurfewActive(chatId, type) {
+    const key = `${chatId}:${type}`;
+    if (activeCurfews.has(key)) {
+        const endTime = activeCurfews.get(key);
+        return Date.now() < endTime.getTime();
+    }
+    return false;
+}
+
+// Middleware to enforce curfews
+async function curfewMiddleware(ctx, next) {
+    if (ctx.chat && ctx.chat.type !== 'private') {
+        const chatId = ctx.chat.id;
+        const isMedia = ctx.message && (ctx.message.photo || ctx.message.video || ctx.message.document || ctx.message.animation);
+        
+        if (isMedia && isCurfewActive(chatId, 'media')) {
+            await ctx.deleteMessage();
+            await ctx.reply('❌ إرسال الوسائط محظور حاليًا.');
+            return;
+        }
+        
+        if (!isMedia && isCurfewActive(chatId, 'messages')) {
+            await ctx.deleteMessage();
+            await ctx.reply('❌ إرسال الرسائل محظور حاليًا.');
+            return;
+        }
+    }
+    
+    return next();
+}
+
+// Load active curfews from the database on bot startup
+async function loadActiveCurfews() {
+    const db = await ensureDatabaseInitialized();
+    const curfews = await db.collection('curfews').find().toArray();
+
+    for (const curfew of curfews) {
+        const { chatId, type, endTime } = curfew;
+        const now = new Date();
+        if (endTime > now) {
+            activeCurfews.set(`${chatId}:${type}`, endTime);
+            const timeLeft = endTime.getTime() - now.getTime();
+            setTimeout(() => liftCurfew(chatId, type), timeLeft);
+        } else {
+            // If the curfew has already expired, remove it from the database
+            await db.collection('curfews').deleteOne({ chatId, type });
+        }
+    }
+}
+
+// Call this function when your bot starts
+loadActiveCurfews();
+
+// Add the curfew middleware to your bot
+bot.use(curfewMiddleware);
 // Add this function to check subscription status directly
 async function checkSubscriptionStatus(ctx, userId) {
     try {
@@ -1857,7 +1944,7 @@ bot.action('show_commands', async (ctx) => {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: '⚠️ إدارة التحذيرات', callback_data: 'manage_warnings' }],
+                    [{ text: '⚠️  منع التجوال او سبام', callback_data: 'manage_warnings' }],
                     [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
                     [{ text: '🔙 رجوع', callback_data: 'back' }]
                 ]
@@ -1959,9 +2046,6 @@ bot.action(/^set_curfew:(media|messages):(\d+)$/, async (ctx) => {
         const [type, hours] = ctx.match.slice(1);
         const chatId = ctx.chat.id;
         const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
-
-        // Here you would implement the logic to set the curfew
-        // For example, storing it in a database and setting up a scheduled task
 
         await setCurfew(chatId, type, parseInt(hours));
 
