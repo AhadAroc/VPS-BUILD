@@ -1852,12 +1852,12 @@ bot.action('show_commands', async (ctx) => {
             '🔹 */تحذير 🔴* – إصدار تحذير لمستخدم\n' +
             '🔹 */تحذيرات* – 🔴 عرض عدد التحذيرات لمستخدم\n';
 
-        // Send the first part with a "Next" button and Warning Explanation
+        // Send the first part with buttons
         await ctx.editMessageCaption(commandsPart1, {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: '⚠️ شرح نظام التحذيرات', callback_data: 'explain_warnings' }],
+                    [{ text: '🔴 شرح نظام التحذيرات', callback_data: 'explain_warnings' }],
                     [{ text: '⚠️ منع التجوال او spam', callback_data: 'manage_warnings' }],
                     [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
                     [{ text: '🔙 رجوع', callback_data: 'back' }]
@@ -1871,6 +1871,28 @@ bot.action('show_commands', async (ctx) => {
     }
 });
 
+// Modify the action handlers for premium features
+bot.action('explain_warnings', async (ctx) => {
+    const userId = ctx.from.id;
+    const isPremium = await isPremiumUser(userId);
+
+    if (!isPremium) {
+        return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+    }
+
+    // Existing code for explaining warnings...
+});
+
+bot.action('manage_warnings', async (ctx) => {
+    const userId = ctx.from.id;
+    const isPremium = await isPremiumUser(userId);
+
+    if (!isPremium) {
+        return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+    }
+
+    // Existing code for managing warnings...
+});
 // Handle the "Next" button to show the second part
 bot.action('show_commands_part2', async (ctx) => {
     try {
