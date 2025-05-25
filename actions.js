@@ -43,7 +43,7 @@ const QUIZ_STATE = {
 };
 
 
-const {isAdminOrOwner,isVIP,isPremiumUser} = require('./commands');    
+const {isAdminOrOwner,isVIP,} = require('./commands');    
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');    
@@ -437,7 +437,42 @@ async function checkSubscriptionStatus(ctx, userId) {
         return false;
     }
 }
-
+async function isPremiumUser(userId) {
+    try {
+        // Use the PremiumUser model directly
+        const user = await PremiumUser.findOne({ userId: parseInt(userId) });
+        
+        // If no user found, they're not premium
+        if (!user) return false;
+        
+        // Check if their premium subscription is still valid
+        const now = new Date();
+        if (new Date(user.expiresAt) > now) {
+            return true; // User is premium and subscription is valid
+        }
+        
+        // If subscription expired, notify the user (if not already notified)
+        if (!user.notified) {
+            try {
+                // Send notification about expired premium status
+                await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
+                
+                // Mark as notified in the database
+                await PremiumUser.updateOne(
+                    { userId: parseInt(userId) },
+                    { $set: { notified: true } }
+                );
+            } catch (err) {
+                console.error("❌ Failed to notify expired premium user:", err.message);
+            }
+        }
+        
+        return false; // Subscription expired
+    } catch (err) {
+        console.error("❌ isPremiumUser error:", err.message);
+        return false; // Return false on error
+    }
+}
 // Replace your forceCheckSubscription function with this
 async function forceCheckSubscription(ctx) {
     try {
