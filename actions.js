@@ -1936,6 +1936,7 @@ bot.action('manage_warnings', async (ctx) => {
     }
 });
 // Add new action handlers for curfew options
+// Add new action handlers for curfew options
 bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
     const type = ctx.match[1];
     let typeText;
@@ -1952,7 +1953,7 @@ bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
     }
     const message = `اختر مدة الحظر ${typeText}:`;
 
-    const durations = [1, 2, 3, 6, 12];
+    const durations = [1, 2, 3, 6, 12, 24];
     const keyboard = durations.map(hours => [{
         text: `${hours} ساعة`,
         callback_data: `set_curfew:${type}:${hours}`
@@ -1982,12 +1983,14 @@ bot.action(/^set_curfew:(media|messages|overall):(\d+)$/, async (ctx) => {
                 break;
         }
 
-        // Here you would implement the logic to set the curfew
-        // For example, storing it in a database and setting up a scheduled task
+        // Implement the logic to set the curfew
         await setCurfew(chatId, type, parseInt(hours));
 
+        const endTime = new Date(Date.now() + hours * 60 * 60 * 1000);
+        const endTimeString = endTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
         await ctx.answerCbQuery(`✅ تم تفعيل الحظر ${typeText} لمدة ${hours} ساعة.`);
-        await ctx.editMessageText(`تم تفعيل الحظر ${typeText} لمدة ${hours} ساعة. سيتم رفع الحظر تلقائياً بعد انتهاء المدة.\n\nملاحظة: المشرفين والمالك لن يتأثروا بهذا الحظر.`, {
+        await ctx.editMessageText(`تم تفعيل حظر ${typeText} لمدة ${hours} ساعة.\nسينتهي الحظر في الساعة ${endTimeString}.\n\nملاحظة: المشرفين والمالك لن يتأثروا بهذا الحظر.`, {
             reply_markup: {
                 inline_keyboard: [[{ text: '🔙 رجوع للإعدادات', callback_data: 'manage_warnings' }]]
             }
