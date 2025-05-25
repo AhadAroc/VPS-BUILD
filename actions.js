@@ -2147,21 +2147,32 @@ bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx) => {
 });
 // Add new action handlers for curfew options
 bot.action(/^curfew_(media|messages)$/, async (ctx) => {
-    const type = ctx.match[1];
-    const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
-    const message = `اختر مدة حظر ${typeText}:`;
+    try {
+        const type = ctx.match[1];
+        const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
+        const message = `اختر مدة حظر ${typeText}:`;
 
-    const durations = [1, 2, 3, 6, 12];
-    const keyboard = durations.map(hours => [{
-        text: `${hours} ساعة`,
-        callback_data: `set_curfew:${type}:${hours}`
-    }]);
+        const durations = [1, 2, 3, 6, 12];
+        const keyboard = durations.map(hours => [{
+            text: `${hours} ساعة`,
+            callback_data: `set_curfew:${type}:${hours}`
+        }]);
 
-    keyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
+        keyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
 
-    await ctx.editMessageText(message, {
-        reply_markup: { inline_keyboard: keyboard }
-    });
+        const replyMarkup = { inline_keyboard: keyboard };
+
+        if (ctx.callbackQuery.message.photo) {
+            // If the message has a photo, edit the caption
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
+        } else {
+            // If it's a text message, edit the text
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
+        }
+    } catch (error) {
+        console.error('Error in curfew action:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء تحديد مدة الحظر.', { show_alert: true });
+    }
 });
 
 bot.action(/^set_curfew:(media|messages):(\d+)$/, async (ctx) => {
@@ -2170,17 +2181,20 @@ bot.action(/^set_curfew:(media|messages):(\d+)$/, async (ctx) => {
         const chatId = ctx.chat.id;
         const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
 
-        // Here you would implement the logic to set the curfew
-        // For example, storing it in a database and setting up a scheduled task
-
         await setCurfew(chatId, type, parseInt(hours));
 
         await ctx.answerCbQuery(`✅ تم تفعيل حظر ${typeText} لمدة ${hours} ساعة.`);
-        await ctx.editMessageText(`تم تفعيل حظر ${typeText} لمدة ${hours} ساعة. سيتم رفع الحظر تلقائياً بعد انتهاء المدة.`, {
-            reply_markup: {
-                inline_keyboard: [[{ text: '🔙 رجوع للإعدادات', callback_data: 'manage_warnings' }]]
-            }
-        });
+        
+        const message = `تم تفعيل حظر ${typeText} لمدة ${hours} ساعة. سيتم رفع الحظر تلقائياً بعد انتهاء المدة.`;
+        const replyMarkup = {
+            inline_keyboard: [[{ text: '🔙 رجوع للإعدادات', callback_data: 'manage_warnings' }]]
+        };
+
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
+        } else {
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
+        }
     } catch (error) {
         console.error('Error setting curfew:', error);
         await ctx.answerCbQuery('❌ حدث خطأ أثناء تفعيل حظر التجول.', { show_alert: true });
