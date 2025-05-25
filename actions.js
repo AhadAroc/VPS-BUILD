@@ -1912,12 +1912,13 @@ bot.action('manage_warnings', async (ctx) => {
 
         // Display the curfew options
         const message = `🕰️ إعدادات حظر التجول:\n\n` +
-                        `اختر نوع الحظر ومدته:`;
+                        `اختر نوع الحظر:`;
 
         const replyMarkup = {
             inline_keyboard: [
                 [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
                 [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
+                [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
                 [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
             ]
         };
@@ -1934,7 +1935,161 @@ bot.action('manage_warnings', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
     }
 });
+// Add new action handlers for curfew options
+bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
+    const type = ctx.match[1];
+    let typeText;
+    switch (type) {
+        case 'media':
+            typeText = 'الوسائط';
+            break;
+        case 'messages':
+            typeText = 'الرسائل';
+            break;
+        case 'overall':
+            typeText = 'الشامل';
+            break;
+    }
+    const message = `اختر مدة الحظر ${typeText}:`;
 
+    const durations = [1, 2, 3, 6, 12];
+    const keyboard = durations.map(hours => [{
+        text: `${hours} ساعة`,
+        callback_data: `set_curfew:${type}:${hours}`
+    }]);
+
+    keyboard.push([{ text: '🔙 رجوع', callback_data: 'manage_warnings' }]);
+
+    await ctx.editMessageText(message, {
+        reply_markup: { inline_keyboard: keyboard }
+    });
+});
+
+bot.action(/^set_curfew:(media|messages|overall):(\d+)$/, async (ctx) => {
+    try {
+        const [type, hours] = ctx.match.slice(1);
+        const chatId = ctx.chat.id;
+        let typeText;
+        switch (type) {
+            case 'media':
+                typeText = 'الوسائط';
+                break;
+            case 'messages':
+                typeText = 'الرسائل';
+                break;
+            case 'overall':
+                typeText = 'الشامل';
+                break;
+        }
+
+        // Here you would implement the logic to set the curfew
+        // For example, storing it in a database and setting up a scheduled task
+        await setCurfew(chatId, type, parseInt(hours));
+
+        await ctx.answerCbQuery(`✅ تم تفعيل الحظر ${typeText} لمدة ${hours} ساعة.`);
+        await ctx.editMessageText(`تم تفعيل الحظر ${typeText} لمدة ${hours} ساعة. سيتم رفع الحظر تلقائياً بعد انتهاء المدة.\n\nملاحظة: المشرفين والمالك لن يتأثروا بهذا الحظر.`, {
+            reply_markup: {
+                inline_keyboard: [[{ text: '🔙 رجوع للإعدادات', callback_data: 'manage_warnings' }]]
+            }
+        });
+    } catch (error) {
+        console.error('Error setting curfew:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء تفعيل حظر التجول.', { show_alert: true });
+    }
+});
+
+// Implement the setCurfew function
+async function setCurfew(chatId, type, hours) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const expiryTime = new Date(Date.now() + hours * 60 * 60 * 1000);
+
+        await db.collection('curfews').updateOne(
+            { chatId: chatId },
+            { 
+                $set: { 
+                    [`${type}Curfew`]: true,
+                    [`${type}CurfewExpiry`]: expiryTime
+                }
+            },
+            { upsert: true }
+        );
+
+        // Schedule a task to remove the curfew after the specified duration
+        setTimeout(async () => {
+            await removeCurfew(chatId, type);
+        }, hours * 60 * 60 * 1000);
+
+    } catch (error) {
+        console.error('Error setting curfew in database:', error);
+        throw error;
+    }
+}
+
+async function removeCurfew(chatId, type) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('curfews').updateOne(
+            { chatId: chatId },
+            { 
+                $set: { 
+                    [`${type}Curfew`]: false,
+                    [`${type}CurfewExpiry`]: null
+                }
+            }
+        );
+        console.log(`Curfew ${type} removed for chat ${chatId}`);
+    } catch (error) {
+        console.error('Error removing curfew:', error);
+    }
+}
+
+// Add this function to check if a curfew is active
+async function isCurfewActive(chatId, type) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const curfew = await db.collection('curfews').findOne({ chatId: chatId });
+        
+        if (curfew && curfew[`${type}Curfew`]) {
+            const expiryTime = curfew[`${type}CurfewExpiry`];
+            return expiryTime > new Date();
+        }
+        return false;
+    } catch (error) {
+        console.error('Error checking curfew status:', error);
+        return false;
+    }
+}
+
+// Modify your message handler to check for curfews
+bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx) => {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+
+    // Check if the user is an admin or owner
+    const isAdminOrOwnerUser = await isAdminOrOwner(ctx, userId);
+
+    if (!isAdminOrOwnerUser) {
+        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
+        if (overallCurfewActive) {
+            // Don't send any message, just silently delete
+            await ctx.deleteMessage();
+            return;
+        }
+
+        if (ctx.message.text && await isCurfewActive(chatId, 'messages')) {
+            await ctx.deleteMessage();
+            return;
+        }
+
+        if (['photo', 'video', 'document', 'audio'].includes(ctx.updateSubTypes[0]) && await isCurfewActive(chatId, 'media')) {
+            await ctx.deleteMessage();
+            return;
+        }
+    }
+
+    // Continue with the rest of your message handling logic...
+});
 // Add new action handlers for curfew options
 bot.action(/^curfew_(media|messages)$/, async (ctx) => {
     const type = ctx.match[1];
