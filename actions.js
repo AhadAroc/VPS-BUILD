@@ -1910,8 +1910,13 @@ bot.action('manage_warnings', async (ctx) => {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
+        // Check if any curfew is active
+        const mediaCurfewActive = await isCurfewActive(chatId, 'media');
+        const messagesCurfewActive = await isCurfewActive(chatId, 'messages');
+        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
+
         // Display the curfew options
-        const message = `🕰️ إعدادات حظر التجول:\n\n` +
+        const message = `🕰️ إعدادات حظر التجوال:\n\n` +
                         `اختر نوع الحظر:`;
 
         const replyMarkup = {
@@ -1919,9 +1924,15 @@ bot.action('manage_warnings', async (ctx) => {
                 [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
                 [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
                 [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
-                [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
             ]
         };
+
+        // Add disable button if any curfew is active
+        if (mediaCurfewActive || messagesCurfewActive || overallCurfewActive) {
+            replyMarkup.inline_keyboard.push([{ text: '❌ إلغاء الحظر الحالي', callback_data: 'disable_current_curfew' }]);
+        }
+
+        replyMarkup.inline_keyboard.push([{ text: '🔙 رجوع', callback_data: 'show_commands' }]);
 
         // Check if the message to be edited is a photo with a caption
         if (ctx.callbackQuery.message.photo) {
@@ -1935,6 +1946,8 @@ bot.action('manage_warnings', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
     }
 });
+
+
 // Add new action handlers for curfew options
 
 
@@ -1978,7 +1991,62 @@ bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
         await ctx.answerCbQuery('❌ حدث خطأ أثناء تحميل إعدادات الحظر.', { show_alert: true });
     }
 });
+bot.action('disable_current_curfew', async (ctx) => {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
 
+        // Check if the user has the required permissions
+        if (!await hasRequiredPermissions(ctx, userId)) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        }
+
+        // Disable all types of curfews
+        await removeCurfew(chatId, 'media');
+        await removeCurfew(chatId, 'messages');
+        await removeCurfew(chatId, 'overall');
+
+        await ctx.answerCbQuery('✅ تم إلغاء جميع أنواع الحظر بنجاح.');
+
+        // Update the message to reflect the changes
+        const message = '🕰️ تم إلغاء جميع أنواع الحظر. اختر إجراءً:';
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
+                [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
+                [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
+                [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+            ]
+        };
+
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
+        } else {
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
+        }
+    } catch (error) {
+        console.error('Error disabling current curfew:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء محاولة إلغاء الحظر الحالي.', { show_alert: true });
+    }
+});
+async function removeCurfew(chatId, type) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('curfews').updateOne(
+            { chatId: chatId },
+            { 
+                $set: { 
+                    [`${type}Curfew`]: false,
+                    [`${type}CurfewExpiry`]: null
+                }
+            }
+        );
+        console.log(`Curfew ${type} removed for chat ${chatId}`);
+    } catch (error) {
+        console.error('Error removing curfew:', error);
+        throw error;
+    }
+}
 // Implement the setCurfew function
 async function setCurfew(chatId, type, hours) {
     try {
