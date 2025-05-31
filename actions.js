@@ -1956,7 +1956,9 @@ bot.action('back_to_main', async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
+
+
                         
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
@@ -5327,7 +5329,9 @@ bot.action('delete_secondary_developers', async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'text handle', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
+
+
                         
                         [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
