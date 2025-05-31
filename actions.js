@@ -930,9 +930,21 @@ bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx, next) => {
                 return; // Stop processing
             }
 
-            // Check for media curfew
-            const messageType = ctx.updateSubTypes[0];
-            if (['photo', 'video', 'document', 'audio', 'animation'].includes(messageType) && 
+            // Check for media curfew - FIX: Safely check for updateSubTypes
+            // The error is here - ctx.updateSubTypes might be undefined
+            let messageType = null;
+            if (ctx.updateSubTypes && ctx.updateSubTypes.length > 0) {
+                messageType = ctx.updateSubTypes[0];
+            } else if (ctx.message) {
+                // Fallback: determine message type from message object
+                if (ctx.message.photo) messageType = 'photo';
+                else if (ctx.message.video) messageType = 'video';
+                else if (ctx.message.document) messageType = 'document';
+                else if (ctx.message.audio) messageType = 'audio';
+                else if (ctx.message.animation) messageType = 'animation';
+            }
+
+            if (messageType && ['photo', 'video', 'document', 'audio', 'animation'].includes(messageType) && 
                 await isCurfewActive(chatId, 'media')) {
                 console.log(`🚫 Deleting ${messageType} due to media curfew in chat ${chatId}`);
                 await ctx.deleteMessage();
@@ -946,7 +958,7 @@ bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx, next) => {
         console.error('Error in curfew middleware:', error);
         return next(); // Continue to next middleware even if there's an error
     }
-})
+});
 // Photo handler
 
 // Example usage: Call this function when a specific command is received
