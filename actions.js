@@ -900,7 +900,53 @@ function setupActions(bot) {
  (bot);
     const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups, } = require('./commands');
 
+// Add this BEFORE any other message handlers
+bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx, next) => {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
 
+        // Skip processing for private chats
+        if (ctx.chat.type === 'private') {
+            return next();
+        }
+
+        // Check if the user is an admin or owner
+        const isAdminOrOwnerUser = await isAdminOrOwner(ctx, userId);
+
+        if (!isAdminOrOwnerUser) {
+            // Check for overall curfew first
+            const overallCurfewActive = await isCurfewActive(chatId, 'overall');
+            if (overallCurfewActive) {
+                console.log(`🚫 Deleting message due to overall curfew in chat ${chatId}`);
+                await ctx.deleteMessage();
+                return; // Stop processing
+            }
+
+            // Check for message curfew
+            if (ctx.message.text && await isCurfewActive(chatId, 'messages')) {
+                console.log(`🚫 Deleting text message due to message curfew in chat ${chatId}`);
+                await ctx.deleteMessage();
+                return; // Stop processing
+            }
+
+            // Check for media curfew
+            const messageType = ctx.updateSubTypes[0];
+            if (['photo', 'video', 'document', 'audio', 'animation'].includes(messageType) && 
+                await isCurfewActive(chatId, 'media')) {
+                console.log(`🚫 Deleting ${messageType} due to media curfew in chat ${chatId}`);
+                await ctx.deleteMessage();
+                return; // Stop processing
+            }
+        }
+
+        // If we get here, no curfew applies or user is exempt
+        return next();
+    } catch (error) {
+        console.error('Error in curfew middleware:', error);
+        return next(); // Continue to next middleware even if there's an error
+    }
+})
 // Photo handler
 
 // Example usage: Call this function when a specific command is received
@@ -2181,35 +2227,7 @@ async function isCurfewActive(chatId, type) {
     }
 }
 
-// Modify your message handler to check for curfews
-bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx) => {
-    const chatId = ctx.chat.id;
-    const userId = ctx.from.id;
 
-    // Check if the user is an admin or owner
-    const isAdminOrOwnerUser = await isAdminOrOwner(ctx, userId);
-
-    if (!isAdminOrOwnerUser) {
-        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
-        if (overallCurfewActive) {
-            // Don't send any message, just silently delete
-            await ctx.deleteMessage();
-            return;
-        }
-
-        if (ctx.message.text && await isCurfewActive(chatId, 'messages')) {
-            await ctx.deleteMessage();
-            return;
-        }
-
-        if (['photo', 'video', 'document', 'audio'].includes(ctx.updateSubTypes[0]) && await isCurfewActive(chatId, 'media')) {
-            await ctx.deleteMessage();
-            return;
-        }
-    }
-
-    // Continue with the rest of your message handling logic...
-});
 // Add new action handlers for curfew options
 bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
     try {
