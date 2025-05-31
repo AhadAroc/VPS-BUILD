@@ -899,7 +899,86 @@ function setupActions(bot) {
  // Set up media handlers
  (bot);
     const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups, } = require('./commands');
+// Add this middleware to handle curfew restrictions
+bot.use(async (ctx, next) => {
+    try {
+        // Skip if not in a group chat or if it's not a message
+        if (!ctx.chat || ctx.chat.type === 'private' || !ctx.message) {
+            return next();
+        }
 
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+
+        // Check if the user is an admin, owner, or has special privileges
+        const isAdminOrOwnerUser = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        const isImportantUser = await isImportant(ctx, userId);
+
+        // Skip curfew checks for privileged users
+        if (isAdminOrOwnerUser || isVIPUser || isImportantUser) {
+            return next();
+        }
+
+        // Check for overall curfew first
+        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
+        if (overallCurfewActive) {
+            console.log(`🚫 Deleting message due to overall curfew in chat ${chatId}`);
+            await ctx.deleteMessage().catch(err => {
+                console.error(`Failed to delete message in overall curfew: ${err.message}`);
+            });
+            return; // Stop processing
+        }
+
+        // Check for message curfew for text messages
+        if (ctx.message.text && await isCurfewActive(chatId, 'messages')) {
+            console.log(`🚫 Deleting text message due to message curfew in chat ${chatId}`);
+            await ctx.deleteMessage().catch(err => {
+                console.error(`Failed to delete text message in message curfew: ${err.message}`);
+            });
+            return; // Stop processing
+        }
+
+        // Check for media curfew - FIX: Safely check for media types
+        const hasMedia = ctx.message.photo || 
+                         ctx.message.video || 
+                         ctx.message.animation || 
+                         ctx.message.document || 
+                         ctx.message.audio;
+                         
+        if (hasMedia && await isCurfewActive(chatId, 'media')) {
+            const mediaType = ctx.message.photo ? 'photo' : 
+                             ctx.message.video ? 'video' : 
+                             ctx.message.animation ? 'animation' : 
+                             ctx.message.document ? 'document' : 'audio';
+                             
+            console.log(`🚫 Deleting ${mediaType} due to media curfew in chat ${chatId}`);
+            
+            // Use a more robust approach to delete the message
+            try {
+                await ctx.telegram.deleteMessage(chatId, ctx.message.message_id);
+                console.log(`✅ Successfully deleted ${mediaType} message ${ctx.message.message_id}`);
+            } catch (deleteErr) {
+                console.error(`❌ Failed to delete ${mediaType} message: ${deleteErr.message}`);
+                
+                // If direct deletion fails, try with ctx.deleteMessage as fallback
+                try {
+                    await ctx.deleteMessage();
+                    console.log(`✅ Fallback deletion successful for message ${ctx.message.message_id}`);
+                } catch (fallbackErr) {
+                    console.error(`❌ Fallback deletion also failed: ${fallbackErr.message}`);
+                }
+            }
+            return; // Stop processing
+        }
+
+        // Continue to next middleware if no curfew applies
+        return next();
+    } catch (error) {
+        console.error('Error in curfew middleware:', error);
+        return next(); // Continue to next middleware on error
+    }
+});
 // Add this BEFORE any other message handlers
 bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx, next) => {
     try {
