@@ -2211,10 +2211,23 @@ bot.on(['text', 'photo', 'video', 'document', 'audio'], async (ctx) => {
     // Continue with the rest of your message handling logic...
 });
 // Add new action handlers for curfew options
-bot.action(/^curfew_(media|messages)$/, async (ctx) => {
+bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
     try {
         const type = ctx.match[1];
-        const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
+        let typeText;
+        
+        switch(type) {
+            case 'media':
+                typeText = 'الوسائط';
+                break;
+            case 'messages':
+                typeText = 'الرسائل';
+                break;
+            case 'overall':
+                typeText = 'شامل';
+                break;
+        }
+        
         const message = `اختر مدة حظر ${typeText}:`;
 
         const durations = [1, 2, 3, 6, 12];
