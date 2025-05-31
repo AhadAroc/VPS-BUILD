@@ -2061,55 +2061,7 @@ bot.action('explain_warnings', async (ctx) => {
 });
 
 
-// Add new action handlers for curfew options
 
-
-bot.action('manage_warnings', async (ctx) => {
-    try {
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-
-        // Check if the user has the required permissions
-        if (!await hasRequiredPermissions(ctx, userId)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-        }
-
-        // Check if any curfew is active
-        const mediaCurfewActive = await isCurfewActive(chatId, 'media');
-        const messagesCurfewActive = await isCurfewActive(chatId, 'messages');
-        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
-
-        // Display the curfew options
-        const message = `🕰️ إعدادات حظر التجول:\n\n` +
-                        `اختر نوع الحظر:`;
-
-        const replyMarkup = {
-            inline_keyboard: [
-                [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
-                [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
-                [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
-            ]
-        };
-
-        // Add disable button if any curfew is active
-        if (mediaCurfewActive || messagesCurfewActive || overallCurfewActive) {
-            replyMarkup.inline_keyboard.push([{ text: '❌ إلغاء الحظر الحالي', callback_data: 'disable_current_curfew' }]);
-        }
-
-        replyMarkup.inline_keyboard.push([{ text: '🔙 رجوع', callback_data: 'show_commands' }]);
-
-        // Check if the message to be edited is a photo with a caption
-        if (ctx.callbackQuery.message.photo) {
-            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
-        } else {
-            // If it's a text message, edit the text
-            await ctx.editMessageText(message, { reply_markup: replyMarkup });
-        }
-    } catch (error) {
-        console.error('Error managing curfew:', error);
-        await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
-    }
-});
 bot.action('disable_current_curfew', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
