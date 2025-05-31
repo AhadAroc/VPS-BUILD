@@ -2253,11 +2253,24 @@ bot.action(/^curfew_(media|messages|overall)$/, async (ctx) => {
     }
 });
 
-bot.action(/^set_curfew:(media|messages):(\d+)$/, async (ctx) => {
+bot.action(/^set_curfew:(media|messages|overall):(\d+)$/, async (ctx) => {
     try {
         const [type, hours] = ctx.match.slice(1);
         const chatId = ctx.chat.id;
-        const typeText = type === 'media' ? 'الوسائط' : 'الرسائل';
+        
+        // Set the appropriate text based on the curfew type
+        let typeText;
+        switch(type) {
+            case 'media':
+                typeText = 'الوسائط';
+                break;
+            case 'messages':
+                typeText = 'الرسائل';
+                break;
+            case 'overall':
+                typeText = 'شامل';
+                break;
+        }
 
         await setCurfew(chatId, type, parseInt(hours));
 
