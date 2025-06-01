@@ -3,7 +3,7 @@ const { getDb, pool } = require('./database');
 const axios = require('axios');
 // Add this at the top of the file with other imports
 const SUBSCRIPTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
-
+const { connectToMongoDB } = require('./database');
 // Add this new Map to store last check times
 const lastSubscriptionCheckTime = new Map();
 const subscriptionStatusCache = new Map(); // cache to remember users
