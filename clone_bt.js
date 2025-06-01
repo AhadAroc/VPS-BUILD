@@ -33,7 +33,7 @@ const crypto = require('crypto');
 //const heroku = new Heroku({ token: HEROKU_API_KEY });
 // Add this near the top of your file with other constants
 const MAX_BOTS_PER_USER = 1;  // Maximum bots per user
-const MAX_TOTAL_BOTS = 10;    // Maximum total bots on the server
+const MAX_TOTAL_BOTS = 426;    // Maximum total bots on the server
 // ... (rest of your existing code)
 // ===== Configuration =====
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
