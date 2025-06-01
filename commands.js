@@ -1760,7 +1760,7 @@ bot.hears('تحذير', async (ctx) => {
         await ctx.replyWithHTML(`⚠️ تحذير للمستخدم <a href="tg://user?id=${targetUserId}">${targetUserName}</a>!\n\n📊 عدد التحذيرات: ${warningState.count}/${settings.kick}\n\n${actionTaken}`);
     } catch (error) {
         console.error('Error in warning command:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة تحذير المستخدم.');
+        await ctx.reply('');
     }
 });
 // Make sure to use this middleware
