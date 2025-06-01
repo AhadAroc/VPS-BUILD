@@ -52,17 +52,28 @@ async function getDevelopers() {
 }
 
 async function isDeveloper(ctx, userId) {
-    // First check hardcoded developer IDs
-    if (developerIds.has(userId.toString())) {
-        return true;
-    }
-    
-    // Then check database
     try {
-        const developers = await getDevelopers();
-        return developers.some(dev => dev.user_id.toString() === userId.toString());
+        // Check if ctx and ctx.chat are defined
+        if (!ctx || !ctx.chat) {
+            console.log('Context or chat is undefined in isDeveloper');
+            return false;
+        }
+
+        const chatId = ctx.chat.id.toString();
+        
+        // Ensure userId is defined and convert to string
+        if (userId === undefined) {
+            console.log('UserId is undefined in isDeveloper');
+            return false;
+        }
+        userId = userId.toString();
+
+        // Rest of your isDeveloper logic...
+        const db = await ensureDatabaseInitialized();
+        const developer = await db.collection('developers').findOne({ userId: userId });
+        return !!developer;
     } catch (error) {
-        console.error('Error checking if user is developer:', error);
+        console.error('Error in isDeveloper:', error);
         return false;
     }
 }
