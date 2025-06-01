@@ -7,7 +7,7 @@ const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 // Declare ownerId at the top of your file
 let ownerId = null;
-
+const mongoose = require('mongoose');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -41,7 +41,7 @@ const QUIZ_STATE = {
     SELECTING_QUESTION_COUNT: 2,
     ACTIVE: 3
 };
-const mongoose = require('mongoose');
+
 
 const {isAdminOrOwner,isVIP,} = require('./commands');    
 const axios = require('axios');
@@ -61,7 +61,7 @@ const premiumUserSchema = new mongoose.Schema({
 
 const PremiumUser = mongoose.model('PremiumUser', premiumUserSchema);
 
-module.exports = PremiumUser;
+
 // Function to download and save file
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
