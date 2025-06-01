@@ -41,7 +41,7 @@ const QUIZ_STATE = {
     SELECTING_QUESTION_COUNT: 2,
     ACTIVE: 3
 };
-
+const mongoose = require('mongoose');
 
 const {isAdminOrOwner,isVIP,} = require('./commands');    
 const axios = require('axios');
