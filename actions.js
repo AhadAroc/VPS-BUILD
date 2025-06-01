@@ -7,7 +7,7 @@ const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 // Declare ownerId at the top of your file
 let ownerId = null;
-
+const { getDatabaseForBot } = require('./database');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
