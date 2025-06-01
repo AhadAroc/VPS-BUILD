@@ -545,7 +545,7 @@ async function getLeaderboard(groupId) {
 }
 async function isPremiumUser(userId) {
     try {
-        // Use the PremiumUser model directly
+        // Always check the database directly, don't rely on cached values
         const user = await PremiumUser.findOne({ userId: parseInt(userId) });
         
         // If no user found, they're not premium
@@ -571,6 +571,15 @@ async function isPremiumUser(userId) {
             } catch (err) {
                 console.error("❌ Failed to notify expired premium user:", err.message);
             }
+        }
+        
+        // If expired, also remove from VIP and important users collections
+        try {
+            const db = await database.setupDatabase();
+            await db.collection('vip_users').deleteMany({ user_id: parseInt(userId) });
+            await db.collection('important_users').deleteMany({ user_id: parseInt(userId) });
+        } catch (err) {
+            console.error("❌ Failed to clean up expired premium user:", err.message);
         }
         
         return false; // Subscription expired
@@ -1962,9 +1971,21 @@ bot.hears('بدء', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        const isBotOwn = await isBotOwner(ctx, userId);
 
-        if (!isSecDev && !isAdmin && !isVIPUser) {
-            return ctx.reply('❌ هذا الأمر مخصص للمالك والمطورين والمشرفين فقط.');
+        // Only proceed if the user is a dev, admin, sec dev, or bot owner
+        if (!isDev && !isAdmin && !isSecDev && !isBotOwn) {
+            return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
+        }
+
+        if (ctx.from) {
+            await updateLastInteraction(
+                ctx.from.id, 
+                ctx.from.username, 
+                ctx.from.first_name, 
+                ctx.from.last_name
+            );
         }
 
         const subscribed = await checkUserSubscription(ctx);
