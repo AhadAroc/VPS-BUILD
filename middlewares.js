@@ -19,7 +19,15 @@ async function isAdminOrOwner(ctx, userId) {
         return false;
     }
 }
-
+async function ensureDatabaseInitialized(botId = null) {
+    try {
+        const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
+        return await connectToMongoDB(dbName);
+    } catch (error) {
+        console.error('Error initializing database:', error);
+        throw error;
+    }
+}
 async function getDevelopers() {
     try {
         // First, check MongoDB for developers
