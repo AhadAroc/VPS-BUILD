@@ -2016,7 +2016,7 @@ bot.hears('بدء', async (ctx) => {
         }
     } catch (error) {
         console.error('Error handling "بدء" command:', error);
-        ctx.reply('❌ حدث خطأ أثناء المعالجة.');
+        ctx.reply('يرجى التواصل مع صانع البوت او المالك ');
     }
 });
 // Add a function to get the current bot owner
