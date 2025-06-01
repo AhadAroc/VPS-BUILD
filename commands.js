@@ -698,7 +698,35 @@ async function getDifficultyLevels() {
         await client.close();
     }
 }
-
+// Add this function to check if a user is the bot owner
+async function isBotOwner(ctx, userId) {
+    try {
+        // If we already know the owner ID and it matches, return true immediately
+        if (ownerId && ownerId === userId) {
+            return true;
+        }
+        
+        // Otherwise, check the database
+        const botId = ctx.botInfo.id;
+        const db = await ensureDatabaseInitialized();
+        const ownership = await db.collection('bot_ownership').findOne({ 
+            bot_id: botId,
+            owner_id: userId,
+            is_active: true
+        });
+        
+        // If found, update our cached ownerId
+        if (ownership) {
+            ownerId = ownership.owner_id;
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('Error checking bot owner status:', error);
+        return false;
+    }
+}
 async function getQuestionsForDifficulty(difficulty) {
     const client = new MongoClient(uri);
     try {
