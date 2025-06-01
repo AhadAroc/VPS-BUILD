@@ -66,7 +66,32 @@ async function isDeveloper(ctx, userId) {
         return false;
     }
 }
+// Add this function to your middlewares.js file
+async function isSubscribed(ctx, userId) {
+    try {
+        const requiredChannels = [
+            { id: -1002555424660, username: 'sub2vea' },
+            { id: -1002331727102, username: 'leavemestary' }
+        ];
 
+        const channelIds = requiredChannels.map(channel => channel.id);
+
+        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
+            userId,
+            channels: channelIds
+        });
+
+        const { subscribed } = response.data;
+
+        return {
+            isSubscribed: subscribed,
+            statusChanged: false // You might want to implement logic for this
+        };
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return { isSubscribed: false, statusChanged: false };
+    }
+}
 
 function setupMiddlewares(bot) {
  // Add a middleware to check subscription for all commands in private chats
