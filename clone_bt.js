@@ -33,7 +33,7 @@ const crypto = require('crypto');
 //const heroku = new Heroku({ token: HEROKU_API_KEY });
 // Add this near the top of your file with other constants
 const MAX_BOTS_PER_USER = 1;  // Maximum bots per user
-const MAX_TOTAL_BOTS = 537;    // Maximum total bots on the server
+const MAX_TOTAL_BOTS = 10;    // Maximum total bots on the server
 // ... (rest of your existing code)
 // ===== Configuration =====
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
@@ -214,7 +214,95 @@ bot.command('add', async (ctx) => {
   }
 });
 
+bot.command('revoke', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
 
+  const args = ctx.message.text.split(" ");
+  if (args.length !== 2) return ctx.reply("❌ الصيغة: /revoke @username أو userId");
+
+  const identifier = args[1];
+  let userId;
+
+  try {
+    if (/^\d+$/.test(identifier)) {
+      // Raw numeric ID
+      userId = parseInt(identifier);
+    } else if (identifier.startsWith("@")) {
+      try {
+        const user = await ctx.telegram.getChat(identifier);
+        userId = user.id;
+      } catch (error) {
+        console.error("getChat error:", error.message);
+        return ctx.reply("❌ لم أتمكن من العثور على المستخدم. هل تحدث مع البوت؟");
+      }
+    } else {
+      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
+    }
+
+    // Check if user has premium status
+    const premiumUser = await PremiumUser.findOne({ userId });
+    
+    if (!premiumUser) {
+      return ctx.reply(`⚠️ المستخدم (${userId}) ليس لديه اشتراك مميز.`);
+    }
+
+    // Delete the premium user record
+    await PremiumUser.deleteOne({ userId });
+    
+    // Try to notify the user that their premium status has been revoked
+    try {
+      await ctx.telegram.sendMessage(userId, '⚠️ تم إلغاء صلاحيتك المميزة. للاستفسار راسل المطور.');
+    } catch (notifyError) {
+      console.log(`Could not notify user ${userId} about revocation: ${notifyError.message}`);
+    }
+
+    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح.`);
+  } catch (err) {
+    console.error("❌ Error in /revoke:", err.message);
+    return ctx.reply("❌ حدث خطأ أثناء إلغاء الصلاحية المميزة.");
+  }
+});
+
+// Add a command to list all premium users
+bot.command('premium_users', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
+
+  try {
+    const premiumUsers = await PremiumUser.find({}).sort({ expiresAt: 1 });
+    
+    if (premiumUsers.length === 0) {
+      return ctx.reply("📊 لا يوجد مستخدمين مميزين حالياً.");
+    }
+
+    let message = "📊 *قائمة المستخدمين المميزين:*\n\n";
+    
+    for (const user of premiumUsers) {
+      const expiryDate = new Date(user.expiresAt).toLocaleDateString('ar-EG');
+      const isExpired = new Date(user.expiresAt) < new Date();
+      const status = isExpired ? "🔴 منتهي" : "🟢 نشط";
+      
+      // Try to get user info
+      let username = "غير معروف";
+      try {
+        const userInfo = await ctx.telegram.getChat(user.userId);
+        username = userInfo.username ? `@${userInfo.username}` : userInfo.first_name || "غير معروف";
+      } catch (error) {
+        console.log(`Could not fetch info for user ${user.userId}: ${error.message}`);
+      }
+      
+      message += `👤 *المستخدم:* ${username} (${user.userId})\n`;
+      message += `📅 *تاريخ الانتهاء:* ${expiryDate}\n`;
+      message += `⚡ *الحالة:* ${status}\n\n`;
+    }
+    
+    message += "ℹ️ استخدم `/revoke معرف_المستخدم` لإلغاء الصلاحية المميزة.";
+    
+    return ctx.reply(message, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error("❌ Error in /premium_users:", err.message);
+    return ctx.reply("❌ حدث خطأ أثناء جلب قائمة المستخدمين المميزين.");
+  }
+});
 async function saveFile(fileLink, fileName) {
     try {
         const mediaDir = path.join(__dirname, 'media');
