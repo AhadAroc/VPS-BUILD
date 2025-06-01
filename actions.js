@@ -59,7 +59,7 @@ const premiumUserSchema = new mongoose.Schema({
     notified: { type: Boolean, default: false }
 });
 
-const PremiumUser = mongoose.model('PremiumUser', premiumUserSchema);
+
 
 
 // Function to download and save file
