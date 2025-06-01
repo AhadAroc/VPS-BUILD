@@ -976,7 +976,7 @@ function setupCommands(bot) {
             const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             const currentDate = new Date().toLocaleDateString('en-GB');
             const isDM = ctx.chat.type === 'private';
-            const isDev = await isDeveloper(ctx, userId);
+            const isDev = await isDeveloper(ctx);
     
             console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
     
