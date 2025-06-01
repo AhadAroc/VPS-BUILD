@@ -2024,13 +2024,13 @@ bot.action('show_commands', async (ctx) => {
             '🔹 */تحذير 🔴* – إصدار تحذير لمستخدم\n' +
             '🔹 */تحذيرات* – 🔴 عرض عدد التحذيرات لمستخدم\n';
 
-        // Send the first part with buttons
+         // Send the first part with buttons
         await ctx.editMessageCaption(commandsPart1, {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
                     [{ text: '🔴 شرح نظام التحذيرات', callback_data: 'explain_warnings' }],
-                    [{ text: '⚠️ منع التجوال او spam', callback_data: 'manage_warnings' }],
+                    [{ text: '⚠️ منع التجوال او spam', callback_data: 'check_premium_for_warnings' }],
                     [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
                     [{ text: '🔙 رجوع', callback_data: 'back' }]
                 ]
@@ -2125,6 +2125,59 @@ bot.action('manage_warnings', async (ctx) => {
     } catch (error) {
         console.error('Error managing curfew:', error);
         await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
+    }
+});
+// Add this action handler to check premium status before accessing manage_warnings
+bot.action('check_premium_for_warnings', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const isPremium = await isPremiumUser(userId);
+        const isSpecificUser = userId === 7308214106;
+
+        if (!isPremium && !isSpecificUser) {
+            return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+        }
+
+        // If user is premium or the specific user, proceed to manage_warnings
+        await ctx.answerCbQuery();
+        
+        // Call the manage_warnings handler directly
+        const chatId = ctx.chat.id;
+        
+        // Check if any curfew is active
+        const mediaCurfewActive = await isCurfewActive(chatId, 'media');
+        const messagesCurfewActive = await isCurfewActive(chatId, 'messages');
+        const overallCurfewActive = await isCurfewActive(chatId, 'overall');
+
+        // Display the curfew options
+        const message = `🕰️ إعدادات حظر التجول:\n\n` +
+                        `اختر نوع الحظر:`;
+
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: 'حظر الوسائط', callback_data: 'curfew_media' }],
+                [{ text: 'حظر الرسائل', callback_data: 'curfew_messages' }],
+                [{ text: 'حظر شامل', callback_data: 'curfew_overall' }],
+            ]
+        };
+
+        // Add disable button if any curfew is active
+        if (mediaCurfewActive || messagesCurfewActive || overallCurfewActive) {
+            replyMarkup.inline_keyboard.push([{ text: '❌ إلغاء الحظر الحالي', callback_data: 'disable_current_curfew' }]);
+        }
+
+        replyMarkup.inline_keyboard.push([{ text: '🔙 رجوع', callback_data: 'show_commands' }]);
+
+        // Check if the message to be edited is a photo with a caption
+        if (ctx.callbackQuery.message.photo) {
+            await ctx.editMessageCaption(message, { reply_markup: replyMarkup });
+        } else {
+            // If it's a text message, edit the text
+            await ctx.editMessageText(message, { reply_markup: replyMarkup });
+        }
+    } catch (error) {
+        console.error('Error checking premium status for warnings:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من حالة العضوية.', { show_alert: true });
     }
 });
 // Handle the "Next" button to show the second part
