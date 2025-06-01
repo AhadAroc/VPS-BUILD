@@ -1656,7 +1656,7 @@ bot.hears('تحذير', async (ctx) => {
         const targetUserName = ctx.message.reply_to_message.from.first_name || 'المستخدم';
 
         // Check if user has admin permissions or is a premium user or has the specific ID
-        const isAdmin = await isAdminOrOwner(ctx, userId);
+        //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isPremium = await isPremiumUser(userId);
         const isSpecificUser = userId === 7308214106;
 
