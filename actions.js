@@ -41,6 +41,12 @@ const QUIZ_STATE = {
     SELECTING_QUESTION_COUNT: 2,
     ACTIVE: 3
 };
+const premiumUserSchema = new mongoose.Schema({
+    userId: { type: Number, required: true, unique: true },
+    expiresAt: { type: Date, required: true },
+    notified: { type: Boolean, default: false }
+});
+
 const PremiumUser = mongoose.model('PremiumUser', premiumUserSchema);
 
 
