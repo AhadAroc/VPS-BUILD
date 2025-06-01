@@ -249,6 +249,27 @@ bot.command('revoke', async (ctx) => {
     // Delete the premium user record
     await PremiumUser.deleteOne({ userId });
     
+    // Update all related collections to remove premium status
+    const db = await database.setupDatabase();
+    
+    // 1. Remove from VIP users collection if they exist there
+    await db.collection('vip_users').deleteMany({ user_id: userId });
+    
+    // 2. Remove from important_users collection if they exist there
+    await db.collection('important_users').deleteMany({ user_id: userId });
+    
+    // 3. Update any other collections that might store premium status
+    // For example, if you have a user_roles or permissions collection
+    await db.collection('user_roles').updateMany(
+      { user_id: userId },
+      { $pull: { roles: "premium" } }
+    );
+    
+    // 4. Clear any cached premium status
+    if (subscriptionCache && subscriptionCache[userId]) {
+      delete subscriptionCache[userId];
+    }
+    
     // Try to notify the user that their premium status has been revoked
     try {
       await ctx.telegram.sendMessage(userId, '⚠️ تم إلغاء صلاحيتك المميزة. للاستفسار راسل المطور.');
@@ -256,7 +277,7 @@ bot.command('revoke', async (ctx) => {
       console.log(`Could not notify user ${userId} about revocation: ${notifyError.message}`);
     }
 
-    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح.`);
+    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح وإزالة جميع الامتيازات المرتبطة.`);
   } catch (err) {
     console.error("❌ Error in /revoke:", err.message);
     return ctx.reply("❌ حدث خطأ أثناء إلغاء الصلاحية المميزة.");
@@ -301,6 +322,74 @@ bot.command('premium_users', async (ctx) => {
   } catch (err) {
     console.error("❌ Error in /premium_users:", err.message);
     return ctx.reply("❌ حدث خطأ أثناء جلب قائمة المستخدمين المميزين.");
+  }
+});
+bot.command('check_premium', async (ctx) => {
+  const args = ctx.message.text.split(" ");
+  let userId;
+  
+  if (args.length === 2) {
+    // Check another user (admin only)
+    if (ctx.from.id !== ADMIN_ID) {
+      return ctx.reply("⛔ فقط المالك يمكنه التحقق من حالة المستخدمين الآخرين.");
+    }
+    
+    const identifier = args[1];
+    if (/^\d+$/.test(identifier)) {
+      userId = parseInt(identifier);
+    } else if (identifier.startsWith("@")) {
+      try {
+        const user = await ctx.telegram.getChat(identifier);
+        userId = user.id;
+      } catch (error) {
+        return ctx.reply("❌ لم أتمكن من العثور على المستخدم.");
+      }
+    } else {
+      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
+    }
+  } else {
+    // Check own status
+    userId = ctx.from.id;
+  }
+  
+  try {
+    // Check premium status directly from database
+    const premiumUser = await PremiumUser.findOne({ userId });
+    
+    // Check VIP status
+    const db = await database.setupDatabase();
+    const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
+    
+    // Check important status
+    const importantUser = await db.collection('important_users').findOne({ user_id: userId });
+    
+    if (!premiumUser && !vipUser && !importantUser) {
+      return ctx.reply(`المستخدم (${userId}) ليس لديه أي صلاحيات مميزة.`);
+    }
+    
+    let message = `📊 *حالة المستخدم (${userId}):*\n\n`;
+    
+    if (premiumUser) {
+      const expiryDate = new Date(premiumUser.expiresAt).toLocaleDateString('ar-EG');
+      const isExpired = new Date(premiumUser.expiresAt) < new Date();
+      const status = isExpired ? "🔴 منتهي" : "🟢 نشط";
+      
+      message += `🌟 *اشتراك مميز:* ${status}\n`;
+      message += `📅 *تاريخ الانتهاء:* ${expiryDate}\n\n`;
+    }
+    
+    if (vipUser) {
+      message += `👑 *مستخدم VIP:* نعم\n`;
+    }
+    
+    if (importantUser) {
+      message += `⭐ *مستخدم مهم:* نعم\n`;
+    }
+    
+    return ctx.reply(message, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error("❌ Error in /check_premium:", err.message);
+    return ctx.reply("❌ حدث خطأ أثناء التحقق من الصلاحيات.");
   }
 });
 async function saveFile(fileLink, fileName) {
