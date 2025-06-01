@@ -53,7 +53,15 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
+const premiumUserSchema = new mongoose.Schema({
+    userId: { type: Number, required: true, unique: true },
+    expiresAt: { type: Date, required: true },
+    notified: { type: Boolean, default: false }
+});
 
+const PremiumUser = mongoose.model('PremiumUser', premiumUserSchema);
+
+module.exports = PremiumUser;
 // Function to download and save file
 // Function to download and save file
 async function saveFile(fileLink, fileName) {
