@@ -1009,7 +1009,14 @@ function setupCommands(bot) {
 // Check if this is a cloned bot and assign ownership if needed
 const botId = ctx.botInfo.id;
 const botUsername = ctx.botInfo.username;
+ try {
+        const userId = ctx.from ? ctx.from.id : undefined;
+        if (!userId) {
+            console.log('User ID is undefined in start command');
+            return ctx.reply('Sorry, there was an error processing your command.');
+        }
 
+        const isDev = await isDeveloper(ctx, userId);
 // Connect to the database to check/save ownership
 try {
     const db = await ensureDatabaseInitialized();
