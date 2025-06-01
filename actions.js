@@ -439,47 +439,38 @@ async function checkSubscriptionStatus(ctx, userId) {
 }
 async function isPremiumUser(userId) {
     try {
-        console.log(`[DEBUG] Checking premium status for user ${userId}`);
-
-        const client = await MongoClient.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-        const db = client.db('test'); // change this if your DB name is different
-        const collection = db.collection('premium_users');
-
-        const user = await collection.findOne({ userId: parseInt(userId) });
-
-        console.log(`[DEBUG] Premium record for ${userId}:`, user);
-
-        if (!user || !user.expiresAt) {
-            await client.close();
-            return false;
-        }
-
+        // Use the PremiumUser model directly
+        const user = await PremiumUser.findOne({ userId: parseInt(userId) });
+        
+        // If no user found, they're not premium
+        if (!user) return false;
+        
+        // Check if their premium subscription is still valid
         const now = new Date();
-        const isValid = new Date(user.expiresAt) > now;
-
-        if (!isValid) {
-            console.log(`[DEBUG] Premium expired for user ${userId}`);
-
-            // Notify if not already notified
-            if (!user.notified) {
-                try {
-                    await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
-                    await collection.updateOne({ userId }, { $set: { notified: true } });
-                } catch (notifyErr) {
-                    console.error(`❌ Failed to notify user ${userId}:`, notifyErr.message);
-                }
-            }
-
-            await client.close();
-            return false;
+        if (new Date(user.expiresAt) > now) {
+            return true; // User is premium and subscription is valid
         }
-
-        await client.close();
-        return true;
-
+        
+        // If subscription expired, notify the user (if not already notified)
+        if (!user.notified) {
+            try {
+                // Send notification about expired premium status
+                await bot.telegram.sendMessage(userId, '⚠️ انتهت صلاحيتك المميزة. راسل المطور للتجديد.');
+                
+                // Mark as notified in the database
+                await PremiumUser.updateOne(
+                    { userId: parseInt(userId) },
+                    { $set: { notified: true } }
+                );
+            } catch (err) {
+                console.error("❌ Failed to notify expired premium user:", err.message);
+            }
+        }
+        
+        return false; // Subscription expired
     } catch (err) {
-        console.error(`❌ Error in isPremiumUser for ${userId}:`, err.message);
-        return false;
+        console.error("❌ isPremiumUser error:", err.message);
+        return false; // Return false on error
     }
 }
 // Replace your forceCheckSubscription function with this
@@ -2172,46 +2163,50 @@ bot.action('manage_warnings', async (ctx) => {
         await ctx.answerCbQuery('❌ حدث خطأ أثناء إدارة حظر التجول.', { show_alert: true });
     }
 });
-// Add this action handler to check premium status before accessing manage_warnings
-// Add this action handler to check premium status before accessing manage_warnings
+
+//  action handler to check premium status before accessing manage_warnings
 bot.action('check_premium_for_warnings', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        
-        // Check if user is admin or has required permissions first
+
+        // First: check if the user has permissions (admin/dev)
         const hasPermissions = await hasRequiredPermissions(ctx, userId);
-        
-        // If user has admin permissions, allow access regardless of premium status
         if (hasPermissions) {
             await ctx.answerCbQuery();
             await handleManageWarnings(ctx);
             return;
         }
-        
-        // For non-admins, check premium status
+
+        // Premium check
         let isPremium = false;
+
         try {
-            isPremium = await isPremiumUser(userId);
+            isPremium = await isPremiumUser(userId); // ✅ MUST await this!
+            console.log(`[DEBUG] Premium check for ${userId}:`, isPremium);
         } catch (error) {
-            console.error('Error checking premium status:', error);
-            // Continue with isPremium as false if there's an error
+            console.error(`[ERROR] Failed to check premium status for ${userId}:`, error);
+            isPremium = false;
         }
-        
+
         const isSpecificUser = userId === 7308214106;
 
         if (!isPremium && !isSpecificUser) {
-            return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+            return ctx.answerCbQuery(
+                '⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.',
+                { show_alert: true }
+            );
         }
 
-        // If user is premium or the specific user, proceed to manage_warnings
+        // ✅ Allowed: premium or specific user
         await ctx.answerCbQuery();
         await handleManageWarnings(ctx);
-        
+
     } catch (error) {
-        console.error('Error checking premium status for warnings:', error);
+        console.error('❌ Error in check_premium_for_warnings:', error);
         await ctx.answerCbQuery('❌ حدث خطأ أثناء التحقق من حالة العضوية.', { show_alert: true });
     }
 });
+
 // Handle the "Next" button to show the second part
 bot.action('show_commands_part2', async (ctx) => {
     try {
