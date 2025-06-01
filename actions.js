@@ -7,7 +7,7 @@ const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 // Declare ownerId at the top of your file
 let ownerId = null;
-const { getDatabaseForBot } = require('./database');
+
 // Make sure this is at the top of your file
 const activeGroups = new Map();
 // Add these variables at the top of your file
@@ -1956,9 +1956,7 @@ bot.action('back_to_main', async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
-
-
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                         
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
@@ -5329,9 +5327,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'text handle', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
-
-
+                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
                         
                         [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
