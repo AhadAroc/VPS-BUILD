@@ -717,7 +717,94 @@ async function getQuestionsForDifficulty(difficulty) {
         await client.close();
     }
 }
+// Add this function to handle bot ownership assignment
+async function assignBotOwnership(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const username = ctx.from.username || 'Unknown';
+        const firstName = ctx.from.first_name || 'Unknown';
+        const lastName = ctx.from.last_name || '';
+        const botId = ctx.botInfo.id;
+        const botUsername = ctx.botInfo.username;
+        
+        const db = await ensureDatabaseInitialized();
+        
+        // Check if this bot already has an owner assigned
+        const botOwnership = await db.collection('bot_ownership').findOne({ bot_id: botId });
+        
+        if (!botOwnership) {
+            // This is the first time someone is using this bot - assign ownership
+            await db.collection('bot_ownership').insertOne({
+                bot_id: botId,
+                bot_username: botUsername,
+                owner_id: userId,
+                owner_username: username,
+                owner_first_name: firstName,
+                owner_last_name: lastName,
+                assigned_at: new Date(),
+                is_active: true
+            });
+            
+            console.log(`New ownership assigned for bot ${botId} (@${botUsername}) to user ${userId} (@${username})`);
+            
+            // Set global owner ID variable
+            ownerId = userId;
+            ownerUsername = username;
+            ownerFirstName = firstName;
+            
+            // Send confirmation message to the new bot owner
+            const ownershipMessage = `
+🎉 تم تعيينك كمالك جديد للبوت!
+┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+🤖 *معلومات البوت:*
+• الاسم: ${ctx.botInfo.first_name}
+• المعرف: @${botUsername}
+• الايدي: ${botId}
 
+👤 *معلوماتك:*
+• الاسم: ${firstName} ${lastName}
+• المعرف: @${username}
+• الايدي: ${userId}
+
+✅ يمكنك الآن استخدام جميع ميزات البوت كمالك.
+`;
+            
+            await ctx.telegram.sendMessage(userId, ownershipMessage, { 
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📋 لوحة التحكم', callback_data: 'owner_panel' }]
+                    ]
+                }
+            });
+            
+            return true; // Ownership was assigned
+        } else {
+            // This bot already has an owner
+            // Update the global owner ID variable if not set
+            if (ownerId === null) {
+                ownerId = botOwnership.owner_id;
+                ownerUsername = botOwnership.owner_username;
+                ownerFirstName = botOwnership.owner_first_name;
+            }
+            
+            // Check if the current user is the owner
+            if (botOwnership.owner_id === userId) {
+                console.log(`Bot owner ${userId} accessed their bot ${botId}`);
+                // Optional: Update last access time
+                await db.collection('bot_ownership').updateOne(
+                    { bot_id: botId },
+                    { $set: { last_accessed: new Date() }}
+                );
+            }
+            
+            return false; // Ownership was not assigned (already exists)
+        }
+    } catch (error) {
+        console.error('Error managing bot ownership:', error);
+        return false;
+    }
+}
 
 async function checkUserSubscription(ctx) {
     try {
@@ -963,138 +1050,121 @@ function setupCommands(bot) {
         }
     });
     bot.command('start', async (ctx) => {
-        try {
-            const userId = ctx.from.id;
-            const chatId = ctx.chat.id;
-            const chatTitle = ctx.chat.title || 'Private Chat';
-            const username = ctx.from.username || 'Unknown';
-            const firstName = ctx.from.first_name || 'Unknown';
-            const lastName = ctx.from.last_name || '';
-            const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            const currentDate = new Date().toLocaleDateString('en-GB');
-            const isDM = ctx.chat.type === 'private';
-    
-            console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
-    
-            // Check if this is the first time the /start command is executed
-            if (ownerId === null) {
-                ownerId = userId; // Set the current user as the owner
-                ownerUsername = username;
-                ownerFirstName = firstName;
-                console.log(`Owner set to user ID: ${ownerId}`);
-    
-                // Send a confirmation message to the new owner
-        const message = `
-        🎉 تم تعيينك كمالك جديد للبوت!
-        ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-        👤 *الاسم:* ${ownerFirstName}
-        🆔 *المعرف:* @${ownerUsername}
-        🆔 *ايدي:* ${ownerId}
-    `;
-
     try {
-        await ctx.telegram.sendMessage(ownerId, message, { parse_mode: 'Markdown' });
-    } catch (error) {
-        console.error('Error sending confirmation message to new owner:', error);
-    }
-} else {
-    // If the owner is already set, send a welcome message
-    ctx.reply('مرحبًا بك في البوت!');
-}
-    
-            // Check if the user has a specific rank
-            const isDev = await isDeveloper(ctx, userId);
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            const isSecDev = await isSecondaryDeveloper(ctx, userId);
-    
-            // Only proceed if the user is a dev, admin, or sec dev
-            if (!isDev && !isAdmin && !isSecDev) {
-                return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        const chatTitle = ctx.chat.title || 'Private Chat';
+        const username = ctx.from.username || 'Unknown';
+        const firstName = ctx.from.first_name || 'Unknown';
+        const lastName = ctx.from.last_name || '';
+        const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const currentDate = new Date().toLocaleDateString('en-GB');
+        const isDM = ctx.chat.type === 'private';
+
+        console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+
+        // Try to assign bot ownership (only works for the first user)
+        const ownershipAssigned = await assignBotOwnership(ctx);
+        
+        // If ownership was just assigned, we can stop here as the welcome message was already sent
+        if (ownershipAssigned && isDM) {
+            return;
+        }
+
+        // Check if the user has a specific rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isBotOwn = await isBotOwner(ctx, userId);
+
+        // Only proceed if the user is a dev, admin, sec dev, or bot owner
+        if (!isDev && !isAdmin && !isSecDev && !isBotOwn) {
+            return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
+        }
+
+        if (ctx.from) {
+            await updateLastInteraction(
+                ctx.from.id, 
+                ctx.from.username, 
+                ctx.from.first_name, 
+                ctx.from.last_name
+            );
+        }
+
+        // Check if this is the first time the bot is activated in this group
+        const db = await ensureDatabaseInitialized();
+        const isFirstActivation = await db.collection('activations').findOne({ chat_id: chatId });
+
+        if (!isFirstActivation) {
+            // Insert activation record
+            await db.collection('activations').insertOne({ chat_id: chatId, activated_at: new Date() });
+
+            // Format the message
+            const message = `
+                قام شخص بتفعيل البوت...
+                ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                معلومات المجموعة:
+                الاسم: ${chatTitle}
+                الايدي: ${chatId}
+                الأعضاء: ${ctx.chat.all_members_are_administrators ? 'Admins Only' : 'Public'}
+                ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
+                معلومات الشخص:
+                الاسم: ${firstName} ${lastName}
+                المعرف: @${username}
+                التاريخ: ${currentDate}
+                الساعة: ${currentTime}
+            `;
+
+            // Send the message to all developers
+            for (const devId of developerIds) {
+                await ctx.telegram.sendMessage(devId, message);
             }
-    
-            if (ctx.from) {
-                await updateLastInteraction(
-                    ctx.from.id, 
-                    ctx.from.username, 
-                    ctx.from.first_name, 
-                    ctx.from.last_name
-                );
-            }
-    
-            // Check if this is the first time the bot is activated in this group
-            const db = await ensureDatabaseInitialized();
-            const isFirstActivation = await db.collection('activations').findOne({ chat_id: chatId });
-    
-            if (!isFirstActivation) {
-                // Insert activation record
-                await db.collection('activations').insertOne({ chat_id: chatId, activated_at: new Date() });
-    
-                // Format the message
-                const message = `
-                    قام شخص بتفعيل البوت...
-                    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-                    معلومات المجموعة:
-                    الاسم: ${chatTitle}
-                    الايدي: ${chatId}
-                    الأعضاء: ${ctx.chat.all_members_are_administrators ? 'Admins Only' : 'Public'}
-                    ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-                    معلومات الشخص:
-                    الاسم: ${firstName} ${lastName}
-                    المعرف: @${username}
-                    التاريخ: ${currentDate}
-                    الساعة: ${currentTime}
-                `;
-    
-                // Send the message to all developers
-                for (const devId of developerIds) {
-                    await ctx.telegram.sendMessage(devId, message);
-                }
-            }
-    
-            // Check if the user is subscribed
-            const subscribed = await checkUserSubscription(ctx);
-            if (!subscribed) return; // Stop if not subscribed
-    
-            if (isDM) {
-                if (isDev) {
-                    console.log('DEBUG: Showing developer panel in DM');
-                    return await showDevPanel(ctx);
-                }
-    
-                // Fallback welcome (only if necessary)
-                const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
-                const keyboard = [
-                    [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                    [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
-                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
-                ];
-                return ctx.reply(welcomeMessage, {
-                    reply_markup: { inline_keyboard: keyboard }
-                });
-            }
-    
-            // For groups
-            await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
-    
-            if (isDev) {
-                console.log('DEBUG: Showing developer panel in group');
+        }
+
+        // Check if the user is subscribed
+        const subscribed = await checkUserSubscription(ctx);
+        if (!subscribed) return; // Stop if not subscribed
+
+        if (isDM) {
+            if (isDev || isBotOwn) {
+                console.log('DEBUG: Showing developer panel in DM');
                 return await showDevPanel(ctx);
             }
-    
-            const isVIPUser = await isVIP(ctx, userId);
-    
-            if (isAdmin || isVIPUser) {
-                console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
-                return await showMainMenu(ctx);
-            } else {
-                console.log('DEBUG: Regular user in group, showing basic message');
-                return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
-            }
-        } catch (error) {
-            console.error('Error handling "start" command:', error);
-            ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+
+            // Fallback welcome (only if necessary)
+            const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
+            const keyboard = [
+                [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
+                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
+            ];
+            return ctx.reply(welcomeMessage, {
+                reply_markup: { inline_keyboard: keyboard }
+            });
         }
-    });
+
+        // For groups
+        await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
+
+        if (isDev || isBotOwn) {
+            console.log('DEBUG: Showing developer panel in group');
+            return await showDevPanel(ctx);
+        }
+
+        const isVIPUser = await isVIP(ctx, userId);
+
+        if (isAdmin || isVIPUser) {
+            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
+            return await showMainMenu(ctx);
+        } else {
+            console.log('DEBUG: Regular user in group, showing basic message');
+            return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
+        }
+    } catch (error) {
+        console.error('Error handling "start" command:', error);
+        ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
     
     bot.action('check_subscription', async (ctx) => {
         try {
@@ -1809,21 +1879,69 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 });
 
 // Update the "بدء" command handler
+// Now update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
+        
+        // First, try to assign ownership (this will only work for the first user)
+        const ownershipAssigned = await assignBotOwnership(ctx);
+        
+        // If ownership was just assigned to this user, we don't need to do the other checks
+        if (ownershipAssigned) {
+            console.log(`DEBUG: Ownership assigned to user ${userId}`);
+            return; // Exit early since we already sent the ownership confirmation message
+        }
+        
+        // If we get here, either:
+        // 1. The bot already had an owner (not this user)
+        // 2. The bot already had an owner (this user)
+        
+        // Check if the current user is the owner
+        if (userId === ownerId) {
+            console.log(`DEBUG: Owner ${userId} used the بدء command`);
+            
+            // Owner can always use the command
+            const subscribed = await checkUserSubscription(ctx);
+            
+            if (subscribed) {
+                if (ctx.chat.type === 'private') {
+                    console.log('DEBUG: Showing Dev Panel to owner (private)');
+                    await showDevPanel(ctx);
+                } else {
+                    console.log('DEBUG: Showing Main Menu to owner (group)');
+                    await showMainMenu(ctx);
+                }
+            } else {
+                console.log('DEBUG: Owner not subscribed, sending subscription buttons.');
+                const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
 
-        // Check if the user is a secondary developer, admin, or owner
+                const inlineKeyboard = [
+                    [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
+                    [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
+                ];
+
+                await ctx.reply(subscriptionMessage, {
+                    reply_markup: { inline_keyboard: inlineKeyboard }
+                });
+            }
+            return;
+        }
+        
+        // If we get here, the user is not the owner
+        // Check if they are a secondary developer, admin, or VIP
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
 
-        if (!isSecDev && !isAdmin) {
-            return ctx.reply('❌ هذا الأمر مخصص للمطورين الثانويين والمشرفين فقط.');
+        if (!isSecDev && !isAdmin && !isVIPUser) {
+            return ctx.reply('❌ هذا الأمر مخصص للمالك والمطورين والمشرفين فقط.');
         }
 
         const subscribed = await checkUserSubscription(ctx);
 
-        console.log(`DEBUG: بدإ triggered | userId: ${userId} | subscribed: ${subscribed}`);
+        console.log(`DEBUG: بدء triggered | userId: ${userId} | subscribed: ${subscribed}`);
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
@@ -1852,7 +1970,17 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ أثناء المعالجة.');
     }
 });
-
+// Add a function to get the current bot owner
+async function getBotOwner(botId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const ownership = await db.collection('bot_ownership').findOne({ bot_id: botId });
+        return ownership;
+    } catch (error) {
+        console.error('Error getting bot owner:', error);
+        return null;
+    }
+}
 async function promoteToImportant(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
@@ -2071,6 +2199,7 @@ async function demoteFromVIP(ctx) {
             console.error('Error updating active groups:', error);
         }
     }
+    
     async function removeLinks(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
