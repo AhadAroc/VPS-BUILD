@@ -2044,38 +2044,42 @@ bot.action('show_commands', async (ctx) => {
 });
 
 bot.action('explain_warnings', async (ctx) => {
-    const userId = ctx.from.id;
-    const isPremium = await isPremiumUser(userId);
-    const isSpecificUser = userId === 7308214106;
-
-    if (!isPremium && !isSpecificUser) {
-        return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
-    }
-
     try {
-        const warningExplanation = 
-            '*📌 شرح نظام التحذيرات:*\n\n' +
-            '1️⃣ *الاستخدام:* يستخدم المشرفون أمر "تحذير" بالرد على رسالة المستخدم المخالف.\n\n' +
-            '2️⃣ *آلية العمل:*\n' +
-            '   • كل تحذير يزيد من عداد تحذيرات المستخدم.\n' +
-            '   • يتم تخزين التحذيرات لكل مستخدم في كل مجموعة بشكل منفصل.\n' +
-            '   • يمكن ضبط إعدادات التحذيرات لكل مجموعة.\n\n' +
-            // ... (rest of the explanation)
-            '⚠️ استخدم هذا النظام بحكمة للحفاظ على نظام المجموعة وتجنب إساءة استخدامه!';
+        const userId = ctx.from.id;
+        
+        // Check if user is admin or has required permissions first
+        const hasPermissions = await hasRequiredPermissions(ctx, userId);
+        
+        // If user has admin permissions, allow access regardless of premium status
+        if (hasPermissions) {
+            await showWarningExplanation(ctx);
+            return;
+        }
+        
+        // For non-admins, check premium status
+        let isPremium = false;
+        try {
+            isPremium = await isPremiumUser(userId);
+        } catch (error) {
+            console.error('Error checking premium status:', error);
+            // Continue with isPremium as false if there's an error
+        }
+        
+        const isSpecificUser = userId === 7308214106;
 
-        await ctx.editMessageCaption(warningExplanation, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
-                ]
-            }
-        });
+        if (!isPremium && !isSpecificUser) {
+            return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+        }
+
+        // If user is premium or the specific user, show the warning explanation
+        await showWarningExplanation(ctx);
+        
     } catch (error) {
         console.error('Error in explain_warnings action:', error);
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض شرح نظام التحذيرات. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
+
 
 bot.action('manage_warnings', async (ctx) => {
     try {
@@ -2277,6 +2281,54 @@ bot.action('disable_current_curfew', async (ctx) => {
         await ctx.answerCbQuery('❌ حدث خطأ أثناء محاولة إلغاء الحظر الحالي.', { show_alert: true });
     }
 });
+// Extract the warning explanation to a separate function
+async function showWarningExplanation(ctx) {
+    const warningExplanation = 
+        '*📌 شرح نظام التحذيرات:*\n\n' +
+        '1️⃣ *الاستخدام:* يستخدم المشرفون أمر "تحذير" بالرد على رسالة المستخدم المخالف.\n\n' +
+        '2️⃣ *آلية العمل:*\n' +
+        '   • كل تحذير يزيد من عداد تحذيرات المستخدم.\n' +
+        '   • يتم تخزين التحذيرات لكل مستخدم في كل مجموعة بشكل منفصل.\n' +
+        '   • يمكن ضبط إعدادات التحذيرات لكل مجموعة.\n\n' +
+        '3️⃣ *الإجراءات التلقائية:*\n' +
+        '   • بعد 2 تحذيرات: منع إرسال الوسائط لمدة 30 دقيقة.\n' +
+        '   • بعد 3 تحذيرات: كتم المستخدم لمدة ساعة.\n' +
+        '   • بعد 5 تحذيرات: طرد المستخدم من المجموعة.\n\n' +
+        '4️⃣ *مراقبة التحذيرات:*\n' +
+        '   • استخدم أمر "تحذيرات" للاطلاع على عدد تحذيرات مستخدم معين.\n' +
+        '   • يتم عرض عدد التحذيرات الحالية عند إصدار تحذير جديد.\n\n' +
+        '5️⃣ *إعادة ضبط التحذيرات:*\n' +
+        '   • تُعاد التحذيرات للصفر تلقائياً بعد الطرد.\n' +
+        '   • يمكن للمشرفين إعادة ضبط التحذيرات يدوياً.\n\n' +
+        '6️⃣ *الحماية من إساءة الاستخدام:*\n' +
+        '   • فقط المشرفون يمكنهم استخدام أمر التحذير.\n' +
+        '   • لا يمكن تحذير المشرفين أو المالكين.\n\n' +
+        '7️⃣ *تخصيص الإعدادات:*\n' +
+        '   • يمكن للمشرفين تعديل عدد التحذيرات اللازمة لكل إجراء.\n' +
+        '   • يمكن تفعيل أو تعطيل بعض الإجراءات حسب احتياجات المجموعة.\n\n' +
+        '⚠️ استخدم هذا النظام بحكمة للحفاظ على نظام المجموعة وتجنب إساءة استخدامه!';
+
+    // Check if the message to be edited is a photo with a caption
+    if (ctx.callbackQuery.message.photo) {
+        await ctx.editMessageCaption(warningExplanation, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+                ]
+            }
+        });
+    } else {
+        await ctx.editMessageText(warningExplanation, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+                ]
+            }
+        });
+    }
+}
 // Extract the manage_warnings logic to a separate function so it can be reused
 async function handleManageWarnings(ctx) {
     try {
