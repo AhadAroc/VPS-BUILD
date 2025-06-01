@@ -2160,13 +2160,7 @@ bot.action('check_premium_for_warnings', async (ctx) => {
     try {
         const userId = ctx.from.id;
 
-        // First: check if the user has permissions (admin/dev)
-        const hasPermissions = await hasRequiredPermissions(ctx, userId);
-        if (hasPermissions) {
-            await ctx.answerCbQuery();
-            await handleManageWarnings(ctx);
-            return;
-        }
+       
 
         // Premium check
         let isPremium = false;
