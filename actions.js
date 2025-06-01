@@ -7,6 +7,7 @@ const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
 // Declare ownerId at the top of your file
 let ownerId = null;
+
 const mongoose = require('mongoose');
 // Make sure this is at the top of your file
 const activeGroups = new Map();
@@ -14,26 +15,30 @@ const activeGroups = new Map();
 let awaitingBotName = false;
 // Add these variables at the top of your file
 let awaitingDeleteReplyWord = false;
+
 const cloudinary = require('cloudinary').v2;
-const { getLeaderboard,getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty,isSecondaryDeveloper  } = require('./commands');
+const { getLeaderboard, getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty, isSecondaryDeveloper } = require('./commands');
 const chatStates = new Map();
 // Add these global variables at the top of your file
 const activeQuizzes = new Map(); // Map to store active quizzes by chat ID
 const userScores = new Map(); // Map to store user scores
+
 // Cloudinary configuration
 cloudinary.config({
   cloud_name: 'dpxowt5m5',
   api_key: '248273337268518',
   api_secret: 'SihooJWz6cMi5bNDAU26Tmf-tIw' // Replace with your actual API secret
 });
+
 // Add this to your global variables
 const quizSettings = new Map();
-const { isDeveloper,isSubscribed } = require('./middlewares');
+const { isDeveloper, isSubscribed } = require('./middlewares');
 const { addQuizQuestion } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
 const { updateActiveGroup } = require('./database');
+
 // Quiz state constants
 const QUIZ_STATE = {
     INACTIVE: 0,
@@ -41,24 +46,25 @@ const QUIZ_STATE = {
     SELECTING_QUESTION_COUNT: 2,
     ACTIVE: 3
 };
+
+// ✅ Premium user schema & safe model
 const premiumUserSchema = new mongoose.Schema({
     userId: { type: Number, required: true, unique: true },
     expiresAt: { type: Date, required: true },
     notified: { type: Boolean, default: false }
 });
+const PremiumUser = mongoose.models.PremiumUser || mongoose.model('PremiumUser', premiumUserSchema);
 
-const PremiumUser = mongoose.model('PremiumUser', premiumUserSchema);
-
-
-const {isAdminOrOwner,isVIP,} = require('./commands');    
+const { isAdminOrOwner, isVIP } = require('./commands');
 const axios = require('axios');
 const fs = require('fs');
-const path = require('path');    
+const path = require('path');
 // Ensure the directory for saving media exists
 const mediaDir = path.join(__dirname, 'media');
 if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
+
 
 
 
