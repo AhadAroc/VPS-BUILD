@@ -2052,6 +2052,7 @@ bot.action('explain_warnings', async (ctx) => {
         
         // If user has admin permissions, allow access regardless of premium status
         if (hasPermissions) {
+            await ctx.answerCbQuery();
             await showWarningExplanation(ctx);
             return;
         }
@@ -2072,6 +2073,7 @@ bot.action('explain_warnings', async (ctx) => {
         }
 
         // If user is premium or the specific user, show the warning explanation
+        await ctx.answerCbQuery();
         await showWarningExplanation(ctx);
         
     } catch (error) {
@@ -2079,21 +2081,11 @@ bot.action('explain_warnings', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض شرح نظام التحذيرات. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-
-
-bot.action('manage_warnings', async (ctx) => {
+// Create a separate function to handle manage_warnings after premium check
+async function handleManageWarnings(ctx) {
     try {
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
-
-        // Check if the user has the required permissions or is the specific user
-        const hasPermissions = await hasRequiredPermissions(ctx, userId);
-        const isPremium = await isPremiumUser(userId);
-        const isSpecificUser = userId === 7308214106;
-
-        if (!hasPermissions && !isPremium && !isSpecificUser) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين والمستخدمين المميزين فقط.', { show_alert: true });
-        }
 
         // Check if any curfew is active
         const mediaCurfewActive = await isCurfewActive(chatId, 'media');
@@ -2127,8 +2119,48 @@ bot.action('manage_warnings', async (ctx) => {
             await ctx.editMessageText(message, { reply_markup: replyMarkup });
         }
     } catch (error) {
-        console.error('Error managing curfew:', error);
+        console.error('Error in handleManageWarnings:', error);
         await ctx.reply('❌ حدث خطأ أثناء إدارة حظر التجول.');
+    }
+}
+
+// Update the manage_warnings handler to use the new premium checking approach
+bot.action('manage_warnings', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check if user is admin or has required permissions first
+        const hasPermissions = await hasRequiredPermissions(ctx, userId);
+        
+        // If user has admin permissions, allow access regardless of premium status
+        if (hasPermissions) {
+            await ctx.answerCbQuery();
+            await handleManageWarnings(ctx);
+            return;
+        }
+        
+        // For non-admins, check premium status
+        let isPremium = false;
+        try {
+            isPremium = await isPremiumUser(userId);
+        } catch (error) {
+            console.error('Error checking premium status:', error);
+            // Continue with isPremium as false if there's an error
+        }
+        
+        const isSpecificUser = userId === 7308214106;
+
+        if (!isPremium && !isSpecificUser) {
+            return ctx.answerCbQuery('⭐ هذه الميزة متاحة فقط للمستخدمين المميزين. يرجى الاشتراك للوصول إليها.', { show_alert: true });
+        }
+
+        // If user is premium or the specific user, proceed to manage warnings
+        await ctx.answerCbQuery();
+        await handleManageWarnings(ctx);
+        
+    } catch (error) {
+        console.error('Error in manage_warnings action:', error);
+        await ctx.answerCbQuery('❌ حدث خطأ أثناء إدارة حظر التجول.', { show_alert: true });
     }
 });
 // Add this action handler to check premium status before accessing manage_warnings
