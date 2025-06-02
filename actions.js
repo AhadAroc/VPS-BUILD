@@ -548,6 +548,92 @@ async function confirmSubscription(ctx) {
         await ctx.answerCbQuery('❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 }
+// Add this function to handle quiz answers
+async function handleQuizAnswer(ctx, chatId, userId, userAnswer) {
+    try {
+        // Check if there's an active quiz in this chat
+        if (!activeQuizzes.has(chatId) || activeQuizzes.get(chatId).state !== QUIZ_STATE.ACTIVE) {
+            return; // No active quiz, so continue with other handlers
+        }
+        
+        const quiz = activeQuizzes.get(chatId);
+        const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
+        
+        if (!currentQuestion) {
+            return; // No current question
+        }
+        
+        // Check if this user has already attempted this question
+        if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
+            quiz.attempts.set(quiz.currentQuestionIndex, new Set());
+        }
+        
+        const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
+        if (questionAttempts.has(userId)) {
+            return; // User already attempted this question
+        }
+        
+        // Check if the answer is correct (case insensitive comparison)
+        const correctAnswer = currentQuestion.answer.toLowerCase();
+        const isCorrect = userAnswer.toLowerCase() === correctAnswer;
+        
+        if (isCorrect) {
+            await handleCorrectQuizAnswer(ctx, chatId, userId);
+        }
+    } catch (error) {
+        console.error('Error in handleQuizAnswer:', error);
+    }
+}
+
+// Add this function to get database for specific bot
+async function getDatabaseForBot(botId) {
+    try {
+        // If no botId is provided, return the main database
+        if (!botId) {
+            return await ensureDatabaseInitialized();
+        }
+        
+        // For specific bot databases, use a naming convention
+        const dbName = `bot_${botId}_db`;
+        return await connectToMongoDB(dbName);
+    } catch (error) {
+        console.error(`Error getting database for bot ${botId}:`, error);
+        // Fallback to main database
+        return await ensureDatabaseInitialized();
+    }
+}
+
+// Update the checkForAutomaticReply function to use getDatabaseForBot
+async function checkForAutomaticReply(ctx) {
+    const text = ctx.message.text.trim().toLowerCase();
+    const botId = ctx.botInfo.id;
+
+    try {
+        // First try to get bot-specific database
+        const db = await getDatabaseForBot(botId);
+        
+        // First, try to find a bot-specific reply
+        let reply = await db.collection('replies').findOne({
+            bot_id: botId,
+            trigger_word: text
+        });
+
+        // If no bot-specific reply is found, try to find a global reply
+        if (!reply) {
+            const mainDb = await ensureDatabaseInitialized();
+            reply = await mainDb.collection('replies').findOne({
+                trigger_word: text,
+                bot_id: { $exists: false }
+            });
+        }
+
+        return reply;
+    } catch (error) {
+        console.error('Error checking for automatic reply:', error);
+        return null;
+    }
+}
+
 
 async function handleCorrectQuizAnswer(ctx, chatId, userId) {
     const quiz = activeQuizzes.get(chatId);
