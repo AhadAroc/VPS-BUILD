@@ -34,7 +34,7 @@ cloudinary.config({
 // Add this to your global variables
 const quizSettings = new Map();
 const { isDeveloper, isSubscribed } = require('./middlewares');
-const { addQuizQuestion } = require('./database');
+const { addQuizQuestion,connectToMongoDB, ensureDatabaseInitialized } = require('./database');
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
