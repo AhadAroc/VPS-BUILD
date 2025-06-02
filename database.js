@@ -106,26 +106,40 @@ async function connectToMongoDB(customDbName = null) {
     }
 }
 
-async function getDatabaseForBot(dbName) {
-    const uri = process.env.MONGODB_URI || mongoUri;  // from .env or config
-    if (!_mongoClient) {
-        _mongoClient = new MongoClient(uri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-            serverSelectionTimeoutMS: 30000,
-            socketTimeoutMS: 45000,
-            connectTimeoutMS: 30000
-        });
-        await _mongoClient.connect();
-        console.log('✅ Native MongoClient connected to cluster');
-    }
+async function getDatabaseForBot(botId) {
+    try {
+        // If no botId is provided, return the main database
+        if (!botId) {
+            return await ensureDatabaseInitialized();
+        }
+        
+        // For specific bot databases, use a naming convention
+        const dbName = `bot_${botId}_db`;
+        
+        // Use the MongoClient for direct connection
+        if (!_mongoClient) {
+            _mongoClient = new MongoClient(mongoUri, {
+                useNewUrlParser: true,
+                useUnifiedTopology: true,
+                serverSelectionTimeoutMS: 30000,
+                socketTimeoutMS: 45000,
+                connectTimeoutMS: 30000
+            });
+            await _mongoClient.connect();
+            console.log('✅ Native MongoClient connected to cluster');
+        }
 
-    if (!_mongoDbs[dbName]) {
-        _mongoDbs[dbName] = _mongoClient.db(dbName);
-        console.log(`✅ Native MongoDB database selected: ${dbName}`);
-    }
+        if (!_mongoDbs[dbName]) {
+            _mongoDbs[dbName] = _mongoClient.db(dbName);
+            console.log(`✅ Native MongoDB database selected: ${dbName}`);
+        }
 
-    return _mongoDbs[dbName];
+        return _mongoDbs[dbName];
+    } catch (error) {
+        console.error(`Error getting database for bot ${botId}:`, error);
+        // Fallback to main database
+        return await ensureDatabaseInitialized();
+    }
 }
 
 async function addQuizQuestion(question) {
