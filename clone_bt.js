@@ -87,7 +87,7 @@ app.get('/', (req, res) => {
 
 // Your existing bot code
 bot.start((ctx) => {
-    ctx.editMessageText('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
+    ctx.reply('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
         [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
         [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')],
         [Markup.button.callback('ℹ️ معلومات', 'show_info')] // Add the Info button
