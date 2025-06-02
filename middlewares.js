@@ -3,7 +3,7 @@ const { getDb, pool } = require('./database');
 const axios = require('axios');
 // Add this at the top of the file with other imports
 const SUBSCRIPTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
-const { connectToMongoDB } = require('./database');
+
 // Add this new Map to store last check times
 const lastSubscriptionCheckTime = new Map();
 const subscriptionStatusCache = new Map(); // cache to remember users
@@ -19,15 +19,7 @@ async function isAdminOrOwner(ctx, userId) {
         return false;
     }
 }
-async function ensureDatabaseInitialized(botId = null) {
-    try {
-        const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
-        return await connectToMongoDB(dbName);
-    } catch (error) {
-        console.error('Error initializing database:', error);
-        throw error;
-    }
-}
+
 async function getDevelopers() {
     try {
         // First, check MongoDB for developers
@@ -60,57 +52,35 @@ async function getDevelopers() {
 }
 
 async function isDeveloper(ctx, userId) {
+    console.log(`Checking if user ${userId} is a developer`);
+    
+    // First check hardcoded developer IDs
+    if (developerIds.has(userId.toString())) {
+        console.log(`User ${userId} is a hardcoded developer`);
+        return true;
+    }
+    
+    // Then check database
     try {
-        // Check if ctx and ctx.chat are defined
-        if (!ctx || !ctx.chat) {
-            console.log('Context or chat is undefined in isDeveloper');
-            return false;
-        }
-
-        const chatId = ctx.chat.id.toString();
+        const developers = await getDevelopers();
+        console.log(`Retrieved ${developers.length} developers from database:`, developers);
         
-        // Ensure userId is defined and convert to string
-        if (userId === undefined) {
-            console.log('UserId is undefined in isDeveloper');
-            return false;
-        }
-        userId = userId.toString();
-
-        // Rest of your isDeveloper logic...
-        const db = await ensureDatabaseInitialized();
-        const developer = await db.collection('developers').findOne({ userId: userId });
-        return !!developer;
+        const isDev = developers.some(dev => {
+            const devId = dev.user_id.toString();
+            const checkId = userId.toString();
+            const isMatch = devId === checkId;
+            console.log(`Comparing dev ID ${devId} with user ID ${checkId}: ${isMatch}`);
+            return isMatch;
+        });
+        
+        console.log(`Final result for user ${userId}: isDeveloper = ${isDev}`);
+        return isDev;
     } catch (error) {
-        console.error('Error in isDeveloper:', error);
+        console.error('Error checking if user is developer:', error);
         return false;
     }
 }
-// Add this function to your middlewares.js file
-async function isSubscribed(ctx, userId) {
-    try {
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea' },
-            { id: -1002331727102, username: 'leavemestary' }
-        ];
 
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        return {
-            isSubscribed: subscribed,
-            statusChanged: false // You might want to implement logic for this
-        };
-    } catch (error) {
-        console.error('Error checking subscription:', error);
-        return { isSubscribed: false, statusChanged: false };
-    }
-}
 
 function setupMiddlewares(bot) {
  // Add a middleware to check subscription for all commands in private chats
