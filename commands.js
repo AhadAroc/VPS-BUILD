@@ -420,8 +420,8 @@ async function showMainMenu(ctx) {
             // ✅ Admins, SecDev, VIPs get the full menu
             keyboard = {
                 inline_keyboard: [
-                    [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                    [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                    [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                     [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                     [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
                 ]
@@ -1463,8 +1463,8 @@ bot.action('back_to_main', async (ctx) => {
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: 'test holder 1', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜 عرض الأوامر', callback_data: 'show_commands' }],
+                        [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                         
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                         [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
