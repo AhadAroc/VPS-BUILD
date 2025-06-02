@@ -936,14 +936,14 @@ const difficulties = {
 
 
 // Make sure to initialize the database before using it
-async function ensureDatabaseInitialized() {
-    let db = database.getDb();
-    if (!db) {
-        console.log('Database not initialized, connecting now...');
-        db = await database.connectToMongoDB();
-    }
-    return db;
-}
+//async function ensureDatabaseInitialized() {
+   // let db = database.getDb();
+   // if (!db) {
+    //    console.log('Database not initialized, connecting now...');
+      ///  db = await database.connectToMongoDB();
+   // }
+   // return db;
+//}
 
 
 async function configureQuiz(ctx) {
