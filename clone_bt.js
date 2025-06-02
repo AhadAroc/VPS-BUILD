@@ -87,12 +87,20 @@ app.get('/', (req, res) => {
 
 // Your existing bot code
 bot.start((ctx) => {
-    ctx.reply('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
+    ctx.editMessageText('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
         [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
-        [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
+        [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')],
+        [Markup.button.callback('ℹ️ معلومات', 'show_info')] // Add the Info button
     ]));
 });
-
+// Handle "Info" button action
+bot.action('show_info', (ctx) => {
+    ctx.reply('ℹ️ *معلومات حول كيفية الاستنساخ:*\n\n' +
+              '1. احصل على التوكن من @BotFather.\n' +
+              '2. اضغط على "إنشاء بوت جديد" وأرسل التوكن.\n' +
+              '3. سيتم إنشاء البوت الخاص بك ويمكنك إدارته من خلال الخيارات المتاحة.\n\n' +
+              'لأي استفسارات إضافية، يرجى التواصل مع الدعم.', { parse_mode: 'Markdown' });
+});
 // Handle "Create Bot" option
 bot.action('create_bot', (ctx) => {
     ctx.reply('🆕 لإنشاء بوت جديد، أرسل **التوكن** الذي حصلت عليه من @BotFather.');
@@ -964,7 +972,7 @@ bot.action('show_active_bots', async (ctx) => {
     });
 });
 bot.action('back_to_main_menu', (ctx) => {
-    ctx.editMessageText('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
+    ctx.editMessageText('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
         [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
         [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
     ]));
@@ -1032,7 +1040,7 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
             ctx.editMessageText('جاري تحديث القائمة...');
             
             // Show the main menu instead of the empty bots list
-            ctx.editMessageText('🤖 أهلا بك! ماذا تريد أن تفعل؟', Markup.inlineKeyboard([
+            ctx.editMessageText('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
                 [Markup.button.callback('• إنشاء بوت جديد •', 'create_bot')],
                 [Markup.button.callback('• عرض البوتات النشطة •', 'show_active_bots')]
             ]));
