@@ -1166,9 +1166,45 @@ bot.command('setup_cycle', async (ctx) => {
 });
 bot.on('new_chat_members', async (ctx) => {
     const newMembers = ctx.message.new_chat_members;
-    if (newMembers.some(member => member.id === ctx.botInfo.id)) {
-        // Bot was added to a new group
-        await updateActiveGroup(ctx.chat.id, ctx.chat.title, ctx.from.id);
+    if (!newMembers || newMembers.length === 0) return;
+
+    const botInfo = await ctx.telegram.getMe();
+    const isBotAdded = newMembers.some(member => member.id === botInfo.id);
+
+    if (isBotAdded) {
+        const chatTitle = ctx.chat.title || 'Unknown';
+        const chatId = ctx.chat.id;
+
+        // ===== Save group to DB =====
+        try {
+            const { getDatabaseForBot } = require('./database');
+            const db = await getDatabaseForBot('replays'); // Use your main database name instead of 'test'
+            
+            if (!db) {
+                console.error('Failed to get database connection');
+                return;
+            }
+
+            await db.collection('groups').updateOne(
+                { group_id: chatId, bot_id: botInfo.id },
+                {
+                    $set: {
+                        group_id: chatId,
+                        title: chatTitle,
+                        is_active: true,
+                        bot_id: botInfo.id,
+                        added_at: new Date()
+                    }
+                },
+                { upsert: true }
+            );
+
+            console.log(`✅ [@${botInfo.username}] Saved group '${chatTitle}' (${chatId}) for bot_id ${botInfo.id}`);
+
+            // Rest of your code...
+        } catch (error) {
+            console.error('Error saving group to database:', error);
+        }
     }
 });
 // Add this new action handler
