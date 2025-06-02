@@ -122,7 +122,21 @@ async function saveFile(fileLink, fileName) {
     }
 }
 
-
+async function isImportant(ctx, userId) {
+    try {
+        // Check if the user is in the database with 'important' role
+        const db = await ensureDatabaseInitialized();
+        const user = await db.collection('users').findOne({
+            user_id: userId,
+            role: 'important'
+        });
+        
+        return !!user; // Return true if user exists, false otherwise
+    } catch (error) {
+        console.error('Error checking important status:', error);
+        return false; // Default to false on error
+    }
+}
  
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
@@ -937,7 +951,6 @@ bot.use(async (ctx, next) => {
         if (isAdminOrOwnerUser || isVIPUser || isImportantUser) {
             return next();
         }
-
         // Check for overall curfew first
         const overallCurfewActive = await isCurfewActive(chatId, 'overall');
         if (overallCurfewActive) {
@@ -3698,14 +3711,15 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     // Register the text handler
     bot.on('text', async (ctx) => {
         const userId = ctx.from.id;
-        const chatId = ctx.chat.id; // 👈 Fix added here
+        const chatId = ctx.chat.id;
         const userState = pendingReplies.get(userId);
         const text = ctx.message.text?.trim();
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
         const userAnswer = ctx.message.text.trim().toLowerCase();
-        if (ctx.session.awaitingBotName) {
+        
+        // Handle bot name change
+        if (ctx.session?.awaitingBotName) {
             const newBotName = ctx.message.text.trim();
-            const chatId = ctx.chat.id;
             try {
                 const db = await getDatabaseForBot('replays');
                 await db.collection('bot_names').updateOne(
@@ -3728,62 +3742,70 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     
                 await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
                 ctx.session.awaitingBotName = false;
+                return;
             } catch (error) {
                 console.error('Error updating bot name:', error);
                 await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت. يرجى المحاولة مرة أخرى.');
                 ctx.session.awaitingBotName = false;
+                return;
             }
         }
-         if (!state) return;
-
-    
-  if (isNaN(count) || count < 1) {
-    return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
-}
-
-let updateField;
-switch (action) {
-    case 'edit_warning_kick':
-        updateField = { kick: count };
-        break;
-    case 'edit_warning_mute':
-        updateField = { mute: count };
-        break;
-    case 'edit_warning_restrict_media':
-        updateField = { restrictMedia: count };
-        break;
-    default:
-        return;
-}
-
-try {
-    await updateWarningSettings(botId, chatId, updateField);
-    await ctx.reply('✅ تم تحديث الإعدادات بنجاح.');
-} catch (error) {
-    console.error('Error updating warning settings:', error);
-    await ctx.reply('❌ حدث خطأ أثناء تحديث الإعدادات.');
-}
-
-userStates.delete(userId);
-    
-    
-
-if (isBroadcasting && text) {
-    try {
-        await broadcastMessage(ctx, null, null, text);
-
-        if (awaitingBroadcastPhoto) {
-            awaitingBroadcastPhoto = false;
-            await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+        
+        // Handle warning settings update
+        const state = userStates.get(userId);
+        if (state && state.action && state.action.startsWith('edit_warning_')) {
+            const count = parseInt(text);
+            const action = state.action;
+            const botId = state.botId || ctx.botInfo.id;
+            
+            if (isNaN(count) || count < 1) {
+                return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
+            }
+            
+            let updateField;
+            switch (action) {
+                case 'edit_warning_kick':
+                    updateField = { kick: count };
+                    break;
+                case 'edit_warning_mute':
+                    updateField = { mute: count };
+                    break;
+                case 'edit_warning_restrict_media':
+                    updateField = { restrictMedia: count };
+                    break;
+                default:
+                    return;
+            }
+            
+            try {
+                await updateWarningSettings(botId, chatId, updateField);
+                await ctx.reply('✅ تم تحديث الإعدادات بنجاح.');
+            } catch (error) {
+                console.error('Error updating warning settings:', error);
+                await ctx.reply('❌ حدث خطأ أثناء تحديث الإعدادات.');
+            }
+            
+            userStates.delete(userId);
+            return;
         }
+        
+        // Handle broadcasting
+        if (isBroadcasting && text) {
+            try {
+                await broadcastMessage(ctx, null, null, text);
 
-        return; // 🛑 Prevent further processing of this broadcast message
-    } catch (error) {
-        console.error('Error broadcasting text:', error);
-        await ctx.reply('❌ حدث خطأ أثناء بث الرسالة.');
-        return;
-    }
-}
+                if (awaitingBroadcastPhoto) {
+                    awaitingBroadcastPhoto = false;
+                    await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+                }
+
+                return; // 🛑 Prevent further processing of this broadcast message
+            } catch (error) {
+                console.error('Error broadcasting text:', error);
+                await ctx.reply('❌ حدث خطأ أثناء بث الرسالة.');
+                return;
+            }
+        }
 
 
     if (userState) {
