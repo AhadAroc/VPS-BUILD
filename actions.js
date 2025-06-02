@@ -2154,7 +2154,7 @@ bot.action('back_to_main', async (ctx) => {
                         [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                         
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
                     ]
                 }
             }
@@ -5809,7 +5809,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
                         [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                         
                         [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
-                        [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }]
+                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
                     ]
                 }
             }
