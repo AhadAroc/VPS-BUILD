@@ -2799,106 +2799,118 @@ async function listImportantUsers(ctx) {
         }
     }
     async function promoteUser(ctx, role) {
-        try {
-            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+        }
+
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
             }
-    
-            let userId, userMention;
-            const args = ctx.message.text.split(' ').slice(1);
-    
-            if (ctx.message.reply_to_message) {
-                userId = ctx.message.reply_to_message.from.id;
-                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-            } else if (args.length > 0) {
-                const username = args[0].replace('@', '');
-                try {
-                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
-                    userId = user.user.id;
-                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
-                } catch (error) {
-                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-                }
-            } else {
-                return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
-            }
-    
-            const db = await ensureDatabaseInitialized();
-            const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
-            let collection, successMessage;
-    
-            switch (role.toLowerCase()) {
-                case 'مميز':
-                case 'vip':
-                    collection = 'vip_users';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
-                    break;
-                case 'ادمن':
-                case 'admin':
-                    collection = 'admins';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
-                    // Promote the user to admin in the Telegram group
-                    await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                        can_change_info: true,
-                        can_delete_messages: true,
-                        can_invite_users: true,
-                        can_restrict_members: true,
-                        can_pin_messages: true,
-                        can_promote_members: false
-                    });
-                    break;
-                case 'مدير':
-                case 'manager':
-                    collection = 'managers';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
-                    break;
-                case 'منشئ':
-                case 'creator':
-                    collection = 'creators';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
-                    break;
-                case 'منشئ اساسي':
-                case 'primary creator':
-                    collection = 'primary_creators';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
-                    break;
-                case 'مطور':
-                case 'developer':
-                    collection = 'developers';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
-                    break;
-                case 'مطور ثانوي':
-                case 'secondary developer':
-                    collection = 'secondary_developers';
-                    successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
-                    break;
-                default:
-                    return ctx.reply('❌ نوع الترقية غير صالح.');
-            }
-    
+        } else {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
+        let collection, successMessage;
+
+        switch (role.toLowerCase()) {
+            case 'مميز':
+            case 'vip':
+                collection = 'vip_users';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
+                break;
+            case 'ادمن':
+            case 'admin':
+                collection = 'admins';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
+                // Promote the user to admin in the Telegram group
+                await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                    can_change_info: true,
+                    can_delete_messages: true,
+                    can_invite_users: true,
+                    can_restrict_members: true,
+                    can_pin_messages: true,
+                    can_promote_members: false
+                });
+                break;
+            case 'مدير':
+            case 'manager':
+                collection = 'managers';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
+                break;
+            case 'منشئ':
+            case 'creator':
+                collection = 'creators';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
+                break;
+            case 'منشئ اساسي':
+            case 'primary creator':
+                collection = 'primary_creators';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
+                break;
+            case 'مطور':
+            case 'developer':
+                collection = 'developers';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
+                break;
+            case 'مطور ثانوي':
+            case 'secondary developer':
+                collection = 'secondary_developers';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
+                break;
+            default:
+                return ctx.reply('❌ نوع الترقية غير صالح.');
+        }
+
+        // First check if the user already exists in the collection
+        const existingUser = await db.collection(collection).findOne({ user_id: userId });
+        
+        if (existingUser) {
+            // User already has this role, just update their information
             await db.collection(collection).updateOne(
-                { user_id: userId, bot_id: botId }, // Include bot_id in the query
+                { user_id: userId },
                 { 
                     $set: { 
-                        user_id: userId, 
-                        bot_id: botId, // Store the bot_id
+                        bot_id: botId,
                         username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
-                        promoted_at: new Date(),
-                        promoted_by: ctx.from.id
+                        updated_at: new Date(),
+                        updated_by: ctx.from.id
                     }
-                },
-                { upsert: true }
+                }
             );
+            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${role}.`);
+        } else {
+            // User doesn't have this role yet, create a new entry
+            await db.collection(collection).insertOne({ 
+                user_id: userId, 
+                bot_id: botId,
+                username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
+                promoted_at: new Date(),
+                promoted_by: ctx.from.id
+            });
             
             ctx.replyWithMarkdown(successMessage);
-    
             console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
-    
-        } catch (error) {
-            console.error(`Error promoting user to ${role}:`, error);
-            ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
         }
+    } catch (error) {
+        console.error(`Error promoting user to ${role}:`, error);
+        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
     }
+}
     // ✅ Demote user
     // ✅ Demote user u check this
     async function demoteUser(ctx) {
