@@ -68,6 +68,65 @@ async function ensureDatabaseInitialized(botId = null) {
     }
 }
 
+async function connectToMongoDB(customDbName = null) {
+    try {
+        console.log('Attempting to connect to MongoDB...');
+        
+        const options = {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 30000,
+            socketTimeoutMS: 45000,
+            connectTimeoutMS: 30000
+        };
+        
+        const dbNameToUse = customDbName || dbName;
+        const uriToUse = mongoUri.replace(dbName, dbNameToUse);
+        
+        const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+        console.log(`Connecting to: ${sanitizedUri} with options:`, options);
+        
+        // If we're already connected to the same database, return the existing connection
+        if (mongoose.connection.readyState === 1 && 
+            mongoose.connection.name === dbNameToUse) {
+            console.log(`Already connected to MongoDB database: ${dbNameToUse}`);
+            return mongoose.connection.db;
+        }
+        
+        await mongoose.connect(uriToUse, options);
+        console.log(`Connected to MongoDB database: ${dbNameToUse} successfully`);
+        
+        // Store the current database connection
+        const db = mongoose.connection.db;
+        
+        return db;
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        throw error;
+    }
+}
+
+async function getDatabaseForBot(dbName) {
+    const uri = process.env.MONGODB_URI || mongoUri;  // from .env or config
+    if (!_mongoClient) {
+        _mongoClient = new MongoClient(uri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 30000,
+            socketTimeoutMS: 45000,
+            connectTimeoutMS: 30000
+        });
+        await _mongoClient.connect();
+        console.log('✅ Native MongoClient connected to cluster');
+    }
+
+    if (!_mongoDbs[dbName]) {
+        _mongoDbs[dbName] = _mongoClient.db(dbName);
+        console.log(`✅ Native MongoDB database selected: ${dbName}`);
+    }
+
+    return _mongoDbs[dbName];
+}
 
 async function addQuizQuestion(question) {
     try {
