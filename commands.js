@@ -410,15 +410,16 @@ async function showMainMenu(ctx) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
 
-        const isSpecialUser = isAdmin || isSecDev || isVIPUser;
+        const isSpecialUser = isAdmin || isSecDev || isVIPUser || isBotAdm;
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
 
         let keyboard;
 
         if (isSpecialUser) {
-            // ✅ Admins, SecDev, VIPs get the full menu
+            // ✅ Admins, SecDev, VIPs, and Bot Admins get the full menu
             keyboard = {
                 inline_keyboard: [
                     [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
@@ -1517,9 +1518,7 @@ bot.hears('broadcast', async (ctx) => {
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
-// Add these to your command setup function
-bot.command('ترقية_ادمن', (ctx) => promoteUser(ctx, 'ادمن'));
-bot.hears(/^ترقية ادمن/, (ctx) => promoteUser(ctx, 'ادمن'));
+
 
 bot.command('promote', (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('promote', (ctx) => promoteUser(ctx, 'developer'));
@@ -1556,7 +1555,11 @@ bot.command('تفعيل_ملصقات', adminOnly((ctx) => enableStickerSharing(c
 // Also add handlers for text commands without the underscore
 bot.hears('منع ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
 bot.hears('فتح ملصقات', adminOnly((ctx) => enableStickerSharing(ctx)));
+bot.command('ترقية_مشرف_بوت', promoteToBotAdmin);
+bot.hears('رفع ادمن', promoteToBotAdmin);
 
+bot.command('ازالة_مشرف_بوت', removeBotAdmin);
+bot.hears('تنزيل ادمن', removeBotAdmin);
 // Additional handler for flexibility
 bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
@@ -2030,7 +2033,127 @@ bot.hears('بدء', async (ctx) => {
     }
 });
 
+async function isBotAdmin(ctx, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botAdmin = await db.collection('bot_admins').findOne({ user_id: userId });
+        return !!botAdmin;
+    } catch (error) {
+        console.error('Error checking bot admin status:', error);
+        return false;
+    }
+}
 
+async function promoteToBotAdmin(ctx, targetUserId, targetUsername) {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check if the user has permission to promote (must be admin or owner)
+        if (!(await isAdminOrOwner(ctx, userId))) {
+            return ctx.reply('❌ عذراً، فقط المشرفين ومالك المجموعة يمكنهم ترقية المستخدمين إلى مشرف بوت.');
+        }
+        
+        // Get the target user ID if not provided directly
+        if (!targetUserId) {
+            if (ctx.message.reply_to_message) {
+                targetUserId = ctx.message.reply_to_message.from.id;
+                targetUsername = ctx.message.reply_to_message.from.first_name;
+            } else {
+                return ctx.reply('❌ يرجى الرد على رسالة المستخدم الذي تريد ترقيته أو تحديد معرفه.');
+            }
+        }
+        
+        // Add the user to bot_admins collection
+        const db = await ensureDatabaseInitialized();
+        await db.collection('bot_admins').updateOne(
+            { user_id: targetUserId },
+            { 
+                $set: { 
+                    user_id: targetUserId,
+                    username: targetUsername,
+                    promoted_by: userId,
+                    promoted_at: new Date(),
+                    chat_id: ctx.chat.id
+                } 
+            },
+            { upsert: true }
+        );
+        
+        await ctx.reply(`✅ تمت ترقية ${targetUsername || 'المستخدم'} إلى مشرف بوت بنجاح.`);
+        
+        // Notify the user about their promotion
+        try {
+            await ctx.telegram.sendMessage(
+                targetUserId,
+                `🎉 مبروك! تمت ترقيتك إلى مشرف بوت في مجموعة "${ctx.chat.title}".`
+            );
+        } catch (error) {
+            console.log('Could not notify user about promotion:', error.message);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error promoting to bot admin:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة الترقية. يرجى المحاولة مرة أخرى لاحقًا.');
+        return false;
+    }
+}
+async function hasRequiredPermissions(ctx, userId) {
+    const isAdmin = await isAdminOrOwner(ctx, userId);
+    const isSecDev = await isSecondaryDeveloper(ctx, userId);
+    const isBotAdm = await isBotAdmin(ctx, userId);
+    return isAdmin || isSecDev || isBotAdm;
+}
+async function demoteFromBotAdmin(ctx, targetUserId, targetUsername) {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check if the user has permission to demote (must be admin or owner)
+        if (!(await isAdminOrOwner(ctx, userId))) {
+            return ctx.reply('❌ عذراً، فقط المشرفين ومالك المجموعة يمكنهم تنزيل مشرفي البوت.');
+        }
+        
+        // Get the target user ID if not provided directly
+        if (!targetUserId) {
+            if (ctx.message.reply_to_message) {
+                targetUserId = ctx.message.reply_to_message.from.id;
+                targetUsername = ctx.message.reply_to_message.from.first_name;
+            } else {
+                return ctx.reply('❌ يرجى الرد على رسالة المستخدم الذي تريد تنزيله أو تحديد معرفه.');
+            }
+        }
+        
+        // Remove the user from bot_admins collection
+        const db = await ensureDatabaseInitialized();
+        const result = await db.collection('bot_admins').deleteOne({ 
+            user_id: targetUserId,
+            chat_id: ctx.chat.id
+        });
+        
+        if (result.deletedCount > 0) {
+            await ctx.reply(`✅ تم تنزيل ${targetUsername || 'المستخدم'} من منصب مشرف بوت بنجاح.`);
+            
+            // Notify the user about their demotion
+            try {
+                await ctx.telegram.sendMessage(
+                    targetUserId,
+                    `ℹ️ تم إزالة صلاحياتك كمشرف بوت في مجموعة "${ctx.chat.title}".`
+                );
+            } catch (error) {
+                console.log('Could not notify user about demotion:', error.message);
+            }
+            
+            return true;
+        } else {
+            await ctx.reply(`❌ المستخدم ${targetUsername || 'المحدد'} ليس مشرف بوت في هذه المجموعة.`);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error demoting from bot admin:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة التنزيل. يرجى المحاولة مرة أخرى لاحقًا.');
+        return false;
+    }
+}
 // Add a function to get the current bot owner
 async function getBotOwner(botId) {
     try {
