@@ -1026,6 +1026,13 @@ async function isImportant(ctx, userId) {
 }
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
+    // Make sure to use this middleware
+bot.use(photoRestrictionMiddleware);
+bot.use(linkRestrictionMiddleware);
+bot.use(videoRestrictionMiddleware);
+bot.use(gifRestrictionMiddleware);
+bot.use(documentRestrictionMiddleware);
+bot.use(stickerRestrictionMiddleware);
     bot.use(async (ctx, next) => {
         try {
             const userId = ctx.from?.id;
@@ -1770,14 +1777,8 @@ bot.hears('تحذير', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء تنفيذ أمر التحذير. يرجى المحاولة مرة أخرى.');
     }
 });
-// Make sure to use this middleware
-bot.use(photoRestrictionMiddleware);
-bot.use(linkRestrictionMiddleware);
-bot.use(videoRestrictionMiddleware);
-bot.use(gifRestrictionMiddleware);
-bot.use(documentRestrictionMiddleware);
-// Make sure to add this middleware to the bot
-bot.use(stickerRestrictionMiddleware);
+
+
 // Add these command handlers in your setupCommands function
 bot.command('report', reportMessage);
 bot.command('ابلاغ', reportMessage);
