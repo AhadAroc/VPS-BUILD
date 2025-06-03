@@ -25,7 +25,8 @@ const subscriptionStatusCache = new Map();
 const config = require('./config');
 
 const mongoose = require('mongoose');
-
+// First, define the Map to track sticker restriction status at the top of your file
+const stickerRestrictionStatus = new Map();
 const premiumUserSchema = new mongoose.Schema({
   userId: { type: Number, required: true, unique: true },
   expiresAt: { type: Date, required: true },
