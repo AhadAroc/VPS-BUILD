@@ -1026,13 +1026,7 @@ async function isImportant(ctx, userId) {
 }
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
-    // Make sure to use this middleware
-bot.use(photoRestrictionMiddleware);
-bot.use(linkRestrictionMiddleware);
-bot.use(videoRestrictionMiddleware);
-bot.use(gifRestrictionMiddleware);
-bot.use(documentRestrictionMiddleware);
-bot.use(stickerRestrictionMiddleware);
+   
     bot.use(async (ctx, next) => {
         try {
             const userId = ctx.from?.id;
@@ -2028,68 +2022,8 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('يرجى التواصل مع صانع البوت او المالك ');
     }
 });
-// Add these functions to handle enabling/disabling sticker sharing
-async function disableStickerSharing(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
 
-        const chatId = ctx.chat.id;
-        stickerRestrictionStatus.set(chatId, true);
-        ctx.reply('✅ تم تعطيل مشاركة الملصقات للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الملصقات الآن.');
-    } catch (error) {
-        console.error('Error in disableStickerSharing:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الملصقات.');
-    }
-}
 
-async function enableStickerSharing(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-
-        const chatId = ctx.chat.id;
-        stickerRestrictionStatus.set(chatId, false);
-        ctx.reply('✅ تم تفعيل مشاركة الملصقات للجميع.');
-    } catch (error) {
-        console.error('Error in enableStickerSharing:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الملصقات.');
-    }
-}
-
-// Create a middleware to enforce sticker restrictions
-const stickerRestrictionMiddleware = async (ctx, next) => {
-    // Only process sticker messages in groups
-    if (!ctx.message || !ctx.message.sticker || ctx.chat.type === 'private') {
-        return next();
-    }
-
-    const chatId = ctx.chat.id;
-    const userId = ctx.from.id;
-
-    // Check if stickers are restricted in this chat
-    if (stickerRestrictionStatus.get(chatId)) {
-        // Check if the user is an admin, VIP, or has special permissions
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        const isPremium = await isPremiumUser(userId);
-
-        if (!isAdmin && !isVIPUser && !isPremium) {
-            // Delete the sticker
-            try {
-                await ctx.deleteMessage();
-                await ctx.reply(`⚠️ @${ctx.from.username || ctx.from.first_name}, مشاركة الملصقات غير مسموحة للأعضاء العاديين في هذه المجموعة.`);
-                return; // Don't call next() to prevent further processing
-            } catch (error) {
-                console.error('Error deleting restricted sticker:', error);
-            }
-        }
-    }
-
-    return next();
-};
 // Add a function to get the current bot owner
 async function getBotOwner(botId) {
     try {
@@ -2282,6 +2216,68 @@ async function demoteFromVIP(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من قائمة المميزين.');
     }
 }
+// Add these functions to handle enabling/disabling sticker sharing
+async function disableStickerSharing(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const chatId = ctx.chat.id;
+        stickerRestrictionStatus.set(chatId, true);
+        ctx.reply('✅ تم تعطيل مشاركة الملصقات للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الملصقات الآن.');
+    } catch (error) {
+        console.error('Error in disableStickerSharing:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الملصقات.');
+    }
+}
+
+async function enableStickerSharing(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const chatId = ctx.chat.id;
+        stickerRestrictionStatus.set(chatId, false);
+        ctx.reply('✅ تم تفعيل مشاركة الملصقات للجميع.');
+    } catch (error) {
+        console.error('Error in enableStickerSharing:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الملصقات.');
+    }
+}
+
+// Create a middleware to enforce sticker restrictions
+const stickerRestrictionMiddleware = async (ctx, next) => {
+    // Only process sticker messages in groups
+    if (!ctx.message || !ctx.message.sticker || ctx.chat.type === 'private') {
+        return next();
+    }
+
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+
+    // Check if stickers are restricted in this chat
+    if (stickerRestrictionStatus.get(chatId)) {
+        // Check if the user is an admin, VIP, or has special permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        const isPremium = await isPremiumUser(userId);
+
+        if (!isAdmin && !isVIPUser && !isPremium) {
+            // Delete the sticker
+            try {
+                await ctx.deleteMessage();
+                await ctx.reply(`⚠️ @${ctx.from.username || ctx.from.first_name}, مشاركة الملصقات غير مسموحة للأعضاء العاديين في هذه المجموعة.`);
+                return; // Don't call next() to prevent further processing
+            } catch (error) {
+                console.error('Error deleting restricted sticker:', error);
+            }
+        }
+    }
+
+    return next();
+};
     async function updateActiveGroups(ctx) {
         try {
             const userId = ctx.from.id;
@@ -2358,6 +2354,13 @@ async function demoteFromVIP(ctx) {
             ctx.reply('❌ حدث خطأ أثناء محاولة حذف الروابط.');
         }
     }
+     // Make sure to use this middleware
+bot.use(photoRestrictionMiddleware);
+bot.use(linkRestrictionMiddleware);
+bot.use(videoRestrictionMiddleware);
+bot.use(gifRestrictionMiddleware);
+bot.use(documentRestrictionMiddleware);
+bot.use(stickerRestrictionMiddleware);
     async function disablePhotoSharing(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
