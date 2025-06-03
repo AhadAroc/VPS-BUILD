@@ -508,7 +508,16 @@ async function showHelp(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض المساعدة. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
-
+async function isBotAdmin(userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botAdmin = await db.collection('bot_admins').findOne({ user_id: userId });
+        return !!botAdmin;
+    } catch (error) {
+        console.error('Error checking bot admin status:', error);
+        return false;
+    }
+}
 async function getLeaderboard(groupId) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -2212,16 +2221,7 @@ async function promoteToImportant(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مميز (Important).');
     }
 }
-async function isBotAdmin(userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const botAdmin = await db.collection('bot_admins').findOne({ user_id: userId });
-        return !!botAdmin;
-    } catch (error) {
-        console.error('Error checking bot admin status:', error);
-        return false;
-    }
-}
+
 
 async function promoteToBotAdmin(ctx) {
     try {
@@ -2266,7 +2266,7 @@ async function promoteToBotAdmin(ctx) {
         );
         
         // Send confirmation message
-        await ctx.reply(`✅ تم ترقية المستخدم ${targetFirstName} إلى مشرف بوت بنجاح.`);
+        await ctx.reply(`✅ تم ترقية المستخدم ${targetFirstName} إلى ادمن بوت بنجاح.`);
         
         // Notify the user
         try {
