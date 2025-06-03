@@ -1023,21 +1023,7 @@ async function checkUserRank(ctx) {
     }
 }
 
-// Add this function to check if a user is important
-async function isImportant(ctx, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const importantUser = await db.collection('important_users').findOne({ 
-            user_id: userId,
-            chat_id: ctx.chat.id,
-            bot_id: ctx.botInfo.id
-        });
-        return !!importantUser;
-    } catch (error) {
-        console.error('Error checking important status:', error);
-        return false;
-    }
-}
+
 
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
@@ -3053,7 +3039,21 @@ async function listImportantUsers(ctx) {
     }
 }
 
-  
+  // Add this function to check if a user is important
+async function isImportant(ctx, userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const importantUser = await db.collection('important_users').findOne({ 
+            user_id: userId,
+            chat_id: ctx.chat.id,
+            bot_id: ctx.botInfo.id
+        });
+        return !!importantUser;
+    } catch (error) {
+        console.error('Error checking important status:', error);
+        return false;
+    }
+}
     
     // Send a joke
     async function sendJoke(ctx) {
