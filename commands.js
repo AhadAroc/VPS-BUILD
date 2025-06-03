@@ -2394,34 +2394,7 @@ function botAdminOnly(handler) {
         }
     };
 }
-// Add this function to list VIP users
-async function listVIPUsers(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
 
-        const db = await ensureDatabaseInitialized();
-        const vipUsers = await db.collection('vip_users').find().toArray();
-
-        if (vipUsers.length === 0) {
-            return ctx.reply('لا يوجد مستخدمين مميزين (VIP) حاليًا.');
-        }
-
-        let message = '📋 قائمة المستخدمين المميزين (VIP):\n\n';
-        for (const user of vipUsers) {
-            const userMention = user.username ? 
-                `@${user.username}` : 
-                `[المستخدم](tg://user?id=${user.user_id})`;
-            message += `• ${userMention} (ID: ${user.user_id})\n`;
-        }
-
-        await ctx.replyWithMarkdown(message);
-    } catch (error) {
-        console.error('Error listing VIP users:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
-    }
-}
     
  // Add this function near the top of your file with other utility functions
 async function updateLastInteraction(userId, username, firstName, lastName) {
@@ -3050,19 +3023,20 @@ async function listImportantUsers(ctx) {
         let message = '📋 قائمة المستخدمين المميزين (Important) في هذه المجموعة:\n\n';
         
         // Get user details for each important user
-        for (const user of importantUsers) {
-    try {
-        // Try to get user information from Telegram
-        const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
-        const firstName = chatMember.user.first_name || 'مستخدم';
-        const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
-        
-        message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
-    } catch (error) {
-        // If we can't get user info, they might have left the group
-        message += `• مستخدم (ID: ${user.user_id}) - ⚠️ لم يعد في المجموعة\n`;
-    }
-}
+         for (const user of importantUsers) {
+            try {
+                // Try to get user information from Telegram
+                const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
+                const firstName = chatMember.user.first_name || 'مستخدم';
+                const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
+                
+                message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+            } catch (error) {
+                // If we can't get user info, just show the ID
+                console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
+                message += `• مستخدم (ID: ${user.user_id})\n`;
+            }
+        }
 
         // Add information about how to demote users
         message += '\n💡 لتنزيل مستخدم من المميزين، استخدم الأمر "تنزيل مميز" مع الرد على رسالة المستخدم.';
