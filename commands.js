@@ -2213,6 +2213,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 
 // Update the "بدء" command handler
 // Now update the "بدء" command handler
+// Update the "بدء" command handler
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
@@ -2265,15 +2266,14 @@ bot.hears('بدء', async (ctx) => {
         // If we get here, the user is not the owner
         // Check if they are a secondary developer, admin, or VIP
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        //const isAdminUser = await isAdminOrOwner(ctx, userId); // Uncommented this line
         const isVIPUser = await isVIP(ctx, userId);
         const isDev = await isDeveloper(ctx, userId);
         const isBotOwn = await isBotOwner(ctx, userId);
-        const isBotAdm = await isBotAdmin(ctx, userId); // Added this line to check if user is a bot admin
+        const isBotAdm = await isBotAdmin(ctx, userId);
        
 
         // Only proceed if the user is a dev, admin, sec dev, bot admin, or bot owner
-        if (!isDev && !isAdminUser && !isSecDev && !isBotOwn && !isBotAdm) {
+        if (!isDev && !isAdmin && !isSecDev && !isBotOwn && !isBotAdm) {
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
 
