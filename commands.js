@@ -1905,6 +1905,85 @@ bot.action('list_secondary_devs', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
     }
 });
+// Add this function to remove a specific VIP user
+async function removeVIPUser(ctx, targetUserId) {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        
+        if (!isAdmin && !isDev) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
+        }
+        
+        // Get the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Remove the user from important_users collection
+        const result = await db.collection('important_users').deleteOne({
+            chat_id: chatId,
+            user_id: targetUserId
+        });
+        
+        if (result.deletedCount > 0) {
+            // Try to get user information
+            let userInfo = 'المستخدم';
+            try {
+                const chatMember = await ctx.telegram.getChatMember(chatId, targetUserId);
+                userInfo = chatMember.user.first_name || 'المستخدم';
+                if (chatMember.user.username) {
+                    userInfo += ` (@${chatMember.user.username})`;
+                }
+            } catch (error) {
+                console.log(`Couldn't get info for user ${targetUserId}: ${error.message}`);
+            }
+            
+            return ctx.reply(`✅ تم إزالة ${userInfo} من قائمة المستخدمين المميزين (VIP) بنجاح.`);
+        } else {
+            return ctx.reply('❌ هذا المستخدم ليس في قائمة المستخدمين المميزين (VIP).');
+        }
+    } catch (error) {
+        console.error('Error removing VIP user:', error);
+        return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة المستخدم من قائمة المميزين.');
+    }
+}
+
+// Add this function to remove all VIP users
+async function removeAllVIPUsers(ctx) {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        
+        if (!isAdmin && !isDev) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
+        }
+        
+        // Get the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Count how many users will be removed
+        const count = await db.collection('important_users').countDocuments({ chat_id: chatId });
+        
+        if (count === 0) {
+            return ctx.reply('📋 لا يوجد مستخدمين مميزين (VIP) في هذه المجموعة.');
+        }
+        
+        // Remove all VIP users for this chat
+        await db.collection('important_users').deleteMany({ chat_id: chatId });
+        
+        return ctx.reply(`✅ تم إزالة جميع المستخدمين المميزين (VIP) من هذه المجموعة. (${count} مستخدم)`);
+    } catch (error) {
+        console.error('Error removing all VIP users:', error);
+        return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
+    }
+}   
 
 // Add this action handler for the configure_quiz button
 bot.action('configure_quiz', async (ctx) => {
@@ -3214,86 +3293,7 @@ async function isImportant(ctx, userId) {
         return false;
     }
 }
- // Add this function to remove a specific VIP user
-async function removeVIPUser(ctx, targetUserId) {
-    try {
-        const chatId = ctx.chat.id;
-        const userId = ctx.from.id;
-        
-        // Check if user has admin permissions
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isDev = await isDeveloper(ctx, userId);
-        
-        if (!isAdmin && !isDev) {
-            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
-        }
-        
-        // Get the database
-        const db = await ensureDatabaseInitialized();
-        
-        // Remove the user from important_users collection
-        const result = await db.collection('important_users').deleteOne({
-            chat_id: chatId,
-            user_id: targetUserId
-        });
-        
-        if (result.deletedCount > 0) {
-            // Try to get user information
-            let userInfo = 'المستخدم';
-            try {
-                const chatMember = await ctx.telegram.getChatMember(chatId, targetUserId);
-                userInfo = chatMember.user.first_name || 'المستخدم';
-                if (chatMember.user.username) {
-                    userInfo += ` (@${chatMember.user.username})`;
-                }
-            } catch (error) {
-                console.log(`Couldn't get info for user ${targetUserId}: ${error.message}`);
-            }
-            
-            return ctx.reply(`✅ تم إزالة ${userInfo} من قائمة المستخدمين المميزين (VIP) بنجاح.`);
-        } else {
-            return ctx.reply('❌ هذا المستخدم ليس في قائمة المستخدمين المميزين (VIP).');
-        }
-    } catch (error) {
-        console.error('Error removing VIP user:', error);
-        return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة المستخدم من قائمة المميزين.');
-    }
-}
-
-// Add this function to remove all VIP users
-async function removeAllVIPUsers(ctx) {
-    try {
-        const chatId = ctx.chat.id;
-        const userId = ctx.from.id;
-        
-        // Check if user has admin permissions
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isDev = await isDeveloper(ctx, userId);
-        
-        if (!isAdmin && !isDev) {
-            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
-        }
-        
-        // Get the database
-        const db = await ensureDatabaseInitialized();
-        
-        // Count how many users will be removed
-        const count = await db.collection('important_users').countDocuments({ chat_id: chatId });
-        
-        if (count === 0) {
-            return ctx.reply('📋 لا يوجد مستخدمين مميزين (VIP) في هذه المجموعة.');
-        }
-        
-        // Remove all VIP users for this chat
-        await db.collection('important_users').deleteMany({ chat_id: chatId });
-        
-        return ctx.reply(`✅ تم إزالة جميع المستخدمين المميزين (VIP) من هذه المجموعة. (${count} مستخدم)`);
-    } catch (error) {
-        console.error('Error removing all VIP users:', error);
-        return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
-    }
-}   
-
+ 
 
     // Send a joke
     async function sendJoke(ctx) {
