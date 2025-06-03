@@ -1624,7 +1624,7 @@ bot.command('ترقية_مميز', (ctx) => promoteUser(ctx, 'مميز'));
 bot.command('تنزيل_مميز', demoteUser);
 
 // Add hears handlers for promoting and demoting VIP users
-bot.hears(/^رفع ادمن مسابقات/, (ctx) => promoteUser(ctx, 'مميز'));
+bot.hears(/^رفع  مسابقات/, (ctx) => promoteUser(ctx, 'مميز'));
 bot.hears(/^تنزيل ادمن مسابقات/, demoteUser);
 
 bot.command('معرفي', (ctx) => showUserId(ctx));
@@ -3649,9 +3649,9 @@ async function isImportant(ctx, userId) {
                 collection = 'vip_users';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
                 break;
-            case 'ادمن':
-            case 'admin':
-                collection = 'admins';
+            case 'verynull':
+            case 'verynull':
+                collection = 'verynull';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
                 // Promote the user to admin in the Telegram group
                 await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
