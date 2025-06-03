@@ -2325,7 +2325,84 @@ async function removeBotAdmin(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء إزالة المستخدم من مشرفي البوت. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
+// Add these action handlers to your bot setup
+bot.action(/^remove_vip:(\d+)$/, async (ctx) => {
+    try {
+        const targetUserId = parseInt(ctx.match[1]);
+        await ctx.answerCbQuery('جاري إزالة المستخدم من القائمة...');
+        await removeVIPUser(ctx, targetUserId);
+        
+        // Refresh the VIP users list
+        await listVIPUsers(ctx);
+    } catch (error) {
+        console.error('Error handling remove_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة المستخدم.');
+    }
+});
 
+bot.action('remove_all_vip', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('جاري إزالة جميع المستخدمين المميزين...');
+        
+        // Show confirmation dialog
+        await ctx.editMessageText('⚠️ هل أنت متأكد من رغبتك في إزالة جميع المستخدمين المميزين (VIP)؟', {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '✅ نعم، إزالة الجميع', callback_data: 'confirm_remove_all_vip' },
+                        { text: '❌ لا، إلغاء', callback_data: 'cancel_remove_all_vip' }
+                    ]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error handling remove_all_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
+    }
+});
+
+bot.action('confirm_remove_all_vip', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('جاري إزالة جميع المستخدمين المميزين...');
+        await removeAllVIPUsers(ctx);
+        
+        // Return to admin menu
+        await ctx.editMessageText('✅ تم إزالة جميع المستخدمين المميزين (VIP) بنجاح.', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع للقائمة الرئيسية', callback_data: 'back_to_admin_menu' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error handling confirm_remove_all_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
+    }
+});
+
+bot.action('cancel_remove_all_vip', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('تم إلغاء العملية');
+        
+        // Refresh the VIP users list
+        await listVIPUsers(ctx);
+    } catch (error) {
+        console.error('Error handling cancel_remove_all_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إلغاء العملية.');
+    }
+});
+
+bot.action('back_to_admin_menu', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        // Show admin menu (you'll need to implement this function)
+        await showAdminMenu(ctx);
+    } catch (error) {
+        console.error('Error handling back_to_admin_menu action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة العودة للقائمة الرئيسية.');
+    }
+});
 // Add this function to check if a user is a bot admin
 async function checkBotAdminPermission(ctx, userId) {
     try {
@@ -3216,84 +3293,7 @@ async function removeAllVIPUsers(ctx) {
         return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
     }
 }   
-// Add these action handlers to your bot setup
-bot.action(/^remove_vip:(\d+)$/, async (ctx) => {
-    try {
-        const targetUserId = parseInt(ctx.match[1]);
-        await ctx.answerCbQuery('جاري إزالة المستخدم من القائمة...');
-        await removeVIPUser(ctx, targetUserId);
-        
-        // Refresh the VIP users list
-        await listVIPUsers(ctx);
-    } catch (error) {
-        console.error('Error handling remove_vip action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة المستخدم.');
-    }
-});
 
-bot.action('remove_all_vip', async (ctx) => {
-    try {
-        await ctx.answerCbQuery('جاري إزالة جميع المستخدمين المميزين...');
-        
-        // Show confirmation dialog
-        await ctx.editMessageText('⚠️ هل أنت متأكد من رغبتك في إزالة جميع المستخدمين المميزين (VIP)؟', {
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: '✅ نعم، إزالة الجميع', callback_data: 'confirm_remove_all_vip' },
-                        { text: '❌ لا، إلغاء', callback_data: 'cancel_remove_all_vip' }
-                    ]
-                ]
-            }
-        });
-    } catch (error) {
-        console.error('Error handling remove_all_vip action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
-    }
-});
-
-bot.action('confirm_remove_all_vip', async (ctx) => {
-    try {
-        await ctx.answerCbQuery('جاري إزالة جميع المستخدمين المميزين...');
-        await removeAllVIPUsers(ctx);
-        
-        // Return to admin menu
-        await ctx.editMessageText('✅ تم إزالة جميع المستخدمين المميزين (VIP) بنجاح.', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '🔙 رجوع للقائمة الرئيسية', callback_data: 'back_to_admin_menu' }]
-                ]
-            }
-        });
-    } catch (error) {
-        console.error('Error handling confirm_remove_all_vip action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
-    }
-});
-
-bot.action('cancel_remove_all_vip', async (ctx) => {
-    try {
-        await ctx.answerCbQuery('تم إلغاء العملية');
-        
-        // Refresh the VIP users list
-        await listVIPUsers(ctx);
-    } catch (error) {
-        console.error('Error handling cancel_remove_all_vip action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إلغاء العملية.');
-    }
-});
-
-bot.action('back_to_admin_menu', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        
-        // Show admin menu (you'll need to implement this function)
-        await showAdminMenu(ctx);
-    } catch (error) {
-        console.error('Error handling back_to_admin_menu action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة العودة للقائمة الرئيسية.');
-    }
-});
 
     // Send a joke
     async function sendJoke(ctx) {
