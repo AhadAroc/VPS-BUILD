@@ -2265,13 +2265,15 @@ bot.hears('بدء', async (ctx) => {
         // If we get here, the user is not the owner
         // Check if they are a secondary developer, admin, or VIP
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        const isAdminUser = await isAdminOrOwner(ctx, userId); // Changed variable name to isAdminUser
+        //const isAdminUser = await isAdminOrOwner(ctx, userId); // Uncommented this line
         const isVIPUser = await isVIP(ctx, userId);
         const isDev = await isDeveloper(ctx, userId);
         const isBotOwn = await isBotOwner(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId); // Added this line to check if user is a bot admin
+       
 
-        // Only proceed if the user is a dev, admin, sec dev, or bot owner
-        if (!isDev && !isAdminUser && !isSecDev && !isBotOwn) {
+        // Only proceed if the user is a dev, admin, sec dev, bot admin, or bot owner
+        if (!isDev && !isAdminUser && !isSecDev && !isBotOwn && !isBotAdm) {
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
 
