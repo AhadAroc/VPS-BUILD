@@ -1026,7 +1026,14 @@ async function isImportant(ctx, userId) {
 }
 function setupCommands(bot) {
     const { setupActions, activeQuizzes, endQuiz,configureQuiz,startAddingCustomQuestions,chatStates, } = require('./actions'); // these were up there
-   
+       // Make sure to use this middleware
+bot.use(photoRestrictionMiddleware);
+bot.use(linkRestrictionMiddleware);
+bot.use(videoRestrictionMiddleware);
+bot.use(gifRestrictionMiddleware);
+bot.use(documentRestrictionMiddleware);
+bot.use(stickerRestrictionMiddleware);
+
     bot.use(async (ctx, next) => {
         try {
             const userId = ctx.from?.id;
@@ -2354,13 +2361,7 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
             ctx.reply('❌ حدث خطأ أثناء محاولة حذف الروابط.');
         }
     }
-     // Make sure to use this middleware
-bot.use(photoRestrictionMiddleware);
-bot.use(linkRestrictionMiddleware);
-bot.use(videoRestrictionMiddleware);
-bot.use(gifRestrictionMiddleware);
-bot.use(documentRestrictionMiddleware);
-bot.use(stickerRestrictionMiddleware);
+ 
     async function disablePhotoSharing(ctx) {
         try {
             if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
