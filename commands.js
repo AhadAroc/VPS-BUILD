@@ -1905,6 +1905,46 @@ bot.action('list_secondary_devs', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
     }
 });
+async function listVIPUsers(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+
+        const vipUsers = await db.collection('vip_users').find({
+            chat_id: chatId,
+            bot_id: botId
+        }).toArray();
+
+        if (vipUsers.length === 0) {
+            return ctx.reply('🚫 لا يوجد مستخدمين VIP في هذه المجموعة.');
+        }
+
+        let message = '📋 قائمة المستخدمين VIP:\n\n';
+
+        for (const user of vipUsers) {
+            try {
+                const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
+                const firstName = chatMember.user.first_name || 'مستخدم';
+                const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
+                message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+            } catch (error) {
+                console.error(`Error getting VIP user info: ${error.message}`);
+                message += `• مستخدم (ID: ${user.user_id})\n`;
+            }
+        }
+
+        message += '\n💡 لتنزيل مستخدم من VIP، استخدم الأمر "تنزيل VIP" مع الرد على رسالة المستخدم.';
+        await ctx.reply(message);
+    } catch (error) {
+        console.error('Error listing VIP users:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المستخدمين VIP.');
+    }
+}
 
 // Add this action handler for the configure_quiz button
 bot.action('configure_quiz', async (ctx) => {
