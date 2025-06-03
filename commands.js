@@ -2341,7 +2341,10 @@ async function listVIPUsers(ctx) {
             return ctx.reply('📋 لا يوجد مستخدمين مميزين (VIP) في هذه المجموعة.');
         }
         
-        let message = '📋 قائمة المستخدمين المميزين (VIP):\n\n';
+        let message = '📋 *قائمة المستخدمين المميزين (VIP):*\n\n';
+        
+        // Create inline keyboard with delete buttons
+        const inlineKeyboard = [];
         
         // Loop through each important user and get their info
         for (const user of importantUsers) {
@@ -2352,14 +2355,43 @@ async function listVIPUsers(ctx) {
                 const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
                 
                 message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+                
+                // Add a button to remove this user
+                inlineKeyboard.push([{
+                    text: `❌ إزالة ${firstName}`,
+                    callback_data: `remove_vip:${user.user_id}`
+                }]);
             } catch (error) {
                 // If we can't get user info, just show the ID
                 console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
                 message += `• مستخدم (ID: ${user.user_id})\n`;
+                
+                // Add a button to remove this user (with generic name)
+                inlineKeyboard.push([{
+                    text: `❌ إزالة مستخدم (${user.user_id})`,
+                    callback_data: `remove_vip:${user.user_id}`
+                }]);
             }
         }
         
-        return ctx.reply(message);
+        // Add a button to remove all VIP users at once
+        inlineKeyboard.push([{
+            text: '🗑️ إزالة جميع المستخدمين المميزين',
+            callback_data: 'remove_all_vips'
+        }]);
+        
+        // Add a back button
+        inlineKeyboard.push([{
+            text: '🔙 رجوع',
+            callback_data: 'back_to_main'
+        }]);
+        
+        // Send the message with the inline keyboard
+        return ctx.replyWithMarkdown(message, {
+            reply_markup: {
+                inline_keyboard: inlineKeyboard
+            }
+        });
     } catch (error) {
         console.error('Error listing VIP users:', error);
         return ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
