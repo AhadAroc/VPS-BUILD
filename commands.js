@@ -2273,7 +2273,7 @@ bot.hears('بدء', async (ctx) => {
        
 
         // Only proceed if the user is a dev, admin, sec dev, bot admin, or bot owner
-        if (!isDev && !isAdmin && !isSecDev && !isBotOwn && !isBotAdm) {
+        if (!isDev && !isSecDev && !isBotOwn && !isBotAdm) {
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
 
