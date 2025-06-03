@@ -2315,7 +2315,7 @@ async function removeBotAdmin(ctx) {
         await db.collection('bot_admins').deleteOne({ user_id: targetUserId });
         
         // Send confirmation message
-        await ctx.reply(`✅ تم إزالة المستخدم ${targetFirstName} من مشرفي البوت بنجاح.`);
+        await ctx.reply(`✅ تم إزالة المستخدم ${targetFirstName} من ادمنية البوت بنجاح.`);
         
         // Notify the user
         try {
@@ -2987,13 +2987,20 @@ async function listImportantUsers(ctx) {
         }
 
         const db = await ensureDatabaseInitialized();
-        const importantUsers = await db.collection('important_users').find().toArray();
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+
+        // Query for important users specific to this chat and bot
+        const importantUsers = await db.collection('important_users').find({
+            chat_id: chatId,
+            bot_id: botId
+        }).toArray();
 
         if (importantUsers.length === 0) {
-            return ctx.reply('لا يوجد مستخدمين مميزين (Important) حاليًا.');
+            return ctx.reply('لا يوجد مستخدمين مميزين (Important) في هذه المجموعة حاليًا.');
         }
 
-        let message = '📋 قائمة المستخدمين المميزين (Important):\n\n';
+        let message = '📋 قائمة المستخدمين المميزين (Important) في هذه المجموعة:\n\n';
         for (const user of importantUsers) {
             const userMention = user.username ? 
                 `@${user.username}` : 
