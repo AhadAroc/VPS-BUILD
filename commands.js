@@ -2182,6 +2182,8 @@ async function promoteToImportant(ctx) {
 
         let userId, userMention;
         const args = ctx.message.text.split(' ').slice(1);
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
 
         if (ctx.message.reply_to_message) {
             userId = ctx.message.reply_to_message.from.id;
@@ -2189,7 +2191,7 @@ async function promoteToImportant(ctx) {
         } else if (args.length > 0) {
             const username = args[0].replace('@', '');
             try {
-                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                const user = await ctx.telegram.getChatMember(chatId, username);
                 userId = user.user.id;
                 userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
             } catch (error) {
@@ -2201,20 +2203,43 @@ async function promoteToImportant(ctx) {
 
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is already an important person
-        const existingImportant = await db.collection('important_users').findOne({ user_id: userId });
+        // Check if the user is already an important person in this specific group and bot
+        const existingImportant = await db.collection('important_users').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId
+        });
+        
         if (existingImportant) {
-            return ctx.reply('هذا المستخدم مميز (Important) بالفعل.');
+            return ctx.reply('هذا المستخدم مميز (Important) بالفعل في هذه المجموعة.');
         }
 
-        // Add the user to the important collection
+        // Get user details for better record-keeping
+        let username, firstName, lastName;
+        try {
+            const userInfo = await ctx.telegram.getChat(userId);
+            username = userInfo.username || null;
+            firstName = userInfo.first_name || null;
+            lastName = userInfo.last_name || null;
+        } catch (error) {
+            console.log(`Could not fetch complete user info for ${userId}: ${error.message}`);
+            // Continue with available information
+        }
+
+        // Add the user to the important collection with group and bot information
         await db.collection('important_users').insertOne({
             user_id: userId,
+            username: username,
+            first_name: firstName,
+            last_name: lastName,
+            chat_id: chatId,
+            chat_title: ctx.chat.title || 'Unknown Group',
+            bot_id: botId,
             promoted_at: new Date(),
             promoted_by: ctx.from.id
         });
 
-        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز (Important) بنجاح.`);
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز (Important) بنجاح في هذه المجموعة.`);
 
     } catch (error) {
         console.error('Error in promoteToImportant:', error);
@@ -2943,6 +2968,8 @@ async function demoteFromImportant(ctx) {
 
         let userId, userMention;
         const args = ctx.message.text.split(' ').slice(1);
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
 
         if (ctx.message.reply_to_message) {
             userId = ctx.message.reply_to_message.from.id;
@@ -2962,16 +2989,36 @@ async function demoteFromImportant(ctx) {
 
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is an important person
-        const existingImportant = await db.collection('important_users').findOne({ user_id: userId });
+        // Check if the user is an important person in this specific group and bot
+        const existingImportant = await db.collection('important_users').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId
+        });
+        
         if (!existingImportant) {
-            return ctx.reply('هذا المستخدم ليس مميز (Important) بالفعل.');
+            return ctx.reply('هذا المستخدم ليس مميز (Important) في هذه المجموعة.');
         }
 
-        // Remove the user from the important collection
-        await db.collection('important_users').deleteOne({ user_id: userId });
+        // Remove the user from the important collection for this specific group and bot
+        await db.collection('important_users').deleteOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId
+        });
 
-        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من مميز (Important) بنجاح.`);
+        // Log the demotion for audit purposes
+        await db.collection('user_role_changes').insertOne({
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            action: 'demote',
+            role: 'important',
+            performed_by: ctx.from.id,
+            timestamp: new Date()
+        });
+
+        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من مميز (Important) بنجاح في هذه المجموعة.`);
 
     } catch (error) {
         console.error('Error in demoteFromImportant:', error);
@@ -3001,14 +3048,27 @@ async function listImportantUsers(ctx) {
         }
 
         let message = '📋 قائمة المستخدمين المميزين (Important) في هذه المجموعة:\n\n';
+        
+        // Get user details for each important user
         for (const user of importantUsers) {
-            const userMention = user.username ? 
-                `@${user.username}` : 
-                `[المستخدم](tg://user?id=${user.user_id})`;
-            message += `• ${userMention} (ID: ${user.user_id})\n`;
+            try {
+                // Try to get user information from Telegram
+                const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
+                const firstName = chatMember.user.first_name || 'مستخدم';
+                const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
+                
+                message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+            } catch (error) {
+                // If we can't get user info, just show the ID
+                console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
+                message += `• مستخدم (ID: ${user.user_id})\n`;
+            }
         }
 
-        await ctx.replyWithMarkdown(message);
+        // Add information about how to demote users
+        message += '\n💡 لتنزيل مستخدم من المميزين، استخدم الأمر "تنزيل مميز" مع الرد على رسالة المستخدم.';
+
+        await ctx.reply(message);
     } catch (error) {
         console.error('Error listing important users:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
