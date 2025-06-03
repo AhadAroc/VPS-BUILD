@@ -2032,7 +2032,56 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('يرجى التواصل مع صانع البوت او المالك ');
     }
 });
-
+// Add this function to your commands.js file
+async function listVIPUsers(ctx) {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        
+        if (!isAdmin && !isDev) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
+        }
+        
+        // Get the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Find all important users for this chat
+        const importantUsers = await db.collection('important_users').find({
+            chat_id: chatId
+        }).toArray();
+        
+        if (!importantUsers || importantUsers.length === 0) {
+            return ctx.reply('📋 لا يوجد مستخدمين مميزين (VIP) في هذه المجموعة.');
+        }
+        
+        let message = '📋 قائمة المستخدمين المميزين (VIP):\n\n';
+        
+        // Loop through each important user and get their info
+        for (const user of importantUsers) {
+            try {
+                // Try to get user information from Telegram
+                const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
+                const firstName = chatMember.user.first_name || 'مستخدم';
+                const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
+                
+                message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+            } catch (error) {
+                // If we can't get user info, just show the ID
+                console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
+                message += `• مستخدم (ID: ${user.user_id})\n`;
+            }
+        }
+        
+        return ctx.reply(message);
+    } catch (error) {
+        console.error('Error listing VIP users:', error);
+        return ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
+    }
+}
 async function isBotAdmin(ctx, userId) {
     try {
         const db = await ensureDatabaseInitialized();
