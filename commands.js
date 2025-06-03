@@ -2212,7 +2212,163 @@ async function promoteToImportant(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مميز (Important).');
     }
 }
+async function isBotAdmin(userId) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botAdmin = await db.collection('bot_admins').findOne({ user_id: userId });
+        return !!botAdmin;
+    } catch (error) {
+        console.error('Error checking bot admin status:', error);
+        return false;
+    }
+}
 
+async function promoteToBotAdmin(ctx) {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check if the user has permission to promote (must be admin, owner or developer)
+        if (!(await isAdminOrOwner(ctx, userId)) && !(await isDeveloper(ctx, userId))) {
+            return ctx.reply('❌ عذراً، فقط المشرفين والمطورين يمكنهم ترقية المستخدمين إلى مشرف بوت.');
+        }
+        
+        // Get the target user ID from reply
+        let targetUserId, targetUsername, targetFirstName;
+        
+        if (ctx.message.reply_to_message) {
+            targetUserId = ctx.message.reply_to_message.from.id;
+            targetUsername = ctx.message.reply_to_message.from.username || '';
+            targetFirstName = ctx.message.reply_to_message.from.first_name || 'مستخدم';
+        } else {
+            return ctx.reply('❌ يرجى الرد على رسالة المستخدم الذي تريد ترقيته إلى مشرف بوت.');
+        }
+        
+        // Don't allow promoting bots
+        if (ctx.message.reply_to_message.from.is_bot) {
+            return ctx.reply('❌ لا يمكن ترقية البوتات إلى مشرف بوت.');
+        }
+        
+        // Add the user to bot_admins collection
+        const db = await ensureDatabaseInitialized();
+        await db.collection('bot_admins').updateOne(
+            { user_id: targetUserId },
+            { 
+                $set: { 
+                    user_id: targetUserId,
+                    username: targetUsername,
+                    first_name: targetFirstName,
+                    promoted_by: userId,
+                    promoted_at: new Date(),
+                    chat_id: ctx.chat.id
+                }
+            },
+            { upsert: true }
+        );
+        
+        // Send confirmation message
+        await ctx.reply(`✅ تم ترقية المستخدم ${targetFirstName} إلى مشرف بوت بنجاح.`);
+        
+        // Notify the user
+        try {
+            await ctx.telegram.sendMessage(
+                targetUserId,
+                `🎉 مبروك! تمت ترقيتك إلى مشرف بوت في المجموعة "${ctx.chat.title}".`
+            );
+        } catch (error) {
+            console.error('Error notifying user about promotion:', error);
+        }
+        
+    } catch (error) {
+        console.error('Error promoting user to bot admin:', error);
+        await ctx.reply('❌ حدث خطأ أثناء ترقية المستخدم. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+}
+
+async function removeBotAdmin(ctx) {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check if the user has permission to demote (must be admin, owner or developer)
+        if (!(await isAdminOrOwner(ctx, userId)) && !(await isDeveloper(ctx, userId))) {
+            return ctx.reply('❌ عذراً، فقط المشرفين والمطورين يمكنهم إزالة مشرفي البوت.');
+        }
+        
+        // Get the target user ID from reply
+        let targetUserId, targetFirstName;
+        
+        if (ctx.message.reply_to_message) {
+            targetUserId = ctx.message.reply_to_message.from.id;
+            targetFirstName = ctx.message.reply_to_message.from.first_name || 'المستخدم';
+        } else {
+            return ctx.reply('❌ يرجى الرد على رسالة المستخدم الذي تريد إزالته من مشرفي البوت.');
+        }
+        
+        // Check if the user is actually a bot admin
+        const db = await ensureDatabaseInitialized();
+        const botAdmin = await db.collection('bot_admins').findOne({ user_id: targetUserId });
+        
+        if (!botAdmin) {
+            return ctx.reply('❌ هذا المستخدم ليس مشرف بوت.');
+        }
+        
+        // Remove the user from bot_admins collection
+        await db.collection('bot_admins').deleteOne({ user_id: targetUserId });
+        
+        // Send confirmation message
+        await ctx.reply(`✅ تم إزالة المستخدم ${targetFirstName} من مشرفي البوت بنجاح.`);
+        
+        // Notify the user
+        try {
+            await ctx.telegram.sendMessage(
+                targetUserId,
+                `⚠️ تمت إزالتك من مشرفي البوت في المجموعة "${ctx.chat.title}".`
+            );
+        } catch (error) {
+            console.error('Error notifying user about demotion:', error);
+        }
+        
+    } catch (error) {
+        console.error('Error removing bot admin:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إزالة المستخدم من مشرفي البوت. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+}
+
+// Add this function to check if a user is a bot admin
+async function checkBotAdminPermission(ctx, userId) {
+    try {
+        // First check if the user is a developer or admin (higher privileges)
+        if (await isDeveloper(ctx, userId) || await isAdminOrOwner(ctx, userId)) {
+            return true;
+        }
+        
+        // Then check if they're a bot admin
+        return await isBotAdmin(userId);
+    } catch (error) {
+        console.error('Error checking bot admin permissions:', error);
+        return false;
+    }
+}
+
+// Add this middleware function to restrict commands to bot admins
+function botAdminOnly(handler) {
+    return async (ctx) => {
+        try {
+            const userId = ctx.from.id;
+            
+            // Check if the user is a bot admin, developer, or chat admin
+            const hasPermission = await checkBotAdminPermission(ctx, userId);
+            
+            if (hasPermission) {
+                return handler(ctx);
+            } else {
+                return ctx.reply('❌ عذراً، هذا الأمر متاح فقط لمشرفي البوت والمطورين.');
+            }
+        } catch (error) {
+            console.error('Error in botAdminOnly middleware:', error);
+            return ctx.reply('❌ حدث خطأ أثناء التحقق من الصلاحيات. يرجى المحاولة مرة أخرى لاحقًا.');
+        }
+    };
+}
 // Add this function to list VIP users
 async function listVIPUsers(ctx) {
     try {
