@@ -2266,7 +2266,7 @@ async function promoteToBotAdmin(ctx) {
         );
         
         // Send confirmation message
-        await ctx.reply(`✅ تم ترقية المستخدم ${targetFirstName} إلى مشرف بوت بنجاح.`);
+        await ctx.reply(`✅ تم ترقية المستخدم ${targetFirstName} إلى ادمن بوت بنجاح.`);
         
         // Notify the user
         try {
