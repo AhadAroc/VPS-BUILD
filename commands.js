@@ -3040,30 +3040,39 @@ async function demoteFromImportant(ctx) {
 }
 
 // Add this function to list important users
-async function listImportantUsers(ctx) {
+// Update the listVIPUsers function to include buttons for removing users
+async function listVIPUsers(ctx) {
     try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-
-        const db = await ensureDatabaseInitialized();
         const chatId = ctx.chat.id;
-        const botId = ctx.botInfo.id;
-
-        // Query for important users specific to this chat and bot
-        const importantUsers = await db.collection('important_users').find({
-            chat_id: chatId,
-            bot_id: botId
-        }).toArray();
-
-        if (importantUsers.length === 0) {
-            return ctx.reply('لا يوجد مستخدمين مميزين (Important) في هذه المجموعة حاليًا.');
-        }
-
-        let message = '📋 قائمة المستخدمين المميزين (Important) في هذه المجموعة:\n\n';
+        const userId = ctx.from.id;
         
-        // Get user details for each important user
-         for (const user of importantUsers) {
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        
+        if (!isAdmin && !isDev) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
+        }
+        
+        // Get the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Find all important users for this chat
+        const importantUsers = await db.collection('important_users').find({
+            chat_id: chatId
+        }).toArray();
+        
+        if (!importantUsers || importantUsers.length === 0) {
+            return ctx.reply('📋 لا يوجد مستخدمين مميزين (VIP) في هذه المجموعة.');
+        }
+        
+        let message = '📋 قائمة المستخدمين المميزين (VIP):\n\n';
+        
+        // Create inline keyboard with remove buttons for each user
+        const inlineKeyboard = [];
+        
+        // Loop through each important user and get their info
+        for (const user of importantUsers) {
             try {
                 // Try to get user information from Telegram
                 const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
@@ -3071,20 +3080,45 @@ async function listImportantUsers(ctx) {
                 const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
                 
                 message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+                
+                // Add a button to remove this user
+                inlineKeyboard.push([{
+                    text: `❌ إزالة ${firstName}`,
+                    callback_data: `remove_vip:${user.user_id}`
+                }]);
             } catch (error) {
                 // If we can't get user info, just show the ID
                 console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
                 message += `• مستخدم (ID: ${user.user_id})\n`;
+                
+                // Add a button to remove this user
+                inlineKeyboard.push([{
+                    text: `❌ إزالة المستخدم ${user.user_id}`,
+                    callback_data: `remove_vip:${user.user_id}`
+                }]);
             }
         }
-
-        // Add information about how to demote users
-        message += '\n💡 لتنزيل مستخدم من المميزين، استخدم الأمر "تنزيل مميز" مع الرد على رسالة المستخدم.';
-
-        await ctx.reply(message);
+        
+        // Add a button to remove all VIP users
+        inlineKeyboard.push([{
+            text: '🗑️ إزالة جميع المستخدمين المميزين',
+            callback_data: 'remove_all_vip'
+        }]);
+        
+        // Add a back button
+        inlineKeyboard.push([{
+            text: '🔙 رجوع',
+            callback_data: 'back_to_admin_menu'
+        }]);
+        
+        return ctx.reply(message, {
+            reply_markup: {
+                inline_keyboard: inlineKeyboard
+            }
+        });
     } catch (error) {
-        console.error('Error listing important users:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
+        console.error('Error listing VIP users:', error);
+        return ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
     }
 }
 
@@ -3103,7 +3137,164 @@ async function isImportant(ctx, userId) {
         return false;
     }
 }
-    
+ // Add this function to remove a specific VIP user
+async function removeVIPUser(ctx, targetUserId) {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        
+        if (!isAdmin && !isDev) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
+        }
+        
+        // Get the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Remove the user from important_users collection
+        const result = await db.collection('important_users').deleteOne({
+            chat_id: chatId,
+            user_id: targetUserId
+        });
+        
+        if (result.deletedCount > 0) {
+            // Try to get user information
+            let userInfo = 'المستخدم';
+            try {
+                const chatMember = await ctx.telegram.getChatMember(chatId, targetUserId);
+                userInfo = chatMember.user.first_name || 'المستخدم';
+                if (chatMember.user.username) {
+                    userInfo += ` (@${chatMember.user.username})`;
+                }
+            } catch (error) {
+                console.log(`Couldn't get info for user ${targetUserId}: ${error.message}`);
+            }
+            
+            return ctx.reply(`✅ تم إزالة ${userInfo} من قائمة المستخدمين المميزين (VIP) بنجاح.`);
+        } else {
+            return ctx.reply('❌ هذا المستخدم ليس في قائمة المستخدمين المميزين (VIP).');
+        }
+    } catch (error) {
+        console.error('Error removing VIP user:', error);
+        return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة المستخدم من قائمة المميزين.');
+    }
+}
+
+// Add this function to remove all VIP users
+async function removeAllVIPUsers(ctx) {
+    try {
+        const chatId = ctx.chat.id;
+        const userId = ctx.from.id;
+        
+        // Check if user has admin permissions
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        
+        if (!isAdmin && !isDev) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين والمطورين.');
+        }
+        
+        // Get the database
+        const db = await ensureDatabaseInitialized();
+        
+        // Count how many users will be removed
+        const count = await db.collection('important_users').countDocuments({ chat_id: chatId });
+        
+        if (count === 0) {
+            return ctx.reply('📋 لا يوجد مستخدمين مميزين (VIP) في هذه المجموعة.');
+        }
+        
+        // Remove all VIP users for this chat
+        await db.collection('important_users').deleteMany({ chat_id: chatId });
+        
+        return ctx.reply(`✅ تم إزالة جميع المستخدمين المميزين (VIP) من هذه المجموعة. (${count} مستخدم)`);
+    } catch (error) {
+        console.error('Error removing all VIP users:', error);
+        return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
+    }
+}   
+// Add these action handlers to your bot setup
+bot.action(/^remove_vip:(\d+)$/, async (ctx) => {
+    try {
+        const targetUserId = parseInt(ctx.match[1]);
+        await ctx.answerCbQuery('جاري إزالة المستخدم من القائمة...');
+        await removeVIPUser(ctx, targetUserId);
+        
+        // Refresh the VIP users list
+        await listVIPUsers(ctx);
+    } catch (error) {
+        console.error('Error handling remove_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة المستخدم.');
+    }
+});
+
+bot.action('remove_all_vip', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('جاري إزالة جميع المستخدمين المميزين...');
+        
+        // Show confirmation dialog
+        await ctx.editMessageText('⚠️ هل أنت متأكد من رغبتك في إزالة جميع المستخدمين المميزين (VIP)؟', {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '✅ نعم، إزالة الجميع', callback_data: 'confirm_remove_all_vip' },
+                        { text: '❌ لا، إلغاء', callback_data: 'cancel_remove_all_vip' }
+                    ]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error handling remove_all_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
+    }
+});
+
+bot.action('confirm_remove_all_vip', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('جاري إزالة جميع المستخدمين المميزين...');
+        await removeAllVIPUsers(ctx);
+        
+        // Return to admin menu
+        await ctx.editMessageText('✅ تم إزالة جميع المستخدمين المميزين (VIP) بنجاح.', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع للقائمة الرئيسية', callback_data: 'back_to_admin_menu' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error handling confirm_remove_all_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
+    }
+});
+
+bot.action('cancel_remove_all_vip', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('تم إلغاء العملية');
+        
+        // Refresh the VIP users list
+        await listVIPUsers(ctx);
+    } catch (error) {
+        console.error('Error handling cancel_remove_all_vip action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة إلغاء العملية.');
+    }
+});
+
+bot.action('back_to_admin_menu', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        // Show admin menu (you'll need to implement this function)
+        await showAdminMenu(ctx);
+    } catch (error) {
+        console.error('Error handling back_to_admin_menu action:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة العودة للقائمة الرئيسية.');
+    }
+});
+
     // Send a joke
     async function sendJoke(ctx) {
         try {
