@@ -3626,5 +3626,7 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups, stickerRestrictionMiddleware,
+    disableStickerSharing,
+    enableStickerSharing };
 
