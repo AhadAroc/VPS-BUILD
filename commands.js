@@ -1971,50 +1971,60 @@ async function listImportantUsers(ctx) {
         }
 
         let message = '📋 *قائمة المستخدمين المميزين (VIP):*\n\n';
+        
+        // Create inline keyboard with remove buttons for each user
         const inlineKeyboard = [];
         
-        // Add each user to the message with a remove button
-        for (let i = 0; i < importantUsers.length; i++) {
-            const user = importantUsers[i];
-            let userInfo = '';
-            
+        // Loop through each important user and get their info
+        for (const user of importantUsers) {
             try {
+                // Try to get user information from Telegram
                 const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
-                userInfo = chatMember.user.first_name || 'المستخدم';
-                if (chatMember.user.username) {
-                    userInfo += ` (@${chatMember.user.username})`;
-                }
+                const firstName = chatMember.user.first_name || 'مستخدم';
+                const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
+                
+                message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+                
+                // Add a button to remove this user
+                inlineKeyboard.push([{
+                    text: `❌ إزالة ${firstName}`,
+                    callback_data: `remove_vip:${user.user_id}`
+                }]);
             } catch (error) {
+                // If we can't get user info, just show the ID
                 console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
-                userInfo = `المستخدم ${user.user_id}`;
+                message += `• مستخدم (ID: ${user.user_id})\n`;
+                
+                // Add a button to remove this user
+                inlineKeyboard.push([{
+                    text: `❌ إزالة المستخدم ${user.user_id}`,
+                    callback_data: `remove_vip:${user.user_id}`
+                }]);
             }
-            
-            message += `${i + 1}. ${userInfo} - ID: \`${user.user_id}\`\n`;
-            
-            // Add a button to remove this specific user
-            inlineKeyboard.push([
-                { text: `❌ إزالة ${userInfo.split(' ')[0]}`, callback_data: `remove_vip:${user.user_id}` }
-            ]);
         }
         
         // Add a button to remove all VIP users
-        inlineKeyboard.push([
-            { text: '🗑️ إزالة جميع المستخدمين المميزين', callback_data: 'remove_all_vips' }
-        ]);
+        inlineKeyboard.push([{
+            text: '🗑️ إزالة جميع المستخدمين المميزين',
+            callback_data: 'remove_all_vip'
+        }]);
         
         // Add a back button
-        inlineKeyboard.push([
-            { text: '🔙 رجوع', callback_data: 'back_to_main' }
-        ]);
+        inlineKeyboard.push([{
+            text: '🔙 رجوع',
+            callback_data: 'back_to_admin_menu'
+        }]);
         
-        await ctx.replyWithMarkdown(message, {
+        // Send the message with the inline keyboard
+        return ctx.reply(message, {
+            parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: inlineKeyboard
             }
         });
     } catch (error) {
         console.error('Error listing important users:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
+        return ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
     }
 }
 // Add these action handlers for removing VIP users
