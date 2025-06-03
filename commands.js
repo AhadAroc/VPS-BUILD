@@ -3051,19 +3051,18 @@ async function listImportantUsers(ctx) {
         
         // Get user details for each important user
         for (const user of importantUsers) {
-            try {
-                // Try to get user information from Telegram
-                const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
-                const firstName = chatMember.user.first_name || 'مستخدم';
-                const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
-                
-                message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
-            } catch (error) {
-                // If we can't get user info, just show the ID
-                console.log(`Couldn't get info for user ${user.user_id}: ${error.message}`);
-                message += `• مستخدم (ID: ${user.user_id})\n`;
-            }
-        }
+    try {
+        // Try to get user information from Telegram
+        const chatMember = await ctx.telegram.getChatMember(chatId, user.user_id);
+        const firstName = chatMember.user.first_name || 'مستخدم';
+        const username = chatMember.user.username ? `@${chatMember.user.username}` : '';
+        
+        message += `• ${firstName} ${username} (ID: ${user.user_id})\n`;
+    } catch (error) {
+        // If we can't get user info, they might have left the group
+        message += `• مستخدم (ID: ${user.user_id}) - ⚠️ لم يعد في المجموعة\n`;
+    }
+}
 
         // Add information about how to demote users
         message += '\n💡 لتنزيل مستخدم من المميزين، استخدم الأمر "تنزيل مميز" مع الرد على رسالة المستخدم.';
