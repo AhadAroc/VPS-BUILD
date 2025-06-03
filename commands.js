@@ -410,7 +410,7 @@ async function showMainMenu(ctx) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
-        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isBotAdm = await isBotAdmin(userId);
 
         const isSpecialUser = isAdmin || isSecDev || isVIPUser || isBotAdm;
 
