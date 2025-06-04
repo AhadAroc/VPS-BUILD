@@ -1568,6 +1568,8 @@ bot.command('ترقية_مطور', async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
 
+
+
 //shortcuts 
 //bot.hears(/^رفع مميز/, promoteToImportant);
 bot.hears(/^ر م/, promoteToImportant); // Shortcut for رفع مميز
@@ -1593,6 +1595,115 @@ bot.command('ل_م', listImportantUsers); // Command version with underscore
 bot.hears('ايدي', (ctx) => showUserId(ctx));
 bot.hears('اد', (ctx) => showUserId(ctx));
 bot.hears('ا د', (ctx) => showUserId(ctx));
+
+
+
+// Shortcuts for promoting/demoting developers
+bot.hears(/^رفع مطور/, async (ctx) => {
+    await promoteUser(ctx, 'مطور');
+});
+bot.hears(/^ر ط/, async (ctx) => {  // Shortcut for رفع مطور
+    await promoteUser(ctx, 'مطور');
+});
+bot.hears(/^رط/, async (ctx) => {  // Alternative shortcut without space
+    await promoteUser(ctx, 'مطور');
+});
+bot.command('رط', async (ctx) => {  // Command version of the shortcut
+    await promoteUser(ctx, 'مطور');
+});
+bot.command('ر_ط', async (ctx) => {  // Command version with underscore
+    await promoteUser(ctx, 'مطور');
+});
+
+// Shortcuts for demoting developers
+bot.hears(/^تنزيل مطور/, async (ctx) => {
+    await demoteUser(ctx, 'developer');
+});
+bot.hears(/^ت ط/, async (ctx) => {  // Shortcut for تنزيل مطور
+    await demoteUser(ctx, 'developer');
+});
+bot.hears(/^تط/, async (ctx) => {  // Alternative shortcut without space
+    await demoteUser(ctx, 'developer');
+});
+bot.command('تط', async (ctx) => {  // Command version of the shortcut
+    await demoteUser(ctx, 'developer');
+});
+bot.command('ت_ط', async (ctx) => {  // Command version with underscore
+    await demoteUser(ctx, 'developer');
+});
+
+// Shortcuts for promoting secondary developers
+bot.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^ر ث/, promoteToSecondaryDeveloper);  // Shortcut for رفع ثانوي
+bot.hears(/^رث/, promoteToSecondaryDeveloper);  // Alternative shortcut without space
+bot.command('رث', promoteToSecondaryDeveloper);  // Command version of the shortcut
+bot.command('ر_ث', promoteToSecondaryDeveloper);  // Command version with underscore
+
+// Shortcuts for promoting bot admins
+bot.hears('رفع ادمن', promoteToBotAdmin);
+bot.hears(/^ر ا/, promoteToBotAdmin);  // Shortcut for رفع ادمن
+bot.hears(/^را/, promoteToBotAdmin);  // Alternative shortcut without space
+bot.command('را', promoteToBotAdmin);  // Command version of the shortcut
+bot.command('ر_ا', promoteToBotAdmin);  // Command version with underscore
+
+// Shortcuts for demoting bot admins
+bot.hears('تنزيل ادمن', removeBotAdmin);
+bot.hears(/^ت ا/, removeBotAdmin);  // Shortcut for تنزيل ادمن
+bot.hears(/^تا/, removeBotAdmin);  // Alternative shortcut without space
+bot.command('تا', removeBotAdmin);  // Command version of the shortcut
+bot.command('ت_ا', removeBotAdmin);  // Command version with underscore
+
+// Shortcuts for promoting primary developers
+bot.hears(/^رفع اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
+bot.hears(/^ر س/, (ctx) => promoteUser(ctx, 'مطور أساسي'));  // Shortcut for رفع اساسي
+bot.hears(/^رس/, (ctx) => promoteUser(ctx, 'مطور أساسي'));  // Alternative shortcut without space
+bot.command('رس', (ctx) => promoteUser(ctx, 'مطور أساسي'));  // Command version of the shortcut
+bot.command('ر_س', (ctx) => promoteUser(ctx, 'مطور أساسي'));  // Command version with underscore
+
+// Shortcuts for checking user rank
+bot.hears('رتبتي', checkUserRank);
+bot.hears(/^ر ت/, checkUserRank);  // Shortcut for رتبتي
+bot.hears(/^رت/, checkUserRank);  // Alternative shortcut without space
+bot.command('رت', checkUserRank);  // Command version of the shortcut
+bot.command('ر_ت', checkUserRank);  // Command version with underscore
+
+// Shortcuts for listing secondary developers
+bot.command('لستة_ثانوي', listSecondaryDevelopers);
+bot.hears('لستة ثانوي', listSecondaryDevelopers);
+bot.hears(/^ل ث/, listSecondaryDevelopers);  // Shortcut for لستة ثانوي
+bot.hears(/^لث/, listSecondaryDevelopers);  // Alternative shortcut without space
+bot.command('لث', listSecondaryDevelopers);  // Command version of the shortcut
+bot.command('ل_ث', listSecondaryDevelopers);  // Command version with underscore
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3269,6 +3380,93 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 🔹 *نكتة* – إرسال نكتة`;
 }
 
+// Now let's add a function to show the commands with buttons including a shortcuts button
+async function showCommandsWithButtons(ctx) {
+    try {
+        const commandText = getCommandList();
+        
+        await ctx.reply(commandText, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '⌨️ عرض الاختصارات السريعة', callback_data: 'show_shortcuts' }],
+                    [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error showing commands with buttons:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض قائمة الأوامر.');
+    }
+}
+
+// Add a handler for the show_shortcuts callback
+bot.action('show_shortcuts', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        const shortcutsMessage = 
+            '*⌨️ الاختصارات السريعة للأوامر:*\n\n' +
+            '*اختصارات الترقية:*\n' +
+            '🔹 *ر م* – رفع مميز\n' +
+            '🔹 *ر ط* – رفع مطور\n' +
+            '🔹 *رط* – رفع مطور (بدون مسافة)\n' +
+            '🔹 *ر ث* – رفع مطور ثانوي\n' +
+            '🔹 *رث* – رفع مطور ثانوي (بدون مسافة)\n' +
+            '🔹 *ر ا* – رفع ادمن\n' +
+            '🔹 *را* – رفع ادمن (بدون مسافة)\n' +
+            '🔹 *ر س* – رفع مطور أساسي\n' +
+            '🔹 *رس* – رفع مطور أساسي (بدون مسافة)\n\n' +
+            
+            '*اختصارات التنزيل:*\n' +
+            '🔹 *ت م* – تنزيل مميز\n' +
+            '🔹 *ت ط* – تنزيل مطور\n' +
+            '🔹 *تط* – تنزيل مطور (بدون مسافة)\n' +
+            '🔹 *ت ا* – تنزيل ادمن\n' +
+            '🔹 *تا* – تنزيل ادمن (بدون مسافة)\n\n' +
+            
+            '*اختصارات أخرى:*\n' +
+            '🔹 *ر ت* – عرض رتبتي\n' +
+            '🔹 *رت* – عرض رتبتي (بدون مسافة)\n\n' +
+            
+            '💡 *ملاحظة:* يمكن استخدام هذه الاختصارات كأوامر أيضاً مع إضافة "/" في البداية أو "_" بين الحروف.\n' +
+            'مثال: `/رط` أو `/ر_ط` بدلاً من *رفع مطور*';
+        
+        await ctx.reply(shortcutsMessage, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 العودة لقائمة الأوامر', callback_data: 'show_commands_list' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error in show_shortcuts action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض الاختصارات.');
+    }
+});
+
+// Add a handler to go back to the commands list
+bot.action('show_commands_list', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await showCommandsWithButtons(ctx);
+    } catch (error) {
+        console.error('Error returning to commands list:', error);
+        await ctx.reply('❌ حدث خطأ أثناء العودة لقائمة الأوامر.');
+    }
+});
+
+// Update the show_commands action to use the new function
+bot.action('show_commands', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await showCommandsWithButtons(ctx);
+    } catch (error) {
+        console.error('Error in show_commands action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض قائمة الأوامر.');
+    }
+});
     
   
     // Add this function to get the custom bot name for a chat
