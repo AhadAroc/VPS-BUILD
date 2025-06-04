@@ -2380,7 +2380,7 @@ bot.action('show_commands_part2', async (ctx) => {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: '🔙 السابق', callback_data: 'show_commands' }],
-                    [{ text: '🔜 التالي', callback_data: 'show_commands_part3' }]
+                    [{ text: '2: 🔜 التالي', callback_data: 'show_commands_part3' }]
                 ]
             }
         });
@@ -2411,7 +2411,7 @@ bot.action('show_commands_part3', async (ctx) => {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: '🔙 السابق', callback_data: 'show_commands_part2' }],
-                    [{ text: '🔜 التالي', callback_data: 'show_commands_part4' }]
+                    [{ text: '3: 🔜 التالي', callback_data: 'show_commands_part4' }]
                 ]
             }
         });
@@ -2439,7 +2439,7 @@ bot.action('show_commands_part4', async (ctx) => {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: '🔙 السابق', callback_data: 'show_commands_part3' }],
-                    [{ text: '🏠 القائمة الرئيسية', callback_data: 'back_to_main' }]
+                    [{ text: '4: 🏠 القائمة الرئيسية', callback_data: 'back_to_main' }]
                 ]
             }
         });
