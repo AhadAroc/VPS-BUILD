@@ -1546,7 +1546,7 @@ bot.hears('قائمة المميزين', listVIPUsers);
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
 
 // Add these command handlers for sticker restriction
 bot.command('منع_ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
@@ -1561,7 +1561,7 @@ bot.hears('رفع ادمن', promoteToBotAdmin);
 bot.command('ازالة_مشرف_بوت', removeBotAdmin);
 bot.hears('تنزيل ادمن', removeBotAdmin);
 // Additional handler for flexibility
-bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 // Add these lines to your existing command handlers
 bot.command('ترقية_مطور', async (ctx) => {
@@ -1578,7 +1578,7 @@ bot.command('لستة_مميز', listImportantUsers);
 bot.hears('لستة مميز', listImportantUsers);
 bot.command('قائمة_المميزين', listImportantUsers);
 bot.hears('قائمة المميزين', listImportantUsers);
-bot.hears(/^ترقية مطور/, async (ctx) => {
+bot.hears(/^رفع مطور/, async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
 // Handle "نكتة" text command
@@ -1588,11 +1588,11 @@ bot.command('ازالة الروابط', adminOnly((ctx) => removeLinks(ctx)));
 bot.hears('ازالة الروابط', (ctx) => removeLinks(ctx));
 bot.command('معرفي', (ctx) => showUserId(ctx));
 bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
-bot.hears('معرفي', (ctx) => showUserId(ctx));
+bot.hears('ايدي', (ctx) => showUserId(ctx));
 bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
 bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
 bot.hears('فتح روابط', adminOnly((ctx) => enableLinkSharing(ctx)));
-bot.hears('غلق روابط', adminOnly((ctx) => disableLinkSharing(ctx)));
+bot.hears('منع روابط', adminOnly((ctx) => disableLinkSharing(ctx)));
 bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.hears('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
@@ -1618,7 +1618,7 @@ bot.command('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
 bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
 
 bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
-bot.hears('سماح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
+bot.hears('فتح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
 // Add command handlers for promoting and demoting VIP users
 bot.command('ترقية_مميز', (ctx) => promoteUser(ctx, 'مميز'));
 bot.command('تنزيل_مميز', demoteUser);
@@ -1629,7 +1629,7 @@ bot.hears(/^تنزيل ادمن مسابقات/, demoteUser);
 
 bot.command('معرفي', (ctx) => showUserId(ctx));
 
-bot.hears('معرفي', (ctx) => showUserId(ctx));
+bot.hears('ايدي', (ctx) => showUserId(ctx));
 bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
 bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
 
@@ -1641,25 +1641,25 @@ bot.command('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx))
 
 // Also add handlers for text commands without the slash
 bot.hears('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
-bot.hears('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
+bot.hears('فتح فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
 bot.command('منع_متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
 bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
 
 // Also add handlers for text commands without the underscore
 bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
-bot.hears('تفعيل متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
+bot.hears('فتح متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
 bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
 bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
 bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
-bot.hears(/^ترقية اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
+bot.hears(/^رفع اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
 
 bot.command('منع_مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
 bot.command('تفعيل_مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
 bot.command('رتبتي', checkUserRank);
     bot.hears('رتبتي', checkUserRank);
 // Also add handlers for text commands without the underscore
-bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
-bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
+//bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
+//bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
 // Add this handler for the warning command
 bot.hears('تحذير', async (ctx) => {
     try {
@@ -3172,13 +3172,15 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
         } catch (error) {
             console.error('Error in showDevPanel:', error);
             await ctx.reply('❌ حدث خطأ أثناء محاولة عرض لوحة التحكم للمطور.');
-        }    }    function getCommandList() {
+        }    }     function getCommandList() {
     return `📜 *قائمة الأوامر:*
 
+
 *📊 أوامر المعلومات*
-🔹 *معرفي* – ظهور الايدي و معرفك
+🔹 *ايدي* – ظهور الايدي و معرفك
 🔹 *رتبتي* – ظهور رتبتك
 🔹 *رابط المجموعة* – الحصول على رابط المجموعة
+
 
 *👥 أوامر الإدارة*
 🔹 *رفع امن مسابقات* – رفع ادمن مسابقات
@@ -3186,12 +3188,14 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 🔹 *رفع مميز* – رفع مستخدم إلى مميز
 🔹 *تنزيل مميز* – تنزيل مستخدم من مميز
 🔹 *لستة مميز* – عرض قائمة المميزين
-🔹 *ترقية ادمن* – ترقية إلى أدمن
-🔹 *ترقية منشئ* – ترقية إلى منشئ
-🔹 *تنزيل* – إزالة رتبة الأدمن
-🔹 *ترقية مطور* – ترقية إلى مطور
-🔹 *ترقية مطور ثانوي* – ترقية إلى مطور ثانوي
+🔹 *رفع ادمن* – ترقية إلى أدمن
+🔹 *تنزيل ادمن* – ترقية إلى أدمن
+🔹 *رفع منشئ* – ترقية إلى منشئ
+🔹 *تنزيل* – إزالة رتبة 
+🔹 *رفع مطور* – ترقية إلى مطور
+🔹 *رفع مطور ثانوي* – ترقية إلى مطور ثانوي
 🔹 *تنزيل مطور* – لتنزيل مطور أول أو ثانوي، اذهب إلى خاص البوت كمطور
+
 
 *🛡️ أوامر الحماية*
 🔹 *كتم* – كتم مستخدم
@@ -3203,25 +3207,29 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 🔹 *تحذيرات* – عرض عدد التحذيرات لمستخدم
 🔹 *نداء الجميع* – مناداة جميع الأعضاء
 
+
 *🖼️ أوامر الوسائط*
 🔹 *مسح الصور* – حذف آخر الصور المرسلة
 🔹 *منع الصور* – منع إرسال الصور
-🔹 *سماح الصور* – السماح بإرسال الصور
+🔹 *فتح الصور* – السماح بإرسال الصور
 🔹 *منع فيديو* – منع إرسال الفيديوهات
-🔹 *تفعيل فيديو* – السماح بإرسال الفيديوهات
+🔹 *فتح فيديو* – السماح بإرسال الفيديوهات
 🔹 *منع متحركة* – منع إرسال الصور المتحركة
-🔹 *تفعيل متحركة* – السماح بإرسال الصور المتحركة
+🔹 *فتح متحركة* – السماح بإرسال الصور المتحركة
 🔹 *منع ملصقات* – منع إرسال الملصقات
 🔹 *فتح ملصقات* – السماح بإرسال الملصقات
+
 
 *🔗 أوامر الروابط*
 🔹 *ازالة الروابط* – حذف الروابط في المجموعة
 🔹 *فتح روابط* – السماح بمشاركة الروابط
-🔹 *غلق روابط* – منع مشاركة الروابط
+🔹 *منع روابط* – منع مشاركة الروابط
+
 
 *🎭 أوامر الترفيه*
 🔹 *نكتة* – إرسال نكتة`;
 }
+
     
   
     // Add this function to get the custom bot name for a chat
@@ -3240,19 +3248,39 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
         }
     }
     async function showUserId(ctx) {
-        try {
-            const userId = ctx.from.id;
-            const firstName = ctx.from.first_name || 'User';
-            const username = ctx.from.username ? `@${ctx.from.username}` : 'N/A';
-            
-            const message = `${firstName}\nمعرفي\n${username} ↫ معرفك ↓\n${userId}`;
-            
-            await ctx.replyWithHTML(`<code>${message}</code>`);
-        } catch (error) {
-            console.error('Error in showUserId:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة عرض معرف المستخدم.');
-        }
+    try {
+        const userId = ctx.from.id;
+        const firstName = ctx.from.first_name || 'المستخدم';
+        const username = ctx.from.username ? `@${ctx.from.username}` : 'غير متوفر';
+        const lastName = ctx.from.last_name || '';
+        
+        // Create a more visually appealing message with proper RTL support
+        const message = `
+┏━━━━━━━━━━━━━━━┓
+┃  📋 معلومات المستخدم  ┃
+┗━━━━━━━━━━━━━━━┛
+
+👤 الاسم: ${firstName} ${lastName}
+🔖 المعرف: ${username}
+🆔 رقم الحساب: <code>${userId}</code>
+
+⌯ يمكنك استخدام هذا المعرف للإشارة إلى حسابك في البوت
+`;
+        
+        // Use Telegram's HTML formatting for better appearance
+        await ctx.replyWithHTML(message, {
+            disable_web_page_preview: true,
+            reply_to_message_id: ctx.message.message_id
+        });
+        
+        // Track user interaction for analytics
+        await updateLastInteraction(userId, ctx.from.username, firstName, lastName);
+        
+    } catch (error) {
+        console.error('Error in showUserId:', error);
+        ctx.reply('❌ عذراً، حدث خطأ أثناء محاولة عرض معلومات حسابك. الرجاء المحاولة مرة أخرى.');
     }
+}
     // Add this function to handle link sharing toggling
     async function enableLinkSharing(ctx) {
         try {
@@ -4295,10 +4323,10 @@ async function getGroupLink(ctx) {
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^ترقية ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
 
 // Additional handler for flexibility
-bot.hears(/^ترقية مطور ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
 
 
 
