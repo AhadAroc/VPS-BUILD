@@ -2460,6 +2460,15 @@ bot.action('back_to_commands', async (ctx) => {
             '🔹 *ر ت* – عرض رتبتي\n' +
             '🔹 *رت* – عرض رتبتي (بدون مسافة)\n';
 
+        await ctx.editMessageText(commandsPart1, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '⌨️ الاختصارات السريعة', callback_data: 'show_shortcuts' }],
+                    [{ text: '🔙 رجوع', callback_data: 'back_to_main' }]
+                ]
+            }
+        });
     } catch (error) {
         console.error('Error in back_to_commands action:', error);
         
