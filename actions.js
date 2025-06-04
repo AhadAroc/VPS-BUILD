@@ -2314,46 +2314,66 @@ bot.action('quiz_bot', async (ctx) => {
 //checkeme
 bot.action('show_commands', async (ctx) => {
     try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        await ctx.answerCbQuery(); // Clear the loading state
+        
+        const commandsList = `📜 *قائمة الأوامر:*
+
+*📊 أوامر المعلومات*
+🔹 *ايدي* – ظهور الايدي و معرفك
+🔹 *رتبتي* – ظهور رتبتك
+🔹 *رابط المجموعة* – الحصول على رابط المجموعة
+
+*👥 أوامر الإدارة*
+🔹 *رفع امن مسابقات* – رفع ادمن مسابقات
+🔹 *تنزيل امن مسابقات* – تنزيل ادمن مسابقات
+🔹 *رفع مميز* – رفع مستخدم إلى مميز
+🔹 *تنزيل مميز* – تنزيل مستخدم من مميز
+🔹 *لستة مميز* – عرض قائمة المميزين
+🔹 *رفع ادمن* – ترقية إلى أدمن
+🔹 *تنزيل ادمن* – ترقية إلى أدمن
+🔹 *رفع منشئ* – ترقية إلى منشئ
+🔹 *تنزيل* – إزالة رتبة`;
+
+        const replyMarkup = {
+            inline_keyboard: [
+                [{ text: '🔙 رجوع', callback_data: 'back' }]
+            ]
+        };
+
+        // Check if the message has a caption (photo, video, etc.) or is a text message
+        const msg = ctx.callbackQuery.message;
+        
+        if (msg.caption !== undefined) {
+            // Message has a caption (it's a media message)
+            await ctx.editMessageCaption(commandsList, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
+        } else {
+            // Message is text-only
+            await ctx.editMessageText(commandsList, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
         }
-
-        // First part of the message with categorized commands
-        const commandsPart1 = 
-            '📜 *قائمة الأوامر:*\n\n' +
-            '*📊 أوامر المعلومات*\n' +
-            '🔹 *ايدي* – ظهور الايدي و معرفك\n' +
-            '🔹 *رتبتي* – ظهور رتبتك\n' +
-            '🔹 *رابط المجموعة* – الحصول على رابط المجموعة\n\n' +
-            
-            '*👥 أوامر الإدارة*\n' +
-            '🔹 *رفع امن مسابقات* – رفع ادمن مسابقات\n' +
-            '🔹 *تنزيل امن مسابقات* – تنزيل ادمن مسابقات\n' +
-            '🔹 *رفع مميز* – رفع مستخدم إلى مميز\n' +
-            '🔹 *تنزيل مميز* – تنزيل مستخدم من مميز\n' +
-            '🔹 *لستة مميز* – عرض قائمة المميزين\n' +
-            '🔹 *رفع ادمن* – ترقية إلى أدمن\n' +
-            '🔹 *تنزيل ادمن* – ترقية إلى أدمن\n' +
-            '🔹 *رفع منشئ* – ترقية إلى منشئ\n' +
-            '🔹 *تنزيل* – إزالة رتبة\n';
-
-        // Send the first part with buttons
-        await ctx.editMessageCaption(commandsPart1, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '🔴 شرح نظام التحذيرات', callback_data: 'explain_warnings' }],
-                    [{ text: '⚠️ منع التجوال او spam', callback_data: 'check_premium_for_warnings' }],
-                    [{ text: '⌨️ الاختصارات السريعة', callback_data: 'show_shortcuts' }],
-                    [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
-                    [{ text: '🔙 رجوع', callback_data: 'back' }]
-                ]
-            }
-        });
-
     } catch (error) {
         console.error('Error in show_commands action:', error);
-        ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+        
+        // Fallback: If editing fails, send a new message
+        try {
+            await ctx.answerCbQuery('جاري عرض الأوامر...');
+            await ctx.reply('📜 *قائمة الأوامر*', {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔙 رجوع', callback_data: 'back' }]
+                    ]
+                }
+            });
+        } catch (fallbackError) {
+            console.error('Error in show_commands fallback:', fallbackError);
+            await ctx.answerCbQuery('حدث خطأ أثناء عرض الأوامر.', { show_alert: true });
+        }
     }
 });
 
@@ -6041,23 +6061,52 @@ bot.action('delete_secondary_developers', async (ctx) => {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
         }
 
-        await ctx.editMessageCaption(
-            '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:',
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
-                        [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
-                        
-                        [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
-                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
-                    ]
-                }
-            }
-        );
+        const mainMenuText = '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:';
+        const mainMenuKeyboard = {
+            inline_keyboard: [
+                [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
+                [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }],
+                [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
+            ]
+        };
+
+        // Check if the message has a caption (photo, video, etc.) or is a text message
+        const msg = ctx.callbackQuery.message;
+        
+        if (msg.caption !== undefined) {
+            // Message has a caption (it's a media message)
+            await ctx.editMessageCaption(mainMenuText, {
+                reply_markup: mainMenuKeyboard
+            });
+        } else {
+            // Message is text-only
+            await ctx.editMessageText(mainMenuText, {
+                reply_markup: mainMenuKeyboard
+            });
+        }
     } catch (error) {
         console.error('Error in back action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء العودة للقائمة الرئيسية.');
+        
+        // Fallback: If editing fails, send a new message
+        try {
+            await ctx.reply(
+                '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:',
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                            [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
+                            [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }],
+                            [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
+                        ]
+                    }
+                }
+            );
+        } catch (fallbackError) {
+            console.error('Error in back action fallback:', fallbackError);
+            await ctx.answerCbQuery('حدث خطأ أثناء العودة للقائمة الرئيسية.', { show_alert: true });
+        }
     }
 });
 
