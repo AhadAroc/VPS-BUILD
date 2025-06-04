@@ -988,41 +988,65 @@ async function checkUserRank(ctx) {
     try {
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
         let rank = 'عضو عادي'; // Default rank
+        let rankEmoji = '👤';
+
+        // Get database connection
+        const db = await ensureDatabaseInitialized();
 
         // Check if user is the owner
         if (ctx.from.username === 'Lorisiv') {
             rank = 'المطور الأساسي';
-        } else {
-            // Check if user is an admin or owner of the group
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            const isDev = await isDeveloper(ctx, userId);
-            const isSecDev = await isSecondaryDeveloper(ctx, userId);
-            const isImportantUser = await isImportant(ctx, userId);
-            const isVipUser = await isVIP(ctx, userId);
-            const isBotAdminUser = await isBotAdmin(ctx, userId);
-
-            if (isAdmin) {
-                const chatMember = await ctx.telegram.getChatMember(chatId, userId);
-                rank = chatMember.status === 'creator' ? 'المالك' : 'مشرف';
-            } else if (isDev) {
-                rank = 'مطور';
-            } else if (isSecDev) {
-                rank = 'مطور ثانوي';
-            } else if (isBotAdminUser) {
-                rank = 'اساسي';
-            } else if (isImportantUser) {
-                rank = 'مميز (Important)';
-            } else if (isVipUser) {
-                rank = 'ادمن مسابقات';
+            rankEmoji = '👑';
+        } 
+        // Check if user is a developer
+        else if (await isDeveloper(ctx, userId)) {
+            rank = 'مطور';
+            rankEmoji = '⚙️';
+        } 
+        // Check if user is a secondary developer
+        else if (await isSecondaryDeveloper(ctx, userId)) {
+            rank = 'مطور ثانوي';
+            rankEmoji = '🔧';
+        } 
+        // Check if user is a bot admin (اساسي)
+        else if (await isBotAdmin(ctx, userId)) {
+            rank = 'اساسي';
+            rankEmoji = '🛡️';
+        }
+        // Check if user is a group admin
+        else if (await isAdminOrOwner(ctx, userId)) {
+            const member = await ctx.telegram.getChatMember(chatId, userId);
+            if (member.status === 'creator') {
+                rank = 'المالك';
+                rankEmoji = '👑';
+            } else {
+                rank = 'مشرف';
+                rankEmoji = '🔰';
             }
+        } 
+        // Check if user is VIP
+        else if (await isVIP(ctx, userId)) {
+            rank = 'مميز';
+            rankEmoji = '💎';
         }
 
-        // Send the rank information
-        await ctx.replyWithHTML(`<b>رتبتك:</b> ${rank}`);
+        // Get user mention
+        const userMention = ctx.from.username 
+            ? `@${ctx.from.username}` 
+            : ctx.from.first_name;
+
+        // Send the rank message
+        await ctx.reply(
+            `${rankEmoji} *المستخدم:* ${userMention}\n` +
+            `🆔 *الايدي:* \`${userId}\`\n` +
+            `🏅 *الرتبة:* ${rank}`,
+            { parse_mode: 'Markdown' }
+        );
     } catch (error) {
-        console.error('Error in checkUserRank:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة التحقق من رتبتك.');
+        console.error('Error checking user rank:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
 
