@@ -2395,7 +2395,7 @@ bot.action('show_shortcuts', async (ctx) => {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🔙 رجوع للأوامر', callback_data: 'handleCommandCallbacks' }]
+                        
                     ]
                 }
             });
@@ -2404,7 +2404,7 @@ bot.action('show_shortcuts', async (ctx) => {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🔙 رجوع للأوامر', callback_data: 'handleCommandCallbacks' }]
+                        
                     ]
                 }
             });
