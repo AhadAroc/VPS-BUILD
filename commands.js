@@ -2730,17 +2730,26 @@ async function listVIPUsers(ctx) {
         return ctx.reply('❌ حدث خطأ أثناء محاولة عرض قائمة المستخدمين المميزين.');
     }
 }
+// Add this function to check if a user is a bot admin
 async function isBotAdmin(ctx, userId) {
     try {
+        const botId = ctx.botInfo.id;
+        const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
-        const botAdmin = await db.collection('bot_admins').findOne({ user_id: userId });
-        return !!botAdmin;
+        
+        const botAdmin = await db.collection('bot_admins').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true
+        });
+        
+        return !!botAdmin; // Returns true if the user is a bot admin
     } catch (error) {
         console.error('Error checking bot admin status:', error);
         return false;
     }
 }
-
 async function promoteToBotAdmin(ctx, targetUserId, targetUsername) {
     try {
         const userId = ctx.from.id;
@@ -2915,34 +2924,32 @@ async function promoteToBotAdmin(ctx) {
             lastName = userInfo.last_name || null;
         } catch (error) {
             console.log(`Could not fetch complete user info for ${userId}: ${error.message}`);
-            // Continue with available information
         }
 
-        // Add the user to the bot_admins collection
+        // Add the user as a bot admin
         await db.collection('bot_admins').insertOne({
             user_id: userId,
             username: username,
             first_name: firstName,
             last_name: lastName,
             chat_id: chatId,
-            chat_title: ctx.chat.title || 'Unknown Group',
             bot_id: botId,
-            promoted_at: new Date(),
             promoted_by: ctx.from.id,
+            promoted_at: new Date(),
             is_active: true
         });
 
-        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى اساسي بنجاح في هذه المجموعة.`);
-
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى اساسي.`);
     } catch (error) {
         console.error('Error in promoteToBotAdmin:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى اساسي.');
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
     }
 }
 
 // Function to demote a user from Bot Admin
 async function demoteFromBotAdmin(ctx) {
     try {
+        // Check if the user executing the command is an admin or owner
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
         }
@@ -2952,13 +2959,14 @@ async function demoteFromBotAdmin(ctx) {
         const chatId = ctx.chat.id;
         const botId = ctx.botInfo.id;
 
+        // Get target user from reply or mention
         if (ctx.message.reply_to_message) {
             userId = ctx.message.reply_to_message.from.id;
             userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
         } else if (args.length > 0) {
             const username = args[0].replace('@', '');
             try {
-                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                const user = await ctx.telegram.getChatMember(chatId, username);
                 userId = user.user.id;
                 userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
             } catch (error) {
@@ -2982,31 +2990,27 @@ async function demoteFromBotAdmin(ctx) {
             return ctx.reply('هذا المستخدم ليس اساسي في هذه المجموعة.');
         }
 
-        // Update the user's status in the bot_admins collection
-        await db.collection('bot_admins').updateOne({ 
-            user_id: userId,
-            chat_id: chatId,
-            bot_id: botId
-        }, {
-            $set: { is_active: false, demoted_at: new Date(), demoted_by: ctx.from.id }
-        });
+        // Update the user's status to inactive
+        await db.collection('bot_admins').updateOne(
+            { 
+                user_id: userId,
+                chat_id: chatId,
+                bot_id: botId,
+                is_active: true
+            },
+            { 
+                $set: { 
+                    is_active: false,
+                    demoted_by: ctx.from.id,
+                    demoted_at: new Date()
+                }
+            }
+        );
 
-        // Log the demotion for audit purposes
-        await db.collection('user_role_changes').insertOne({
-            user_id: userId,
-            chat_id: chatId,
-            bot_id: botId,
-            action: 'demote',
-            role: 'bot_admin',
-            performed_by: ctx.from.id,
-            timestamp: new Date()
-        });
-
-        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من اساسي بنجاح في هذه المجموعة.`);
-
+        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من اساسي.`);
     } catch (error) {
         console.error('Error in demoteFromBotAdmin:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من اساسي.');
+        ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم.');
     }
 }
 
