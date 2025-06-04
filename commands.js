@@ -1000,6 +1000,7 @@ async function checkUserRank(ctx) {
             const isSecDev = await isSecondaryDeveloper(ctx, userId);
             const isImportantUser = await isImportant(ctx, userId);
             const isVipUser = await isVIP(ctx, userId);
+            const isBotAdminUser = await isBotAdmin(ctx, userId);
 
             if (isAdmin) {
                 const chatMember = await ctx.telegram.getChatMember(chatId, userId);
@@ -1008,6 +1009,8 @@ async function checkUserRank(ctx) {
                 rank = 'مطور';
             } else if (isSecDev) {
                 rank = 'مطور ثانوي';
+            } else if (isBotAdminUser) {
+                rank = 'اساسي';
             } else if (isImportantUser) {
                 rank = 'مميز (Important)';
             } else if (isVipUser) {
