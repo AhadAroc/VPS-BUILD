@@ -1010,8 +1010,8 @@ async function checkUserRank(ctx) {
             rank = 'مطور ثانوي';
             rankEmoji = '🔧';
         } 
-        // Check if user is a bot admin (اساسي)
-        else if (await isBotAdmin(ctx, userId)) {
+        // Check if user is a bot owner (اساسي)
+        else if (await isBotOwner(ctx, userId)) {
             rank = 'اساسي';
             rankEmoji = '🛡️';
         }
@@ -2757,28 +2757,23 @@ async function listVIPUsers(ctx) {
 // Add this function to check if a user is a bot admin
 async function isBotAdmin(ctx, userId) {
     try {
+        const botId = ctx.botInfo.id;
         const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
         
-        // Convert IDs to numbers to ensure consistent comparison
-        const userIdNum = parseInt(userId);
-        const chatIdNum = parseInt(chatId);
+        console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
         
-        console.log(`Checking if user ${userIdNum} is a bot admin (اساسي) in chat ${chatIdNum}`);
-        
-        // Query the database for active bot admins
-        const admin = await db.collection('bot_admins').findOne({
-            user_id: userIdNum,
-            chat_id: chatIdNum,
-            is_active: true
+        const botAdmin = await db.collection('bot_admins').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true  // Make sure to check is_active flag
         });
         
-        const isAdmin = !!admin;
-        console.log(`User ${userIdNum} is${isAdmin ? '' : ' not'} a bot admin (اساسي) in chat ${chatIdNum}`);
-        
-        return isAdmin;
+        console.log(`Bot admin check result:`, botAdmin ? true : false);
+        return !!botAdmin; // Returns true if the user is an active bot admin
     } catch (error) {
-        console.error('Error checking if user is bot admin (اساسي):', error);
+        console.error('Error checking bot admin status:', error);
         return false;
     }
 }
