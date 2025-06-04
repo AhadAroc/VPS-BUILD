@@ -1079,10 +1079,10 @@ async function sendCommandListTelegraf(ctx) {
         inline_keyboard: [
             [
                 { text: "⚡ عرض الاختصارات", callback_data: "show_shortcuts" },
-                { text: "🔄 تحديث", callback_data: "refresh_commands" }
+                
             ],
             [
-                { text: "❌ إغلاق", callback_data: "close_menu" }
+                
             ]
         ]
     };
