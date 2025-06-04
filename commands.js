@@ -3273,8 +3273,20 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
             reply_to_message_id: ctx.message.message_id
         });
         
-        // Track user interaction for analytics
-        await updateLastInteraction(userId, ctx.from.username, firstName, lastName);
+        // Track user interaction in the database
+        try {
+            // Import database module if not already imported
+            const database = require('./database');
+            await database.updateUserActivity(userId);
+            
+            // Store user information if available
+            if (database.addUser && typeof database.addUser === 'function') {
+                await database.addUser(userId, username, firstName, lastName);
+            }
+        } catch (dbError) {
+            console.error('Error updating user activity:', dbError);
+            // Continue execution even if database update fails
+        }
         
     } catch (error) {
         console.error('Error in showUserId:', error);
