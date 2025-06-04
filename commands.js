@@ -3446,27 +3446,7 @@ bot.action('show_shortcuts', async (ctx) => {
     }
 });
 
-// Add a handler to go back to the commands list
-bot.action('show_commands_list', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        await showCommandsWithButtons(ctx);
-    } catch (error) {
-        console.error('Error returning to commands list:', error);
-        await ctx.reply('❌ حدث خطأ أثناء العودة لقائمة الأوامر.');
-    }
-});
 
-// Update the show_commands action to use the new function
-bot.action('show_commands', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        await showCommandsWithButtons(ctx);
-    } catch (error) {
-        console.error('Error in show_commands action:', error);
-        await ctx.reply('❌ حدث خطأ أثناء عرض قائمة الأوامر.');
-    }
-});
     
   
     // Add this function to get the custom bot name for a chat
