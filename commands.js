@@ -3176,8 +3176,19 @@ async function disableStickerSharing(ctx) {
         }
 
         const chatId = ctx.chat.id;
+        
+        // Store restriction in database for persistence
+        const db = await ensureDatabaseInitialized();
+        await db.collection('chat_restrictions').updateOne(
+            { chat_id: chatId },
+            { $set: { stickers_restricted: true, updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Update in-memory cache
         stickerRestrictionStatus.set(chatId, true);
-        ctx.reply('✅ تم تعطيل مشاركة الملصقات للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الملصقات الآن.');
+        
+        ctx.reply('✅ تم تعطيل مشاركة جميع أنواع الملصقات للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إرسال الملصقات الآن.');
     } catch (error) {
         console.error('Error in disableStickerSharing:', error);
         ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل مشاركة الملصقات.');
@@ -3191,45 +3202,100 @@ async function enableStickerSharing(ctx) {
         }
 
         const chatId = ctx.chat.id;
+        
+        // Update database
+        const db = await ensureDatabaseInitialized();
+        await db.collection('chat_restrictions').updateOne(
+            { chat_id: chatId },
+            { $set: { stickers_restricted: false, updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Update in-memory cache
         stickerRestrictionStatus.set(chatId, false);
-        ctx.reply('✅ تم تفعيل مشاركة الملصقات للجميع.');
+        
+        ctx.reply('✅ تم تفعيل مشاركة جميع أنواع الملصقات للجميع.');
     } catch (error) {
         console.error('Error in enableStickerSharing:', error);
         ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الملصقات.');
     }
 }
 
+
 // Create a middleware to enforce sticker restrictions
 const stickerRestrictionMiddleware = async (ctx, next) => {
-    // Only process sticker messages in groups
-    if (!ctx.message || !ctx.message.sticker || ctx.chat.type === 'private') {
+    // Skip if not in a group or not a message
+    if (!ctx.message || ctx.chat.type === 'private') {
         return next();
     }
 
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-
+    
     // Check if stickers are restricted in this chat
     if (stickerRestrictionStatus.get(chatId)) {
-        // Check if the user is an admin, VIP, or has special permissions
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        const isPremium = await isPremiumUser(userId);
+        // Check for all types of stickers
+        const hasSticker = ctx.message.sticker;
+        const hasAnimatedSticker = hasSticker && ctx.message.sticker.is_animated;
+        const hasVideoSticker = hasSticker && ctx.message.sticker.is_video;
+        const hasCustomEmoji = ctx.message.entities && 
+            ctx.message.entities.some(entity => entity.type === 'custom_emoji');
+        
+        // If any type of sticker is detected
+        if (hasSticker || hasAnimatedSticker || hasVideoSticker || hasCustomEmoji) {
+            // Check if the user is an admin, VIP, or has special permissions
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVIPUser = await isVIP(ctx, userId);
+            const isPremium = await isPremiumUser(userId);
+            const isBotAdm = await isBotAdmin(ctx, userId);
 
-        if (!isAdmin && !isVIPUser && !isPremium) {
-            // Delete the sticker
-            try {
-                await ctx.deleteMessage();
-                await ctx.reply(`⚠️ @${ctx.from.username || ctx.from.first_name}, مشاركة الملصقات غير مسموحة للأعضاء العاديين في هذه المجموعة.`);
-                return; // Don't call next() to prevent further processing
-            } catch (error) {
-                console.error('Error deleting restricted sticker:', error);
+            if (!isAdmin && !isVIPUser && !isPremium && !isBotAdm) {
+                // Delete the sticker
+                try {
+                    await ctx.deleteMessage();
+                    
+                    // Get sticker type for the message
+                    let stickerType = "ملصق";
+                    if (hasAnimatedSticker) stickerType = "ملصق متحرك";
+                    if (hasVideoSticker) stickerType = "ملصق فيديو";
+                    if (hasCustomEmoji) stickerType = "إيموجي مخصص";
+                    
+                    await ctx.reply(
+                        `⚠️ @${ctx.from.username || ctx.from.first_name}، مشاركة ${stickerType} غير مسموحة للأعضاء العاديين في هذه المجموعة.`,
+                        { reply_to_message_id: ctx.message.message_id }
+                    );
+                    
+                    // Log the restriction
+                    console.log(`Deleted ${stickerType} from user ${userId} in chat ${chatId}`);
+                    
+                    return; // Don't call next() to prevent further processing
+                } catch (error) {
+                    console.error('Error deleting restricted sticker:', error);
+                }
             }
         }
     }
 
     return next();
 };
+async function loadStickerRestrictions() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const restrictions = await db.collection('chat_restrictions').find(
+            { stickers_restricted: true }
+        ).toArray();
+        
+        // Update the in-memory cache
+        restrictions.forEach(restriction => {
+            stickerRestrictionStatus.set(restriction.chat_id, true);
+        });
+        
+        console.log(`Loaded ${restrictions.length} sticker restrictions from database`);
+    } catch (error) {
+        console.error('Error loading sticker restrictions:', error);
+    }
+}
+
     async function updateActiveGroups(ctx) {
         try {
             const userId = ctx.from.id;
