@@ -2357,63 +2357,7 @@ bot.action('show_commands', async (ctx) => {
     }
 });
 
-// Add a new action handler for showing shortcuts
-bot.action('show_shortcuts', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        
-        const shortcutsMessage = 
-            '<b>⌨️ الاختصارات السريعة للأوامر:</b>\n\n' +
-            '<b>اختصارات الترقية:</b>\n' +
-            '🔹 <b>ر م</b> – رفع مميز\n' +
-            '🔹 <b>ر ط</b> – رفع مطور\n' +
-            '🔹 <b>رط</b> – رفع مطور (بدون مسافة)\n' +
-            '🔹 <b>ر ث</b> – رفع مطور ثانوي\n' +
-            '🔹 <b>رث</b> – رفع مطور ثانوي (بدون مسافة)\n' +
-            '🔹 <b>ر ا</b> – رفع ادمن\n' +
-            '🔹 <b>را</b> – رفع ادمن (بدون مسافة)\n' +
-            '🔹 <b>ر س</b> – رفع مطور أساسي\n' +
-            '🔹 <b>رس</b> – رفع مطور أساسي (بدون مسافة)\n\n' +
-            
-            '<b>اختصارات التنزيل:</b>\n' +
-            '🔹 <b>ت م</b> – تنزيل مميز\n' +
-            '🔹 <b>ت ط</b> – تنزيل مطور\n' +
-            '🔹 <b>تط</b> – تنزيل مطور (بدون مسافة)\n' +
-            '🔹 <b>ت ا</b> – تنزيل ادمن\n' +
-            '🔹 <b>تا</b> – تنزيل ادمن (بدون مسافة)\n\n' +
-            
-            '<b>اختصارات أخرى:</b>\n' +
-            '🔹 <b>ر ت</b> – عرض رتبتي\n' +
-            '🔹 <b>رت</b> – عرض رتبتي (بدون مسافة)\n\n' +
-            
-            '💡 <b>ملاحظة:</b> يمكن استخدام هذه الاختصارات كأوامر أيضاً مع إضافة "/" في البداية أو "_" بين الحروف.\n' +
-            'مثال: <code>/رط</code> أو <code>/ر_ط</code> بدلاً من <b>رفع مطور</b>';
 
-        // Check if the message to be edited is a photo with a caption
-        if (ctx.callbackQuery.message.photo) {
-            await ctx.editMessageCaption(shortcutsMessage, {
-                parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: [
-                        
-                    ]
-                }
-            });
-        } else {
-            await ctx.editMessageText(shortcutsMessage, {
-                parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: [
-                        
-                    ]
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error in show_shortcuts action:', error);
-        ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الاختصارات. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
-    }
-});
 // Handle the "Next" button to show the second part
 bot.action('show_commands_part2', async (ctx) => {
     try {
