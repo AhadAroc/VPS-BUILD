@@ -2395,7 +2395,7 @@ bot.action('show_shortcuts', async (ctx) => {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
-                        
+                        [{ text: '🔙 رجوع للأوامر', callback_data: 'back_to_commands' }]
                     ]
                 }
             });
@@ -2404,7 +2404,7 @@ bot.action('show_shortcuts', async (ctx) => {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
-                        
+                        [{ text: '🔙 رجوع للأوامر', callback_data: 'back_to_commands' }]
                     ]
                 }
             });
@@ -2412,6 +2412,73 @@ bot.action('show_shortcuts', async (ctx) => {
     } catch (error) {
         console.error('Error in show_shortcuts action:', error);
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الاختصارات. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
+    }
+});
+bot.action('back_to_commands', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        // First part of the message with categorized commands
+        const commandsPart1 = 
+            '📜 *قائمة الأوامر:*\n\n' +
+            '*📊 أوامر المعلومات*\n' +
+            '🔹 *ايدي* – ظهور الايدي و معرفك\n' +
+            '🔹 *رتبتي* – ظهور رتبتك\n' +
+            '🔹 *رابط المجموعة* – الحصول على رابط المجموعة\n\n' +
+            
+            '*👥 أوامر الإدارة*\n' +
+            '🔹 *رفع امن مسابقات* – رفع ادمن مسابقات\n' +
+            '🔹 *تنزيل امن مسابقات* – تنزيل ادمن مسابقات\n' +
+            '🔹 *رفع مميز* – رفع مستخدم إلى مميز\n' +
+            '🔹 *تنزيل مميز* – تنزيل مستخدم من مميز\n' +
+            '🔹 *لستة مميز* – عرض قائمة المميزين\n' +
+            '🔹 *رفع ادمن* – ترقية إلى أدمن\n' +
+            '🔹 *تنزيل ادمن* – ترقية إلى أدمن\n' +
+            '🔹 *رفع منشئ* – ترقية إلى منشئ\n' +
+            '🔹 *تنزيل* – إزالة رتبة\n\n' +
+            
+            '*⌨️ الاختصارات السريعة للأوامر:*\n\n' +
+            '*اختصارات الترقية:*\n' +
+            '🔹 *ر م* – رفع مميز\n' +
+            '🔹 *ر ط* – رفع مطور\n' +
+            '🔹 *رط* – رفع مطور (بدون مسافة)\n' +
+            '🔹 *ر ث* – رفع مطور ثانوي\n' +
+            '🔹 *رث* – رفع مطور ثانوي (بدون مسافة)\n' +
+            '🔹 *ر ا* – رفع ادمن\n' +
+            '🔹 *را* – رفع ادمن (بدون مسافة)\n' +
+            '🔹 *ر س* – رفع مطور أساسي\n' +
+            '🔹 *رس* – رفع مطور أساسي (بدون مسافة)\n\n' +
+            
+            '*اختصارات التنزيل:*\n' +
+            '🔹 *ت م* – تنزيل مميز\n' +
+            '🔹 *ت ط* – تنزيل مطور\n' +
+            '🔹 *تط* – تنزيل مطور (بدون مسافة)\n' +
+            '🔹 *ت ا* – تنزيل ادمن\n' +
+            '🔹 *تا* – تنزيل ادمن (بدون مسافة)\n\n' +
+            
+            '*اختصارات أخرى:*\n' +
+            '🔹 *ر ت* – عرض رتبتي\n' +
+            '🔹 *رت* – عرض رتبتي (بدون مسافة)\n';
+
+    } catch (error) {
+        console.error('Error in back_to_commands action:', error);
+        
+        // Handle the error gracefully
+        try {
+            // Try to notify the user about the error
+            await ctx.answerCbQuery('❌ حدث خطأ أثناء العودة لقائمة الأوامر. جاري المحاولة مرة أخرى...', { show_alert: true });
+            
+            // Attempt to go back to the main menu instead
+            await ctx.editMessageText('حدث خطأ أثناء العودة لقائمة الأوامر. يرجى المحاولة مرة أخرى.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🏠 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+                    ]
+                }
+            });
+        } catch (secondError) {
+            console.error('Error handling back_to_commands error:', secondError);
+        }
     }
 });
 // Handle the "Next" button to show the second part
