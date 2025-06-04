@@ -2085,12 +2085,29 @@ bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
 
 // Add this near your other command handlers
 bot.command('stop', async (ctx) => {
-    const chatId = ctx.chat.id;
-    if (activeQuizzes.has(chatId)) {
-        await endQuiz(ctx, chatId);
-        await ctx.reply('تم إيقاف المسابقة.');
-    } else {
-        await ctx.reply('لا توجد مسابقة نشطة حالياً.');
+    try {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        
+        // Check if the user is a bot admin or owner
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isBotOwn = await isBotOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        // Only allow bot admins and owners to stop quizzes
+        if (!isAdmin && !isBotAdm && !isBotOwn) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين ومالك البوت.');
+        }
+        
+        if (activeQuizzes.has(chatId)) {
+            await endQuiz(ctx, chatId);
+            await ctx.reply('✅ تم إيقاف المسابقة بنجاح.');
+        } else {
+            await ctx.reply('ℹ️ لا توجد مسابقة نشطة حالياً.');
+        }
+    } catch (error) {
+        console.error('Error handling stop command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إيقاف المسابقة.');
     }
 });
  // Add this action handler for the show_stats button
