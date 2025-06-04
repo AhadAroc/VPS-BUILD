@@ -2055,6 +2055,73 @@ bot.action('list_secondary_devs', async (ctx) => {
         await ctx.reply('❌ حدث خطأ أثناء محاولة إضافة أسئلة مخصصة.');
     }
 });
+// Add a handler for the show_shortcuts callback
+bot.action('show_shortcuts', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        
+        const shortcutsMessage = 
+            '*⌨️ الاختصارات السريعة للأوامر:*\n\n' +
+            '*اختصارات الترقية:*\n' +
+            '🔹 *ر م* – رفع مميز\n' +
+            '🔹 *ر ط* – رفع مطور\n' +
+            '🔹 *رط* – رفع مطور (بدون مسافة)\n' +
+            '🔹 *ر ث* – رفع مطور ثانوي\n' +
+            '🔹 *رث* – رفع مطور ثانوي (بدون مسافة)\n' +
+            '🔹 *ر ا* – رفع ادمن\n' +
+            '🔹 *را* – رفع ادمن (بدون مسافة)\n' +
+            '🔹 *ر س* – رفع مطور أساسي\n' +
+            '🔹 *رس* – رفع مطور أساسي (بدون مسافة)\n\n' +
+            
+            '*اختصارات التنزيل:*\n' +
+            '🔹 *ت م* – تنزيل مميز\n' +
+            '🔹 *ت ط* – تنزيل مطور\n' +
+            '🔹 *تط* – تنزيل مطور (بدون مسافة)\n' +
+            '🔹 *ت ا* – تنزيل ادمن\n' +
+            '🔹 *تا* – تنزيل ادمن (بدون مسافة)\n\n' +
+            
+            '*اختصارات أخرى:*\n' +
+            '🔹 *ر ت* – عرض رتبتي\n' +
+            '🔹 *رت* – عرض رتبتي (بدون مسافة)\n\n' +
+            
+            '💡 *ملاحظة:* يمكن استخدام هذه الاختصارات كأوامر أيضاً مع إضافة "/" في البداية أو "_" بين الحروف.\n' +
+            'مثال: `/رط` أو `/ر_ط` بدلاً من *رفع مطور*';
+        
+        await ctx.reply(shortcutsMessage, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 العودة لقائمة الأوامر', callback_data: 'show_commands_list' }]
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error in show_shortcuts action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض الاختصارات.');
+    }
+});
+
+// Add a handler to go back to the commands list
+bot.action('show_commands_list', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await showCommandsWithButtons(ctx);
+    } catch (error) {
+        console.error('Error returning to commands list:', error);
+        await ctx.reply('❌ حدث خطأ أثناء العودة لقائمة الأوامر.');
+    }
+});
+
+// Update the show_commands action to use the new function
+bot.action('show_commands', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await showCommandsWithButtons(ctx);
+    } catch (error) {
+        console.error('Error in show_commands action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء عرض قائمة الأوامر.');
+    }
+});
 // Add this function to remove a specific VIP user
 async function removeVIPUser(ctx, targetUserId) {
     try {
@@ -3379,7 +3446,6 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 *🎭 أوامر الترفيه*
 🔹 *نكتة* – إرسال نكتة`;
 }
-
 // Now let's add a function to show the commands with buttons including a shortcuts button
 async function showCommandsWithButtons(ctx) {
     try {
@@ -3399,10 +3465,6 @@ async function showCommandsWithButtons(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض قائمة الأوامر.');
     }
 }
-
-
-
-
     
   
     // Add this function to get the custom bot name for a chat
