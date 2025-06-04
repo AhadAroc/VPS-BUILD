@@ -1849,7 +1849,7 @@ bot.command('ترقية_مطور', async (ctx) => {
 
 // Add these command handlers for the new command
 bot.command('رفع_اساسي', promoteToBotAdmin);
-bot.hears(/^رفع اساسي/, promoteToBotAdmin);
+bot.hears(/^رفع اساسي/, promoteUser);
 
 
 
@@ -1881,20 +1881,20 @@ bot.hears('اد', (ctx) => showUserId(ctx));
 bot.hears('ا د', (ctx) => showUserId(ctx));
 
 
-bot.hears(/^ر ا/, promoteToBotAdmin); // Shortcut for رفع اساسي
-bot.hears(/^را/, promoteToBotAdmin); // Alternative shortcut without space
-bot.command('را', promoteToBotAdmin); // Command version of the shortcut
-bot.command('ر_ا', promoteToBotAdmin); // Command version with underscores
+bot.hears(/^ر ا/, promoteUser); // Shortcut for رفع اساسي
+bot.hears(/^را/, promoteUser); // Alternative shortcut without space
+bot.command('را', promoteUser); // Command version of the shortcut
+bot.command('ر_ا', promoteUser); // Command version with underscores
 
 // Add these command handlers for the demotion command
-bot.command('تنزيل_اساسي', demoteFromBotAdmin);
-bot.hears(/^تنزيل اساسي/, demoteFromBotAdmin);
+bot.command('تنزيل_اساسي', demoteUser);
+bot.hears(/^تنزيل اساسي/, demoteUser);
 
 // Add shortcuts for تنزيل اساسي
-bot.hears(/^ت ا/, demoteFromBotAdmin); // Shortcut for تنزيل اساسي
-bot.hears(/^تا/, demoteFromBotAdmin); // Alternative shortcut without space
+bot.hears(/^ت ا/, demoteUser); // Shortcut for تنزيل اساسي
+bot.hears(/^تا/, demoteUser); // Alternative shortcut without space
 bot.command('تا', demoteFromBotAdmin); // Command version of the shortcut
-bot.command('ت_ا', demoteFromBotAdmin); // Command version with underscore
+bot.command('ت_ا', demoteUser); // Command version with underscore
 
 
 
