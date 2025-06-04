@@ -4459,7 +4459,7 @@ async function isImportant(ctx, userId) {
         console.error(`Error promoting user to ${role}:`, error);
         ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
     }
-
+}
     // ✅ Demote user
     // ✅ Demote user u check this
     async function demoteUser(ctx) {
