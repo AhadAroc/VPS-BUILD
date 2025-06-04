@@ -1567,6 +1567,45 @@ bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 bot.command('ترقية_مطور', async (ctx) => {
     await promoteUser(ctx, 'مطور');
 });
+
+//shortcuts 
+//bot.hears(/^رفع مميز/, promoteToImportant);
+bot.hears(/^ر م/, promoteToImportant); // Shortcut for رفع مميز
+bot.hears(/^رم/, promoteToImportant); // Alternative shortcut without space
+bot.command('رم', promoteToImportant); // Command version of the shortcut
+bot.command('ر_م', promoteToImportant); // Command version with underscore
+
+// Similarly, let's add shortcuts for demoting VIP users
+//bot.hears(/^تنزيل مميز/, demoteFromImportant);
+bot.hears(/^ت م/, demoteFromImportant); // Shortcut for تنزيل مميز
+bot.hears(/^تم/, demoteFromImportant); // Alternative shortcut without space
+bot.command('تم', demoteFromImportant); // Command version of the shortcut
+bot.command('ت_م', demoteFromImportant); // Command version with underscore
+
+// Let's also add shortcuts for listing VIP users
+//bot.hears('لستة مميز', listImportantUsers);
+bot.hears('ل م', listImportantUsers); // Shortcut for لستة مميز
+bot.hears('لم', listImportantUsers); // Alternative shortcut without space
+bot.command('لم', listImportantUsers); // Command version of the shortcut
+bot.command('ل_م', listImportantUsers); // Command version with underscore
+
+// for id 
+bot.hears('ايدي', (ctx) => showUserId(ctx));
+bot.hears('اد', (ctx) => showUserId(ctx));
+bot.hears('ا د', (ctx) => showUserId(ctx));
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Add these command handlers to your bot setup
 bot.command('رفع_مميز', promoteToImportant);
 bot.hears(/^رفع مميز/, promoteToImportant);
