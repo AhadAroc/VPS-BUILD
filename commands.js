@@ -721,29 +721,28 @@ async function getDifficultyLevels() {
 // Add this function to check if a user is the bot owner
 async function isBotOwner(ctx, userId) {
     try {
-        // If we already know the owner ID and it matches, return true immediately
-        if (ownerId && ownerId === userId) {
-            return true;
-        }
-        
-        // Otherwise, check the database
-        const botId = ctx.botInfo.id;
+        const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
-        const ownership = await db.collection('bot_ownership').findOne({ 
-            bot_id: botId,
-            owner_id: userId,
+        
+        // Convert IDs to numbers to ensure consistent comparison
+        const userIdNum = parseInt(userId);
+        const chatIdNum = parseInt(chatId);
+        
+        console.log(`Checking if user ${userIdNum} is a bot owner (اساسي) in chat ${chatIdNum}`);
+        
+        // Query the database for bot owners
+        const owner = await db.collection('bot_owners').findOne({
+            user_id: userIdNum,
+            chat_id: chatIdNum,
             is_active: true
         });
         
-        // If found, update our cached ownerId
-        if (ownership) {
-            ownerId = ownership.owner_id;
-            return true;
-        }
+        const isOwner = !!owner;
+        console.log(`User ${userIdNum} is${isOwner ? '' : ' not'} a bot owner (اساسي) in chat ${chatIdNum}`);
         
-        return false;
+        return isOwner;
     } catch (error) {
-        console.error('Error checking bot owner status:', error);
+        console.error('Error checking if user is bot owner (اساسي):', error);
         return false;
     }
 }
@@ -4407,6 +4406,11 @@ async function isImportant(ctx, userId) {
                 collection = 'primary_creators';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
                 break;
+            case 'اساسي':
+            case 'bot owner':
+                collection = 'bot_owners';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى اساسي.`;
+                break;
             case 'مطور':
             case 'developer':
                 collection = 'developers';
@@ -4455,7 +4459,7 @@ async function isImportant(ctx, userId) {
         console.error(`Error promoting user to ${role}:`, error);
         ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
     }
-}
+
     // ✅ Demote user
     // ✅ Demote user u check this
     async function demoteUser(ctx) {
