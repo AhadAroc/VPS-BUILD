@@ -1829,8 +1829,9 @@ bot.hears(/^ابلاغ$/, reportMessage);
 bot.hears(/^تبليغ$/, reportMessage);
 bot.command('تبليغ', reportMessage);
 
-bot.hears('الاوامر', (ctx) => {
-    ctx.reply(getCommandList());
+// Handle the command with buttons
+bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
+    await sendCommandListTelegraf(ctx);
 });
 
 // Add this near your other command handlers
@@ -3211,15 +3212,18 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
         } catch (error) {
             console.error('Error in showDevPanel:', error);
             await ctx.reply('❌ حدث خطأ أثناء محاولة عرض لوحة التحكم للمطور.');
-        }    }     function getCommandList() {
-    return `📜 *قائمة الأوامر:*
-
+        }   
+    
+    
+    }  
+        
+    async function sendCommandList(bot, chatId, messageId = null) {
+    const commandText = `📜 *قائمة الأوامر:*
 
 *📊 أوامر المعلومات*
 🔹 *ايدي* – ظهور الايدي و معرفك
 🔹 *رتبتي* – ظهور رتبتك
 🔹 *رابط المجموعة* – الحصول على رابط المجموعة
-
 
 *👥 أوامر الإدارة*
 🔹 *رفع امن مسابقات* – رفع ادمن مسابقات
@@ -3230,11 +3234,10 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 🔹 *رفع ادمن* – ترقية إلى أدمن
 🔹 *تنزيل ادمن* – ترقية إلى أدمن
 🔹 *رفع منشئ* – ترقية إلى منشئ
-🔹 *تنزيل* – إزالة رتبة 
+🔹 *تنزيل* – إزالة رتبة
 🔹 *رفع مطور* – ترقية إلى مطور
 🔹 *رفع مطور ثانوي* – ترقية إلى مطور ثانوي
 🔹 *تنزيل مطور* – لتنزيل مطور أول أو ثانوي، اذهب إلى خاص البوت كمطور
-
 
 *🛡️ أوامر الحماية*
 🔹 *كتم* – كتم مستخدم
@@ -3245,7 +3248,6 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 🔹 *تحذير* – إصدار تحذير لمستخدم
 🔹 *تحذيرات* – عرض عدد التحذيرات لمستخدم
 🔹 *نداء الجميع* – مناداة جميع الأعضاء
-
 
 *🖼️ أوامر الوسائط*
 🔹 *مسح الصور* – حذف آخر الصور المرسلة
@@ -3258,16 +3260,147 @@ const stickerRestrictionMiddleware = async (ctx, next) => {
 🔹 *منع ملصقات* – منع إرسال الملصقات
 🔹 *فتح ملصقات* – السماح بإرسال الملصقات
 
-
 *🔗 أوامر الروابط*
 🔹 *ازالة الروابط* – حذف الروابط في المجموعة
 🔹 *فتح روابط* – السماح بمشاركة الروابط
 🔹 *منع روابط* – منع مشاركة الروابط
 
-
 *🎭 أوامر الترفيه*
 🔹 *نكتة* – إرسال نكتة`;
+
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: "⚡ عرض الاختصارات", callback_data: "show_shortcuts" },
+                { text: "🔄 تحديث", callback_data: "refresh_commands" }
+            ],
+            [
+                { text: "❌ إغلاق", callback_data: "close_menu" }
+            ]
+        ]
+    };
+
+    const options = {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    };
+
+    try {
+        if (messageId) {
+            // Edit existing message
+            await bot.editMessageText(commandText, {
+                chat_id: chatId,
+                message_id: messageId,
+                ...options
+            });
+        } else {
+            // Send new message
+            await bot.sendMessage(chatId, commandText, options);
+        }
+    } catch (error) {
+        console.error('Error sending command list:', error);
+    }
 }
+
+// Async function to send shortcuts with buttons
+async function sendShortcutsList(bot, chatId, messageId = null) {
+    const shortcutsText = `⚡ *قائمة الاختصارات:*
+
+*🔺 اختصارات الرفع:*
+🔹 *ر م* – رفع مميز
+🔹 *ر ط* – رفع مطور
+🔹 *رط* – رفع مطور (بدون مسافة)
+🔹 *ر ث* – رفع مطور ثانوي
+🔹 *رث* – رفع مطور ثانوي (بدون مسافة)
+🔹 *ر ا* – رفع ادمن
+🔹 *را* – رفع ادمن (بدون مسافة)
+🔹 *ر س* – رفع مطور أساسي
+🔹 *رس* – رفع مطور أساسي (بدون مسافة)
+
+*🔻 اختصارات التنزيل:*
+🔹 *ت م* – تنزيل مميز
+🔹 *ت ط* – تنزيل مطور
+🔹 *تط* – تنزيل مطور (بدون مسافة)
+🔹 *ت ا* – تنزيل ادمن
+🔹 *تا* – تنزيل ادمن (بدون مسافة)
+
+*📋 اختصارات أخرى:*
+🔹 *ر ت* – عرض رتبتي
+🔹 *رت* – عرض رتبتي (بدون مسافة)`;
+
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: "📜 عرض الأوامر الكاملة", callback_data: "show_commands" },
+                { text: "🔄 تحديث", callback_data: "refresh_shortcuts" }
+            ],
+            [
+                { text: "❌ إغلاق", callback_data: "close_menu" }
+            ]
+        ]
+    };
+
+    const options = {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    };
+
+    try {
+        if (messageId) {
+            // Edit existing message
+            await bot.editMessageText(shortcutsText, {
+                chat_id: chatId,
+                message_id: messageId,
+                ...options
+            });
+        } else {
+            // Send new message
+            await bot.sendMessage(chatId, shortcutsText, options);
+        }
+    } catch (error) {
+        console.error('Error sending shortcuts list:', error);
+    }
+}
+
+// Handle callback queries from inline buttons
+async function handleCallbackQuery(bot, callbackQuery) {
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+    const data = callbackQuery.data;
+
+    try {
+        // Answer the callback query to remove loading state
+        await bot.answerCallbackQuery(callbackQuery.id);
+
+        switch (data) {
+            case 'show_shortcuts':
+                await sendShortcutsList(bot, chatId, messageId);
+                break;
+
+            case 'show_commands':
+                await sendCommandList(bot, chatId, messageId);
+                break;
+
+            case 'refresh_commands':
+                await sendCommandList(bot, chatId, messageId);
+                break;
+
+            case 'refresh_shortcuts':
+                await sendShortcutsList(bot, chatId, messageId);
+                break;
+
+            case 'close_menu':
+                await bot.deleteMessage(chatId, messageId);
+                break;
+
+            default:
+                console.log('Unknown callback data:', data);
+        }
+    } catch (error) {
+        console.error('Error handling callback query:', error);
+    }
+}    
+        
 
     
   
