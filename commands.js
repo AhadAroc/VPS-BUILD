@@ -4371,13 +4371,15 @@ async function isImportant(ctx, userId) {
         const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
         let collection, successMessage;
 
-        switch (role.toLowerCase()) {
+        // Ensure role is a string before calling toLowerCase()
+        const roleStr = String(role);
+        
+        switch (roleStr.toLowerCase()) {
             case 'مميز':
             case 'vip':
                 collection = 'vip_users';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
                 break;
-            case 'verynull':
             case 'verynull':
                 collection = 'verynull';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
@@ -4460,11 +4462,11 @@ async function isImportant(ctx, userId) {
                         username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
                         updated_at: new Date(),
                         updated_by: ctx.from.id,
-                        is_bot_owner: role.toLowerCase() === 'اساسي' || role.toLowerCase() === 'bot owner'
+                        is_bot_owner: roleStr.toLowerCase() === 'اساسي' || roleStr.toLowerCase() === 'bot owner'
                     }
                 }
             );
-            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${role}.`);
+            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${roleStr}.`);
         } else {
             // User doesn't have this role yet, create a new entry
             await db.collection(collection).insertOne({ 
@@ -4473,15 +4475,15 @@ async function isImportant(ctx, userId) {
                 username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
                 promoted_at: new Date(),
                 promoted_by: ctx.from.id,
-                is_bot_owner: role.toLowerCase() === 'اساسي' || role.toLowerCase() === 'bot owner'
+                is_bot_owner: roleStr.toLowerCase() === 'اساسي' || roleStr.toLowerCase() === 'bot owner'
             });
             
             ctx.replyWithMarkdown(successMessage);
-            console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
+            console.log(`User ${userId} promoted to ${roleStr} by bot ${botId}`);
         }
     } catch (error) {
         console.error(`Error promoting user to ${role}:`, error);
-        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
+        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.`);
     }
 }
     // ✅ Demote user
