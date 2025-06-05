@@ -140,14 +140,14 @@ async function isImportant(ctx, userId) {
  
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
-<<<<<<< HEAD
+
         const db = await getDatabaseForBot('replays');
         const groups = await db.collection('groups').find({ is_active: true }).toArray();
-=======
+
         const db = await ensureDatabaseInitialized();
         // Use 'let' instead of 'const' for groups since you might need to modify it
         let groups = await db.collection('groups').find({ is_active: true }).toArray();
->>>>>>> a7a798526b1445cfe5cf647971b3511800a435c8
+
 
         for (const group of groups) {
             try {
