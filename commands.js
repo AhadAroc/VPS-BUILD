@@ -1891,9 +1891,7 @@ bot.hears(/^را/, promoteToBotOwner); // Alternative shortcut without space
 bot.command('را', promoteToBotOwner); // Command version of the shortcut
 bot.command('ر_ا', promoteToBotOwner); // Command version with underscores
 
-// Add these command handlers for the demotion command
-bot.command('تنزيل_اساسي', demoteFromBotAdmin);
-bot.hears(/^تنزيل اساسي/, demoteFromBotAdmin);
+
 
 // Add shortcuts for تنزيل اساسي
 bot.hears(/^ت ا/, demoteFromBotOwner); // Shortcut for تنزيل اساسي
