@@ -1145,8 +1145,8 @@ async function sendShortcutsList(ctx) {
 🔹 *رث* – رفع مطور ثانوي (بدون مسافة)
 🔹 *ر ا* – رفع ادمن
 🔹 *را* – رفع ادمن (بدون مسافة)
-🔹 *ر س* – رفع مطور أساسي
-🔹 *رس* – رفع مطور أساسي (بدون مسافة)
+🔹 *ر ا* – رفع مطور أساسي
+🔹 *را* – رفع مطور أساسي (بدون مسافة)
 
 *🔻 اختصارات التنزيل:*
 🔹 *ت م* – تنزيل مميز
@@ -1201,8 +1201,9 @@ async function handleCommandCallbacks(ctx) {
 🔹 *رث* – رفع مطور ثانوي (بدون مسافة)
 🔹 *ر ا* – رفع ادمن
 🔹 *را* – رفع ادمن (بدون مسافة)
-🔹 *ر س* – رفع مطور أساسي
-🔹 *رس* – رفع مطور أساسي (بدون مسافة)
+🔹 *ر ا* – رفع مطور أساسي
+🔹 *را* – رفع مطور أساسي (بدون مسافة)
+
 
 *🔻 اختصارات التنزيل:*
 🔹 *ت م* – تنزيل مميز
@@ -1885,20 +1886,20 @@ bot.hears('اد', (ctx) => showUserId(ctx));
 bot.hears('ا د', (ctx) => showUserId(ctx));
 
 
-bot.hears(/^ر ا/, promoteToBotAdmin); // Shortcut for رفع اساسي
-bot.hears(/^را/, promoteToBotAdmin); // Alternative shortcut without space
-bot.command('را', promoteToBotAdmin); // Command version of the shortcut
-bot.command('ر_ا', promoteToBotAdmin); // Command version with underscores
+bot.hears(/^ر ا/, promoteToBotOwner); // Shortcut for رفع اساسي
+bot.hears(/^را/, promoteToBotOwner); // Alternative shortcut without space
+bot.command('را', promoteToBotOwner); // Command version of the shortcut
+bot.command('ر_ا', promoteToBotOwner); // Command version with underscores
 
 // Add these command handlers for the demotion command
 bot.command('تنزيل_اساسي', demoteFromBotAdmin);
 bot.hears(/^تنزيل اساسي/, demoteFromBotAdmin);
 
 // Add shortcuts for تنزيل اساسي
-bot.hears(/^ت ا/, demoteFromBotAdmin); // Shortcut for تنزيل اساسي
-bot.hears(/^تا/, demoteFromBotAdmin); // Alternative shortcut without space
-bot.command('تا', demoteFromBotAdmin); // Command version of the shortcut
-bot.command('ت_ا', demoteFromBotAdmin); // Command version with underscore
+bot.hears(/^ت ا/, demoteFromBotOwner); // Shortcut for تنزيل اساسي
+bot.hears(/^تا/, demoteFromBotOwner); // Alternative shortcut without space
+bot.command('تا', demoteFromBotOwner); // Command version of the shortcut
+bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
 
 
 
@@ -2839,7 +2840,7 @@ async function hasRequiredPermissions(ctx, userId) {
     const isBotAdm = await isBotAdmin(ctx, userId);
     return isAdmin || isSecDev || isBotAdm;
 }
-async function demoteFromBotAdmin(ctx) {
+async function demoteFromBotOwner(ctx) {
     try {
         // Check if the user executing the command is an admin or owner
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
@@ -2870,21 +2871,21 @@ async function demoteFromBotAdmin(ctx) {
 
         const db = await ensureDatabaseInitialized();
         
-        // Check if the user is a bot admin - FIXED QUERY
-        const existingAdmin = await db.collection('bot_admins').findOne({ 
+        // Check if the user is a bot owner - CORRECTED COLLECTION NAME
+        const existingOwner = await db.collection('bot_owners').findOne({ 
             user_id: userId,
             chat_id: chatId,
             bot_id: botId,
-            is_active: true  // Make sure to check is_active flag
+            is_active: true
         });
         
-        if (!existingAdmin) {
+        if (!existingOwner) {
             return ctx.reply('هذا المستخدم ليس اساسي في هذه المجموعة.');
         }
 
         // Update the user's status to inactive
-        await db.collection('bot_admins').updateOne(
-            { _id: existingAdmin._id },
+        await db.collection('bot_owners').updateOne(
+            { _id: existingOwner._id },
             { 
                 $set: { 
                     is_active: false,
@@ -2896,10 +2897,11 @@ async function demoteFromBotAdmin(ctx) {
 
         ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من اساسي.`);
     } catch (error) {
-        console.error('Error in demoteFromBotAdmin:', error);
+        console.error('Error in demoteFromBotOwner:', error);
         ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم.');
     }
 }
+
 // Add a function to get the current bot owner
 async function getBotOwner(botId) {
     try {
@@ -3929,8 +3931,8 @@ async function sendShortcutsList(bot, chatId, messageId = null) {
 🔹 *رث* – رفع مطور ثانوي (بدون مسافة)
 🔹 *ر ا* – رفع ادمن
 🔹 *را* – رفع ادمن (بدون مسافة)
-🔹 *ر س* – رفع مطور أساسي
-🔹 *رس* – رفع مطور أساسي (بدون مسافة)
+🔹 *ر ا* – رفع مطور أساسي
+🔹 *را* – رفع مطور أساسي (بدون مسافة)
 
 *🔻 اختصارات التنزيل:*
 🔹 *ت م* – تنزيل مميز
