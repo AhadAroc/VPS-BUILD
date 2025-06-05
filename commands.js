@@ -4342,102 +4342,146 @@ async function isImportant(ctx, userId) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
         }
     }
-   async function promoteUser(ctx, role) {
+    async function promoteUser(ctx, role) {
     try {
-        // Check if the command is a reply to a user
-        if (!ctx.message.reply_to_message) {
-            return ctx.reply('❌ يجب الرد على رسالة المستخدم لترقيته.');
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
         }
 
-        const promoterId = ctx.from.id;
-        const targetUserId = ctx.message.reply_to_message.from.id;
-        const targetUsername = ctx.message.reply_to_message.from.username || 'غير معروف';
-        const targetFirstName = ctx.message.reply_to_message.from.first_name || 'المستخدم';
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
 
-        // Check if the promoter is the bot owner or has sufficient permissions
-        const isOwner = promoterId === ownerId;
-        const isDev = await isDeveloper(ctx, promoterId);
-
-        // Only the owner can promote to owner role
-        if (role === 'مالك' && !isOwner) {
-            return ctx.reply('❌ فقط مالك البوت يمكنه ترقية مستخدم إلى مالك.');
-        }
-
-        // For other roles, check if promoter is owner or developer
-        if (!isOwner && !isDev) {
-            return ctx.reply('❌ فقط المالك والمطورين يمكنهم ترقية المستخدمين.');
-        }
-
-        // Get the database
-        const db = await ensureDatabaseInitialized();
-
-        if (role === 'مالك') {
-            // Update the owner ID in the configuration
-            await db.collection('bot_config').updateOne(
-                { key: 'owner_id' },
-                { $set: { value: targetUserId } },
-                { upsert: true }
-            );
-
-            // Update the global ownerId variable
-            ownerId = targetUserId;
-
-            // Notify the new owner
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
             try {
-                await ctx.telegram.sendMessage(
-                    targetUserId,
-                    `🎉 تهانينا! تمت ترقيتك إلى مالك البوت بواسطة المالك السابق.`
-                );
+                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
             } catch (error) {
-                console.log(`Could not notify new owner: ${error.message}`);
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
             }
-
-            return ctx.reply(`✅ تم ترقية ${targetFirstName} (@${targetUsername}) إلى مالك البوت بنجاح.`);
-        } else if (role === 'مطور' || role === 'developer') {
-            // Add user to developers collection
-            await db.collection('developers').updateOne(
-                { user_id: targetUserId },
-                { 
-                    $set: { 
-                        user_id: targetUserId,
-                        username: targetUsername,
-                        first_name: targetFirstName,
-                        added_by: promoterId,
-                        added_at: new Date()
-                    }
-                },
-                { upsert: true }
-            );
-
-            // Update the developerIds array if needed
-            if (!developerIds.includes(targetUserId)) {
-                developerIds.push(targetUserId);
-            }
-
-            return ctx.reply(`✅ تم ترقية ${targetFirstName} (@${targetUsername}) إلى مطور بنجاح.`);
-        } else if (role === 'مطور أساسي') {
-            // Add user to primary developers collection
-            await db.collection('primary_developers').updateOne(
-                { user_id: targetUserId },
-                { 
-                    $set: { 
-                        user_id: targetUserId,
-                        username: targetUsername,
-                        first_name: targetFirstName,
-                        added_by: promoterId,
-                        added_at: new Date()
-                    }
-                },
-                { upsert: true }
-            );
-
-            return ctx.reply(`✅ تم ترقية ${targetFirstName} (@${targetUsername}) إلى مطور أساسي بنجاح.`);
         } else {
-            return ctx.reply('❌ نوع الترقية غير معروف.');
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
+        let collection, successMessage;
+
+        switch (role.toLowerCase()) {
+            case 'مميز':
+            case 'vip':
+                collection = 'vip_users';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
+                break;
+            case 'verynull':
+            case 'verynull':
+                collection = 'verynull';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
+                // Promote the user to admin in the Telegram group
+                await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                    can_change_info: true,
+                    can_delete_messages: true,
+                    can_invite_users: true,
+                    can_restrict_members: true,
+                    can_pin_messages: true,
+                    can_promote_members: false
+                });
+                break;
+            case 'مدير':
+            case 'manager':
+                collection = 'managers';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
+                break;
+            case 'منشئ':
+            case 'creator':
+                collection = 'creators';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
+                break;
+            case 'منشئ اساسي':
+            case 'primary creator':
+                collection = 'primary_creators';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
+                break;
+            case 'اساسي':
+            case 'bot owner':
+                collection = 'bot_owners';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى اساسي (مالك البوت).`;
+                
+                // Update the bot_config collection to set this user as the bot owner
+                await db.collection('bot_config').updateOne(
+                    { key: 'owner_id' },
+                    { $set: { value: userId } },
+                    { upsert: true }
+                );
+                
+                // Update the global ownerId variable if it exists in your code
+                if (typeof ownerId !== 'undefined') {
+                    ownerId = userId;
+                }
+                
+                // Notify the user about their new role
+                try {
+                    await ctx.telegram.sendMessage(
+                        userId,
+                        `🎉 تهانينا! تمت ترقيتك إلى مالك البوت (اساسي).`
+                    );
+                } catch (error) {
+                    console.log(`Could not notify new owner: ${error.message}`);
+                }
+                break;
+            case 'مطور':
+            case 'developer':
+                collection = 'developers';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
+                break;
+            case 'مطور ثانوي':
+            case 'secondary developer':
+                collection = 'secondary_developers';
+                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
+                break;
+            default:
+                return ctx.reply('❌ نوع الترقية غير صالح.');
+        }
+
+        // First check if the user already exists in the collection
+        const existingUser = await db.collection(collection).findOne({ user_id: userId });
+        
+        if (existingUser) {
+            // User already has this role, just update their information
+            await db.collection(collection).updateOne(
+                { user_id: userId },
+                { 
+                    $set: { 
+                        bot_id: botId,
+                        username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
+                        updated_at: new Date(),
+                        updated_by: ctx.from.id,
+                        is_bot_owner: role.toLowerCase() === 'اساسي' || role.toLowerCase() === 'bot owner'
+                    }
+                }
+            );
+            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${role}.`);
+        } else {
+            // User doesn't have this role yet, create a new entry
+            await db.collection(collection).insertOne({ 
+                user_id: userId, 
+                bot_id: botId,
+                username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
+                promoted_at: new Date(),
+                promoted_by: ctx.from.id,
+                is_bot_owner: role.toLowerCase() === 'اساسي' || role.toLowerCase() === 'bot owner'
+            });
+            
+            ctx.replyWithMarkdown(successMessage);
+            console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
         }
     } catch (error) {
-        console.error('Error promoting user:', error);
-        return ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+        console.error(`Error promoting user to ${role}:`, error);
+        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
     }
 }
     // ✅ Demote user
