@@ -138,24 +138,14 @@ async function isImportant(ctx, userId) {
     }
 }
  
-
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
-
-
-        const db = await getDatabaseForBot('replays');
-        const groups = await db.collection('groups').find({ is_active: true }).toArray();
-
-        const db = await ensureDatabaseInitialized();
-
         // Use the existing database connection instead of declaring a new 'db' variable
         const database = await ensureDatabaseInitialized();
-
         // Use 'let' instead of 'const' for groups since you might need to modify it
         let groups = await database.collection('groups').find({ is_active: true }).toArray();
 
         console.log(`Broadcasting to ${groups.length} groups.`); // Debugging line
-
 
         for (const group of groups) {
             try {
@@ -269,7 +259,7 @@ async function handleMediaMessage(ctx, mediaType) {
             console.log(`File saved locally at: ${savedFilePath}`);
             
             // Save to database
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const replyData = {
                 user_id: userId,
                 username: username,
@@ -380,7 +370,7 @@ console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotNam
                 return;
             } else if (userState.step === 'awaiting_response') {
                 try {
-                    const db = await getDatabaseForBot('replays');
+                    const db = await ensureDatabaseInitialized(userState.botId);
                     await db.collection('replies').insertOne({
                         bot_id: userState.botId,
                         trigger_word: userState.triggerWord,
@@ -423,7 +413,7 @@ console.log(`[BOT_NAME_CHECK] userText: "${userText}" | botName: "${customBotNam
 }
 async function updateReplyTexts(triggerWord, texts) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         await db.collection('replies').updateOne(
             { trigger_word: triggerWord },
             { 
@@ -442,7 +432,7 @@ async function updateReplyTexts(triggerWord, texts) {
 
 async function setReplyTypeToCycle(triggerWord) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         await db.collection('replies').updateOne(
             { trigger_word: triggerWord },
             { 
@@ -1431,7 +1421,7 @@ bot.action('remove_custom_chat_name', async (ctx) => {
         await ctx.answerCbQuery();
         const chatId = ctx.chat.id;
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             await db.collection('bot_custom_names').deleteOne({ chat_id: chatId });
             await ctx.reply('تم إزالة الاسم المحلي للبوت في هذه المجموعة.');
         } catch (error) {
@@ -1545,7 +1535,7 @@ async function showDevPanel(ctx) {
     }
     async function getDevelopersList() {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const developers = await db.collection('developers').find().toArray();
             return developers;
         } catch (error) {
@@ -1567,7 +1557,7 @@ function shuffleArray(array) {
     // Similarly update other functions that use pool directly
     async function createSecondaryDevelopersTable() {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             // In MongoDB, collections are created automatically when documents are inserted
             console.log('secondary_developers collection ready to use');
         } catch (error) {
@@ -1604,7 +1594,7 @@ function shuffleArray(array) {
 
     async function createBotCustomNamesTable() {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             // In MongoDB, collections are created automatically when documents are inserted
             console.log('bot_custom_names collection ready to use');
         } catch (error) {
@@ -1614,7 +1604,7 @@ function shuffleArray(array) {
     // Add this function at the beginning of your file or before it's used
     async function fetchRepliesFromDatabase() {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             return await db.collection('replies').find().toArray();
         } catch (error) {
             console.error('Error fetching replies:', error);
@@ -1624,7 +1614,7 @@ function shuffleArray(array) {
 // Add this function to create the groups table
 async function createGroupsTable() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         // In MongoDB, collections are created automatically
         console.log('groups collection ready to use');
     } catch (error) {
@@ -1634,7 +1624,7 @@ async function createGroupsTable() {
 // Update this function to use MongoDB
 async function markGroupAsInactive(groupId) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         await db.collection('groups').updateOne(
             { group_id: groupId },
             { $set: { is_active: false } }
@@ -1698,7 +1688,7 @@ function adminOnly(handler) {
  // Update this function to use MongoDB
  async function getOverallStats() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const subscribers = await db.collection('users').countDocuments({ is_active: true });
         const groups = await db.collection('groups').countDocuments({ is_active: true });
         const total = subscribers + groups;
@@ -1712,7 +1702,7 @@ function adminOnly(handler) {
 
 async function getSubscribersCount() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         return await db.collection('users').countDocuments({ is_active: true });
     } catch (error) {
         console.error('Error getting subscribers count:', error);
@@ -1722,7 +1712,7 @@ async function getSubscribersCount() {
 
 async function getGroupsCount() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         return await db.collection('groups').countDocuments({ is_active: true });
     } catch (error) {
         console.error('Error getting groups count:', error);
@@ -1732,7 +1722,7 @@ async function getGroupsCount() {
 
 async function generateBackup() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const users = await db.collection('users').find().toArray();
         const groups = await db.collection('groups').find().toArray();
         const developers = await db.collection('developers').find().toArray();
@@ -1755,7 +1745,7 @@ async function generateBackup() {
 
 async function cleanSubscribers() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
@@ -1773,7 +1763,7 @@ async function cleanSubscribers() {
 // Add this function to fix null trigger words in the database
 async function fixNullTriggerWords() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         
         // Find all replies with null trigger_word
         const nullTriggerReplies = await db.collection('replies').find({ 
@@ -1863,7 +1853,7 @@ initializeDatabase();
 // Add this function to create a unique index on trigger_word if it doesn't exist
 async function ensureUniqueIndexOnTriggerWord() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         
         // Check if the index already exists
         const indexes = await db.collection('replies').indexes();
@@ -1893,7 +1883,7 @@ async function ensureUniqueIndexOnTriggerWord() {
 }
 async function cleanGroups() {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
@@ -1963,7 +1953,7 @@ async function handleCustomQuestionInput(ctx) {
 // Add this function to save the custom question to the database
 async function saveCustomQuestion(chatId, question, answer) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         await db.collection('custom_questions').insertOne({
             chatId: chatId,
             question: question,
@@ -2011,7 +2001,7 @@ async function handleAwaitingReplyResponse(ctx) {
             return true;
         }
 
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
 
         // Check if trigger word already exists
         const existingReply = await db.collection('replies').findOne({ 
@@ -2066,7 +2056,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 
 async function setUserAsVIP(userId) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const result = await db.collection('users').updateOne(
             { user_id: userId },
             { $set: { role: 'vip', is_vip: true } },
@@ -2138,7 +2128,7 @@ createGroupsTable();
     }
     async function loadActiveGroupsFromDatabase() {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             
             const groups = await db.collection('groups').find({ is_active: true }).toArray();
             
@@ -2241,7 +2231,7 @@ bot.action('dev_replies', async (ctx) => {
 });
 async function getAllReplies(botId) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         return await db.collection('replies').find({ bot_id: botId }).toArray();
     } catch (error) {
         console.error('Error fetching all replies:', error);
@@ -2274,7 +2264,7 @@ bot.action('back_to_main', async (ctx) => {
         const isVIPUser = await isVIP(ctx, ctx.from.id);
 
         // New check for secondary developer in the database
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const secDevInDb = await db.collection('secondary_developers').findOne({ user_id: ctx.from.id });
 
         if (!isAdmin && !isSecDev && !isVIPUser && !secDevInDb) {
@@ -3383,7 +3373,7 @@ bot.action('cancel_add_reply', async (ctx) => {
             const userId = ctx.from.id;
     
             if (await isDeveloper(ctx, userId)) {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized(botId);
                 
                 // Fetch all replies for this bot
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
@@ -3439,7 +3429,7 @@ bot.action('cancel_add_reply', async (ctx) => {
     bot.action(/^confirm_delete_all_replies:(\d+)$/, async (ctx) => {
         try {
             const botId = ctx.match[1];
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized(botId);
             await db.collection('replies').deleteMany({ bot_id: botId });
             await ctx.answerCbQuery('تم حذف جميع الردود بنجاح');
             await ctx.editMessageText('تم حذف جميع الردود لهذا البوت.', {
@@ -3467,7 +3457,7 @@ bot.action('cancel_add_reply', async (ctx) => {
 bot.action(/^confirm_delete_reply:(\d+):(.+)$/, async (ctx) => {
     try {
         const [botId, replyId] = ctx.match.slice(1);
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized(botId);
         await db.collection('replies').deleteOne({ _id: ObjectId(replyId), bot_id: botId });
         await ctx.answerCbQuery('تم حذف الرد بنجاح');
         await ctx.editMessageText('تم حذف الرد. هل تريد حذف رد آخر؟', {
@@ -3658,7 +3648,7 @@ bot.action(/^set_warning_restrict_media:(\d+):(\d+):(\d+)$/, async (ctx) => {
             if (await isDeveloper(ctx, userId)) {
                 await ctx.answerCbQuery('عرض الردود العامة');
                 
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized(botId);
                 const replies = await db.collection('replies').find({ bot_id: botId }).toArray();
     
                 let replyList = 'الردود العامة:\n\n';
@@ -4080,7 +4070,7 @@ async function checkBotNameAndReply(ctx) {
     }
 
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const botNameDoc = await db.collection('bot_names').findOne({ chat_id: chatId });
 
         if (botNameDoc && messageText.includes(botNameDoc.name.toLowerCase())) {
@@ -4103,7 +4093,7 @@ bot.action('show_current_bot_name', async (ctx) => {
         await ctx.answerCbQuery();
         const chatId = ctx.chat.id;
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const botName = await db.collection('bot_names').findOne({ chat_id: chatId });
             if (botName) {
                 await ctx.reply(`اهلا بك عزيزي في قسم اسم البوت\nاسم البوت الآن: ${botName.name}`);
@@ -4163,7 +4153,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
 
     if (!state || state.step !== 'awaiting_response') return;
 
-    const db = await getDatabaseForBot('replays');
+    const db = await ensureDatabaseInitialized();
 
     let mediaType = 'unknown';
     let fileId;
@@ -4287,7 +4277,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         if (ctx.session?.awaitingBotName) {
             const newBotName = ctx.message.text.trim();
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('bot_names').updateOne(
                     { chat_id: chatId },
                     { $set: { name: newBotName } },
@@ -4381,11 +4371,11 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
             await ctx.reply(`تم استلام الكلمة "${text}". الآن أرسل الرد (نص أو وسائط):`);
             return;
         }
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const trigger = text.toLowerCase();
         const reply = await db.collection('replies').findOne({ trigger_word: trigger });
         if (userState.step === 'awaiting_response') {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
                 bot_id: userState.botId,
                 trigger_word: userState.triggerWord,
@@ -4421,7 +4411,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                 } else if (awaitingReplyResponse) {
                     const replyResponse = ctx.message.text;
                     try {
-                        const db = await getDatabaseForBot('replays');
+                        const db = await ensureDatabaseInitialized();
                         const botId = ctx.botInfo.id; // Get current bot ID
                         
                         await db.collection('replies').updateOne(
@@ -4446,7 +4436,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     }
                 } else if (awaitingDeleteReplyWord) {
                     try {
-                        const db = await getDatabaseForBot('replays');
+                        const db = await ensureDatabaseInitialized();
                         const botId = ctx.botInfo.id;
                         
                         const result = await db.collection('replies').deleteOne({ 
@@ -4511,7 +4501,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                         const botId = userState.botId || ctx.botInfo.id;
                         
                         try {
-                            const db = await getDatabaseForBot('replays');
+                            const db = await ensureDatabaseInitialized(botId);
                             await db.collection('replies').updateOne(
                                 { trigger_word: triggerWord, bot_id: botId },
                                 { $set: { 
@@ -4536,7 +4526,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
             
             // Check for automatic replies
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 console.log('Searching for reply with keyword:', text);
                 
                 // First try to find a bot-specific reply
@@ -4797,7 +4787,7 @@ if (await isDeveloper(ctx, userId)) {
         if (ctx.message.photo && awaitingReplyResponse) {
             const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
                     trigger_word: tempReplyWord,
                     type: 'photo',
@@ -4824,7 +4814,7 @@ if (await isDeveloper(ctx, userId)) {
         if (ctx.message.animation && awaitingReplyResponse) {
             const fileId = ctx.message.animation.file_id;
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
                     trigger_word: tempReplyWord,
                     type: 'animation',
@@ -4851,7 +4841,7 @@ if (await isDeveloper(ctx, userId)) {
         if (ctx.message.document && awaitingReplyResponse) {
             const fileId = ctx.message.document.file_id;
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
                     trigger_word: tempReplyWord,
                     type: 'document',
@@ -4880,7 +4870,7 @@ if (await isDeveloper(ctx, userId)) {
         if (ctx.message.sticker && awaitingReplyResponse) {
             const fileId = ctx.message.sticker.file_id;
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
                     trigger_word: tempReplyWord,
                     type: 'sticker',
@@ -4906,7 +4896,7 @@ if (await isDeveloper(ctx, userId)) {
         if (ctx.message.video && awaitingReplyResponse) {
             const fileId = ctx.message.video.file_id;
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
                     trigger_word: tempReplyWord,
                     type: 'video',
@@ -4983,7 +4973,7 @@ async function handleAwaitingReplyWord(ctx) {
 async function handleAwaitingReplyResponse(ctx) {
     const text = ctx.message.text.trim();
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         await db.collection('replies').insertOne({
             trigger_word: tempReplyWord,
             word: tempReplyWord,
@@ -5134,7 +5124,7 @@ async function handleMediaReply(ctx, mediaType) {
         
         try {
             // Save to database
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             await db.collection('replies').insertOne({
                 trigger_word: tempReplyWord.trim().toLowerCase(),
                 type: mediaType,
@@ -5220,7 +5210,7 @@ bot.on('animation', async (ctx) => {
 
             try {
                 // Save to database
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').insertOne({
                     user_id: userId,
                     username: username,
@@ -5281,7 +5271,7 @@ bot.on('sticker', async (ctx) => {
             const botId = ctx.botInfo.id;
             
             // Get database connection
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             
             // Save the sticker reply to database
             await db.collection('replies').updateOne(
@@ -5326,7 +5316,7 @@ async function checkForAutomaticReply(ctx) {
     const botId = ctx.botInfo.id;
 
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         
         // First, try to find a bot-specific reply
         let reply = await db.collection('replies').findOne({
@@ -5389,7 +5379,7 @@ async function checkForAutomaticReply(ctx) {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('عرض قائمة المطورين');
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 const botId = ctx.botInfo.id; // Get the current bot's ID
                 const developers = await db.collection('developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
                 
@@ -5451,7 +5441,7 @@ async function checkForAutomaticReply(ctx) {
     
     bot.action('main_bot_dev', async (ctx) => {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const mainDev = await db.collection('developers').findOne({});
             
             if (mainDev) {
@@ -5562,7 +5552,7 @@ async function checkForAutomaticReply(ctx) {
         if (await isDeveloper(ctx, ctx.from.id)) {
             await ctx.answerCbQuery('حذف المطورين');
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 const botId = ctx.botInfo.id; // Get the current bot's ID
                 const developers = await db.collection('developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
                 
@@ -5602,7 +5592,7 @@ async function checkForAutomaticReply(ctx) {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 const developer = await db.collection('developers').findOne({ user_id: parseInt(devIdToDelete) });
                 
                 if (developer) {
@@ -5631,7 +5621,7 @@ async function checkForAutomaticReply(ctx) {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 const result = await db.collection('developers').deleteOne({ user_id: parseInt(devIdToDelete) });
                 
                 if (result.deletedCount > 0) {
@@ -5833,7 +5823,7 @@ bot.action('list_secondary_developers', async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery('عرض قائمة المطورين الثانويين');
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const botId = ctx.botInfo.id; // Get the current bot's ID
             const secondaryDevs = await db.collection('secondary_developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
 
@@ -5869,7 +5859,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
     if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery('حذف المطورين الثانويين');
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const botId = ctx.botInfo.id; // Get the current bot's ID
             const secondaryDevs = await db.collection('secondary_developers').find({ bot_id: botId }).toArray(); // Filter by bot_id
 
@@ -5909,7 +5899,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 const developer = await db.collection('secondary_developers').findOne({ user_id: parseInt(devIdToDelete) });
                 
                 if (developer) {
@@ -5938,7 +5928,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
         const devIdToDelete = ctx.match[1];
         if (await isDeveloper(ctx, ctx.from.id)) {
             try {
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 const result = await db.collection('secondary_developers').deleteOne({ user_id: parseInt(devIdToDelete) });
                 
                 if (result.deletedCount > 0) {
@@ -6024,7 +6014,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
             await ctx.answerCbQuery('جاري جلب معلومات المجموعات النشطة...');
             await ctx.editMessageText('جاري جلب المعلومات، يرجى الانتظار...');
     
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const activeGroups = await db.collection('active_groups').find().toArray();
     
             let message = '📋 قائمة المجموعات النشطة:\n\n';
@@ -6168,7 +6158,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
 // ✅ Show list of active groups
 async function getActiveGroups(ctx) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const activeGroups = await db.collection('active_groups').find().toArray();
 
         if (activeGroups.length === 0) {
@@ -6189,7 +6179,7 @@ async function getActiveGroups(ctx) {
 
 async function getDetailedActiveGroups(ctx) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const activeGroups = await db.collection('active_groups')
             .find()
             .sort({ last_activity: -1 })
@@ -6267,7 +6257,7 @@ async function getDetailedActiveGroups(ctx) {
 async function updateGroupInfo(ctx) {
     if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
         try {
-            const db = await getDatabaseForBot('replays');
+            const db = await ensureDatabaseInitialized();
             const chatId = ctx.chat.id;
             const chatTitle = ctx.chat.title;
             const memberCount = await ctx.telegram.getChatMembersCount(chatId);
@@ -6306,7 +6296,7 @@ async function updateGroupInfo(ctx) {
 
 async function getCustomBotName(chatId) {
     try {
-        const db = await getDatabaseForBot('replays');
+        const db = await ensureDatabaseInitialized();
         const customName = await db.collection('bot_names').findOne({ chat_id: chatId });
         
         if (customName) {
@@ -6336,7 +6326,7 @@ async function sendReply(ctx, reply) {
                 const newIndex = (currentIndex + 1) % texts.length;
                 console.log(`New index: ${newIndex}`);
 
-                const db = await getDatabaseForBot('replays');
+                const db = await ensureDatabaseInitialized();
                 await db.collection('replies').updateOne(
                     { _id: reply._id },
                     { $set: { cycle_index: newIndex } }
