@@ -141,35 +141,50 @@ async function isImportant(ctx, userId) {
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
 
+
         const db = await getDatabaseForBot('replays');
         const groups = await db.collection('groups').find({ is_active: true }).toArray();
 
         const db = await ensureDatabaseInitialized();
+
+        // Use the existing database connection instead of declaring a new 'db' variable
+        const database = await ensureDatabaseInitialized();
+
         // Use 'let' instead of 'const' for groups since you might need to modify it
-        let groups = await db.collection('groups').find({ is_active: true }).toArray();
+        let groups = await database.collection('groups').find({ is_active: true }).toArray();
+
+        console.log(`Broadcasting to ${groups.length} groups.`); // Debugging line
 
 
         for (const group of groups) {
             try {
                 if (mediaType && mediaId) {
-                    // Send media with caption
-                    await ctx.telegram.sendMediaGroup(group.group_id, [{
-                        type: mediaType,
-                        media: mediaId,
-                        caption: caption || ''
-                    }]);
+                    switch (mediaType) {
+                        case 'photo':
+                            await ctx.telegram.sendPhoto(group.group_id, mediaId, { caption: caption || '' });
+                            break;
+                        case 'video':
+                            await ctx.telegram.sendVideo(group.group_id, mediaId, { caption: caption || '' });
+                            break;
+                        // 🛑 Add more cases for other media if needed
+                        default:
+                            console.error('Unsupported media type:', mediaType);
+                            break;
+                    }
                 } else if (caption) {
-                    // Send caption only
+                    // Text-only message
                     await ctx.telegram.sendMessage(group.group_id, caption);
                 }
+
+                console.log(`Message sent to group: ${group.group_id}`);
             } catch (error) {
-                console.error(`Error sending message to group ${group.group_id}:`, error);
+                console.error(`❌ Error sending to group ${group.group_id}:`, error);
             }
         }
 
         await ctx.reply('✅ تم إرسال الرسالة إلى جميع المجموعات النشطة.');
     } catch (error) {
-        console.error('Error in broadcastMessage:', error);
+        console.error('❌ Error in broadcastMessage:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة إرسال الرسالة.');
     }
 }
