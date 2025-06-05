@@ -1848,6 +1848,9 @@ bot.command('ترقية_مطور', async (ctx) => {
 });
 
 // Add these command handlers for the new command
+//bot.command('رفع_اساسي', promoteToBotAdmin);
+//bot.hears(/^رفع اساسي/, promoteToBotAdmin);
+
 bot.command('رفع_اساسي', promoteToBotAdmin);
 bot.hears(/^رفع اساسي/, promoteToBotAdmin);
 
@@ -1986,8 +1989,7 @@ bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
 bot.hears('فتح متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
 bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
 bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
-bot.command('ترقية_اساسي', (ctx) => promoteUser(ctx, 'مطور أساسي'));
-bot.hears(/^رفع اساسي/, (ctx) => promoteUser(ctx, 'مطور أساسي'));
+
 
 bot.command('منع_مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
 bot.command('تفعيل_مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
@@ -2671,6 +2673,39 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('يرجى التواصل مع صانع البوت او المالك ');
     }
 });
+async function promoteToBotOwner(ctx) {
+    try {
+        const userId = ctx.message?.reply_to_message?.from?.id;
+        const chatId = ctx.chat.id;
+
+        if (!userId) {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم الذي تريد ترقيته إلى اساسي.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+
+        // Check if already a bot owner
+        const existing = await db.collection('bot_owners').findOne({ user_id: userId, chat_id: chatId });
+        if (existing) {
+            return ctx.reply('⚠️ هذا المستخدم هو بالفعل اساسي في هذه المجموعة.');
+        }
+
+        // Add user to bot_owners
+        await db.collection('bot_owners').insertOne({
+            user_id: userId,
+            chat_id: chatId,
+            is_active: true,
+            promoted_at: new Date()
+        });
+
+        await ctx.reply(`🛡️ تم ترقية المستخدم إلى رتبة *اساسي* بنجاح.`, { parse_mode: 'Markdown' });
+
+    } catch (err) {
+        console.error('Error in promoteToBotOwner:', err);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+    }
+}
+
 // Add this function to your commands.js file
 async function listVIPUsers(ctx) {
     try {
