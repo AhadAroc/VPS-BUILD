@@ -140,8 +140,14 @@ async function isImportant(ctx, userId) {
  
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
+<<<<<<< HEAD
         const db = await getDatabaseForBot('replays');
         const groups = await db.collection('groups').find({ is_active: true }).toArray();
+=======
+        const db = await ensureDatabaseInitialized();
+        // Use 'let' instead of 'const' for groups since you might need to modify it
+        let groups = await db.collection('groups').find({ is_active: true }).toArray();
+>>>>>>> a7a798526b1445cfe5cf647971b3511800a435c8
 
         for (const group of groups) {
             try {
@@ -2374,10 +2380,11 @@ bot.action('show_shortcuts', async (ctx) => {
             '🔹 <b>رث</b> – رفع مطور ثانوي (بدون مسافة)\n' +
             '🔹 <b>ر ا</b> – رفع ادمن\n' +
             '🔹 <b>را</b> – رفع ادمن (بدون مسافة)\n' +
-            '🔹 <b>ر ا</b> – رفع مطور أساسي\n' +
-            '🔹 <b>را</b> – رفع مطور أساسي (بدون مسافة)\n\n' +
+            '🔹 <b>ر س</b> – رفع مطور أساسي\n' +
+            '🔹 <b>رس</b> – رفع مطور أساسي (بدون مسافة)\n\n' +
             
             '<b>اختصارات التنزيل:</b>\n' +
+            '🔹 <b>ت س</b> – تنزيل اساسي\n' +
             '🔹 <b>ت م</b> – تنزيل مميز\n' +
             '🔹 <b>ت ط</b> – تنزيل مطور\n' +
             '🔹 <b>تط</b> – تنزيل مطور (بدون مسافة)\n' +
