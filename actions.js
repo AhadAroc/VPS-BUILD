@@ -141,7 +141,8 @@ async function isImportant(ctx, userId) {
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
         const db = await ensureDatabaseInitialized();
-        const groups = await db.collection('groups').find({ is_active: true }).toArray();
+        // Use 'let' instead of 'const' for groups since you might need to modify it
+        let groups = await db.collection('groups').find({ is_active: true }).toArray();
 
         for (const group of groups) {
             try {
