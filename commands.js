@@ -1849,7 +1849,7 @@ bot.command('ترقية_مطور', async (ctx) => {
 
 // Add these command handlers for the new command
 bot.command('رفع_اساسي', promoteToBotAdmin);
-bot.hears(/^رفع اساسي/, promoteUser);
+bot.hears(/^رفع اساسي/, promoteToBotAdmin);
 
 
 
@@ -1881,20 +1881,20 @@ bot.hears('اد', (ctx) => showUserId(ctx));
 bot.hears('ا د', (ctx) => showUserId(ctx));
 
 
-bot.hears(/^ر ا/, promoteUser); // Shortcut for رفع اساسي
-bot.hears(/^را/, promoteUser); // Alternative shortcut without space
-bot.command('را', promoteUser); // Command version of the shortcut
-bot.command('ر_ا', promoteUser); // Command version with underscores
+bot.hears(/^ر ا/, promoteToBotAdmin); // Shortcut for رفع اساسي
+bot.hears(/^را/, promoteToBotAdmin); // Alternative shortcut without space
+bot.command('را', promoteToBotAdmin); // Command version of the shortcut
+bot.command('ر_ا', promoteToBotAdmin); // Command version with underscores
 
 // Add these command handlers for the demotion command
-bot.command('تنزيل_اساسي', demoteUser);
-bot.hears(/^تنزيل اساسي/, demoteUser);
+bot.command('تنزيل_اساسي', demoteFromBotAdmin);
+bot.hears(/^تنزيل اساسي/, demoteFromBotAdmin);
 
 // Add shortcuts for تنزيل اساسي
-bot.hears(/^ت ا/, demoteUser); // Shortcut for تنزيل اساسي
-bot.hears(/^تا/, demoteUser); // Alternative shortcut without space
+bot.hears(/^ت ا/, demoteFromBotAdmin); // Shortcut for تنزيل اساسي
+bot.hears(/^تا/, demoteFromBotAdmin); // Alternative shortcut without space
 bot.command('تا', demoteFromBotAdmin); // Command version of the shortcut
-bot.command('ت_ا', demoteUser); // Command version with underscore
+bot.command('ت_ا', demoteFromBotAdmin); // Command version with underscore
 
 
 
@@ -4371,15 +4371,13 @@ async function isImportant(ctx, userId) {
         const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
         let collection, successMessage;
 
-        // Ensure role is a string before calling toLowerCase()
-        const roleStr = String(role);
-        
-        switch (roleStr.toLowerCase()) {
+        switch (role.toLowerCase()) {
             case 'مميز':
             case 'vip':
                 collection = 'vip_users';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
                 break;
+            case 'verynull':
             case 'verynull':
                 collection = 'verynull';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
@@ -4408,33 +4406,6 @@ async function isImportant(ctx, userId) {
                 collection = 'primary_creators';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
                 break;
-            case 'اساسي':
-            case 'bot owner':
-                collection = 'bot_owners';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى اساسي (مالك البوت).`;
-                
-                // Update the bot_config collection to set this user as the bot owner
-                await db.collection('bot_config').updateOne(
-                    { key: 'owner_id' },
-                    { $set: { value: userId } },
-                    { upsert: true }
-                );
-                
-                // Update the global ownerId variable if it exists in your code
-                if (typeof ownerId !== 'undefined') {
-                    ownerId = userId;
-                }
-                
-                // Notify the user about their new role
-                try {
-                    await ctx.telegram.sendMessage(
-                        userId,
-                        `🎉 تهانينا! تمت ترقيتك إلى مالك البوت (اساسي).`
-                    );
-                } catch (error) {
-                    console.log(`Could not notify new owner: ${error.message}`);
-                }
-                break;
             case 'مطور':
             case 'developer':
                 collection = 'developers';
@@ -4461,12 +4432,11 @@ async function isImportant(ctx, userId) {
                         bot_id: botId,
                         username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
                         updated_at: new Date(),
-                        updated_by: ctx.from.id,
-                        is_bot_owner: roleStr.toLowerCase() === 'اساسي' || roleStr.toLowerCase() === 'bot owner'
+                        updated_by: ctx.from.id
                     }
                 }
             );
-            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${roleStr}.`);
+            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${role}.`);
         } else {
             // User doesn't have this role yet, create a new entry
             await db.collection(collection).insertOne({ 
@@ -4474,16 +4444,15 @@ async function isImportant(ctx, userId) {
                 bot_id: botId,
                 username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
                 promoted_at: new Date(),
-                promoted_by: ctx.from.id,
-                is_bot_owner: roleStr.toLowerCase() === 'اساسي' || roleStr.toLowerCase() === 'bot owner'
+                promoted_by: ctx.from.id
             });
             
             ctx.replyWithMarkdown(successMessage);
-            console.log(`User ${userId} promoted to ${roleStr} by bot ${botId}`);
+            console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
         }
     } catch (error) {
         console.error(`Error promoting user to ${role}:`, error);
-        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.`);
+        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
     }
 }
     // ✅ Demote user
