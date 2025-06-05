@@ -1009,18 +1009,24 @@ async function checkUserRank(ctx) {
             rank = 'مطور ثانوي';
             rankEmoji = '🔧';
         } 
-        // Check if user is a bot owner (اساسي)
+        // Check if user is a bot owner (اساسي) - This will now work correctly
         else if (await isBotOwner(ctx, userId)) {
             rank = 'اساسي';
             rankEmoji = '🛡️';
         }
         // Check if user is a group admin
         else if (await isAdminOrOwner(ctx, userId)) {
-            const member = await ctx.telegram.getChatMember(chatId, userId);
-            if (member.status === 'creator') {
-                rank = 'المالك';
-                rankEmoji = '👑';
-            } else {
+            try {
+                const member = await ctx.telegram.getChatMember(chatId, userId);
+                if (member.status === 'creator') {
+                    rank = 'المالك';
+                    rankEmoji = '👑';
+                } else {
+                    rank = 'مشرف';
+                    rankEmoji = '🔰';
+                }
+            } catch (error) {
+                console.log('Error getting chat member status:', error);
                 rank = 'مشرف';
                 rankEmoji = '🔰';
             }
@@ -1848,13 +1854,8 @@ bot.command('ترقية_مطور', async (ctx) => {
 });
 
 // Add these command handlers for the new command
-//bot.command('رفع_اساسي', promoteToBotAdmin);
-//bot.hears(/^رفع اساسي/, promoteToBotAdmin);
-
-bot.command('رفع_اساسي', promoteToBotAdmin);
-bot.hears(/^رفع اساسي/, promoteToBotAdmin);
-
-
+bot.command('رفع_اساسي', promoteToBotOwner);
+bot.hears(/^رفع اساسي/, promoteToBotOwner);
 
 
 //shortcuts 
@@ -2673,39 +2674,6 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('يرجى التواصل مع صانع البوت او المالك ');
     }
 });
-async function promoteToBotOwner(ctx) {
-    try {
-        const userId = ctx.message?.reply_to_message?.from?.id;
-        const chatId = ctx.chat.id;
-
-        if (!userId) {
-            return ctx.reply('❌ يجب الرد على رسالة المستخدم الذي تريد ترقيته إلى اساسي.');
-        }
-
-        const db = await ensureDatabaseInitialized();
-
-        // Check if already a bot owner
-        const existing = await db.collection('bot_owners').findOne({ user_id: userId, chat_id: chatId });
-        if (existing) {
-            return ctx.reply('⚠️ هذا المستخدم هو بالفعل اساسي في هذه المجموعة.');
-        }
-
-        // Add user to bot_owners
-        await db.collection('bot_owners').insertOne({
-            user_id: userId,
-            chat_id: chatId,
-            is_active: true,
-            promoted_at: new Date()
-        });
-
-        await ctx.reply(`🛡️ تم ترقية المستخدم إلى رتبة *اساسي* بنجاح.`, { parse_mode: 'Markdown' });
-
-    } catch (err) {
-        console.error('Error in promoteToBotOwner:', err);
-        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
-    }
-}
-
 // Add this function to your commands.js file
 async function listVIPUsers(ctx) {
     try {
@@ -3017,7 +2985,103 @@ async function promoteToBotAdmin(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
     }
 }
+async function promoteToBotOwner(ctx) {
+    try {
+        // Check if the user executing the command is an admin or owner
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+
+        // Get target user from reply or mention
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(chatId, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
+        } else {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته إلى اساسي.');
+        }
+
+        const db = await ensureDatabaseInitialized();
+        
+        // Check if the user is already a bot owner - CORRECTED COLLECTION NAME
+        const existingOwner = await db.collection('bot_owners').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true
+        });
+        
+        if (existingOwner) {
+            return ctx.reply('هذا المستخدم اساسي بالفعل في هذه المجموعة.');
+        }
+
+        // Get user details for better record-keeping
+        let username, firstName, lastName;
+        try {
+            const userInfo = await ctx.telegram.getChat(userId);
+            username = userInfo.username || null;
+            firstName = userInfo.first_name || null;
+            lastName = userInfo.last_name || null;
+        } catch (error) {
+            console.log(`Could not fetch complete user info for ${userId}: ${error.message}`);
+        }
+
+        // Check if user was previously demoted and update their record
+        const previousRecord = await db.collection('bot_owners').findOne({
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId
+        });
+
+        if (previousRecord) {
+            // Update existing record to active
+            await db.collection('bot_owners').updateOne(
+                { _id: previousRecord._id },
+                { 
+                    $set: {
+                        is_active: true,
+                        promoted_by: ctx.from.id,
+                        promoted_at: new Date(),
+                        // Clear any demotion data
+                        demoted_by: null,
+                        demoted_at: null
+                    }
+                }
+            );
+        } else {
+            // Add the user as a new bot owner
+            await db.collection('bot_owners').insertOne({
+                user_id: userId,
+                username: username,
+                first_name: firstName,
+                last_name: lastName,
+                chat_id: chatId,
+                bot_id: botId,
+                promoted_by: ctx.from.id,
+                promoted_at: new Date(),
+                is_active: true
+            });
+        }
+
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى اساسي.`);
+    } catch (error) {
+        console.error('Error in promoteToBotOwner:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+    }
+}
 // Function to demote a user from Bot Admin
 async function promoteToBotAdmin(ctx) {
     try {
