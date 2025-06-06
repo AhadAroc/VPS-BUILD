@@ -2326,8 +2326,15 @@ bot.action('quiz_bot', async (ctx) => {
 //checkeme
 bot.action('show_commands', async (ctx) => {
     try {
-        if (!await hasRequiredPermissions(ctx, ctx.from.id)) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
+        const userId = ctx.from.id;
+
+        // Check if the user has the required permissions
+        const hasPermissions = await hasRequiredPermissions(ctx, userId);
+        const isBotOwnerUser = await isBotOwner(ctx, userId);
+        const isBotAdminUser = await isBotAdmin(userId);
+
+        if (!hasPermissions && !isBotOwnerUser && !isBotAdminUser) {
+            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين، مالكي البوت، ومشرفي البوت فقط.', { show_alert: true });
         }
 
         // First part of the message with categorized commands
@@ -2370,7 +2377,6 @@ bot.action('show_commands', async (ctx) => {
         ctx.answerCbQuery('❌ حدث خطأ أثناء عرض الأوامر. يرجى المحاولة مرة أخرى لاحقًا.', { show_alert: true });
     }
 });
-
 // Add a new action handler for showing shortcuts
 bot.action('show_shortcuts', async (ctx) => {
     try {
