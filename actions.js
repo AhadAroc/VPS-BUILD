@@ -1194,7 +1194,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups, } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups,isBotAdmin } = require('./commands');
 // Add this middleware to handle curfew restrictions
 bot.use(async (ctx, next) => {
     try {
