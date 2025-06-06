@@ -6193,33 +6193,44 @@ bot.action('delete_secondary_developers', async (ctx) => {
   // ✅ Back to the main menu in the same message
   bot.action('back', async (ctx) => {
     try {
-        await ctx.answerCbQuery(); // Clear the loading state
-
-        // Check if the user is an admin, owner, or secondary developer
-        const isAdmin = await isAdminOrOwner(ctx, ctx.from.id);
-        const isSecDev = await isSecondaryDeveloper(ctx, ctx.from.id);
-
-        if (!isAdmin && !isSecDev) {
-            return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين فقط.', { show_alert: true });
-        }
-
-        await ctx.editMessageCaption(
-            '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا. اختر خيارًا:',
-            {
+        await ctx.answerCbQuery();
+        
+        // Check if we're in a photo message or text message
+        if (ctx.callbackQuery.message.photo) {
+            // For photo messages, we need to go back to the main menu with photo
+            await ctx.editMessageMedia(
+                {
+                    type: 'photo',
+                    media: 'https://i.postimg.cc/R0jjs1YY/bot.jpg',
+                    caption: '🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا . اختر خيارًا:'
+                },
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                            [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
+                            [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
+                            [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
+                        ]
+                    }
+                }
+            );
+        } else {
+            // For text messages, just edit the text
+            await ctx.editMessageText('🤖 مرحبًا! أنا بوت الحماية والمسابقات ايضا . اختر خيارًا:', {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
                         [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
-                        
-                        [{ text: ' بوت المسابقات', callback_data: 'quiz_bot' }], // Added quiz bot option
+                        [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                         [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
                     ]
                 }
-            }
-        );
+            });
+        }
     } catch (error) {
-        console.error('Error in back action:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء العودة للقائمة الرئيسية.');
+        console.error('Error handling back action:', error);
+        await ctx.reply('❌ حدث خطأ أثناء العودة للقائمة الرئيسية.');
     }
 });
 
