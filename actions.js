@@ -2431,7 +2431,7 @@ bot.action('show_commands', async (ctx) => {
                     [{ text: '⚠️ منع التجوال او spam', callback_data: 'check_premium_for_warnings' }],
                     [{ text: '⌨️ الاختصارات السريعة', callback_data: 'show_shortcuts' }],
                     [{ text: '🔜 التالي', callback_data: 'show_commands_part2' }],
-                    [{ text: '🔙 رجوع', callback_data: 'show_commands' }]
+                    [{ text: '🔙 رجوع', callback_data: 'back' }]
                 ]
             }
         });
