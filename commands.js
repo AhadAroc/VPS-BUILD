@@ -513,8 +513,14 @@ async function showHelp(ctx) {
 }
 async function isBotAdmin(userId) {
     try {
+        if (!userId) {
+            console.error('Error in isBotAdmin: userId is undefined');
+            return false;
+        }
+        
         const db = await ensureDatabaseInitialized();
-        const botAdmin = await db.collection('bot_admins').findOne({ user_id: userId });
+        const botAdmin = await db.collection('bot_admins').findOne({ user_id: parseInt(userId) });
+        console.log(`Bot admin check for user ${userId}: ${!!botAdmin}`);
         return !!botAdmin;
     } catch (error) {
         console.error('Error checking bot admin status:', error);
@@ -613,8 +619,14 @@ async function showQuizMenu(ctx) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-        // Fix: Call isBotAdmin with just userId to match its definition
         const isBotAdm = await isBotAdmin(userId);
+        
+        console.log(`Quiz menu permissions for user ${userId}:`, {
+            isAdmin,
+            isVIPUser,
+            isPremium,
+            isBotAdm
+        });
         
         // Consider including isBotAdm in the permission check
         if (!isAdmin && !isVIPUser && !isBotAdm && !isPremium) {
