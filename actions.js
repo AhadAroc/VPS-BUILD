@@ -2369,6 +2369,7 @@ bot.action('quiz_bot', async (ctx) => {
         const userId = ctx.from.id;
         const hasPermissions = await hasRequiredPermissions(ctx, userId);
         const isUserVIP = await isVIP(ctx, userId);
+        const isBotAdminUser = await isBotAdmin(ctx, userId);
         
         console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP });
 
