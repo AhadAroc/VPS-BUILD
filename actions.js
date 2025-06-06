@@ -1934,27 +1934,35 @@ async function isBotOwner(ctx, userId) {
         return false;
     }
 }
+
 async function isBotAdmin(ctx, userId) {
     try {
-        // Ensure ctx and userId are defined
-        if (!ctx || !userId) {
-            console.error('Invalid input to isBotAdmin: ctx or userId is undefined');
+        // Check if ctx and ctx.botInfo exist
+        if (!ctx || !ctx.botInfo) {
+            console.error('Error: ctx or ctx.botInfo is undefined in isBotAdmin');
             return false;
         }
-
+        
         const botId = ctx.botInfo.id;
+        
+        // Check if ctx.chat exists
+        if (!ctx.chat) {
+            console.error('Error: ctx.chat is undefined in isBotAdmin');
+            return false;
+        }
+        
         const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
-
+        
         console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
-
+        
         const botAdmin = await db.collection('bot_admins').findOne({ 
             user_id: userId,
             chat_id: chatId,
             bot_id: botId,
             is_active: true  // Make sure to check is_active flag
         });
-
+        
         console.log(`Bot admin check result:`, botAdmin ? true : false);
         return !!botAdmin; // Returns true if the user is an active bot admin
     } catch (error) {
