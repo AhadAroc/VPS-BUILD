@@ -610,6 +610,7 @@ async function showQuizMenu(ctx) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
+        const isBotAdminUser = await isBotAdmin(ctx, userId);
         if (!isAdmin && !isVIPUser) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
