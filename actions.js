@@ -1194,7 +1194,7 @@ function setupActions(bot) {
 
  // Set up media handlers
  (bot);
-    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups,isBotOwner } = require('./commands');
+    const { setupCommands, showMainMenu, showQuizMenu,chatBroadcastStates, awaitingBroadcastPhoto,updateActiveGroups, } = require('./commands');
 // Add this middleware to handle curfew restrictions
 bot.use(async (ctx, next) => {
     try {
@@ -1907,7 +1907,33 @@ async function updateLastInteraction(userId, username, firstName, lastName) {
     }
 }
 
-
+async function isBotOwner(ctx, userId) {
+    try {
+        const chatId = ctx.chat.id;
+        const db = await ensureDatabaseInitialized();
+        
+        // Convert IDs to numbers to ensure consistent comparison
+        const userIdNum = parseInt(userId);
+        const chatIdNum = parseInt(chatId);
+        
+        console.log(`Checking if user ${userIdNum} is a bot owner (اساسي) in chat ${chatIdNum}`);
+        
+        // Query the database for bot owners
+        const owner = await db.collection('bot_owners').findOne({
+            user_id: userIdNum,
+            chat_id: chatIdNum,
+            is_active: true
+        });
+        
+        const isOwner = !!owner;
+        console.log(`User ${userIdNum} is${isOwner ? '' : ' not'} a bot owner (اساسي) in chat ${chatIdNum}`);
+        
+        return isOwner;
+    } catch (error) {
+        console.error('Error checking if user is bot owner (اساسي):', error);
+        return false;
+    }
+}
 
 async function handleCustomQuestionInput(ctx) {
     const chatId = ctx.chat.id;
@@ -2229,7 +2255,6 @@ bot.action('dev_replies', async (ctx) => {
         await ctx.answerCbQuery('حدث خطأ أثناء تحميل قسم الردود');
     }
 });
-
 async function getAllReplies(botId) {
     try {
         const db = await ensureDatabaseInitialized();
