@@ -1009,10 +1009,15 @@ async function checkUserRank(ctx) {
             rank = 'مطور ثانوي';
             rankEmoji = '🔧';
         } 
-        // Check if user is a bot owner (اساسي) - This will now work correctly
+        // Check if user is a bot owner (اساسي)
         else if (await isBotOwner(ctx, userId)) {
             rank = 'اساسي';
             rankEmoji = '🛡️';
+        }
+        // Check if user is a bot admin
+        else if (await isBotAdmin(userId)) {
+            rank = 'مشرف بوت';
+            rankEmoji = '🛠️';
         }
         // Check if user is a group admin
         else if (await isAdminOrOwner(ctx, userId)) {
@@ -2780,58 +2785,63 @@ async function isBotAdmin(ctx, userId) {
         return false;
     }
 }
-async function promoteToBotAdmin(ctx, targetUserId, targetUsername) {
+async function promoteToBotAdmin(ctx) {
     try {
-        const userId = ctx.from.id;
-        
-        // Check if the user has permission to promote (must be admin or owner)
-        if (!(await isAdminOrOwner(ctx, userId))) {
-            return ctx.reply('❌ عذراً، فقط المشرفين ومالك المجموعة يمكنهم ترقية المستخدمين إلى مشرف بوت.');
+        // Check if the user executing the command is an admin or owner
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
         }
-        
-        // Get the target user ID if not provided directly
-        if (!targetUserId) {
-            if (ctx.message.reply_to_message) {
-                targetUserId = ctx.message.reply_to_message.from.id;
-                targetUsername = ctx.message.reply_to_message.from.first_name;
-            } else {
-                return ctx.reply('❌ يرجى الرد على رسالة المستخدم الذي تريد ترقيته أو تحديد معرفه.');
+
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+
+        // Get target user from reply or mention
+        if (ctx.message.reply_to_message) {
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(chatId, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
             }
+        } else {
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته إلى مشرف بوت.');
         }
-        
-        // Add the user to bot_admins collection
+
         const db = await ensureDatabaseInitialized();
-        await db.collection('bot_admins').updateOne(
-            { user_id: targetUserId },
-            { 
-                $set: { 
-                    user_id: targetUserId,
-                    username: targetUsername,
-                    promoted_by: userId,
-                    promoted_at: new Date(),
-                    chat_id: ctx.chat.id
-                } 
-            },
-            { upsert: true }
-        );
         
-        await ctx.reply(`✅ تمت ترقية ${targetUsername || 'المستخدم'} إلى مشرف بوت بنجاح.`);
+        // Check if the user is already a bot admin
+        const existingAdmin = await db.collection('bot_admins').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true
+        });
         
-        // Notify the user about their promotion
-        try {
-            await ctx.telegram.sendMessage(
-                targetUserId,
-                `🎉 مبروك! تمت ترقيتك إلى مشرف بوت في مجموعة "${ctx.chat.title}".`
-            );
-        } catch (error) {
-            console.log('Could not notify user about promotion:', error.message);
+        if (existingAdmin) {
+            return ctx.reply('هذا المستخدم مشرف بوت بالفعل في هذه المجموعة.');
         }
-        
-        return true;
+
+        // Add the user as a new bot admin
+        await db.collection('bot_admins').insertOne({
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            promoted_by: ctx.from.id,
+            promoted_at: new Date(),
+            is_active: true
+        });
+
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مشرف بوت بنجاح.`);
     } catch (error) {
-        console.error('Error promoting to bot admin:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة الترقية. يرجى المحاولة مرة أخرى لاحقًا.');
-        return false;
+        console.error('Error in promoteToBotAdmin:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مشرف بوت.');
     }
 }
 async function hasRequiredPermissions(ctx, userId) {
@@ -3013,55 +3023,68 @@ async function promoteToBotOwner(ctx) {
     }
 }
 
-
 async function removeBotAdmin(ctx) {
     try {
-        const userId = ctx.from.id;
-        
-        // Check if the user has permission to demote (must be admin, owner or developer)
-        if (!(await isAdminOrOwner(ctx, userId)) && !(await isDeveloper(ctx, userId))) {
-            return ctx.reply('❌ عذراً، فقط المشرفين والمطورين يمكنهم إزالة مشرفي البوت.');
+        // Check if the user executing the command is an admin or owner
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
         }
-        
-        // Get the target user ID from reply
-        let targetUserId, targetFirstName;
-        
+
+        let userId, userMention;
+        const args = ctx.message.text.split(' ').slice(1);
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+
+        // Get target user from reply or mention
         if (ctx.message.reply_to_message) {
-            targetUserId = ctx.message.reply_to_message.from.id;
-            targetFirstName = ctx.message.reply_to_message.from.first_name || 'المستخدم';
+            userId = ctx.message.reply_to_message.from.id;
+            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+        } else if (args.length > 0) {
+            const username = args[0].replace('@', '');
+            try {
+                const user = await ctx.telegram.getChatMember(chatId, username);
+                userId = user.user.id;
+                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+            } catch (error) {
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
         } else {
-            return ctx.reply('❌ يرجى الرد على رسالة المستخدم الذي تريد إزالته من مشرفي البوت.');
+            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لتنزيله من مشرف بوت.');
         }
-        
-        // Check if the user is actually a bot admin
+
         const db = await ensureDatabaseInitialized();
-        const botAdmin = await db.collection('bot_admins').findOne({ user_id: targetUserId });
         
-        if (!botAdmin) {
-            return ctx.reply('❌ هذا المستخدم ليس مشرف بوت.');
+        // Check if the user is a bot admin
+        const existingAdmin = await db.collection('bot_admins').findOne({ 
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true
+        });
+        
+        if (!existingAdmin) {
+            return ctx.reply('هذا المستخدم ليس مشرف بوت في هذه المجموعة.');
         }
-        
-        // Remove the user from bot_admins collection
-        await db.collection('bot_admins').deleteOne({ user_id: targetUserId });
-        
-        // Send confirmation message
-        await ctx.reply(`✅ تم إزالة المستخدم ${targetFirstName} من ادمنية البوت بنجاح.`);
-        
-        // Notify the user
-        try {
-            await ctx.telegram.sendMessage(
-                targetUserId,
-                `⚠️ تمت إزالتك من مشرفي البوت في المجموعة "${ctx.chat.title}".`
-            );
-        } catch (error) {
-            console.error('Error notifying user about demotion:', error);
-        }
-        
+
+        // Update the user's status to inactive
+        await db.collection('bot_admins').updateOne(
+            { _id: existingAdmin._id },
+            { 
+                $set: { 
+                    is_active: false,
+                    demoted_by: ctx.from.id,
+                    demoted_at: new Date()
+                }
+            }
+        );
+
+        ctx.replyWithMarkdown(`✅ تم تنزيل المستخدم ${userMention} من مشرف بوت بنجاح.`);
     } catch (error) {
-        console.error('Error removing bot admin:', error);
-        await ctx.reply('❌ حدث خطأ أثناء إزالة المستخدم من مشرفي البوت. يرجى المحاولة مرة أخرى لاحقًا.');
+        console.error('Error in removeBotAdmin:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تنزيل المستخدم من مشرف بوت.');
     }
 }
+
 // Add these action handlers to your bot setup
 bot.action(/^remove_vip:(\d+)$/, async (ctx) => {
     try {
