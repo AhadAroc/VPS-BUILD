@@ -400,7 +400,10 @@ async function documentRestrictionMiddleware(ctx, next) {
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
-    return isAdmin || isSecDev;
+    const isBotAdm = await isBotAdmin(userId);
+    const isPremium = await isPremiumUser(userId);
+    
+    return isAdmin || isSecDev || isBotAdm || isPremium;
 }
 // ✅ Display main menu
 async function showMainMenu(ctx) {
