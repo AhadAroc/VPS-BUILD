@@ -2371,7 +2371,7 @@ bot.action('quiz_bot', async (ctx) => {
         const isUserVIP = await isVIP(ctx, userId);
         const isBotAdminUser = await isBotAdmin(ctx, userId);
         
-        console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP });
+        console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP ,isBotAdmin });
 
         if (!hasPermissions && !isUserVIP) {
             console.log(`User ${userId} denied access to quiz_bot`);
