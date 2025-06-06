@@ -1937,36 +1937,30 @@ async function isBotOwner(ctx, userId) {
 
 async function isBotAdmin(ctx, userId) {
     try {
-        // Don't try to use ctx if it's not defined
+        // Check if ctx and ctx.botInfo exist
         if (!ctx || !ctx.botInfo) {
-            console.log('ctx or ctx.botInfo is undefined in isBotAdmin');
+            console.error('Error: ctx or ctx.botInfo is undefined in isBotAdmin');
             return false;
         }
         
         const botId = ctx.botInfo.id;
-        const chatId = ctx.chat ? ctx.chat.id : null;
         
-        // If we don't have a chat ID, we can't check admin status
-        if (!chatId) {
-            console.log('No chat ID available in isBotAdmin');
+        // Check if ctx.chat exists
+        if (!ctx.chat) {
+            console.error('Error: ctx.chat is undefined in isBotAdmin');
             return false;
         }
         
+        const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
         
         console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
         
-        // Convert IDs to numbers to ensure consistent comparison
-        const userIdNum = parseInt(userId);
-        const chatIdNum = parseInt(chatId);
-        const botIdNum = parseInt(botId);
-        
-        // Only pass primitive values to the database query
         const botAdmin = await db.collection('bot_admins').findOne({ 
-            user_id: userIdNum,
-            chat_id: chatIdNum,
-            bot_id: botIdNum,
-            is_active: true
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true  // Make sure to check is_active flag
         });
         
         console.log(`Bot admin check result:`, botAdmin ? true : false);
@@ -2377,14 +2371,9 @@ bot.action('quiz_bot', async (ctx) => {
         const isUserVIP = await isVIP(ctx, userId);
         const isBotAdminUser = await isBotAdmin(ctx, userId);
         
-        console.log(`User ${userId} permissions check:`, { 
-            hasPermissions, 
-            isUserVIP, 
-            isBotAdminUser  // Changed from isBotAdmin to isBotAdminUser
-        });
+        console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP ,isBotAdmin });
 
-        // Update the condition to include isBotAdminUser
-        if (!hasPermissions && !isUserVIP && !isBotAdminUser) {
+        if (!hasPermissions && !isUserVIP) {
             console.log(`User ${userId} denied access to quiz_bot`);
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين والمميزين فقط.', { show_alert: true });
         }
