@@ -2371,9 +2371,14 @@ bot.action('quiz_bot', async (ctx) => {
         const isUserVIP = await isVIP(ctx, userId);
         const isBotAdminUser = await isBotAdmin(ctx, userId);
         
-        console.log(`User ${userId} permissions check:`, { hasPermissions, isUserVIP ,isBotAdmin });
+        console.log(`User ${userId} permissions check:`, { 
+            hasPermissions, 
+            isUserVIP, 
+            isBotAdminUser  // Changed from isBotAdmin to isBotAdminUser
+        });
 
-        if (!hasPermissions && !isUserVIP) {
+        // Update the condition to include isBotAdminUser
+        if (!hasPermissions && !isUserVIP && !isBotAdminUser) {
             console.log(`User ${userId} denied access to quiz_bot`);
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين والمميزين فقط.', { show_alert: true });
         }
