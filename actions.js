@@ -2389,10 +2389,13 @@ bot.action('show_commands', async (ctx) => {
     try {
         const userId = ctx.from.id;
 
-        // Check if the user has the required permissions
+       // Check if the user has the required permissions
         const hasPermissions = await hasRequiredPermissions(ctx, userId);
         const isBotOwnerUser = await isBotOwner(ctx, userId);
-        const isBotAdminUser = await isBotAdmin(userId);
+        
+
+        // Fix: Pass ctx as the first parameter to isBotAdmin
+        const isBotAdminUser = await isBotAdmin(ctx, userId); // <-- Corrected line
 
         if (!hasPermissions && !isBotOwnerUser && !isBotAdminUser) {
             return ctx.answerCbQuery('❌ هذا الأمر مخصص للمشرفين والمطورين الثانويين، مالكي البوت، ومشرفي البوت فقط.', { show_alert: true });
