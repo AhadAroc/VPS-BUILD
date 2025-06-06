@@ -3501,7 +3501,7 @@ bot.action(/^cancel_delete_reply:(\d+)$/, async (ctx) => {
 bot.action('dev_broadcast', async (ctx) => {
     try {
         await ctx.answerCbQuery();
-        awaitingBroadcastPhoto = true;
+        //awaitingBroadcastPhoto = true;
 
         await ctx.reply(
 `📢 وضع الإذاعة مفعل!
