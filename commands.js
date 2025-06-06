@@ -2766,32 +2766,39 @@ async function listVIPUsers(ctx) {
 // Add this function to check if a user is a bot admin
 async function isBotAdmin(ctx, userId) {
     try {
-        // If ctx is provided, extract only the necessary data
-        let botId = null;
-        let chatId = null;
+        // Don't try to use ctx if it's not defined
+        if (!ctx || !ctx.botInfo) {
+            console.log('ctx or ctx.botInfo is undefined in isBotAdmin');
+            return false;
+        }
         
-        if (ctx) {
-            // Extract only the primitive values we need
-            botId = ctx.botInfo ? ctx.botInfo.id : null;
-            chatId = ctx.chat ? ctx.chat.id : null;
+        const botId = ctx.botInfo.id;
+        const chatId = ctx.chat ? ctx.chat.id : null;
+        
+        // If we don't have a chat ID, we can't check admin status
+        if (!chatId) {
+            console.log('No chat ID available in isBotAdmin');
+            return false;
         }
         
         const db = await ensureDatabaseInitialized();
         
-        // Create a query object with only the necessary fields
-        const query = { user_id: userId };
+        console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
         
-        // Add optional fields if they exist
-        if (botId) query.bot_id = botId;
-        if (chatId) query.chat_id = chatId;
+        // Convert IDs to numbers to ensure consistent comparison
+        const userIdNum = parseInt(userId);
+        const chatIdNum = parseInt(chatId);
+        const botIdNum = parseInt(botId);
         
-        // Add active status to query
-        query.is_active = true;
+        // Only pass primitive values to the database query
+        const botAdmin = await db.collection('bot_admins').findOne({ 
+            user_id: userIdNum,
+            chat_id: chatIdNum,
+            bot_id: botIdNum,
+            is_active: true
+        });
         
-        console.log(`Checking if user ${userId} is a bot admin with query:`, JSON.stringify(query));
-        
-        const botAdmin = await db.collection('bot_admins').findOne(query);
-        
+        console.log(`Bot admin check result:`, botAdmin ? true : false);
         return !!botAdmin; // Returns true if the user is an active bot admin
     } catch (error) {
         console.error('Error checking bot admin status:', error);
