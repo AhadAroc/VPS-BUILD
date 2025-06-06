@@ -121,7 +121,33 @@ async function saveFile(fileLink, fileName) {
         throw error;
     }
 }
-
+async function isBotOwner(ctx, userId) {
+    try {
+        const chatId = ctx.chat.id;
+        const db = await ensureDatabaseInitialized();
+        
+        // Convert IDs to numbers to ensure consistent comparison
+        const userIdNum = parseInt(userId);
+        const chatIdNum = parseInt(chatId);
+        
+        console.log(`Checking if user ${userIdNum} is a bot owner (اساسي) in chat ${chatIdNum}`);
+        
+        // Query the database for bot owners
+        const owner = await db.collection('bot_owners').findOne({
+            user_id: userIdNum,
+            chat_id: chatIdNum,
+            is_active: true
+        });
+        
+        const isOwner = !!owner;
+        console.log(`User ${userIdNum} is${isOwner ? '' : ' not'} a bot owner (اساسي) in chat ${chatIdNum}`);
+        
+        return isOwner;
+    } catch (error) {
+        console.error('Error checking if user is bot owner (اساسي):', error);
+        return false;
+    }
+}
 async function isImportant(ctx, userId) {
     try {
         // Check if the user is in the database with 'important' role
