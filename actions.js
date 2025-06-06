@@ -1956,12 +1956,16 @@ async function isBotAdmin(ctx, userId) {
         
         console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
         
-        // Only pass the necessary primitive values to the database query
-        // Don't pass the entire ctx object which contains circular references
+        // Convert IDs to numbers to ensure consistent comparison
+        const userIdNum = parseInt(userId);
+        const chatIdNum = parseInt(chatId);
+        const botIdNum = parseInt(botId);
+        
+        // Only pass primitive values to the database query
         const botAdmin = await db.collection('bot_admins').findOne({ 
-            user_id: userId,
-            chat_id: chatId,
-            bot_id: botId,
+            user_id: userIdNum,
+            chat_id: chatIdNum,
+            bot_id: botIdNum,
             is_active: true
         });
         
