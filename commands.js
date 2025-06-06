@@ -610,8 +610,11 @@ async function showQuizMenu(ctx) {
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-         const isBotAdm = await isBotAdmin(null, userId);
-        if (!isAdmin && !isVIPUser) {
+        // Fix: Call isBotAdmin with just userId to match its definition
+        const isBotAdm = await isBotAdmin(userId);
+        
+        // Consider including isBotAdm in the permission check
+        if (!isAdmin && !isVIPUser && !isBotAdm && !isPremium) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
