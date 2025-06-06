@@ -18,7 +18,7 @@ let awaitingBotName = false;
 let awaitingDeleteReplyWord = false;
 
 const cloudinary = require('cloudinary').v2;
-const { getLeaderboard, getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty, isSecondaryDeveloper,handleCommandCallbacks } = require('./commands');
+const { getLeaderboard, getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty, isSecondaryDeveloper,handleCommandCallbacks,isBotOwner } = require('./commands');
 const chatStates = new Map();
 // Add these global variables at the top of your file
 const activeQuizzes = new Map(); // Map to store active quizzes by chat ID
