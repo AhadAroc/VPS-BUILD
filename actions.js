@@ -1937,30 +1937,32 @@ async function isBotOwner(ctx, userId) {
 
 async function isBotAdmin(ctx, userId) {
     try {
-        // Check if ctx and ctx.botInfo exist
+        // Don't try to use ctx if it's not defined
         if (!ctx || !ctx.botInfo) {
-            console.error('Error: ctx or ctx.botInfo is undefined in isBotAdmin');
+            console.log('ctx or ctx.botInfo is undefined in isBotAdmin');
             return false;
         }
         
         const botId = ctx.botInfo.id;
+        const chatId = ctx.chat ? ctx.chat.id : null;
         
-        // Check if ctx.chat exists
-        if (!ctx.chat) {
-            console.error('Error: ctx.chat is undefined in isBotAdmin');
+        // If we don't have a chat ID, we can't check admin status
+        if (!chatId) {
+            console.log('No chat ID available in isBotAdmin');
             return false;
         }
         
-        const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
         
         console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
         
+        // Only pass the necessary primitive values to the database query
+        // Don't pass the entire ctx object which contains circular references
         const botAdmin = await db.collection('bot_admins').findOne({ 
             user_id: userId,
             chat_id: chatId,
             bot_id: botId,
-            is_active: true  // Make sure to check is_active flag
+            is_active: true
         });
         
         console.log(`Bot admin check result:`, botAdmin ? true : false);
