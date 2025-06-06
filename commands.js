@@ -2766,36 +2766,17 @@ async function listVIPUsers(ctx) {
 // Add this function to check if a user is a bot admin
 async function isBotAdmin(ctx, userId) {
     try {
-        // Don't try to use ctx if it's not defined
-        if (!ctx || !ctx.botInfo) {
-            console.log('ctx or ctx.botInfo is undefined in isBotAdmin');
-            return false;
-        }
-        
         const botId = ctx.botInfo.id;
-        const chatId = ctx.chat ? ctx.chat.id : null;
-        
-        // If we don't have a chat ID, we can't check admin status
-        if (!chatId) {
-            console.log('No chat ID available in isBotAdmin');
-            return false;
-        }
-        
+        const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
         
         console.log(`Checking if user ${userId} is a bot admin in chat ${chatId}`);
         
-        // Convert IDs to numbers to ensure consistent comparison
-        const userIdNum = parseInt(userId);
-        const chatIdNum = parseInt(chatId);
-        const botIdNum = parseInt(botId);
-        
-        // Only pass primitive values to the database query
         const botAdmin = await db.collection('bot_admins').findOne({ 
-            user_id: userIdNum,
-            chat_id: chatIdNum,
-            bot_id: botIdNum,
-            is_active: true
+            user_id: userId,
+            chat_id: chatId,
+            bot_id: botId,
+            is_active: true  // Make sure to check is_active flag
         });
         
         console.log(`Bot admin check result:`, botAdmin ? true : false);
