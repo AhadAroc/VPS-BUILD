@@ -776,7 +776,120 @@ async function checkForAutomaticReply(ctx) {
     }
 }
 
-
+// Add this function to handle user demotion
+async function handleUserDemotion(ctx) {
+    try {
+        // Check if the message matches the pattern @username تنزيل role or تنزيل role @username
+        const text = ctx.message.text?.trim();
+        let match = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
+if (!match) {
+    match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
+}
+        if (!match) {
+            match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
+            if (match) {
+                // Swap the positions for the second pattern
+                match = [match[0], match[2], match[1]];
+            } else {
+                return false; // Not a demotion command
+            }
+        }
+        
+        // Extract username and role
+        const username = match[1];
+        const role = match[2];
+        
+        // Check if the user executing the command is an admin or owner
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            await ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+            return true; // Command was handled
+        }
+        
+        // Initialize database
+        const db = await ensureDatabaseInitialized();
+        
+        // Determine collection based on role
+        let collection;
+        
+        switch (role.toLowerCase()) {
+            case 'مميز':
+            case 'vip':
+                collection = 'vip_users';
+                break;
+            case 'ادمن':
+            case 'admin':
+                collection = 'admins';
+                break;
+            case 'مدير':
+            case 'manager':
+                collection = 'managers';
+                break;
+            case 'منشئ':
+            case 'creator':
+                collection = 'creators';
+                break;
+            case 'منشئ اساسي':
+            case 'primary creator':
+                collection = 'primary_creators';
+                break;
+            case 'مطور':
+            case 'developer':
+                collection = 'developers';
+                break;
+            case 'مطور ثانوي':
+            case 'secondary developer':
+                collection = 'secondary_developers';
+                break;
+            default:
+                await ctx.reply('❌ نوع الرتبة غير صالح.');
+                return true; // Command was handled
+                console.log('handleUserDemotion called with text:', text);
+        }
+        
+        // Try to get user ID if possible
+        let targetUserId = null;
+        try {
+            // First try to get from chat member
+            const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
+            targetUserId = chatMember.user.id;
+        } catch (error) {
+            console.log(`Could not get user ID for @${username}, will search by username only: ${error.message}`);
+            
+            // Try to find in known_users collection
+            try {
+                const knownUser = await db.collection('known_users').findOne({ username: username });
+                if (knownUser) {
+                    targetUserId = knownUser.user_id;
+                }
+            } catch (dbError) {
+                console.log(`Database lookup failed for @${username}: ${dbError.message}`);
+            }
+        }
+        
+        // Create query based on available information
+        const query = targetUserId ? { user_id: targetUserId } : { username: username };
+        
+        // Check if user exists in the collection
+        const existingUser = await db.collection(collection).findOne(query);
+        
+        if (!existingUser) {
+            await ctx.reply(`❌ المستخدم @${username} ليس لديه رتبة ${role} لإزالتها.`);
+            return true;
+        }
+        
+        // Remove the user from the collection
+        await db.collection(collection).deleteOne(query);
+        
+        await ctx.reply(`✅ تم إزالة رتبة ${role} من المستخدم @${username} بنجاح.`);
+        console.log(`User @${username}${targetUserId ? ` (${targetUserId})` : ''} demoted from ${role} by user ${ctx.from.id}`);
+        
+        return true; // Command was handled
+    } catch (error) {
+        console.error('Error in handleUserDemotion:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إزالة الرتبة من المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.');
+        return true; // Command was handled, even though it failed
+    }
+}
 async function handleCorrectQuizAnswer(ctx, chatId, userId) {
     const quiz = activeQuizzes.get(chatId);
     const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
@@ -4951,120 +5064,7 @@ async function handleUserPromotion(ctx) {
     }
 }
 
-// Add this function to handle user demotion
-async function handleUserDemotion(ctx) {
-    try {
-        // Check if the message matches the pattern @username تنزيل role or تنزيل role @username
-        const text = ctx.message.text?.trim();
-        let match = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
-if (!match) {
-    match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
-}
-        if (!match) {
-            match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
-            if (match) {
-                // Swap the positions for the second pattern
-                match = [match[0], match[2], match[1]];
-            } else {
-                return false; // Not a demotion command
-            }
-        }
-        
-        // Extract username and role
-        const username = match[1];
-        const role = match[2];
-        
-        // Check if the user executing the command is an admin or owner
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            await ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-            return true; // Command was handled
-        }
-        
-        // Initialize database
-        const db = await ensureDatabaseInitialized();
-        
-        // Determine collection based on role
-        let collection;
-        
-        switch (role.toLowerCase()) {
-            case 'مميز':
-            case 'vip':
-                collection = 'vip_users';
-                break;
-            case 'ادمن':
-            case 'admin':
-                collection = 'admins';
-                break;
-            case 'مدير':
-            case 'manager':
-                collection = 'managers';
-                break;
-            case 'منشئ':
-            case 'creator':
-                collection = 'creators';
-                break;
-            case 'منشئ اساسي':
-            case 'primary creator':
-                collection = 'primary_creators';
-                break;
-            case 'مطور':
-            case 'developer':
-                collection = 'developers';
-                break;
-            case 'مطور ثانوي':
-            case 'secondary developer':
-                collection = 'secondary_developers';
-                break;
-            default:
-                await ctx.reply('❌ نوع الرتبة غير صالح.');
-                return true; // Command was handled
-                console.log('handleUserDemotion called with text:', text);
-        }
-        
-        // Try to get user ID if possible
-        let targetUserId = null;
-        try {
-            // First try to get from chat member
-            const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
-            targetUserId = chatMember.user.id;
-        } catch (error) {
-            console.log(`Could not get user ID for @${username}, will search by username only: ${error.message}`);
-            
-            // Try to find in known_users collection
-            try {
-                const knownUser = await db.collection('known_users').findOne({ username: username });
-                if (knownUser) {
-                    targetUserId = knownUser.user_id;
-                }
-            } catch (dbError) {
-                console.log(`Database lookup failed for @${username}: ${dbError.message}`);
-            }
-        }
-        
-        // Create query based on available information
-        const query = targetUserId ? { user_id: targetUserId } : { username: username };
-        
-        // Check if user exists in the collection
-        const existingUser = await db.collection(collection).findOne(query);
-        
-        if (!existingUser) {
-            await ctx.reply(`❌ المستخدم @${username} ليس لديه رتبة ${role} لإزالتها.`);
-            return true;
-        }
-        
-        // Remove the user from the collection
-        await db.collection(collection).deleteOne(query);
-        
-        await ctx.reply(`✅ تم إزالة رتبة ${role} من المستخدم @${username} بنجاح.`);
-        console.log(`User @${username}${targetUserId ? ` (${targetUserId})` : ''} demoted from ${role} by user ${ctx.from.id}`);
-        
-        return true; // Command was handled
-    } catch (error) {
-        console.error('Error in handleUserDemotion:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة إزالة الرتبة من المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.');
-        return true; // Command was handled, even though it failed
-    }
-}
+
 // Helper function to get Arabic names for media types
 // Add this helper function
 function getMediaTypeInArabic(mediaType) {
