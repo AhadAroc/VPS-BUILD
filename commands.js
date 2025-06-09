@@ -130,14 +130,20 @@ async function getLatestGroupsMembersState(botId, userId) {
 }
 // Add this function to check if a user is a VIP
 async function isVIP(ctx, userId) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
+    const db = await ensureDatabaseInitialized();
+
+    // Try by user_id first
+    let vipUser = await db.collection('vip_users').findOne({ user_id: userId });
+    if (vipUser) return true;
+
+    // Fallback to check by username if Telegram username is available
+    const username = ctx.from.username;
+    if (username) {
+        vipUser = await db.collection('vip_users').findOne({ username: username });
         return !!vipUser;
-    } catch (error) {
-        console.error('Error checking VIP status:', error);
-        return false;
     }
+
+    return false;
 }
 async function updateGroupActivity(ctx, botId) {
     const chatId = ctx.chat.id;
