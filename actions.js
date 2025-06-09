@@ -4272,40 +4272,46 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     // For the text handler that's causing errors, update it to:
     // Register the text handler
     bot.on('text', async (ctx) => {
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-        const userState = pendingReplies.get(userId);
-        const text = ctx.message.text?.trim();
-        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-        const userAnswer = ctx.message.text.trim().toLowerCase();
         try {
-        const chatId = ctx.chat.id;
         const userId = ctx.from.id;
-        
-       const text = ctx.message.text.trim();
-const match = text.match(/^@(\w+)\s+رفع\s+(.*)$/); // Matches "@username رفع مطور"
+        const chatId = ctx.chat.id;
+        const text = ctx.message.text?.trim();
+        const userAnswer = text?.toLowerCase();
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
 
-if (match) {
-    const username = match[1]; // e.g., "asdsdwec"
-    const role = match[2];     // e.g., "مطور"
+        // ✅ 1. Handle @username رفع role
+        const match = text.match(/^@(\w+)\s+رفع\s+(.*)$/); // e.g., "@user رفع مطور"
+        if (match) {
+            const username = match[1];
+            const role = match[2];
 
-    try {
-        // Try resolving the username to get the user ID
-        const user = await ctx.telegram.getChat(`@${username}`);
-        const userId = user.id;
+            try {
+                const db = await ensureDatabaseInitialized();
+                const userRecord = await db.collection('known_users').findOne({ username });
 
-        // Simulate a reply context for promoteUser
-        ctx.message.reply_to_message = { from: user };
-        ctx.message.text = `رفع ${role}`;
+                if (!userRecord) {
+                    await ctx.reply(`❌ لم أستطع العثور على المستخدم @${username}. تأكد أنه بدأ البوت أو موجود في المجموعة.`);
+                    return;
+                }
 
-        await promoteUser(ctx, role); // ✅ Now works with proper userId
-    } catch (err) {
-        console.error('❌ Failed to promote by username:', err.message);
-        await ctx.reply(`❌ لم أستطع العثور على المستخدم @${username}. تأكد أنه بدأ البوت أو موجود في المجموعة.`);
-    }
+                // Simulate reply message context
+                ctx.message.reply_to_message = {
+                    from: {
+                        id: userRecord.user_id,
+                        username: userRecord.username,
+                        first_name: userRecord.first_name || 'User'
+                    }
+                };
+                ctx.message.text = `رفع ${role}`;
 
-    return;
-}
+                await promoteUser(ctx, role);
+            } catch (err) {
+                console.error('❌ Failed to promote by @username:', err.message);
+                await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية @${username}`);
+            }
+
+            return; // 🛑 Stop further processing
+        }
 
         // Check if there's an active quiz in this chat
         if (activeQuizzes && activeQuizzes.has(chatId) && 
