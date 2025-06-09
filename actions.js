@@ -5152,18 +5152,18 @@ async function handleTextMessage(ctx) {
     const userAnswer = text.toLowerCase();
 
     // ✅ Case 1: Reply-based promotion like [reply] رفع مطور
-    const match = text.match(/^رفع\s+(.*)$/); // e.g., رفع مطور
-    if (match && ctx.message.reply_to_message) {
-        const role = match[1]; // "مطور"
+    const promotionMatch = text.match(/^رفع\s+(.*)$/); // e.g., رفع مطور
+    if (promotionMatch && ctx.message.reply_to_message) {
+        const role = promotionMatch[1]; // "مطور"
         await promoteUser(ctx, role);
         return;
     }
 
     // ✅ Case 2: @username رفع مطور — only works if user is stored in DB
-    const usernameMatch = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
-    if (usernameMatch) {
-        const mentionedUsername = usernameMatch[1];
-        const role = usernameMatch[2];
+    const usernamePromotionMatch = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
+    if (usernamePromotionMatch) {
+        const mentionedUsername = usernamePromotionMatch[1];
+        const role = usernamePromotionMatch[2];
 
         try {
             const db = await ensureDatabaseInitialized();
@@ -5189,6 +5189,46 @@ async function handleTextMessage(ctx) {
         } catch (err) {
             console.error('❌ Failed to promote by @username:', err.message);
             await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية @${mentionedUsername}`);
+            return;
+        }
+    }
+
+    // ✅ Case 3: Reply-based demotion like [reply] تنزيل مطور
+    const demotionMatch = text.match(/^تنزيل\s+(.*)$/); // e.g., تنزيل مطور
+    if (demotionMatch && ctx.message.reply_to_message) {
+        await demoteUser(ctx);
+        return;
+    }
+
+    // ✅ Case 4: @username تنزيل مطور — only works if user is stored in DB
+    const usernameDemotionMatch = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
+    if (usernameDemotionMatch) {
+        const mentionedUsername = usernameDemotionMatch[1];
+
+        try {
+            const db = await ensureDatabaseInitialized();
+            const userRecord = await db.collection('known_users').findOne({ username: mentionedUsername });
+
+            if (!userRecord) {
+                await ctx.reply(`❌ لا أستطيع تنزيل @${mentionedUsername}. لم أره من قبل.`);
+                return;
+            }
+
+            // Simulate a reply to that user
+            ctx.message.reply_to_message = {
+                from: {
+                    id: userRecord.user_id,
+                    username: userRecord.username,
+                    first_name: userRecord.first_name || 'User'
+                }
+            };
+            
+            // We don't need to set the role for demotion as demoteUser checks all roles
+            await demoteUser(ctx);
+            return;
+        } catch (err) {
+            console.error('❌ Failed to demote by @username:', err.message);
+            await ctx.reply(`❌ حدث خطأ أثناء محاولة تنزيل @${mentionedUsername}`);
             return;
         }
     }
