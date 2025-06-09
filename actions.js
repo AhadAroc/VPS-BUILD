@@ -4272,7 +4272,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     // For the text handler that's causing errors, update it to:
     // Register the text handler
     bot.on('text', async (ctx) => {
-        try {
+      try {
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
         const text = ctx.message.text?.trim();
@@ -4286,6 +4286,48 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
             const role = match[2];
 
             try {
+                // First check if we're in a group chat
+                if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+                    try {
+                        // Try to get the user from the group members
+                        const chatMember = await ctx.telegram.getChatMember(chatId, `@${username}`);
+                        
+                        if (chatMember && chatMember.user) {
+                            // User found in the group, create reply context
+                            ctx.message.reply_to_message = {
+                                from: {
+                                    id: chatMember.user.id,
+                                    username: chatMember.user.username,
+                                    first_name: chatMember.user.first_name || 'User'
+                                }
+                            };
+                            ctx.message.text = `رفع ${role}`;
+                            
+                            // Also save this user to known_users for future reference
+                            const db = await ensureDatabaseInitialized();
+                            await db.collection('known_users').updateOne(
+                                { user_id: chatMember.user.id },
+                                { 
+                                    $set: { 
+                                        username: chatMember.user.username,
+                                        first_name: chatMember.user.first_name,
+                                        last_name: chatMember.user.last_name,
+                                        last_seen: new Date()
+                                    }
+                                },
+                                { upsert: true }
+                            );
+                            
+                            await promoteUser(ctx, role);
+                            return;
+                        }
+                    } catch (groupError) {
+                        console.log(`Could not find @${username} in group members, trying database: ${groupError.message}`);
+                        // Continue to database lookup if group lookup fails
+                    }
+                }
+                
+                // If not found in group or not in a group, try database lookup
                 const db = await ensureDatabaseInitialized();
                 const userRecord = await db.collection('known_users').findOne({ username });
 
