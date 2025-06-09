@@ -4824,9 +4824,57 @@ function getMediaTypeInArabic(mediaType) {
         const username = ctx.from.username;
         const message = ctx.message;
         const chatId = ctx.chat.id;
+// Check for promotion commands with username mention
+        if (message.text && message.text.includes('@') && 
+            (message.text.includes('رفع مطور') || 
+             message.text.includes('رفع مطور ثانوي') || 
+             message.text.includes('رفع ادمن') || 
+             message.text.includes('رفع مدير') || 
+             message.text.includes('رفع منشئ') || 
+             message.text.includes('رفع منشئ اساسي') || 
+             message.text.includes('رفع مميز'))) {
+            
+            // Extract the username and role
+            const mentionedUsername = message.text.match(/@([a-zA-Z0-9_]+)/);
+            let role = '';
+            
+            if (message.text.includes('رفع مطور')) role = 'developer';
+            else if (message.text.includes('رفع مطور ثانوي')) role = 'secondary_developer';
+            else if (message.text.includes('رفع ادمن')) role = 'admin';
+            else if (message.text.includes('رفع مدير')) role = 'manager';
+            else if (message.text.includes('رفع منشئ')) role = 'creator';
+            else if (message.text.includes('رفع منشئ اساسي')) role = 'primary_creator';
+            else if (message.text.includes('رفع مميز')) role = 'vip';
+            
+            if (mentionedUsername && role) {
+                const username = mentionedUsername[1];
+                
+                // Check if the user promoting has permission
+                if (await isDeveloper(ctx, userId) || await isAdmin(ctx, userId)) {
+                    try {
+                        // Try to get user ID from username
+                        const userInfo = await ctx.telegram.getChat(`@${username}`);
+                        if (userInfo && userInfo.id) {
+                            // Call the existing promoteUser function with the found user ID
+                            await promoteUserById(ctx, role, userInfo.id, username);
+                        } else {
+                            await ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من كتابة اسم المستخدم بشكل صحيح.');
+                        }
+                    } catch (error) {
+                        console.error('Error promoting user by username:', error);
+                        await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم. تأكد من أن اسم المستخدم صحيح وأن البوت يمكنه الوصول إلى معلومات المستخدم.');
+                    }
+                } else {
+                    await ctx.reply('❌ عذراً، ليس لديك صلاحية لترقية المستخدمين.');
+                }
+                
+                return; // Stop further processing
+            }
+        }
 
         // Update last interaction for the user
         updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
+        
         
         // If in a group, update the group's active status
         if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
@@ -5024,7 +5072,162 @@ if (ctx.chat.type === 'private') {
         return;
     }
 }
-
+async function promoteUserById(ctx, role, targetUserId, targetUsername) {
+    try {
+        const promoterId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        
+        // Check if the promoter has permission
+        if (!(await isDeveloper(ctx, promoterId)) && !(await isAdmin(ctx, promoterId))) {
+            await ctx.reply('❌ عذراً، ليس لديك صلاحية لترقية المستخدمين.');
+            return;
+        }
+        
+        // Get database connection
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo.id;
+        
+        // Handle different roles
+        switch (role) {
+            case 'developer':
+                // Check if the promoter is a developer
+                if (await isDeveloper(ctx, promoterId)) {
+                    await db.collection('developers').updateOne(
+                        { user_id: targetUserId, bot_id: botId },
+                        { 
+                            $set: { 
+                                user_id: targetUserId, 
+                                username: targetUsername,
+                                bot_id: botId,
+                                promoted_by: promoterId,
+                                promoted_at: new Date()
+                            }
+                        },
+                        { upsert: true }
+                    );
+                    await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى مطور.`);
+                } else {
+                    await ctx.reply('❌ عذراً، فقط المطورين يمكنهم ترقية مطورين جدد.');
+                }
+                break;
+                
+            case 'secondary_developer':
+                // Check if the promoter is a developer
+                if (await isDeveloper(ctx, promoterId)) {
+                    await db.collection('secondary_developers').updateOne(
+                        { user_id: targetUserId, bot_id: botId },
+                        { 
+                            $set: { 
+                                user_id: targetUserId, 
+                                username: targetUsername,
+                                bot_id: botId,
+                                promoted_by: promoterId,
+                                promoted_at: new Date()
+                            }
+                        },
+                        { upsert: true }
+                    );
+                    await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى مطور ثانوي.`);
+                } else {
+                    await ctx.reply('❌ عذراً، فقط المطورين يمكنهم ترقية مطورين ثانويين.');
+                }
+                break;
+                
+            // Add cases for other roles (admin, manager, creator, etc.)
+            case 'admin':
+                await db.collection('admins').updateOne(
+                    { user_id: targetUserId, chat_id: chatId },
+                    { 
+                        $set: { 
+                            user_id: targetUserId, 
+                            username: targetUsername,
+                            chat_id: chatId,
+                            promoted_by: promoterId,
+                            promoted_at: new Date()
+                        }
+                    },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى ادمن.`);
+                break;
+                
+            case 'manager':
+                await db.collection('managers').updateOne(
+                    { user_id: targetUserId, chat_id: chatId },
+                    { 
+                        $set: { 
+                            user_id: targetUserId, 
+                            username: targetUsername,
+                            chat_id: chatId,
+                            promoted_by: promoterId,
+                            promoted_at: new Date()
+                        }
+                    },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى مدير.`);
+                break;
+                
+            case 'creator':
+                await db.collection('creators').updateOne(
+                    { user_id: targetUserId, chat_id: chatId },
+                    { 
+                        $set: { 
+                            user_id: targetUserId, 
+                            username: targetUsername,
+                            chat_id: chatId,
+                            promoted_by: promoterId,
+                            promoted_at: new Date()
+                        }
+                    },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى منشئ.`);
+                break;
+                
+            case 'primary_creator':
+                await db.collection('primary_creators').updateOne(
+                    { user_id: targetUserId, chat_id: chatId },
+                    { 
+                        $set: { 
+                            user_id: targetUserId, 
+                            username: targetUsername,
+                            chat_id: chatId,
+                            promoted_by: promoterId,
+                            promoted_at: new Date()
+                        }
+                    },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى منشئ اساسي.`);
+                break;
+                
+            case 'vip':
+                await db.collection('vips').updateOne(
+                    { user_id: targetUserId, chat_id: chatId },
+                    { 
+                        $set: { 
+                            user_id: targetUserId, 
+                            username: targetUsername,
+                            chat_id: chatId,
+                            promoted_by: promoterId,
+                            promoted_at: new Date()
+                        }
+                    },
+                    { upsert: true }
+                );
+                await ctx.reply(`✅ تم ترقية المستخدم @${targetUsername} إلى مميز.`);
+                break;
+                
+            default:
+                await ctx.reply('❌ نوع الترقية غير معروف.');
+                break;
+        }
+    } catch (error) {
+        console.error('Error in promoteUserById:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+    }
+}
 // Add this function to handle awaiting reply word
 async function handleAwaitingReplyWord(ctx) {
     tempReplyWord = ctx.message.text.trim().toLowerCase();
