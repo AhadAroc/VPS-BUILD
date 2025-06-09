@@ -4344,8 +4344,8 @@ async function isImportant(ctx, userId) {
     }
     async function promoteUser(ctx, role) {
     try {
-        // Ensure we have a valid context object
-        if (!ctx || !ctx.message || !ctx.reply) {
+        // Validate context object
+        if (!ctx || !ctx.message || !ctx.from || !ctx.from.id) {
             console.error('Invalid context object in promoteUser');
             return;
         }
@@ -4356,160 +4356,80 @@ async function isImportant(ctx, userId) {
         }
 
         let userId, userMention, username;
-        const args = ctx.message.text.split(' ').slice(1);
-        const chatId = ctx.chat.id;
-        const botId = ctx.botInfo?.id;
+        const chatId = ctx.chat?.id;
+        
+        if (!chatId) {
+            console.error('Chat ID is undefined in promoteUser');
+            return ctx.reply('❌ حدث خطأ: لا يمكن تحديد معرف المحادثة.');
+        }
 
         // Get target user from reply or mention
         if (ctx.message.reply_to_message) {
+            // User is replying to someone
             userId = ctx.message.reply_to_message.from.id;
             userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
             username = ctx.message.reply_to_message.from.username;
-        } else if (args.length > 0) {
-            // Try to extract username from the command
-            let usernameArg = args[0].replace('@', '');
+        } else {
+            // Extract username or user ID from command
+            const args = ctx.message.text.split(' ');
+            
+            // Check if we have enough arguments
+            if (args.length < 2) {
+                return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
+            }
+            
+            // Find the username/ID in the arguments
+            let userIdentifier = null;
+            for (const arg of args) {
+                if (arg.startsWith('@') || /^\d+$/.test(arg)) {
+                    userIdentifier = arg;
+                    break;
+                }
+            }
+            
+            if (!userIdentifier) {
+                return ctx.reply('❌ لم يتم العثور على معرف المستخدم في الأمر. يرجى استخدام @username أو الرد على رسالة المستخدم.');
+            }
             
             try {
                 // Try to get user info from Telegram
-                const user = await ctx.telegram.getChat(usernameArg);
-                if (user && user.id) {
-                    userId = user.id;
-                    userMention = `[${user.first_name || 'User'}](tg://user?id=${userId})`;
-                    username = user.username;
+                const user = await ctx.telegram.getChatMember(chatId, userIdentifier.replace('@', ''));
+                if (user && user.user) {
+                    userId = user.user.id;
+                    userMention = `[${user.user.first_name || 'User'}](tg://user?id=${userId})`;
+                    username = user.user.username;
                 } else {
                     return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
                 }
             } catch (error) {
-                console.error('Error getting user by username:', error);
-                
-                // Try to find user in database
-                try {
-                    const db = await ensureDatabaseInitialized();
-                    const userRecord = await db.collection('users').findOne({ 
-                        username: { $regex: new RegExp(`^${usernameArg}$`, 'i') }
-                    });
-                    
-                    if (userRecord) {
-                        userId = userRecord.user_id;
-                        userMention = `[User](tg://user?id=${userId})`;
-                        username = userRecord.username;
-                    } else {
-                        return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-                    }
-                } catch (dbError) {
-                    console.error('Database error when finding user:', dbError);
-                    return ctx.reply('❌ حدث خطأ أثناء البحث عن المستخدم.');
-                }
+                console.error('Error getting user by identifier:', error);
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
             }
-        } else {
-            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
         }
 
-        // Ensure we have a valid user ID at this point
-        if (!userId) {
-            return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-        }
-
-        const db = await ensureDatabaseInitialized();
-        
-        // Handle different roles
-        switch (role.toLowerCase()) {
+        // Now that we have the user ID, handle the promotion based on role
+        switch (role) {
             case 'مطور':
-                // Check if user is already a developer
-                const existingDev = await db.collection('developers').findOne({ user_id: userId });
-                if (existingDev) {
-                    return ctx.reply('هذا المستخدم مطور بالفعل.');
-                }
-                
-                // Add user to developers collection
-                await db.collection('developers').insertOne({
-                    user_id: userId,
-                    username: username,
-                    promoted_at: new Date(),
-                    promoted_by: ctx.from.id
-                });
-                
-                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور بنجاح.`);
+                await promoteToDeveloper(ctx, userId, userMention);
                 break;
-                
             case 'مطور ثانوي':
-                // Check if user is already a secondary developer
-                const existingSecDev = await db.collection('secondary_developers').findOne({ user_id: userId });
-                if (existingSecDev) {
-                    return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
-                }
-                
-                // Add user to secondary_developers collection
-                await db.collection('secondary_developers').insertOne({
-                    user_id: userId,
-                    username: username,
-                    promoted_at: new Date(),
-                    promoted_by: ctx.from.id
-                });
-                
-                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
+                await promoteToSecondaryDeveloper(ctx, userId, userMention);
                 break;
-                
-            case 'مميز':
-                // Check if user is already VIP
-                const existingVIP = await db.collection('vip_users').findOne({ 
-                    user_id: userId,
-                    chat_id: chatId,
-                    is_active: true
-                });
-                
-                if (existingVIP) {
-                    return ctx.reply('هذا المستخدم مميز بالفعل في هذه المجموعة.');
-                }
-                
-                // Add user to vip_users collection
-                await db.collection('vip_users').insertOne({
-                    user_id: userId,
-                    username: username,
-                    chat_id: chatId,
-                    promoted_at: new Date(),
-                    promoted_by: ctx.from.id,
-                    is_active: true
-                });
-                
-                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز.`);
-                break;
-                
             case 'اساسي':
-                // Check if user is already a bot owner
-                const existingOwner = await db.collection('bot_owners').findOne({ 
-                    user_id: userId,
-                    chat_id: chatId,
-                    bot_id: botId,
-                    is_active: true
-                });
-                
-                if (existingOwner) {
-                    return ctx.reply('هذا المستخدم اساسي بالفعل في هذه المجموعة.');
-                }
-                
-                // Add user to bot_owners collection
-                await db.collection('bot_owners').insertOne({
-                    user_id: userId,
-                    username: username,
-                    chat_id: chatId,
-                    bot_id: botId,
-                    promoted_at: new Date(),
-                    promoted_by: ctx.from.id,
-                    is_active: true
-                });
-                
-                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى اساسي.`);
+                await promoteToBotOwner(ctx, userId, userMention);
                 break;
-                
+            case 'مميز':
+                await promoteToImportant(ctx, userId, userMention);
+                break;
+            case 'ادمن':
+                await promoteToBotAdmin(ctx, userId, userMention);
+                break;
             default:
-                ctx.reply(`❌ الرتبة "${role}" غير معروفة. الرتب المتاحة: مطور، مطور ثانوي، مميز، اساسي.`);
+                return ctx.reply(`❌ الرتبة "${role}" غير معروفة أو غير مدعومة.`);
         }
     } catch (error) {
-        console.error('Error promoting user:', error);
-        if (ctx && ctx.reply) {
-            ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
-        }
+        console.error('Error promoting user to ' + role + ':', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 }
     // ✅ Demote user
@@ -4668,6 +4588,30 @@ async function isImportant(ctx, userId) {
             ctx.reply('❌ حدث خطأ أثناء محاولة نداء الجميع.');
         }
     }
+    // Helper function for promoting to developer
+async function promoteToDeveloper(ctx, userId, userMention) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Check if user is already a developer
+        const existingDev = await db.collection('developers').findOne({ user_id: userId });
+        if (existingDev) {
+            return ctx.reply('هذا المستخدم مطور بالفعل.');
+        }
+
+        // Add the user as a developer
+        await db.collection('developers').insertOne({
+            user_id: userId,
+            promoted_at: new Date(),
+            promoted_by: ctx.from.id
+        });
+
+        ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور بنجاح.`);
+    } catch (error) {
+        console.error('Error in promoteToDeveloper:', error);
+        throw error; // Let the parent function handle the error
+    }
+}
     // Delete latest message
     async function deleteLatestMessage(ctx) {
         try {
