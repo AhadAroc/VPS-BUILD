@@ -4278,15 +4278,17 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const chatId = ctx.chat.id;
         const text = ctx.message.text?.trim();
         const userAnswer = text?.toLowerCase();
-        
-        // Initialize isBroadcasting based on chat state
+
+        // Handle broadcast state first
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-        
+
+        // ✅ Handle promotions
         const handled = await handleUserPromotion(ctx);
         if (handled) return;
-        const demoted = await handleUserDemotion(ctx);
-if (demoted) return;
 
+        // ✅ Handle demotions
+        const demoted = await handleUserDemotion(ctx);
+        if (demoted) return;
         // Check if there's an active quiz in this chat
         if (activeQuizzes && activeQuizzes.has(chatId) && 
             activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
