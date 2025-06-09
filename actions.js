@@ -4957,7 +4957,9 @@ async function handleUserDemotion(ctx) {
         // Check if the message matches the pattern @username تنزيل role or تنزيل role @username
         const text = ctx.message.text?.trim();
         let match = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
-        
+if (!match) {
+    match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
+}
         if (!match) {
             match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
             if (match) {
@@ -5016,6 +5018,7 @@ async function handleUserDemotion(ctx) {
             default:
                 await ctx.reply('❌ نوع الرتبة غير صالح.');
                 return true; // Command was handled
+                console.log('handleUserDemotion called with text:', text);
         }
         
         // Try to get user ID if possible
