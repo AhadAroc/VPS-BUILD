@@ -4281,8 +4281,6 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const handled = await handleUserPromotion(ctx);
         if (handled) return;
 
-       
-
         // Check if there's an active quiz in this chat
         if (activeQuizzes && activeQuizzes.has(chatId) && 
             activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
@@ -4297,7 +4295,6 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     quiz.attempts.set(`${userId}_${quiz.currentQuestionIndex}`, true);
                     
                     // Check if the answer is correct (case insensitive comparison)
-                    const userAnswer = text.trim().toLowerCase();
                     const correctAnswer = currentQuestion.answer.toLowerCase();
                     const isCorrect = userAnswer === correctAnswer;
                     
