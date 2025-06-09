@@ -5032,7 +5032,14 @@ async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
     const userAnswer = ctx.message.text.trim().toLowerCase();
+const text = ctx.message.text.trim();
+const match = text.match(/^رفع\s+(.*)$/); // e.g., رفع مطور
 
+if (match && ctx.message.reply_to_message) {
+    const role = match[1]; // "مطور"
+    await promoteUser(ctx, role); // this will now work because ctx.message.reply_to_message exists
+    return;
+}
     // Check for active quiz
     if (activeQuizzes.has(chatId)) {
         await handleQuizAnswer(ctx, chatId, userId, userAnswer);
