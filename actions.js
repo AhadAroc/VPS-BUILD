@@ -4792,22 +4792,33 @@ if (reply) {
 // Updated handleMediaReply function to check both global and user-specific states
 async function handleUserPromotion(ctx) {
     try {
-        // Check if the message matches the pattern @username رفع role
+        // Check if the message matches the pattern @username رفع role OR رفع role @username
         const text = ctx.message.text?.trim();
-        const match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
+        let match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
         
-        if (!match) return false; // Not a promotion command
+        if (!match) {
+            // Try the alternative pattern: رفع role @username
+            match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
+            if (match) {
+                // Swap the positions for the second pattern
+                match = [match[0], match[2], match[1]];
+            } else {
+                return false; // Not a promotion command
+            }
+        }
         
         // Extract username and role
         const username = match[1];
         const role = match[2];
         
         // Check if the user executing the command is an admin or owner
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+        const fromUserId = ctx.from.id; // Use ctx.from.id instead of userId
+        if (!(await isAdminOrOwner(ctx, fromUserId))) {
             await ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
             return true; // Command was handled
         }
         
+        // Rest of the function remains the same...
         // Initialize database
         const db = await ensureDatabaseInitialized();
         const botId = ctx.botInfo?.id || 'unknown'; // Fallback if bot info is not available
@@ -4857,11 +4868,11 @@ async function handleUserPromotion(ctx) {
         }
         
         // Try to get user ID if possible, but don't fail if we can't
-        let userId = null;
+        let targetUserId = null;
         try {
             // First try to get from chat member
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
-            userId = chatMember.user.id;
+            targetUserId = chatMember.user.id;
         } catch (error) {
             console.log(`Could not get user ID for @${username}, will store by username only: ${error.message}`);
             
@@ -4869,7 +4880,7 @@ async function handleUserPromotion(ctx) {
             try {
                 const knownUser = await db.collection('known_users').findOne({ username: username });
                 if (knownUser) {
-                    userId = knownUser.user_id;
+                    targetUserId = knownUser.user_id;
                 }
             } catch (dbError) {
                 console.log(`Database lookup failed for @${username}: ${dbError.message}`);
@@ -4877,7 +4888,7 @@ async function handleUserPromotion(ctx) {
         }
         
         // Check if user already exists in the collection
-        const query = userId ? { user_id: userId } : { username: username };
+        const query = targetUserId ? { user_id: targetUserId } : { username: username };
         const existingUser = await db.collection(collection).findOne(query);
         
         if (existingUser) {
@@ -4889,7 +4900,7 @@ async function handleUserPromotion(ctx) {
                         bot_id: botId,
                         username: username,
                         updated_at: new Date(),
-                        updated_by: ctx.from.id
+                        updated_by: fromUserId
                     }
                 }
             );
@@ -4897,21 +4908,21 @@ async function handleUserPromotion(ctx) {
         } else {
             // User doesn't have this role yet, create a new entry
             await db.collection(collection).insertOne({ 
-                user_id: userId, // May be null
+                user_id: targetUserId, // May be null
                 username: username,
                 bot_id: botId,
                 promoted_at: new Date(),
-                promoted_by: ctx.from.id,
+                promoted_by: fromUserId,
                 chat_id: ctx.chat.id
             });
             
             // Also add to known_users collection for future reference
-            if (userId) {
+            if (targetUserId) {
                 await db.collection('known_users').updateOne(
                     { username: username },
                     { 
                         $set: { 
-                            user_id: userId,
+                            user_id: targetUserId,
                             last_seen: new Date(),
                             last_seen_chat: ctx.chat.id
                         }
@@ -4921,7 +4932,7 @@ async function handleUserPromotion(ctx) {
             }
             
             await ctx.reply(successMessage);
-            console.log(`User @${username}${userId ? ` (${userId})` : ''} promoted to ${role} by user ${ctx.from.id}`);
+            console.log(`User @${username}${targetUserId ? ` (${targetUserId})` : ''} promoted to ${role} by user ${fromUserId}`);
         }
         
         return true; // Command was handled
@@ -4932,7 +4943,117 @@ async function handleUserPromotion(ctx) {
     }
 }
 
-
+// Add this function to handle user demotion
+async function handleUserDemotion(ctx) {
+    try {
+        // Check if the message matches the pattern @username تنزيل role or تنزيل role @username
+        const text = ctx.message.text?.trim();
+        let match = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
+        
+        if (!match) {
+            match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
+            if (match) {
+                // Swap the positions for the second pattern
+                match = [match[0], match[2], match[1]];
+            } else {
+                return false; // Not a demotion command
+            }
+        }
+        
+        // Extract username and role
+        const username = match[1];
+        const role = match[2];
+        
+        // Check if the user executing the command is an admin or owner
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            await ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+            return true; // Command was handled
+        }
+        
+        // Initialize database
+        const db = await ensureDatabaseInitialized();
+        
+        // Determine collection based on role
+        let collection;
+        
+        switch (role.toLowerCase()) {
+            case 'مميز':
+            case 'vip':
+                collection = 'vip_users';
+                break;
+            case 'ادمن':
+            case 'admin':
+                collection = 'admins';
+                break;
+            case 'مدير':
+            case 'manager':
+                collection = 'managers';
+                break;
+            case 'منشئ':
+            case 'creator':
+                collection = 'creators';
+                break;
+            case 'منشئ اساسي':
+            case 'primary creator':
+                collection = 'primary_creators';
+                break;
+            case 'مطور':
+            case 'developer':
+                collection = 'developers';
+                break;
+            case 'مطور ثانوي':
+            case 'secondary developer':
+                collection = 'secondary_developers';
+                break;
+            default:
+                await ctx.reply('❌ نوع الرتبة غير صالح.');
+                return true; // Command was handled
+        }
+        
+        // Try to get user ID if possible
+        let targetUserId = null;
+        try {
+            // First try to get from chat member
+            const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
+            targetUserId = chatMember.user.id;
+        } catch (error) {
+            console.log(`Could not get user ID for @${username}, will search by username only: ${error.message}`);
+            
+            // Try to find in known_users collection
+            try {
+                const knownUser = await db.collection('known_users').findOne({ username: username });
+                if (knownUser) {
+                    targetUserId = knownUser.user_id;
+                }
+            } catch (dbError) {
+                console.log(`Database lookup failed for @${username}: ${dbError.message}`);
+            }
+        }
+        
+        // Create query based on available information
+        const query = targetUserId ? { user_id: targetUserId } : { username: username };
+        
+        // Check if user exists in the collection
+        const existingUser = await db.collection(collection).findOne(query);
+        
+        if (!existingUser) {
+            await ctx.reply(`❌ المستخدم @${username} ليس لديه رتبة ${role} لإزالتها.`);
+            return true;
+        }
+        
+        // Remove the user from the collection
+        await db.collection(collection).deleteOne(query);
+        
+        await ctx.reply(`✅ تم إزالة رتبة ${role} من المستخدم @${username} بنجاح.`);
+        console.log(`User @${username}${targetUserId ? ` (${targetUserId})` : ''} demoted from ${role} by user ${ctx.from.id}`);
+        
+        return true; // Command was handled
+    } catch (error) {
+        console.error('Error in handleUserDemotion:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إزالة الرتبة من المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.');
+        return true; // Command was handled, even though it failed
+    }
+}
 // Helper function to get Arabic names for media types
 // Add this helper function
 function getMediaTypeInArabic(mediaType) {
