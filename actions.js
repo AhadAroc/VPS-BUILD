@@ -4341,6 +4341,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         // Handle bot name change
         if (ctx.session?.awaitingBotName) {
             const newBotName = ctx.message.text.trim();
+            const userId = ctx.from.id;
             try {
                 const db = await ensureDatabaseInitialized();
                 await db.collection('bot_names').updateOne(
