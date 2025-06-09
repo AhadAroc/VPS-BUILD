@@ -1927,7 +1927,32 @@ bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
 
 
 
+// Add these lines to your existing command handlers
+bot.hears(/^(رفع|ترقية) (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي|اساسي)/, (ctx) => {
+    try {
+        const role = ctx.match[2];
+        promoteUser(ctx, role);
+    } catch (error) {
+        console.error('Error processing promotion command:', error);
+        ctx.reply('❌ حدث خطأ أثناء معالجة أمر الترقية.');
+    }
+});
 
+// Add support for username mentions in promotion commands
+bot.hears(/^(رفع|ترقية) @(\w+) (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي|اساسي)/, async (ctx) => {
+    try {
+        const username = ctx.match[2];
+        const role = ctx.match[3];
+        
+        // Create a modified message text that our promoteUser function can parse
+        ctx.message.text = `${ctx.match[1]} ${role} @${username}`;
+        
+        await promoteUser(ctx, role);
+    } catch (error) {
+        console.error('Error processing promotion by username:', error);
+        ctx.reply('❌ حدث خطأ أثناء معالجة أمر الترقية.');
+    }
+})
 
 
 
@@ -4319,115 +4344,172 @@ async function isImportant(ctx, userId) {
     }
     async function promoteUser(ctx, role) {
     try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+        // Ensure we have a valid context object
+        if (!ctx || !ctx.message || !ctx.reply) {
+            console.error('Invalid context object in promoteUser');
+            return;
         }
 
-        let userId, userMention;
-        const args = ctx.message.text.split(' ').slice(1);
+        // Check if the user executing the command is an admin or owner
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        let userId, userMention, username;
+        const args = ctx.message.text.split(' ').slice(1);
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo?.id;
+
+        // Get target user from reply or mention
         if (ctx.message.reply_to_message) {
             userId = ctx.message.reply_to_message.from.id;
             userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            username = ctx.message.reply_to_message.from.username;
         } else if (args.length > 0) {
-            const username = args[0].replace('@', '');
+            // Try to extract username from the command
+            let usernameArg = args[0].replace('@', '');
+            
             try {
-                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
-                userId = user.user.id;
-                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+                // Try to get user info from Telegram
+                const user = await ctx.telegram.getChat(usernameArg);
+                if (user && user.id) {
+                    userId = user.id;
+                    userMention = `[${user.first_name || 'User'}](tg://user?id=${userId})`;
+                    username = user.username;
+                } else {
+                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                }
             } catch (error) {
-                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                console.error('Error getting user by username:', error);
+                
+                // Try to find user in database
+                try {
+                    const db = await ensureDatabaseInitialized();
+                    const userRecord = await db.collection('users').findOne({ 
+                        username: { $regex: new RegExp(`^${usernameArg}$`, 'i') }
+                    });
+                    
+                    if (userRecord) {
+                        userId = userRecord.user_id;
+                        userMention = `[User](tg://user?id=${userId})`;
+                        username = userRecord.username;
+                    } else {
+                        return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                    }
+                } catch (dbError) {
+                    console.error('Database error when finding user:', dbError);
+                    return ctx.reply('❌ حدث خطأ أثناء البحث عن المستخدم.');
+                }
             }
         } else {
             return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
         }
 
-        const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
-        let collection, successMessage;
-
-        switch (role.toLowerCase()) {
-            case 'مميز':
-            case 'vip':
-                collection = 'vip_users';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
-                break;
-            case 'verynull':
-            case 'verynull':
-                collection = 'verynull';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
-                // Promote the user to admin in the Telegram group
-                await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                    can_change_info: true,
-                    can_delete_messages: true,
-                    can_invite_users: true,
-                    can_restrict_members: true,
-                    can_pin_messages: true,
-                    can_promote_members: false
-                });
-                break;
-            case 'مدير':
-            case 'manager':
-                collection = 'managers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
-                break;
-            case 'منشئ':
-            case 'creator':
-                collection = 'creators';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
-                break;
-            case 'منشئ اساسي':
-            case 'primary creator':
-                collection = 'primary_creators';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
-                break;
-            case 'مطور':
-            case 'developer':
-                collection = 'developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
-                break;
-            case 'مطور ثانوي':
-            case 'secondary developer':
-                collection = 'secondary_developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
-                break;
-            default:
-                return ctx.reply('❌ نوع الترقية غير صالح.');
+        // Ensure we have a valid user ID at this point
+        if (!userId) {
+            return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
         }
 
-        // First check if the user already exists in the collection
-        const existingUser = await db.collection(collection).findOne({ user_id: userId });
+        const db = await ensureDatabaseInitialized();
         
-        if (existingUser) {
-            // User already has this role, just update their information
-            await db.collection(collection).updateOne(
-                { user_id: userId },
-                { 
-                    $set: { 
-                        bot_id: botId,
-                        username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
-                        updated_at: new Date(),
-                        updated_by: ctx.from.id
-                    }
+        // Handle different roles
+        switch (role.toLowerCase()) {
+            case 'مطور':
+                // Check if user is already a developer
+                const existingDev = await db.collection('developers').findOne({ user_id: userId });
+                if (existingDev) {
+                    return ctx.reply('هذا المستخدم مطور بالفعل.');
                 }
-            );
-            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${role}.`);
-        } else {
-            // User doesn't have this role yet, create a new entry
-            await db.collection(collection).insertOne({ 
-                user_id: userId, 
-                bot_id: botId,
-                username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
-                promoted_at: new Date(),
-                promoted_by: ctx.from.id
-            });
-            
-            ctx.replyWithMarkdown(successMessage);
-            console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
+                
+                // Add user to developers collection
+                await db.collection('developers').insertOne({
+                    user_id: userId,
+                    username: username,
+                    promoted_at: new Date(),
+                    promoted_by: ctx.from.id
+                });
+                
+                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور بنجاح.`);
+                break;
+                
+            case 'مطور ثانوي':
+                // Check if user is already a secondary developer
+                const existingSecDev = await db.collection('secondary_developers').findOne({ user_id: userId });
+                if (existingSecDev) {
+                    return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
+                }
+                
+                // Add user to secondary_developers collection
+                await db.collection('secondary_developers').insertOne({
+                    user_id: userId,
+                    username: username,
+                    promoted_at: new Date(),
+                    promoted_by: ctx.from.id
+                });
+                
+                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي بنجاح.`);
+                break;
+                
+            case 'مميز':
+                // Check if user is already VIP
+                const existingVIP = await db.collection('vip_users').findOne({ 
+                    user_id: userId,
+                    chat_id: chatId,
+                    is_active: true
+                });
+                
+                if (existingVIP) {
+                    return ctx.reply('هذا المستخدم مميز بالفعل في هذه المجموعة.');
+                }
+                
+                // Add user to vip_users collection
+                await db.collection('vip_users').insertOne({
+                    user_id: userId,
+                    username: username,
+                    chat_id: chatId,
+                    promoted_at: new Date(),
+                    promoted_by: ctx.from.id,
+                    is_active: true
+                });
+                
+                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى مميز.`);
+                break;
+                
+            case 'اساسي':
+                // Check if user is already a bot owner
+                const existingOwner = await db.collection('bot_owners').findOne({ 
+                    user_id: userId,
+                    chat_id: chatId,
+                    bot_id: botId,
+                    is_active: true
+                });
+                
+                if (existingOwner) {
+                    return ctx.reply('هذا المستخدم اساسي بالفعل في هذه المجموعة.');
+                }
+                
+                // Add user to bot_owners collection
+                await db.collection('bot_owners').insertOne({
+                    user_id: userId,
+                    username: username,
+                    chat_id: chatId,
+                    bot_id: botId,
+                    promoted_at: new Date(),
+                    promoted_by: ctx.from.id,
+                    is_active: true
+                });
+                
+                ctx.replyWithMarkdown(`✅ تم ترقية المستخدم ${userMention} إلى اساسي.`);
+                break;
+                
+            default:
+                ctx.reply(`❌ الرتبة "${role}" غير معروفة. الرتب المتاحة: مطور، مطور ثانوي، مميز، اساسي.`);
         }
     } catch (error) {
-        console.error(`Error promoting user to ${role}:`, error);
-        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
+        console.error('Error promoting user:', error);
+        if (ctx && ctx.reply) {
+            ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+        }
     }
 }
     // ✅ Demote user
