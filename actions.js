@@ -5031,15 +5031,51 @@ if (await isDeveloper(ctx, userId)) {
 async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
-    const userAnswer = ctx.message.text.trim().toLowerCase();
-const text = ctx.message.text.trim();
-const match = text.match(/^رفع\s+(.*)$/); // e.g., رفع مطور
+    const text = ctx.message.text.trim();
+    const userAnswer = text.toLowerCase();
 
-if (match && ctx.message.reply_to_message) {
-    const role = match[1]; // "مطور"
-    await promoteUser(ctx, role); // this will now work because ctx.message.reply_to_message exists
-    return;
-}
+    // ✅ Case 1: Reply-based promotion like [reply] رفع مطور
+    const match = text.match(/^رفع\s+(.*)$/); // e.g., رفع مطور
+    if (match && ctx.message.reply_to_message) {
+        const role = match[1]; // "مطور"
+        await promoteUser(ctx, role);
+        return;
+    }
+
+    // ✅ Case 2: @username رفع مطور — only works if user is stored in DB
+    const usernameMatch = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
+    if (usernameMatch) {
+        const mentionedUsername = usernameMatch[1];
+        const role = usernameMatch[2];
+
+        try {
+            const db = await ensureDatabaseInitialized();
+            const userRecord = await db.collection('known_users').findOne({ username: mentionedUsername });
+
+            if (!userRecord) {
+                await ctx.reply(`❌ لا أستطيع ترقية @${mentionedUsername}. لم أره من قبل.`);
+                return;
+            }
+
+            // Simulate a reply to that user
+            ctx.message.reply_to_message = {
+                from: {
+                    id: userRecord.user_id,
+                    username: userRecord.username,
+                    first_name: userRecord.first_name || 'User'
+                }
+            };
+            ctx.message.text = `رفع ${role}`;
+
+            await promoteUser(ctx, role);
+            return;
+        } catch (err) {
+            console.error('❌ Failed to promote by @username:', err.message);
+            await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية @${mentionedUsername}`);
+            return;
+        }
+    }
+
     // Check for active quiz
     if (activeQuizzes.has(chatId)) {
         await handleQuizAnswer(ctx, chatId, userId, userAnswer);
