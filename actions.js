@@ -4278,11 +4278,12 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const text = ctx.message.text?.trim();
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
         const userAnswer = ctx.message.text.trim().toLowerCase();
-        try {
+         try {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         const text = ctx.message.text;
-          // Handle promotion by username mention (@username رفع مطور)
+        
+        // Handle promotion by username mention (@username رفع مطور)
         const promotionRegex = /^@(\w+)\s+(رفع|ترقية)\s+(مطور|مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور ثانوي)$/;
         const promotionMatch = text?.match(promotionRegex);
         
@@ -4296,20 +4297,58 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     return ctx.reply('❌ عذراً، هذا الأمر مخصص للمشرفين والمطورين فقط.');
                 }
                 
-                // Try to get user info from username
+                // Try to find the user in the database first
+                const db = await ensureDatabaseInitialized();
+                const userRecord = await db.collection('users').findOne({ username: username.toLowerCase() });
+                
+                if (userRecord) {
+                    // User found in database, use their ID
+                    const targetUserId = userRecord.user_id;
+                    
+                    // Create a modified context with the target user info
+                    const modifiedCtx = {
+                        ...ctx,
+                        message: {
+                            ...ctx.message,
+                            text: `ترقية ${role}`,
+                            entities: [{
+                                type: 'text_mention',
+                                offset: ctx.message.text.indexOf(`@${username}`),
+                                length: username.length + 1,
+                                user: {
+                                    id: targetUserId,
+                                    username: username
+                                }
+                            }]
+                        }
+                    };
+                    
+                    // Call the promoteUser function with the modified context
+                    await promoteUser(modifiedCtx, role);
+                    return; // Stop further processing
+                }
+                
+                // If not found in database, try to get from Telegram
                 try {
-                    const user = await ctx.telegram.getChat(`@${username}`);
-                    if (user) {
+                    // This will only work if the user has interacted with the bot before
+                    const chatMembers = await ctx.telegram.getChatAdministrators(chatId);
+                    const targetUser = chatMembers.find(member => 
+                        member.user.username && 
+                        member.user.username.toLowerCase() === username.toLowerCase()
+                    );
+                    
+                    if (targetUser) {
                         // Create a modified context with the target user info
                         const modifiedCtx = {
                             ...ctx,
                             message: {
                                 ...ctx.message,
-                                text: `ترقية ${role} @${username}`,
+                                text: `ترقية ${role}`,
                                 entities: [{
-                                    type: 'mention',
+                                    type: 'text_mention',
                                     offset: ctx.message.text.indexOf(`@${username}`),
-                                    length: username.length + 1
+                                    length: username.length + 1,
+                                    user: targetUser.user
                                 }]
                             }
                         };
@@ -4318,9 +4357,13 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                         await promoteUser(modifiedCtx, role);
                         return; // Stop further processing
                     }
+                    
+                    // If we get here, the user wasn't found
+                    return ctx.reply(`❌ لم أتمكن من العثور على المستخدم @${username}. يجب أن يكون المستخدم قد تفاعل مع البوت من قبل أو أن يكون مشرفًا في المجموعة.`);
+                    
                 } catch (error) {
-                    console.error('Error getting user from username:', error);
-                    return ctx.reply(`❌ لم أتمكن من العثور على المستخدم @${username}. تأكد من أن المعرف صحيح وأن المستخدم قد تفاعل مع البوت من قبل.`);
+                    console.error('Error getting chat members:', error);
+                    return ctx.reply(`❌ لم أتمكن من العثور على المستخدم @${username}. تأكد من أن المستخدم موجود في المجموعة وقد تفاعل مع البوت من قبل.`);
                 }
             } catch (error) {
                 console.error('Error processing promotion by username:', error);
