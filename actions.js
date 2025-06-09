@@ -4212,11 +4212,23 @@ bot.action('show_current_bot_name', async (ctx) => {
         await demoteUser(ctx, 'developer');
     });
     // Add these lines to your existing command handlers
-bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, (ctx) => {
-    const role = ctx.match[1];
-    promoteUser(ctx, role);
+bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, async (ctx) => {
+    try {
+        // Validate context object before passing it
+        if (!ctx || !ctx.message || !ctx.from || !ctx.from.id || !ctx.chat) {
+            console.error('Invalid context object in promotion handler');
+            return;
+        }
+        
+        const role = ctx.match[1];
+        await promoteUser(ctx, role);
+    } catch (error) {
+        console.error('Error in promotion handler:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.').catch(e => {
+            console.error('Failed to send error message:', e);
+        });
+    }
 });
-
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 
 
