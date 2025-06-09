@@ -1928,31 +1928,42 @@ bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
 
 
 // Add these lines to your existing command handlers
-bot.hears(/^(رفع|ترقية) (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي|اساسي)/, (ctx) => {
+bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, async (ctx) => {
     try {
-        const role = ctx.match[2];
-        promoteUser(ctx, role);
+        // Validate context object before passing it
+        if (!ctx || !ctx.message || !ctx.from || !ctx.from.id || !ctx.chat) {
+            console.error('Invalid context object in promotion handler');
+            return;
+        }
+        
+        const role = ctx.match[1];
+        await promoteUser(ctx, role);
     } catch (error) {
-        console.error('Error processing promotion command:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة أمر الترقية.');
+        console.error('Error in promotion handler:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.').catch(e => {
+            console.error('Failed to send error message:', e);
+        });
     }
 });
 
 // Add support for username mentions in promotion commands
-bot.hears(/^(رفع|ترقية) @(\w+) (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي|اساسي)/, async (ctx) => {
+bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, async (ctx) => {
     try {
-        const username = ctx.match[2];
-        const role = ctx.match[3];
+        // Validate context object before passing it
+        if (!ctx || !ctx.message || !ctx.from || !ctx.from.id || !ctx.chat) {
+            console.error('Invalid context object in promotion handler');
+            return;
+        }
         
-        // Create a modified message text that our promoteUser function can parse
-        ctx.message.text = `${ctx.match[1]} ${role} @${username}`;
-        
+        const role = ctx.match[1];
         await promoteUser(ctx, role);
     } catch (error) {
-        console.error('Error processing promotion by username:', error);
-        ctx.reply('❌ حدث خطأ أثناء معالجة أمر الترقية.');
+        console.error('Error in promotion handler:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.').catch(e => {
+            console.error('Failed to send error message:', e);
+        });
     }
-})
+});
 
 
 
@@ -4787,7 +4798,7 @@ async function enableDocumentSharing(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة المستندات.');
     }
 }
-async function promoteToSecondaryDeveloper(ctx) {
+async function promoteToSecondaryDeveloper(ctx, userId, userMention) {
     try {
         console.log('DEBUG: Attempting to promote to secondary developer');
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
@@ -4795,25 +4806,27 @@ async function promoteToSecondaryDeveloper(ctx) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين ومالك المجموعة فقط.');
         }
 
-        let userId, userMention, username;
-        if (ctx.message.reply_to_message) {
-            userId = ctx.message.reply_to_message.from.id;
-            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-            username = ctx.message.reply_to_message.from.username;
-        } else {
-            const args = ctx.message.text.split(' ').slice(1);
-            if (args.length === 0) {
-                console.log('DEBUG: No username provided');
-                return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
-            }
-            username = args[0].replace('@', '');
-            try {
-                const user = await ctx.telegram.getChat(username);
-                userId = user.id;
-                userMention = `[${user.first_name}](tg://user?id=${userId})`;
-            } catch (error) {
-                console.log('DEBUG: User not found', error);
-                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+        // If userId and userMention are provided, use them directly
+        if (!userId || !userMention) {
+            // Otherwise, extract from message (backward compatibility)
+            if (ctx.message.reply_to_message) {
+                userId = ctx.message.reply_to_message.from.id;
+                userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
+            } else {
+                const args = ctx.message.text.split(' ').slice(1);
+                if (args.length === 0) {
+                    console.log('DEBUG: No username provided');
+                    return ctx.reply('❌ يجب ذكر معرف المستخدم (@username) أو الرد على رسالته لترقيته إلى مطور ثانوي.');
+                }
+                const username = args[0].replace('@', '');
+                try {
+                    const user = await ctx.telegram.getChat(username);
+                    userId = user.id;
+                    userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                } catch (error) {
+                    console.log('DEBUG: User not found', error);
+                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                }
             }
         }
 
@@ -4825,6 +4838,16 @@ async function promoteToSecondaryDeveloper(ctx) {
         if (existingDev) {
             console.log('DEBUG: User is already a secondary developer');
             return ctx.reply('هذا المستخدم مطور ثانوي بالفعل.');
+        }
+
+        // Get username if possible
+        let username;
+        try {
+            const userInfo = await ctx.telegram.getChat(userId);
+            username = userInfo.username;
+        } catch (error) {
+            console.log('Could not fetch username:', error);
+            username = null;
         }
 
         console.log('DEBUG: Adding user to secondary_developers collection');
@@ -4842,7 +4865,6 @@ async function promoteToSecondaryDeveloper(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم إلى مطور ثانوي. الرجاء المحاولة مرة أخرى لاحقًا.');
     }
 }
-
 async function disableVideoSharing(ctx) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
