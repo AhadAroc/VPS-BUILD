@@ -4506,8 +4506,8 @@ async function isImportant(ctx, userId) {
             'managers', 
             'admins', 
             'vip_users',
-            'bot_owners', // Added bot_owners collection
-            'bot_admins'  // Added bot_admins collection
+            'bot_owners',
+            'bot_admins'
         ];
         
         let userRoles = [];
@@ -4525,6 +4525,15 @@ async function isImportant(ctx, userId) {
                 }
             } catch (error) {
                 console.error(`Error checking ${role} collection:`, error);
+            }
+        }
+
+        // Special handling for "مطور" (developer) command
+        const commandText = ctx.message.text.toLowerCase();
+        if (commandText.includes('تنزيل مطور')) {
+            // If specifically demoting a developer, check if they were removed from developers collection
+            if (!removedRoles.includes('developers') && !removedRoles.includes('secondary_developers')) {
+                return ctx.reply('❌ هذا المستخدم ليس مطورًا.');
             }
         }
 
