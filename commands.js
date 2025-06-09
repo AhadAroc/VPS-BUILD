@@ -1934,7 +1934,7 @@ bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
 
 // Add these command handlers to your bot setup
 bot.command('رفع_مميز', promoteToImportant);
-bot.hears(/^رفع مميز/, promoteToImportant);
+//bot.hears(/^رفع مميز/, promoteToImportant);
 bot.command('تنزيل_مميز', demoteFromImportant);
 bot.hears(/^تنزيل مميز/, demoteFromImportant);
 
