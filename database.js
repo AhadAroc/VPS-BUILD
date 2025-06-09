@@ -511,37 +511,43 @@ async function setupDatabase() {
             }
         }
 
-        console.log('Database setup completed');
+               console.log('Database setup completed');
+        return db; // ✅ Add this so callers get the usable db object
     } catch (error) {
         console.error('Error setting up database:', error);
         throw error;
     }
 }
+
 // Add a new function for quiz-related operations
-async function saveQuizScore(chatId, userId, firstName, lastName, username, points) {
+async function saveQuizScore(chatId, userId, firstName, lastName, username, score) {
     try {
         const db = await ensureDatabaseInitialized();
+        if (!db) {
+            throw new Error('Database connection failed');
+        }
         
-        // Update or insert the user's score
         await db.collection('quiz_scores').updateOne(
-            { chatId: chatId, userId: userId },
+            { chat_id: chatId, user_id: userId },
             { 
-                $inc: { score: points },
-                $set: { 
-                    firstName: firstName,
-                    lastName: lastName,
+                $set: {
+                    chat_id: chatId,
+                    user_id: userId,
+                    first_name: firstName,
+                    last_name: lastName,
                     username: username,
-                    lastUpdated: new Date()
-                }
+                    last_played: new Date()
+                },
+                $inc: { total_score: score }
             },
             { upsert: true }
         );
         
-        console.log(`Saved quiz score for user ${userId} in chat ${chatId}: +${points} points`);
+        console.log(`Saved quiz score for user ${userId} in chat ${chatId}: +${score} points`);
         return true;
     } catch (error) {
         console.error('Error saving quiz score:', error);
-        throw error;
+        return false;
     }
 }
 
