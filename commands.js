@@ -517,22 +517,40 @@ async function showHelp(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض المساعدة. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
-async function isBotAdmin(userId) {
+async function isBotAdmin(ctx, userId) {
     try {
         if (!userId) {
             console.error('Error in isBotAdmin: userId is undefined');
             return false;
         }
-        
+
         const db = await ensureDatabaseInitialized();
-        const botAdmin = await db.collection('bot_admins').findOne({ user_id: parseInt(userId) });
-        console.log(`Bot admin check for user ${userId}: ${!!botAdmin}`);
-        return !!botAdmin;
+
+        // 1. Check by user_id
+        const botAdminById = await db.collection('bot_admins').findOne({ user_id: parseInt(userId) });
+        if (botAdminById) {
+            console.log(`Bot admin check for user ${userId} by ID: true`);
+            return true;
+        }
+
+        // 2. Fallback: Check by username
+        const username = ctx.from?.username;
+        if (username) {
+            const botAdminByUsername = await db.collection('bot_admins').findOne({ username: username });
+            if (botAdminByUsername) {
+                console.log(`Bot admin check for @${username} by username: true`);
+                return true;
+            }
+        }
+
+        console.log(`Bot admin check for user ${userId}: false`);
+        return false;
     } catch (error) {
         console.error('Error checking bot admin status:', error);
         return false;
     }
 }
+
 async function getLeaderboard(groupId) {
     try {
         const db = await ensureDatabaseInitialized();
@@ -749,23 +767,38 @@ async function isBotOwner(ctx, userId) {
         const chatId = ctx.chat.id;
         const db = await ensureDatabaseInitialized();
         
-        // Convert IDs to numbers to ensure consistent comparison
         const userIdNum = parseInt(userId);
         const chatIdNum = parseInt(chatId);
-        
+
         console.log(`Checking if user ${userIdNum} is a bot owner (اساسي) in chat ${chatIdNum}`);
-        
-        // Query the database for bot owners
-        const owner = await db.collection('bot_owners').findOne({
+
+        // 1. Try matching by user_id and chat_id
+        const byId = await db.collection('bot_owners').findOne({
             user_id: userIdNum,
             chat_id: chatIdNum,
             is_active: true
         });
-        
-        const isOwner = !!owner;
-        console.log(`User ${userIdNum} is${isOwner ? '' : ' not'} a bot owner (اساسي) in chat ${chatIdNum}`);
-        
-        return isOwner;
+        if (byId) {
+            console.log(`User ${userIdNum} is a bot owner by ID.`);
+            return true;
+        }
+
+        // 2. Fallback: try matching by username
+        const username = ctx.from?.username;
+        if (username) {
+            const byUsername = await db.collection('bot_owners').findOne({
+                username: username,
+                chat_id: chatIdNum,
+                is_active: true
+            });
+            if (byUsername) {
+                console.log(`User @${username} is a bot owner by username.`);
+                return true;
+            }
+        }
+
+        console.log(`User ${userIdNum} is not a bot owner.`);
+        return false;
     } catch (error) {
         console.error('Error checking if user is bot owner (اساسي):', error);
         return false;
@@ -4746,11 +4779,29 @@ async function isPrimaryDeveloper(ctx, userId) {
 async function isSecondaryDeveloper(ctx, userId) {
     try {
         const db = await ensureDatabaseInitialized();
-        const secondaryDev = await db.collection('secondary_developers').findOne({ user_id: userId });
-        return !!secondaryDev; // Returns true if the user is found in the secondary_developers collection, false otherwise
+
+        // First try matching by user_id
+        const byId = await db.collection('secondary_developers').findOne({ user_id: userId });
+        if (byId) {
+            console.log(`User ${userId} found as secondary developer by ID.`);
+            return true;
+        }
+
+        // Fallback: try matching by username
+        const username = ctx.from?.username;
+        if (username) {
+            const byUsername = await db.collection('secondary_developers').findOne({ username: username });
+            if (byUsername) {
+                console.log(`User @${username} matched as secondary developer by username.`);
+                return true;
+            }
+        }
+
+        console.log(`User ${userId} is not a secondary developer.`);
+        return false;
     } catch (error) {
         console.error('Error checking secondary developer status:', error);
-        return false; // Return false in case of any error
+        return false;
     }
 }
 
