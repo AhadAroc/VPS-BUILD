@@ -4432,100 +4432,172 @@ async function isImportant(ctx, userId) {
 }
     // ✅ Demote user
     // ✅ Demote user u check this
-    async function demoteUser(ctx) {
-        try {
-            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+   async function demoteUser(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
+        }
+
+        let userId, userMention, username;
+        const replyMessage = ctx.message.reply_to_message;
+
+        if (replyMessage) {
+            userId = replyMessage.from.id;
+            username = replyMessage.from.username;
+            userMention = `[${replyMessage.from.first_name}](tg://user?id=${userId})`;
+        } else {
+            const args = ctx.message.text.split(' ').slice(1);
+            if (args.length === 0) {
+                return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) أو معرفه الرقمي.');
             }
-    
-            let userId, userMention;
-            const replyMessage = ctx.message.reply_to_message;
-    
-            if (replyMessage) {
-                userId = replyMessage.from.id;
-                userMention = `[${replyMessage.from.first_name}](tg://user?id=${userId})`;
-            } else {
-                const args = ctx.message.text.split(' ').slice(1);
-                if (args.length === 0) {
-                    return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) أو معرفه الرقمي.');
+            
+            const identifier = args[0].replace('@', '');
+            
+            // Try to get user by username or ID
+            try {
+                // Check if it's a numeric ID
+                if (/^\d+$/.test(identifier)) {
+                    userId = parseInt(identifier);
+                    try {
+                        const user = await ctx.telegram.getChat(userId);
+                        username = user.username;
+                        userMention = `[${user.first_name}](tg://user?id=${userId})`;
+                    } catch (error) {
+                        // If we can't get the user info, just use the ID
+                        userMention = `المستخدم (${userId})`;
+                    }
+                } else {
+                    // It's a username
+                    username = identifier;
+                    try {
+                        const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
+                        userId = user.user.id;
+                        userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
+                    } catch (error) {
+                        // If we can't get the user ID, just use the username
+                        userMention = `@${username}`;
+                    }
                 }
-                const username = args[0].replace('@', '');
-                try {
-                    const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
-                    userId = user.user.id;
-                    userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
-                } catch (error) {
-                    return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            } catch (error) {
+                console.error('Error getting user info:', error);
+                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+            }
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo?.id || 'unknown'; // Fallback if bot info is not available
+        
+        // Build query based on available information
+        let query = {};
+        if (userId) {
+            query.user_id = userId;
+        } else if (username) {
+            query.username = username;
+        } else {
+            return ctx.reply('❌ لم يتم العثور على معلومات كافية عن المستخدم.');
+        }
+
+        // Check all possible roles
+        const roles = [
+            'developers', 
+            'secondary_developers', 
+            'primary_creators',
+            'creators',
+            'managers', 
+            'admins', 
+            'vip_users',
+            'bot_owners', // Added bot_owners collection
+            'bot_admins'  // Added bot_admins collection
+        ];
+        
+        let userRoles = [];
+        let removedRoles = [];
+
+        // Check each collection for the user
+        for (const role of roles) {
+            try {
+                const result = await db.collection(role).findOne(query);
+                if (result) {
+                    userRoles.push(role);
+                    // Remove the user from this collection
+                    await db.collection(role).deleteOne({ _id: result._id });
+                    removedRoles.push(role);
                 }
+            } catch (error) {
+                console.error(`Error checking ${role} collection:`, error);
             }
-    
-            const db = await ensureDatabaseInitialized();
-            let collection, successMessage;
-    
-            // Check all possible roles
-            const roles = ['developers', 'secondary_developers', 'primary_developers', 'admins', 'vip_users'];
-            let userRole = null;
-    
-            for (const role of roles) {
-                const user = await db.collection(role).findOne({ user_id: userId });
-                if (user) {
-                    userRole = role;
-                    break;
-                }
-            }
-    
-            if (!userRole) {
-                return ctx.reply('❌ هذا المستخدم ليس لديه أي رتبة خاصة للإزالة.');
-            }
-    
-            // Remove the user from the corresponding collection
-            await db.collection(userRole).deleteOne({ user_id: userId });
-    
-            switch (userRole) {
+        }
+
+        if (removedRoles.length === 0) {
+            return ctx.reply('❌ هذا المستخدم ليس لديه أي رتبة خاصة للإزالة.');
+        }
+
+        // Generate success message based on removed roles
+        let successMessage = `✅ تم إزالة الرتب التالية من المستخدم ${userMention}:\n`;
+        
+        for (const role of removedRoles) {
+            switch (role) {
                 case 'developers':
-                    successMessage = `✅ تم إزالة رتبة المطور من المستخدم ${userMention}.`;
+                    successMessage += '- مطور\n';
                     break;
                 case 'secondary_developers':
-                    successMessage = `✅ تم إزالة رتبة المطور الثانوي من المستخدم ${userMention}.`;
+                    successMessage += '- مطور ثانوي\n';
                     break;
-                case 'primary_developers':
-                    successMessage = `✅ تم إزالة رتبة المطور الأساسي من المستخدم ${userMention}.`;
+                case 'primary_creators':
+                    successMessage += '- منشئ اساسي\n';
+                    break;
+                case 'creators':
+                    successMessage += '- منشئ\n';
+                    break;
+                case 'managers':
+                    successMessage += '- مدير\n';
                     break;
                 case 'admins':
-                    successMessage = `✅ تم إزالة رتبة الادمن من المستخدم ${userMention}.`;
-                    // Remove admin privileges in the Telegram group
-                    await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                        can_change_info: false,
-                        can_delete_messages: false,
-                        can_invite_users: false,
-                        can_restrict_members: false,
-                        can_pin_messages: false,
-                        can_promote_members: false
-                    });
+                    successMessage += '- ادمن\n';
+                    // Try to remove admin privileges in the Telegram group
+                    try {
+                        await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
+                            can_change_info: false,
+                            can_delete_messages: false,
+                            can_invite_users: false,
+                            can_restrict_members: false,
+                            can_pin_messages: false,
+                            can_promote_members: false
+                        });
+                    } catch (error) {
+                        console.error('Error removing admin privileges:', error);
+                    }
                     break;
                 case 'vip_users':
-                    successMessage = `✅ تم إزالة رتبة ادمن المسابقات (VIP) من المستخدم ${userMention}.`;
-                    // Reset user permissions to default
-                    await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
-                        can_send_messages: true,
-                        can_send_media_messages: true,
-                        can_send_polls: true,
-                        can_send_other_messages: true,
-                        can_add_web_page_previews: true,
-                        can_change_info: false,
-                        can_invite_users: false,
-                        can_pin_messages: false
-                    });
+                    successMessage += '- مميز (VIP)\n';
+                    break;
+                case 'bot_owners':
+                    successMessage += '- مالك البوت\n';
+                    break;
+                case 'bot_admins':
+                    successMessage += '- ادمن البوت\n';
                     break;
             }
-    
-            ctx.replyWithMarkdown(successMessage);
-    
-        } catch (error) {
-            console.error('Error in demoteUser:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة إزالة رتبة المستخدم.');
         }
+
+        // Add record to demotions collection for audit trail
+        await db.collection('demotions').insertOne({
+            user_id: userId,
+            username: username,
+            demoted_by: ctx.from.id,
+            demoted_at: new Date(),
+            removed_roles: removedRoles,
+            chat_id: ctx.chat.id,
+            bot_id: botId
+        });
+
+        ctx.replyWithMarkdown(successMessage);
+
+    } catch (error) {
+        console.error('Error in demoteUser:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة إزالة رتبة المستخدم.');
     }
+}
     //call command
     async function callEveryone(ctx) {
         try {
