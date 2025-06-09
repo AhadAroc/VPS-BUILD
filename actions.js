@@ -4290,10 +4290,36 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                 if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
                     try {
                         // Try to get the user from the group members
-                        const chatMember = await ctx.telegram.getChatMember(chatId, `@${username}`);
+                        // Use getChatMember with error handling
+                        let chatMember;
+                        try {
+                            chatMember = await ctx.telegram.getChatMember(chatId, `@${username}`);
+                        } catch (memberError) {
+                            console.log(`Error getting chat member @${username}: ${memberError.message}`);
+                            
+                            // Try to find by username directly from database
+                            const db = await ensureDatabaseInitialized();
+                            const userRecord = await db.collection('known_users').findOne({ 
+                                username: username 
+                            });
+                            
+                            if (userRecord) {
+                                // Create a simulated chat member from database record
+                                chatMember = {
+                                    user: {
+                                        id: userRecord.user_id,
+                                        username: userRecord.username,
+                                        first_name: userRecord.first_name || 'User',
+                                        last_name: userRecord.last_name
+                                    }
+                                };
+                            } else {
+                                throw new Error('User not found in database');
+                            }
+                        }
                         
                         if (chatMember && chatMember.user) {
-                            // User found in the group, create reply context
+                            // User found, create reply context
                             ctx.message.reply_to_message = {
                                 from: {
                                     id: chatMember.user.id,
@@ -4303,53 +4329,118 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                             };
                             ctx.message.text = `رفع ${role}`;
                             
-                            // Also save this user to known_users for future reference
-                            const db = await ensureDatabaseInitialized();
-                            await db.collection('known_users').updateOne(
-                                { user_id: chatMember.user.id },
-                                { 
-                                    $set: { 
-                                        username: chatMember.user.username,
-                                        first_name: chatMember.user.first_name,
-                                        last_name: chatMember.user.last_name,
-                                        last_seen: new Date()
-                                    }
-                                },
-                                { upsert: true }
-                            );
+                            // Save this user to known_users for future reference
+                            try {
+                                const db = await ensureDatabaseInitialized();
+                                await db.collection('known_users').updateOne(
+                                    { user_id: chatMember.user.id },
+                                    { 
+                                        $set: { 
+                                            username: chatMember.user.username,
+                                            first_name: chatMember.user.first_name,
+                                            last_name: chatMember.user.last_name,
+                                            last_seen: new Date()
+                                        }
+                                    },
+                                    { upsert: true }
+                                );
+                            } catch (dbError) {
+                                console.error('Error updating known_users:', dbError);
+                                // Continue even if database update fails
+                            }
                             
-                            await promoteUser(ctx, role);
+                            // Call promoteUser with error handling
+                            try {
+                                await promoteUser(ctx, role);
+                            } catch (promoteError) {
+                                console.error('Error in promoteUser:', promoteError);
+                                await ctx.reply(`⚠️ حدث خطأ أثناء محاولة ترقية المستخدم. سيتم المحاولة بطريقة بديلة...`);
+                                
+                                // Fallback: Direct database update
+                                try {
+                                    const db = await ensureDatabaseInitialized();
+                                    const botId = ctx.botInfo.id;
+                                    
+                                    // Determine which collection to update based on role
+                                    let collection;
+                                    if (role.includes('مطور')) {
+                                        collection = 'developers';
+                                    } else if (role.includes('مميز')) {
+                                        collection = 'vip_users';
+                                    } else if (role.includes('ادمن') || role.includes('أدمن')) {
+                                        collection = 'bot_admins';
+                                    } else if (role.includes('منشئ') || role.includes('اساسي')) {
+                                        collection = 'bot_owners';
+                                    }
+                                    
+                                    if (collection) {
+                                        await db.collection(collection).updateOne(
+                                            { 
+                                                user_id: chatMember.user.id,
+                                                chat_id: chatId,
+                                                bot_id: botId
+                                            },
+                                            { 
+                                                $set: {
+                                                    user_id: chatMember.user.id,
+                                                    username: chatMember.user.username,
+                                                    first_name: chatMember.user.first_name,
+                                                    last_name: chatMember.user.last_name,
+                                                    chat_id: chatId,
+                                                    bot_id: botId,
+                                                    promoted_by: userId,
+                                                    promoted_at: new Date(),
+                                                    is_active: true
+                                                }
+                                            },
+                                            { upsert: true }
+                                        );
+                                        
+                                        await ctx.reply(`✅ تم ترقية المستخدم @${username} إلى ${role} بنجاح.`);
+                                    } else {
+                                        await ctx.reply(`❌ الرتبة "${role}" غير معروفة.`);
+                                    }
+                                } catch (fallbackError) {
+                                    console.error('Fallback promotion failed:', fallbackError);
+                                    await ctx.reply(`❌ فشلت محاولة الترقية. يرجى التأكد من صحة المعرف والمحاولة مرة أخرى.`);
+                                }
+                            }
                             return;
                         }
                     } catch (groupError) {
-                        console.log(`Could not find @${username} in group members, trying database: ${groupError.message}`);
+                        console.log(`Could not find @${username} in group members: ${groupError.message}`);
                         // Continue to database lookup if group lookup fails
                     }
                 }
                 
                 // If not found in group or not in a group, try database lookup
-                const db = await ensureDatabaseInitialized();
-                const userRecord = await db.collection('known_users').findOne({ username });
+                try {
+                    const db = await ensureDatabaseInitialized();
+                    const userRecord = await db.collection('known_users').findOne({ username });
 
-                if (!userRecord) {
-                    await ctx.reply(`❌ لم أستطع العثور على المستخدم @${username}. تأكد أنه بدأ البوت أو موجود في المجموعة.`);
-                    return;
-                }
-
-                // Simulate reply message context
-                ctx.message.reply_to_message = {
-                    from: {
-                        id: userRecord.user_id,
-                        username: userRecord.username,
-                        first_name: userRecord.first_name || 'User'
+                    if (!userRecord) {
+                        await ctx.reply(`❌ لم أستطع العثور على المستخدم @${username}. تأكد أنه بدأ البوت أو موجود في المجموعة.`);
+                        return;
                     }
-                };
-                ctx.message.text = `رفع ${role}`;
 
-                await promoteUser(ctx, role);
+                    // Simulate reply message context
+                    ctx.message.reply_to_message = {
+                        from: {
+                            id: userRecord.user_id,
+                            username: userRecord.username,
+                            first_name: userRecord.first_name || 'User'
+                        }
+                    };
+                    ctx.message.text = `رفع ${role}`;
+
+                    await promoteUser(ctx, role);
+                } catch (dbError) {
+                    console.error('Database lookup error:', dbError);
+                    await ctx.reply(`❌ حدث خطأ أثناء البحث عن المستخدم في قاعدة البيانات.`);
+                }
             } catch (err) {
                 console.error('❌ Failed to promote by @username:', err.message);
-                await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية @${username}`);
+                await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية @${username}. يرجى التأكد من صحة المعرف والمحاولة مرة أخرى.`);
             }
 
             return; // 🛑 Stop further processing
