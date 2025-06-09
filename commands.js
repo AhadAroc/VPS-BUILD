@@ -1975,7 +1975,7 @@ bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
 bot.command('رفع_مميز', promoteToImportant);
 //bot.hears(/^رفع مميز/, promoteToImportant);
 bot.command('تنزيل_مميز', demoteFromImportant);
-bot.hears(/^تنزيل مميز/, demoteFromImportant);
+//bot.hears(/^تنزيل مميز/, demoteFromImportant);
 
 // Update command handlers for listing important users
 bot.command('لستة_مميز', listImportantUsers);
