@@ -4271,13 +4271,17 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
 // Register the text handler
     // For the text handler that's causing errors, update it to:
     // Register the text handler
-    bot.on('text', async (ctx) => {
-      try {
+   
+     bot.on('text', async (ctx) => {
+    try {
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
         const text = ctx.message.text?.trim();
         const userAnswer = text?.toLowerCase();
+        
+        // Initialize isBroadcasting based on chat state
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+        
         const handled = await handleUserPromotion(ctx);
         if (handled) return;
 
