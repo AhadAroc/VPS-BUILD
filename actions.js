@@ -4377,6 +4377,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         // Handle warning settings update
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
+        const userState = userStates.get(userId);
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
         const state = userStates.get(userId);
          const text = ctx.message.text?.trim();
