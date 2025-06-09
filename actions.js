@@ -4376,7 +4376,10 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         
         // Handle warning settings update
         const userId = ctx.from.id;
+        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
         const state = userStates.get(userId);
+         const text = ctx.message.text?.trim();
+        const userAnswer = text?.toLowerCase();
         if (state && state.action && state.action.startsWith('edit_warning_')) {
             const count = parseInt(text);
             const action = state.action;
