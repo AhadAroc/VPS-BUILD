@@ -4282,32 +4282,26 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         
-        const text = ctx.message.text.trim();
+       const text = ctx.message.text.trim();
 const match = text.match(/^@(\w+)\s+رفع\s+(.*)$/); // Matches "@username رفع مطور"
 
 if (match) {
-    const username = match[1]; // e.g., "john_doe"
+    const username = match[1]; // e.g., "asdsdwec"
     const role = match[2];     // e.g., "مطور"
 
     try {
-        // Get chat ID
-        const chatId = ctx.chat.id;
+        // Try resolving the username to get the user ID
+        const user = await ctx.telegram.getChat(`@${username}`);
+        const userId = user.id;
 
-        // Get user info from Telegram
-        const user = await ctx.telegram.getChatMember(chatId, username);
-        if (!user || !user.user) {
-            await ctx.reply('❌ لم يتم العثور على المستخدم.');
-            return;
-        }
+        // Simulate a reply context for promoteUser
+        ctx.message.reply_to_message = { from: user };
+        ctx.message.text = `رفع ${role}`;
 
-        const userId = user.user.id;
-        ctx.message.reply_to_message = { from: user.user }; // simulate a reply
-        ctx.message.text = `رفع ${role}`; // mimic a proper command format
-
-        await promoteUser(ctx, role); // Call your function with simulated context
+        await promoteUser(ctx, role); // ✅ Now works with proper userId
     } catch (err) {
         console.error('❌ Failed to promote by username:', err.message);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+        await ctx.reply(`❌ لم أستطع العثور على المستخدم @${username}. تأكد أنه بدأ البوت أو موجود في المجموعة.`);
     }
 
     return;
