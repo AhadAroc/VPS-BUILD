@@ -317,7 +317,20 @@ async function handleTextMessage(ctx) {
     const userText = ctx.message.text.trim().toLowerCase();
 
     console.log(`Processing text message: "${userText}" from user ${userId} in chat ${chatId}`);
+ // Check for promotion by username first
+    if (await handlePromotionByUsername(ctx)) {
+        return;
+    }
 
+    // Rest of your existing handleTextMessage function...
+    // Handle state-based operations first
+    if (awaitingReplyWord) {
+        tempReplyWord = userText;
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
+        return;
+    }
     // Handle state-based operations first
     if (awaitingReplyWord) {
         tempReplyWord = userText;
@@ -5095,7 +5108,20 @@ async function handleTextMessage(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
     const userAnswer = ctx.message.text.trim().toLowerCase();
+ // Check for promotion by username first
+    if (await handlePromotionByUsername(ctx)) {
+        return;
+    }
 
+    // Rest of your existing handleTextMessage function...
+    // Handle state-based operations first
+    if (awaitingReplyWord) {
+        tempReplyWord = userText;
+        await ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
+        return;
+    }
     // Check for active quiz
     if (activeQuizzes.has(chatId)) {
         await handleQuizAnswer(ctx, chatId, userId, userAnswer);
@@ -5111,7 +5137,124 @@ if (ctx.chat.type === 'private') {
         return;
     }
 }
-
+async function handlePromotionByUsername(ctx) {
+    try {
+        const text = ctx.message.text.trim();
+        // Match patterns like "@username رفع مطور" or "رفع @username مطور"
+        const promotionRegex = /^(?:@(\w+)\s+(رفع|ترقية)\s+(مطور|مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور ثانوي)|(رفع|ترقية)\s+@(\w+)\s+(مطور|مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور ثانوي))$/;
+        const match = text.match(promotionRegex);
+        
+        if (!match) return false;
+        
+        // Check if the user has permission to promote
+        const userId = ctx.from.id;
+        if (!(await isAdminOrOwner(ctx, userId)) && !(await isDeveloper(ctx, userId))) {
+            await ctx.reply('❌ عذراً، هذا الأمر مخصص للمشرفين والمطورين فقط.');
+            return true;
+        }
+        
+        // Extract username and role based on the pattern matched
+        let username, role;
+        if (match[1]) {
+            // Pattern: @username رفع مطور
+            username = match[1];
+            role = match[3];
+        } else {
+            // Pattern: رفع @username مطور
+            username = match[5];
+            role = match[6];
+        }
+        
+        console.log(`Promotion request: username=${username}, role=${role}`);
+        
+        // Try to find the user in the database first
+        const db = await ensureDatabaseInitialized();
+        const userRecord = await db.collection('users').findOne({ 
+            username: username.toLowerCase() 
+        });
+        
+        let targetUserId;
+        
+        if (userRecord) {
+            // User found in database, use their ID
+            targetUserId = userRecord.user_id;
+            console.log(`Found user in database: ${targetUserId}`);
+        } else {
+            // User not found in database, try to resolve via Telegram API
+            try {
+                // This might fail if the user hasn't interacted with the bot
+                const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
+                targetUserId = chatMember.user.id;
+                console.log(`Resolved user via Telegram API: ${targetUserId}`);
+            } catch (error) {
+                console.error('Error getting user from username:', error);
+                await ctx.reply(`❌ لم يتم العثور على المستخدم @${username}. يجب أن يكون المستخدم قد تفاعل مع البوت مسبقاً.`);
+                return true;
+            }
+        }
+        
+        if (!targetUserId) {
+            await ctx.reply(`❌ لم يتم العثور على المستخدم @${username}. يجب أن يكون المستخدم قد تفاعل مع البوت مسبقاً.`);
+            return true;
+        }
+        
+        // Map Arabic role names to function names
+        const roleMap = {
+            'مطور': 'promoteToSecondaryDeveloper',
+            'مطور ثانوي': 'promoteToSecondaryDeveloper',
+            'مميز': 'promoteToVIP',
+            'ادمن': 'promoteToBotAdmin',
+            'مدير': 'promoteToBotAdmin',
+            'منشئ': 'promoteToBotOwner',
+            'منشئ اساسي': 'promoteToBotOwner'
+        };
+        
+        const functionName = roleMap[role];
+        if (!functionName) {
+            await ctx.reply(`❌ الرتبة "${role}" غير معروفة.`);
+            return true;
+        }
+        
+        // Import the required function
+        const { promoteToSecondaryDeveloper, promoteToVIP, promoteToBotAdmin, promoteToBotOwner } = require('./commands');
+        
+        // Create a modified context with reply_to_message containing the target user
+        const modifiedCtx = {
+            ...ctx,
+            message: {
+                ...ctx.message,
+                reply_to_message: {
+                    from: {
+                        id: targetUserId,
+                        first_name: username
+                    }
+                }
+            }
+        };
+        
+        // Call the appropriate promotion function
+        switch (functionName) {
+            case 'promoteToSecondaryDeveloper':
+                await promoteToSecondaryDeveloper(modifiedCtx);
+                break;
+            case 'promoteToVIP':
+                await promoteToVIP(modifiedCtx);
+                break;
+            case 'promoteToBotAdmin':
+                await promoteToBotAdmin(modifiedCtx);
+                break;
+            case 'promoteToBotOwner':
+                await promoteToBotOwner(modifiedCtx);
+                break;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error processing promotion by username:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.');
+        return true;
+    }
+}
 // Add this function to handle awaiting reply word
 async function handleAwaitingReplyWord(ctx) {
     tempReplyWord = ctx.message.text.trim().toLowerCase();
