@@ -4960,23 +4960,25 @@ async function handleUserDemotion(ctx) {
     try {
         // Check if the message matches the pattern @username تنزيل role or تنزيل role @username
         const text = ctx.message.text?.trim();
-        let match = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
+let match;
+
+// Try pattern 1: @username تنزيل role
+match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
+
+// Try pattern 2: تنزيل role @username
 if (!match) {
-    match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
+    const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
+    if (altMatch) {
+        match = [altMatch[0], altMatch[2], altMatch[1]]; // Swap order for consistency
+    }
 }
-        if (!match) {
-            match = text.match(/^تنزيل\s+(.*)\s+@(\w+)$/);
-            if (match) {
-                // Swap the positions for the second pattern
-                match = [match[0], match[2], match[1]];
-            } else {
-                return false; // Not a demotion command
-            }
-        }
-        
-        // Extract username and role
-        const username = match[1];
-        const role = match[2];
+
+if (!match) {
+    return false; // Not a valid demotion command
+}
+
+const username = match[1].trim();
+const role = match[2].trim().toLowerCase();
         
         // Check if the user executing the command is an admin or owner
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
