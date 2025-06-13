@@ -138,13 +138,18 @@ async function connectToMongoDB(customDbName = null) {
             currentMongooseDb = null;
         }
         
-        // Connect to MongoDB
-        if (!mongooseConnected) {
-            await mongoose.connect(uriToUse, mongooseOptions);
-            mongooseConnected = true;
-            currentMongooseDb = dbNameToUse;
-            console.log(`Connected to MongoDB database: ${dbNameToUse} successfully`);
-        }
+        // Create a timeout promise
+        const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000);
+        });
+        
+        // Race between connection and timeout
+        await Promise.race([connectPromise, timeoutPromise]);
+        
+        mongooseConnected = true;
+        currentMongooseDb = dbNameToUse;
+        console.log(`Connected to MongoDB database: ${dbNameToUse} successfully`);
         
         // Store the current database connection
         db = mongoose.connection.db;
@@ -153,7 +158,9 @@ async function connectToMongoDB(customDbName = null) {
         console.error('MongoDB connection error:', error);
         mongooseConnected = false;
         currentMongooseDb = null;
-        throw error;
+        
+        // Return mock database to prevent crashes
+        return createMockDatabase();
     }
 }
 
@@ -510,20 +517,7 @@ async function setupDatabase() {
             }
         }
 
-        // Create indexes for better performance
-        const indexPromises = [
-            db.collection('quiz_questions').createIndex({ category: 1, difficulty: 1 }),
-            db.collection('quiz_scores').createIndex({ userId: 1 }),
-            db.collection('quiz_answers').createIndex({ userId: 1 }),
-            db.collection('replies').createIndex({ trigger_word: 1 }),
-            db.collection('developers').createIndex({ user_id: 1 }, { unique: true }),
-            db.collection('groups').createIndex({ group_id: 1 }, { unique: true }),
-            db.collection('users').createIndex({ user_id: 1 }, { unique: true })
-        ];
-
-        await Promise.all(indexPromises);
-
-        // Ensure required collections exist
+        // Ensure required collections exist first
         const collections = ['quiz_questions', 'quiz_scores', 'quiz_answers', 'replies', 'developers', 'groups', 'users'];
         for (const collection of collections) {
             const exists = await db.listCollections({ name: collection }).hasNext();
@@ -533,6 +527,19 @@ async function setupDatabase() {
             }
         }
 
+        // Create indexes safely - check if they exist first
+        const indexOperations = [
+            createIndexSafely(db.collection('quiz_questions'), { category: 1, difficulty: 1 }),
+            createIndexSafely(db.collection('quiz_scores'), { userId: 1 }),
+            createIndexSafely(db.collection('quiz_answers'), { userId: 1 }),
+            createIndexSafely(db.collection('replies'), { trigger_word: 1 }, { unique: true }),
+            createIndexSafely(db.collection('developers'), { user_id: 1 }, { unique: true }),
+            createIndexSafely(db.collection('groups'), { group_id: 1 }, { unique: true }),
+            createIndexSafely(db.collection('users'), { user_id: 1 }, { unique: true })
+        ];
+
+        await Promise.all(indexOperations);
+
         console.log('Database setup completed');
         return db;
     } catch (error) {
@@ -540,7 +547,28 @@ async function setupDatabase() {
         throw error;
     }
 }
-
+async function createIndexSafely(collection, keys, options = {}) {
+    try {
+        // Generate the index name that MongoDB would use
+        const indexName = Object.keys(keys).map(key => `${key}_${keys[key]}`).join('_');
+        
+        // Check if index already exists
+        const indexes = await collection.indexes();
+        const existingIndex = indexes.find(idx => idx.name === indexName);
+        
+        if (existingIndex) {
+            console.log(`Index ${indexName} already exists on collection ${collection.collectionName}`);
+            return;
+        }
+        
+        // Create the index if it doesn't exist
+        await collection.createIndex(keys, options);
+        console.log(`Created index ${indexName} on collection ${collection.collectionName}`);
+    } catch (error) {
+        console.error(`Error creating index on collection ${collection.collectionName}:`, error);
+        // Don't throw the error to allow other operations to continue
+    }
+}
 // Add a new function for quiz-related operations
 async function saveQuizScore(chatId, userId, firstName, lastName, username, score) {
     try {
