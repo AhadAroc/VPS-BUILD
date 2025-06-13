@@ -5206,5 +5206,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,handleCommandCallbacks,isBotOwner,isBotAdmin,promoteUser,isSubscribed };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,handleCommandCallbacks,isBotOwner,isBotAdmin,promoteUser, };
 
