@@ -1,5 +1,5 @@
 const { developerIds } = require('./config');
-const { isSubscribed } = require('./commands');
+//const { isSubscribed } = require('./commands');
 const { getDb, pool } = require('./database');
 const axios = require('axios');
 // Add this at the top of the file with other imports
