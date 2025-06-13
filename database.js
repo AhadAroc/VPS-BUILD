@@ -1,7 +1,7 @@
 const { MongoClient } = require('mongodb');
 const { mongoUri, dbName, developerIds } = require('./config');
 const mongoose = require('mongoose');
-
+require('dotenv').config();
 
 const mongooseOptions = {
     useNewUrlParser: true,
