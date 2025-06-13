@@ -703,31 +703,7 @@ async function showQuizMenu(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض قائمة المسابقات. الرجاء المحاولة مرة أخرى.');
     }
 }
-// Add this function to your code
-async function ensureDatabaseInitialized(dbName = 'test') {
-  try {
-    // Use a promise with timeout for the database connection
-    const db = await Promise.race([
-      database.getDatabase(dbName),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database connection timed out')), 10000)
-      )
-    ]);
-    return db;
-  } catch (error) {
-    console.error('Database initialization error:', error);
-    // Return a mock database object that won't crash your app
-    return {
-      collection: () => ({
-        findOne: async () => null,
-        find: async () => ({ toArray: async () => [] }),
-        updateOne: async () => ({ modifiedCount: 0 }),
-        insertOne: async () => ({ insertedId: null }),
-        deleteMany: async () => ({ deletedCount: 0 })
-      })
-    };
-  }
-}
+
 async function broadcastMessage(ctx, mediaType, mediaId, caption) {
     try {
         const db = await ensureDatabaseInitialized();
