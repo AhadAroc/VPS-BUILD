@@ -823,92 +823,48 @@ async function getQuestionsForDifficulty(difficulty) {
         await client.close();
     }
 }
+function escapeMarkdown(text) {
+    if (!text) return '';
+    // Escape special Markdown characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+    return text.replace(/([_*\[\]()~`>#+=|{}.!\\-])/g, '\\$1');
+}
+
 // Add this function to handle bot ownership assignment
-async function assignBotOwnership(ctx) {
+async function assignBotOwnership(ctx, botId, newOwnerId) {
     try {
-        const userId = ctx.from.id;
-        const username = ctx.from.username || 'Unknown';
-        const firstName = ctx.from.first_name || 'Unknown';
-        const lastName = ctx.from.last_name || '';
-        const botId = ctx.botInfo.id;
-        const botUsername = ctx.botInfo.username;
+        // Your existing code...
         
-        const db = await ensureDatabaseInitialized();
+        // When sending the message, escape any user-provided text:
+        const botName = escapeMarkdown(botInfo.name || 'Unknown');
+        const botUsername = escapeMarkdown(botInfo.username || 'Unknown');
+        const ownerName = escapeMarkdown(ownerInfo.first_name || 'Unknown');
+        const ownerUsername = escapeMarkdown(ownerInfo.username || 'Unknown');
         
-        // Check if this bot already has an owner assigned
-        const botOwnership = await db.collection('bot_ownership').findOne({ bot_id: botId });
-        
-        if (!botOwnership) {
-            // This is the first time someone is using this bot - assign ownership
-            await db.collection('bot_ownership').insertOne({
-                bot_id: botId,
-                bot_username: botUsername,
-                owner_id: userId,
-                owner_username: username,
-                owner_first_name: firstName,
-                owner_last_name: lastName,
-                assigned_at: new Date(),
-                is_active: true
-            });
-            
-            console.log(`New ownership assigned for bot ${botId} (@${botUsername}) to user ${userId} (@${username})`);
-            
-            // Set global owner ID variable
-            ownerId = userId;
-            ownerUsername = username;
-            ownerFirstName = firstName;
-            
-            // Send confirmation message to the new bot owner
-            const ownershipMessage = `
+        const message = `
 🎉 تم تعيينك كمالك جديد للبوت!
 ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
 🤖 *معلومات البوت:*
-• الاسم: ${ctx.botInfo.first_name}
+• الاسم: ${botName}
 • المعرف: @${botUsername}
 • الايدي: ${botId}
 
 👤 *معلوماتك:*
-• الاسم: ${firstName} ${lastName}
-• المعرف: @${username}
-• الايدي: ${userId}
+• الاسم: ${ownerName}
+• المعرف: @${ownerUsername}
+• الايدي: ${newOwnerId}
 
 ✅ يمكنك الآن استخدام جميع ميزات البوت كمالك.
 `;
-            
-            await ctx.telegram.sendMessage(userId, ownershipMessage, { 
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '📋 لوحة التحكم', callback_data: 'owner_panel' }]
-                    ]
-                }
-            });
-            
-            return true; // Ownership was assigned
-        } else {
-            // This bot already has an owner
-            // Update the global owner ID variable if not set
-            if (ownerId === null) {
-                ownerId = botOwnership.owner_id;
-                ownerUsername = botOwnership.owner_username;
-                ownerFirstName = botOwnership.owner_first_name;
-            }
-            
-            // Check if the current user is the owner
-            if (botOwnership.owner_id === userId) {
-                console.log(`Bot owner ${userId} accessed their bot ${botId}`);
-                // Optional: Update last access time
-                await db.collection('bot_ownership').updateOne(
-                    { bot_id: botId },
-                    { $set: { last_accessed: new Date() }}
-                );
-            }
-            
-            return false; // Ownership was not assigned (already exists)
-        }
+
+        await ctx.telegram.sendMessage(newOwnerId, message, {
+            parse_mode: 'MarkdownV2', // Consider using MarkdownV2 for better escaping
+            reply_markup: { /* your existing markup */ }
+        });
+        
+        // Rest of your function...
     } catch (error) {
         console.error('Error managing bot ownership:', error);
-        return false;
+        // Handle error...
     }
 }
 
