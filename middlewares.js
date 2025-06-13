@@ -1,4 +1,5 @@
 const { developerIds } = require('./config');
+const { isSubscribed } = require('./commands');
 const { getDb, pool } = require('./database');
 const axios = require('axios');
 // Add this at the top of the file with other imports
@@ -50,7 +51,6 @@ async function getDevelopers() {
         return Array.from(developerIds).map(id => ({ user_id: id }));
     }
 }
-
 async function isDeveloper(ctx, userId) {
     console.log(`Checking if user ${userId} is a developer`);
     
@@ -59,27 +59,35 @@ async function isDeveloper(ctx, userId) {
         console.log(`User ${userId} is a hardcoded developer`);
         return true;
     }
-    
-    // Then check database
+
+    const db = await ensureDatabaseInitialized();
+
     try {
-        const developers = await getDevelopers();
-        console.log(`Retrieved ${developers.length} developers from database:`, developers);
-        
-        const isDev = developers.some(dev => {
-            const devId = dev.user_id.toString();
-            const checkId = userId.toString();
-            const isMatch = devId === checkId;
-            console.log(`Comparing dev ID ${devId} with user ID ${checkId}: ${isMatch}`);
-            return isMatch;
-        });
-        
-        console.log(`Final result for user ${userId}: isDeveloper = ${isDev}`);
-        return isDev;
+        // First check by user_id
+        const byId = await db.collection('developers').findOne({ user_id: userId });
+        if (byId) {
+            console.log(`User ${userId} found as developer by ID.`);
+            return true;
+        }
+
+        // Fallback: check by username
+        const username = ctx.from?.username;
+        if (username) {
+            const byUsername = await db.collection('developers').findOne({ username: username });
+            if (byUsername) {
+                console.log(`User ${username} matched as developer by username.`);
+                return true;
+            }
+        }
+
+        console.log(`User ${userId} is not a developer.`);
+        return false;
     } catch (error) {
         console.error('Error checking if user is developer:', error);
         return false;
     }
 }
+
 
 
 function setupMiddlewares(bot) {
