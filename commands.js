@@ -830,69 +830,91 @@ function escapeMarkdown(text) {
 }
 
 // Add this function to handle bot ownership assignment
-async function assignBotOwnership(ctx, botId, newOwnerId) {
+async function assignBotOwnership(ctx) {
     try {
-        // Get database connection
-        const db = await ensureDatabaseInitialized();
-        
-        // Get bot information from the database
-        const botData = await db.collection('bots').findOne({ bot_id: parseInt(botId) });
-        
-        // Get user information
-        let ownerInfo;
-        try {
-            // Try to get user info from Telegram
-            ownerInfo = await ctx.telegram.getChat(newOwnerId);
-        } catch (error) {
-            console.error('Error getting owner info:', error);
-            // Fallback to basic info
-            ownerInfo = {
-                first_name: 'المستخدم',
-                username: ''
-            };
+        // Make sure we have a valid context with chat and user information
+        if (!ctx || !ctx.chat || !ctx.from) {
+            console.error('Invalid context in assignBotOwnership');
+            return false;
         }
+
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
         
-        // Prepare bot info with safe defaults
-        const botInfo = {
-            name: botData?.name || 'البوت',
-            username: botData?.username || '',
-            id: botId
-        };
+        // Log the values to help with debugging
+        console.log(`Attempting to assign bot ownership - userId: ${userId}, chatId: ${chatId}`);
         
-        // Update the bot owner in the database
-        await db.collection('bots').updateOne(
-            { bot_id: parseInt(botId) },
-            { $set: { owner_id: parseInt(newOwnerId), updated_at: new Date() } },
-            { upsert: true }
-        );
-        
-        // Escape special characters for Markdown
-        const botName = escapeMarkdown(botInfo.name);
-        const botUsername = escapeMarkdown(botInfo.username);
-        const ownerName = escapeMarkdown(ownerInfo.first_name || 'المستخدم');
-        const ownerUsername = escapeMarkdown(ownerInfo.username || '');
-        
-        // Create a plain text message (no Markdown)
-        const message = `
+        // Ensure we have valid IDs before proceeding
+        if (!userId || !chatId) {
+            console.error(`Missing required IDs - userId: ${userId}, chatId: ${chatId}`);
+            return false;
+        }
+
+        // Check if the bot already has an owner
+        if (ownerId) {
+            console.log(`Bot already has an owner: ${ownerId}`);
+            return false;
+        }
+
+        // Get information about the bot
+        try {
+            const botInfo = await ctx.telegram.getMe();
+            console.log(`Bot info retrieved: ${JSON.stringify(botInfo)}`);
+            
+            // Get information about the user
+            const userInfo = await ctx.telegram.getChat(userId);
+            console.log(`User info retrieved: ${JSON.stringify(userInfo)}`);
+            
+            // Set the owner information
+            ownerId = userId;
+            ownerUsername = ctx.from.username || 'No username';
+            ownerFirstName = ctx.from.first_name || 'Unknown';
+            
+            // Store the owner information in the database
+            const db = await ensureDatabaseInitialized();
+            await db.collection('bot_owners').updateOne(
+                { bot_id: botInfo.id },
+                {
+                    $set: {
+                        owner_id: userId,
+                        owner_username: ownerUsername,
+                        owner_first_name: ownerFirstName,
+                        updated_at: new Date()
+                    },
+                    $setOnInsert: {
+                        created_at: new Date()
+                    }
+                },
+                { upsert: true }
+            );
+            
+            // Send confirmation message to the new owner
+            const ownerMessage = `
 🎉 تم تعيينك كمالك جديد للبوت!
 ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
 🤖 معلومات البوت:
-• الاسم: ${botInfo.name}
-• المعرف: @${botInfo.username}
-• الايدي: ${botId}
+• الاسم: ${botInfo.first_name || 'البوت'}
+• المعرف: @${botInfo.username || ''}
+• الايدي: ${botInfo.id || 'غير معروف'}
 
 👤 معلوماتك:
-• الاسم: ${ownerInfo.first_name || 'المستخدم'}
-${ownerInfo.username ? `• المعرف: @${ownerInfo.username}` : ''}
-• الايدي: ${newOwnerId}
+• الاسم: ${ownerFirstName || 'المستخدم'}
+• المعرف: @${ownerUsername || ''}
+• الايدي: ${userId || 'غير معروف'}
 
 ✅ يمكنك الآن استخدام جميع ميزات البوت كمالك.
 `;
-
-        // Send a plain text message without parse_mode
-        await ctx.telegram.sendMessage(newOwnerId, message);
-        
-        return true;
+            
+            // Send the message to the current chat, not to an undefined chat_id
+            await ctx.reply(ownerMessage);
+            
+            console.log(`Bot ownership assigned to user ${userId}`);
+            ownerMessageSent = true;
+            return true;
+        } catch (error) {
+            console.error('Error getting owner info:', error);
+            throw error;
+        }
     } catch (error) {
         console.error('Error managing bot ownership:', error);
         return false;
