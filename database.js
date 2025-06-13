@@ -3,14 +3,16 @@ const { mongoUri, dbName, developerIds } = require('./config');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-//const mongooseOptions = {
-    //useNewUrlParser: true,
-    //useUnifiedTopology: true,
-   // serverSelectionTimeoutMS: 30000,
-    //socketTimeoutMS: 45000,
-    //connectTimeoutMS: 30000,
-//};
-
+const mongooseOptions = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000,  // Reduced from 30000
+    socketTimeoutMS: 15000,           // Reduced from 45000
+    connectTimeoutMS: 10000           // Reduced from 30000
+};
+// Track mongoose connection state
+let mongooseConnected = false;
+let currentMongooseDb = null;
 // MongoDB connection
 let db = null;
 let client = null;
