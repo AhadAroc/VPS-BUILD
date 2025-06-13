@@ -832,39 +832,70 @@ function escapeMarkdown(text) {
 // Add this function to handle bot ownership assignment
 async function assignBotOwnership(ctx, botId, newOwnerId) {
     try {
-        // Your existing code...
+        // Get database connection
+        const db = await ensureDatabaseInitialized();
         
-        // When sending the message, escape any user-provided text:
-        const botName = escapeMarkdown(botInfo.name || 'Unknown');
-        const botUsername = escapeMarkdown(botInfo.username || 'Unknown');
-        const ownerName = escapeMarkdown(ownerInfo.first_name || 'Unknown');
-        const ownerUsername = escapeMarkdown(ownerInfo.username || 'Unknown');
+        // Get bot information from the database
+        const botData = await db.collection('bots').findOne({ bot_id: parseInt(botId) });
         
+        // Get user information
+        let ownerInfo;
+        try {
+            // Try to get user info from Telegram
+            ownerInfo = await ctx.telegram.getChat(newOwnerId);
+        } catch (error) {
+            console.error('Error getting owner info:', error);
+            // Fallback to basic info
+            ownerInfo = {
+                first_name: 'المستخدم',
+                username: ''
+            };
+        }
+        
+        // Prepare bot info with safe defaults
+        const botInfo = {
+            name: botData?.name || 'البوت',
+            username: botData?.username || '',
+            id: botId
+        };
+        
+        // Update the bot owner in the database
+        await db.collection('bots').updateOne(
+            { bot_id: parseInt(botId) },
+            { $set: { owner_id: parseInt(newOwnerId), updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Escape special characters for Markdown
+        const botName = escapeMarkdown(botInfo.name);
+        const botUsername = escapeMarkdown(botInfo.username);
+        const ownerName = escapeMarkdown(ownerInfo.first_name || 'المستخدم');
+        const ownerUsername = escapeMarkdown(ownerInfo.username || '');
+        
+        // Create a plain text message (no Markdown)
         const message = `
 🎉 تم تعيينك كمالك جديد للبوت!
 ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
-🤖 *معلومات البوت:*
-• الاسم: ${botName}
-• المعرف: @${botUsername}
+🤖 معلومات البوت:
+• الاسم: ${botInfo.name}
+• المعرف: @${botInfo.username}
 • الايدي: ${botId}
 
-👤 *معلوماتك:*
-• الاسم: ${ownerName}
-• المعرف: @${ownerUsername}
+👤 معلوماتك:
+• الاسم: ${ownerInfo.first_name || 'المستخدم'}
+${ownerInfo.username ? `• المعرف: @${ownerInfo.username}` : ''}
 • الايدي: ${newOwnerId}
 
 ✅ يمكنك الآن استخدام جميع ميزات البوت كمالك.
 `;
 
-        await ctx.telegram.sendMessage(newOwnerId, message, {
-            parse_mode: 'MarkdownV2', // Consider using MarkdownV2 for better escaping
-            reply_markup: { /* your existing markup */ }
-        });
+        // Send a plain text message without parse_mode
+        await ctx.telegram.sendMessage(newOwnerId, message);
         
-        // Rest of your function...
+        return true;
     } catch (error) {
         console.error('Error managing bot ownership:', error);
-        // Handle error...
+        return false;
     }
 }
 
