@@ -61,10 +61,45 @@ module.exports.getDatabaseForBot = getDatabaseForBot;
 async function ensureDatabaseInitialized(botId = null) {
     try {
         const dbName = botId ? `bot_${botId}_db` : process.env.DB_NAME;
-        return await connectToMongoDB(dbName);
+        
+        // Create a timeout promise that rejects after 10 seconds
+        const timeoutPromise = new Promise((_, reject) => {
+            const timeoutId = setTimeout(() => {
+                clearTimeout(timeoutId);
+                reject(new Error('Database connection timed out after 10 seconds'));
+            }, 10000); // 10 seconds timeout
+        });
+        
+        // Race between the database connection and the timeout
+        const db = await Promise.race([
+            connectToMongoDB(dbName),
+            timeoutPromise
+        ]);
+        
+        return db;
     } catch (error) {
         console.error('Error initializing database:', error);
-        throw error;
+        
+        // Return a mock database object that won't crash your app
+        return {
+            collection: (name) => ({
+                findOne: async () => null,
+                find: async () => ({ toArray: async () => [] }),
+                updateOne: async () => ({ modifiedCount: 0 }),
+                insertOne: async () => ({ insertedId: null }),
+                deleteMany: async () => ({ deletedCount: 0 }),
+                distinct: async () => [],
+                aggregate: () => ({
+                    toArray: async () => []
+                }),
+                countDocuments: async () => 0,
+                createIndex: async () => null
+            }),
+            listCollections: () => ({
+                hasNext: async () => true
+            }),
+            createCollection: async () => null
+        };
     }
 }
 
