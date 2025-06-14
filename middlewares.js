@@ -53,40 +53,53 @@ async function getDevelopers() {
 }
 async function isDeveloper(ctx, userId) {
     console.log(`Checking if user ${userId} is a developer`);
-    
-    // First check hardcoded developer IDs
+
+    // ✅ 1. Hardcoded developer check (global)
     if (developerIds.has(userId.toString())) {
         console.log(`User ${userId} is a hardcoded developer`);
         return true;
     }
 
     const db = await ensureDatabaseInitialized();
+    const botId = ctx.botInfo?.id;
+
+    if (!botId) {
+        console.warn('⚠️ Bot ID not available in ctx.botInfo');
+        return false;
+    }
 
     try {
-        // First check by user_id
-        const byId = await db.collection('developers').findOne({ user_id: userId });
+        // ✅ 2. Check by user_id + bot_id
+        const byId = await db.collection('developers').findOne({
+            user_id: userId,
+            bot_id: botId
+        });
         if (byId) {
-            console.log(`User ${userId} found as developer by ID.`);
+            console.log(`✅ User ${userId} is developer for bot ${botId}`);
             return true;
         }
 
-        // Fallback: check by username
+        // ✅ 3. Fallback by username + bot_id
         const username = ctx.from?.username;
         if (username) {
-            const byUsername = await db.collection('developers').findOne({ username: username });
+            const byUsername = await db.collection('developers').findOne({
+                username: username,
+                bot_id: botId
+            });
             if (byUsername) {
-                console.log(`User ${username} matched as developer by username.`);
+                console.log(`✅ Username ${username} matched developer for bot ${botId}`);
                 return true;
             }
         }
 
-        console.log(`User ${userId} is not a developer.`);
+        console.log(`❌ User ${userId} is not a developer for bot ${botId}`);
         return false;
     } catch (error) {
-        console.error('Error checking if user is developer:', error);
+        console.error('❌ Error in isDeveloper():', error);
         return false;
     }
 }
+
 
 
 
