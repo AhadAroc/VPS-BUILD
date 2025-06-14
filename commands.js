@@ -922,57 +922,69 @@ async function assignBotOwnership(ctx) {
 }
 
 async function checkUserSubscription(ctx) {
-    try {
-        const userId = ctx.from.id;
-        const subscriptionStatusCache = new Map();
-        // Define the channels that require subscription
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
+try {
+const userId = ctx.from.id;
+const subscriptionStatusCache = new Map();
+
+javascript
+Copy
+Edit
+    console.log(`🔍 [SUB] Starting subscription check for user ${userId}`);
+
+    // Define the channels that require subscription
+    const requiredChannels = [
+        { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+        { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
+    ];
+
+    const channelIds = requiredChannels.map(channel => channel.id);
+    console.log(`📦 [SUB] Checking channels: ${channelIds.join(', ')}`);
+
+    console.log(`📡 [SUB] Sending request to Bot B...`);
+    const response = await axios.post(
+        'http://69.62.114.242:80/check-subscription',
+        { userId, channels: channelIds },
+        { timeout: 5000 } // 5-second timeout
+    );
+
+    console.log(`✅ [SUB] Bot B response received:`, response.data);
+
+    const { subscribed } = response.data;
+
+    if (subscribed) {
+        console.log(`🎉 [SUB] User ${userId} is subscribed.`);
+        subscriptionStatusCache.set(userId, true);
+        return true;
+    } else {
+        console.log(`⚠️ [SUB] User ${userId} is NOT subscribed.`);
+        const subscriptionMessage = '⚠️ لاستخدام البوت، يرجى الاشتراك في القنوات التالية:';
+        const inlineKeyboard = [
+            [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
+            [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
+            [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
         ];
 
-        // Extract channel IDs for the Axios request
-        const channelIds = requiredChannels.map(channel => channel.id);
-
-        // Send a POST request to Bot B
-        const response = await axios.post('http://69.62.114.242:80/check-subscription', {
-            userId,
-            channels: channelIds
-        });
-
-        const { subscribed } = response.data;
-
-        if (subscribed) {
-            subscriptionStatusCache.set(userId, true);
-            // Don't show menus here - just return true
-            return true; // ✅ Subscribed
-        } else {
-            const subscriptionMessage = '⚠️ لاستخدام البوت، يرجى الاشتراك في القنوات التالية:';
-            const inlineKeyboard = [
-                [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-                [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-            ];
-
-            if (ctx.callbackQuery) {
-                await ctx.answerCbQuery('❗ اشترك أولاً');
-                await ctx.editMessageText(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                }).catch(err => console.error('editMessageText error:', err));
-            } else {
-                await ctx.reply(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            }
-            return false; // ❌ Not subscribed
-        }
-    } catch (error) {
-        console.error('Error in checkUserSubscription:', error);
         if (ctx.callbackQuery) {
-            await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => {});
+            console.log(`↩️ [SUB] Sending callback query alert.`);
+            await ctx.answerCbQuery('❗ اشترك أولاً');
+            await ctx.editMessageText(subscriptionMessage, {
+                reply_markup: { inline_keyboard: inlineKeyboard }
+            }).catch(err => console.error('editMessageText error:', err));
+        } else {
+            console.log(`↩️ [SUB] Sending subscription prompt message.`);
+            await ctx.reply(subscriptionMessage, {
+                reply_markup: { inline_keyboard: inlineKeyboard }
+            });
         }
-        return false; // treat as not subscribed on error
+        return false;
     }
+} catch (error) {
+    console.error(`❌ [SUB] Subscription check error for user ${ctx.from?.id}:`, error.message || error);
+    if (ctx.callbackQuery) {
+        await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => {});
+    }
+    return false;
+}
 }
 
 async function isSubscribed(ctx, userId) {
