@@ -34,34 +34,30 @@ const CloneSchema = new mongoose.Schema({
 
 
 async function initializeApp() {
-    try {
-        await database.setupDatabase();
-        console.log('Database initialized successfully');
+  try {
+    const db = await database.connectToMongoDB(); // await full DB init
+    if (!db) throw new Error('❌ DB init failed');
 
-        try {
-            const botData = await getBotData();
-            console.log('Bot data retrieved:', botData);
-        } catch (error) {
-            console.error('Failed to get or create bot data:', error);
-            // Continue execution even if bot data retrieval fails
-        }
+    console.log('✅ DB connection established');
 
-        setupMiddlewares(bot);
-        setupCommands(bot);
-        setupActions(bot);
+    const botData = await getBotData(); // optionally await this
 
-        await bot.launch();
-        console.log('Bot started successfully');
+    setupMiddlewares(bot);
+    setupCommands(bot);     // no need to await unless setupCommands is async
+    setupActions(bot);      // same here
 
-        const PORT = process.env.PORT || 3000;
-        app.listen(PORT, () => {
-            console.log(`Express server is running on port ${PORT}`);
-        });
+    await bot.launch();
+    console.log('🤖 Bot launched!');
 
-    } catch (error) {
-        console.error('Error initializing application:', error);
-        process.exit(1);
-    }
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`🌐 Express server running on port ${PORT}`);
+    });
+
+  } catch (error) {
+    console.error('❌ Error during bot startup:', error);
+    process.exit(1);
+  }
 }
 
 async function getBotData() {
