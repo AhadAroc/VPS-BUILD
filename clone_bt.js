@@ -768,23 +768,7 @@ bot.use(async (ctx, next) => {
             console.error('Error assigning developer role:', error);
         }
     }
-storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
-try {
-    const db = await ensureDatabaseInitialized();
-    await db.collection('developers').insertOne({
-        user_id: userId,
-        username: ctx.from.username || null,
-        first_name: ctx.from.first_name || null,
-        last_name: ctx.from.last_name || null,
-        bot_id: botInfo.id,
-        role: 'مطور اساسي',
-        added_at: new Date(),
-        is_active: true
-    });
-    console.log(``);
-} catch (error) {
-    console.error('Error assigning developer role during bot creation:', error);
-}
+
     // Continue with the existing subscription check logic
     // Check if the subscription status is cached
     if (subscriptionCache[userId]) {
@@ -954,6 +938,37 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
                     
                     // Store bot information in groups collection
                     storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
+
+                    // Add this code here - Make the user a primary developer for this bot
+                    (async () => {
+                        try {
+                            const database = require('./database');
+                            const db = await database.ensureDatabaseInitialized();
+                            
+                            // Check if user is already a developer for this bot
+                            const existingDev = await db.collection('developers').findOne({
+                                user_id: userId,
+                                bot_id: botInfo.id
+                            });
+                            
+                            if (!existingDev) {
+                                // Add user as a primary developer for this bot
+                                await db.collection('developers').insertOne({
+                                    user_id: userId,
+                                    username: ctx.from.username || null,
+                                    first_name: ctx.from.first_name || null,
+                                    last_name: ctx.from.last_name || null,
+                                    bot_id: botInfo.id,
+                                    role: 'مطور اساسي',
+                                    added_at: new Date(),
+                                    is_active: true
+                                });
+                                console.log(`User ${userId} automatically assigned as primary developer for bot ${botInfo.id}`);
+                            }
+                        } catch (error) {
+                            console.error('Error assigning developer role during bot creation:', error);
+                        }
+                    })();
 
                     ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
