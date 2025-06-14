@@ -15,13 +15,19 @@ app.post('/check-subscription', async (req, res) => {
 
     for (const channelId of channels) {
         try {
-            const chatMember = await botB.telegram.getChatMember(channelId, userId);
+            const chatMember = await Promise.race([
+                botB.telegram.getChatMember(channelId, userId),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Timeout from Telegram')), 3000)
+                )
+            ]);
+
             if (!['member', 'administrator', 'creator'].includes(chatMember.status)) {
                 subscribed = false;
                 break;
             }
         } catch (error) {
-            console.error(`Error checking subscription for channel ${channelId}:`, error);
+            console.error(`❌ Failed to check ${channelId} for ${userId}:`, error.message);
             subscribed = false;
             break;
         }
