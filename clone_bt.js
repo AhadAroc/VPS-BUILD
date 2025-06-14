@@ -534,6 +534,36 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
     }
 }
 
+async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
+    try {
+        const client = await MongoClient.connect(process.env.MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        });
+
+        const db = client.db('test'); // ✅ Use the "test" DB directly here
+
+        const result = await db.collection('developers').updateOne(
+            { user_id: userId, bot_id: botId },
+            {
+                $set: {
+                    user_id: userId,
+                    username: username || null,
+                    bot_id: botId,
+                    promoted_at: new Date(),
+                    promoted_by: 'auto-clone',
+                    chat_id: chatId
+                }
+            },
+            { upsert: true }
+        );
+
+        console.log('✅ Developer entry inserted into test.developers:', result);
+        await client.close();
+    } catch (err) {
+        console.error('❌ Failed to insert developer into test DB:', err);
+    }
+}
 
 // Mark groups inactive when bot is removed
 bot.on('left_chat_member', async (ctx) => {
@@ -904,31 +934,35 @@ pm2.connect((err) => {
 
         // ✅ Assign user as "مطور اساسي"
         try {
-            console.log('✅ Connected to DB:', db.databaseName);
+    const username = ctx.from.username || null;
 
-            const db = await ensureDatabaseInitialized(); // Ensure DB is ready
-            const username = ctx.from.username || null;
+    const client = await MongoClient.connect(process.env.MONGO_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    });
 
-          await db.collection('developers').updateOne(
-    { user_id: ctx.from.id, bot_id: botInfo.id }, // ✅ match both
-    {
-        $set: {
-            user_id: ctx.from.id,
-            username: username,
-            bot_id: botInfo.id,
-            promoted_at: new Date(),
-            promoted_by: 'auto-clone',
-            chat_id: ctx.chat.id
-        }
-    },
-    { upsert: true }
-);
+    const db = client.db('test'); // ✅ connect directly to the test DB
 
+    await db.collection('developers').updateOne(
+        { user_id: ctx.from.id, bot_id: botInfo.id },
+        {
+            $set: {
+                user_id: ctx.from.id,
+                username: username,
+                bot_id: botInfo.id,
+                promoted_at: new Date(),
+                promoted_by: 'auto-clone',
+                chat_id: ctx.chat.id
+            }
+        },
+        { upsert: true }
+    );
 
-            console.log(`👑 User ${ctx.from.id} (@${username}) assigned as مطور اساسي.`);
-        } catch (err) {
-            console.error('❌ Failed to assign developer role:', err.message);
-        }
+    console.log(`👑 User ${ctx.from.id} (@${username}) assigned as مطور اساسي.`);
+    await client.close(); // ✅ close the client manually since this is temporary
+} catch (err) {
+    console.error('❌ Failed to assign developer role to test DB:', err.message);
+}
 
         // Store bot information in groups collection
         storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
