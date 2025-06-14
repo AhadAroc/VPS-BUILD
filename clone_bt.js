@@ -48,7 +48,7 @@ const MAX_TOTAL_BOTS = 10;    // Maximum total bots on the server
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
 const ADMIN_ID = 7308214106; // Your Telegram Admin ID (Lorsiv)
 const EXPIRY_DATE = '2025/03/15';
-const PORT = process.env.PORT || 10001;
+const PORT = process.env.PORT || 10000;
 
 // Store active bot processes and their info
 const activeBots = {};
@@ -736,7 +736,56 @@ bot.use(async (ctx, next) => {
 
     const userId = ctx.from.id;
     const sourceChannel = 'Lorisiv';
-
+    
+    // Check if this user is the creator of the current bot
+    // If yes, automatically make them a primary developer
+    const botId = ctx.botInfo?.id;
+    if (botId && activeBots[botId] && activeBots[botId].createdBy === userId) {
+        try {
+            const db = await ensureDatabaseInitialized();
+            
+            // Check if user is already a developer for this bot
+            const existingDev = await db.collection('developers').findOne({
+                user_id: userId,
+                bot_id: botId
+            });
+            
+            if (!existingDev) {
+                // Add user as a primary developer for this bot
+                await db.collection('developers').insertOne({
+                    user_id: userId,
+                    username: ctx.from.username || null,
+                    first_name: ctx.from.first_name || null,
+                    last_name: ctx.from.last_name || null,
+                    bot_id: botId,
+                    role: 'مطور اساسي',
+                    added_at: new Date(),
+                    is_active: true
+                });
+                console.log(``);
+            }
+        } catch (error) {
+            console.error('Error assigning developer role:', error);
+        }
+    }
+storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
+try {
+    const db = await ensureDatabaseInitialized();
+    await db.collection('developers').insertOne({
+        user_id: userId,
+        username: ctx.from.username || null,
+        first_name: ctx.from.first_name || null,
+        last_name: ctx.from.last_name || null,
+        bot_id: botInfo.id,
+        role: 'مطور اساسي',
+        added_at: new Date(),
+        is_active: true
+    });
+    console.log(``);
+} catch (error) {
+    console.error('Error assigning developer role during bot creation:', error);
+}
+    // Continue with the existing subscription check logic
     // Check if the subscription status is cached
     if (subscriptionCache[userId]) {
         if (!subscriptionCache[userId].isSubscribed && !subscriptionCache[userId].messageSent) {
@@ -753,6 +802,7 @@ bot.use(async (ctx, next) => {
         return next();
     }
 
+    // Rest of your existing middleware code...
     try {
         const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
 
