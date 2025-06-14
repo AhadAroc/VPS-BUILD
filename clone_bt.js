@@ -904,6 +904,8 @@ pm2.connect((err) => {
 
         // ✅ Assign user as "مطور اساسي"
         try {
+            console.log('✅ Connected to DB:', db.databaseName);
+
             const db = await ensureDatabaseInitialized(); // Ensure DB is ready
             const username = ctx.from.username || null;
 
