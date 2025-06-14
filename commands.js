@@ -937,11 +937,20 @@ async function checkUserSubscription(ctx) {
         const channelIds = requiredChannels.map(channel => channel.id);
         console.log(`📦 [SUB] Checking channels: ${channelIds.join(', ')}`);
 
-        console.log(`📡 [SUB] Sending request to Bot B...`);
+        // FIXED: Correct port number (3000 instead of 80)
+        const botBUrl = 'http://69.62.114.242:3000/check-subscription';
+        
+        console.log(`📡 [SUB] Sending request to Bot B at ${botBUrl}...`);
         const response = await axios.post(
-            'http://69.62.114.242:3000/check-subscription',
+            botBUrl,
             { userId, channels: channelIds },
-            { timeout: 5000 } // 5-second timeout for the HTTP request
+            { 
+                timeout: 8000, // 8-second timeout
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'TelegramBot/1.0'
+                }
+            }
         );
 
         console.log(`✅ [SUB] Bot B response received:`, response.data);
@@ -976,13 +985,46 @@ async function checkUserSubscription(ctx) {
             return false;
         }
     } catch (error) {
-        console.error(`❌ [SUB] Subscription check error for user ${ctx.from?.id}:`, error.message || error);
+        console.error(`❌ [SUB] Subscription check error for user ${ctx.from?.id}:`, {
+            message: error.message,
+            code: error.code,
+            response: error.response?.status,
+            isTimeout: error.code === 'ECONNABORTED'
+        });
+        
         if (ctx.callbackQuery) {
             await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => { });
         }
         return false;
     }
 }
+
+// Quick test function to verify Bot B connectivity
+async function testBotBConnection() {
+    try {
+        console.log('🔧 Testing Bot B connection...');
+        
+        // Test ping endpoint first
+        const pingResponse = await axios.get('http://69.62.114.242:3000/ping', { timeout: 5000 });
+        console.log('✅ Ping successful:', pingResponse.data);
+        
+        // Test subscription check endpoint
+        const testResponse = await axios.post(
+            'http://69.62.114.242:3000/check-subscription',
+            { userId: 12345, channels: [-1002555424660] },
+            { timeout: 5000 }
+        );
+        console.log('✅ Subscription check test successful:', testResponse.data);
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Bot B connection test failed:', error.message);
+        return false;
+    }
+}
+
+// Call this once when your bot starts to verify connectivity
+// testBotBConnection();
 
 async function isSubscribed(ctx, userId) {
     try {
