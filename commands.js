@@ -926,9 +926,7 @@ try {
 const userId = ctx.from.id;
 const subscriptionStatusCache = new Map();
 
-javascript
-Copy
-Edit
+
     console.log(`🔍 [SUB] Starting subscription check for user ${userId}`);
 
     // Define the channels that require subscription
