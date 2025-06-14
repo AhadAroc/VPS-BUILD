@@ -4,6 +4,7 @@ const { getDb, pool ,ensureDatabaseInitialized} = require('./database');
 const axios = require('axios');
 // Add this at the top of the file with other imports
 const SUBSCRIPTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const { MongoClient } = require('mongodb');
 
 // Add this new Map to store last check times
 const lastSubscriptionCheckTime = new Map();
