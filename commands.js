@@ -999,29 +999,7 @@ async function checkUserSubscription(ctx) {
     }
 }
 
-// Quick test function to verify Bot B connectivity
-async function testBotBConnection() {
-    try {
-        console.log('🔧 Testing Bot B connection...');
-        
-        // Test ping endpoint first
-        const pingResponse = await axios.get('http://69.62.114.242:3000/ping', { timeout: 5000 });
-        console.log('✅ Ping successful:', pingResponse.data);
-        
-        // Test subscription check endpoint
-        const testResponse = await axios.post(
-            'http://69.62.114.242:3000/check-subscription',
-            { userId: 12345, channels: [-1002555424660] },
-            { timeout: 5000 }
-        );
-        console.log('✅ Subscription check test successful:', testResponse.data);
-        
-        return true;
-    } catch (error) {
-        console.error('❌ Bot B connection test failed:', error.message);
-        return false;
-    }
-}
+
 
 // Call this once when your bot starts to verify connectivity
 // testBotBConnection();
