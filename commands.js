@@ -1457,7 +1457,7 @@ bot.use(stickerRestrictionMiddleware);
             return next(); // let the bot work even if check fails (fail-safe)
         }
     });
-    bot.command('start', async (ctx) => {
+   bot.command('start', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
@@ -1469,45 +1469,45 @@ bot.use(stickerRestrictionMiddleware);
         const currentDate = new Date().toLocaleDateString('en-GB');
         const isDM = ctx.chat.type === 'private';
 
-        console.log('DEBUG: "/start" command triggered by user:', userId, 'in chat type:', ctx.chat.type);
+        console.log(`📥 /start triggered by ${userId} (${username}) in ${ctx.chat.type}`);
 
-        // Try to assign bot ownership (only works for the first user)
+        console.log('🛠️ Assigning bot ownership...');
         const ownershipAssigned = await assignBotOwnership(ctx);
-        
-        // If ownership was just assigned, we can stop here as the welcome message was already sent
+        console.log('✅ Ownership checked.');
+
         if (ownershipAssigned && isDM) {
+            console.log('👑 Ownership assigned and in DM, exiting.');
             return;
         }
 
-        // Check if the user has a specific rank
+        console.log('🔍 Checking ranks...');
         const isDev = await isDeveloper(ctx, userId);
         const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isBotOwn = await isBotOwner(ctx, userId);
+        console.log('✅ Ranks checked.');
 
-        // Only proceed if the user is a dev, admin, sec dev, or bot owner
         if (!isDev && !isAdmin && !isSecDev && !isBotOwn) {
+            console.log('⛔ Not allowed: user lacks required role.');
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
 
         if (ctx.from) {
-            await updateLastInteraction(
-                ctx.from.id, 
-                ctx.from.username, 
-                ctx.from.first_name, 
-                ctx.from.last_name
-            );
+            console.log('📅 Updating last interaction...');
+            await updateLastInteraction(ctx.from.id, username, firstName, lastName);
+            console.log('✅ Last interaction updated.');
         }
 
-        // Check if this is the first time the bot is activated in this group
+        console.log('💾 Initializing DB...');
         const db = await ensureDatabaseInitialized();
-        const isFirstActivation = await db.collection('activations').findOne({ chat_id: chatId });
+        console.log('✅ DB initialized.');
 
+        console.log('🧠 Checking activation...');
+        const isFirstActivation = await db.collection('activations').findOne({ chat_id: chatId });
         if (!isFirstActivation) {
-            // Insert activation record
+            console.log('🆕 First-time activation: inserting...');
             await db.collection('activations').insertOne({ chat_id: chatId, activated_at: new Date() });
 
-            // Format the message
             const message = `
                 قام شخص بتفعيل البوت...
                 ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
@@ -1517,62 +1517,63 @@ bot.use(stickerRestrictionMiddleware);
                 الأعضاء: ${ctx.chat.all_members_are_administrators ? 'Admins Only' : 'Public'}
                 ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉ ┉
                 معلومات الشخص:
-                  الاسم: ${firstName} ${lastName}
+                الاسم: ${firstName} ${lastName}
                 المعرف: @${username || 'غير متوفر'}
                 الايدي: ${ctx.from.id}
                 التاريخ: ${currentDate}
                 الساعة: ${currentTime}
             `;
 
-            // Send the message to all developers
+            console.log('📤 Sending activation message to devs...');
             for (const devId of developerIds) {
                 await ctx.telegram.sendMessage(devId, message);
             }
+            console.log('✅ Activation notifications sent.');
         }
-        // Check if the user is subscribed
+
+        console.log('📦 Checking subscription...');
         const subscribed = await checkUserSubscription(ctx);
-        if (!subscribed) return; // Stop if not subscribed
+        console.log(`✅ Subscription status: ${subscribed}`);
+        if (!subscribed) return;
 
         if (isDM) {
             if (isDev || isBotOwn) {
-                console.log('DEBUG: Showing developer panel in DM');
+                console.log('💻 DM dev/bot owner – showing dev panel...');
                 return await showDevPanel(ctx);
             }
 
-            // Fallback welcome (only if necessary)
             const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
             const keyboard = [
                 [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
                 [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
                 [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
             ];
-            return ctx.reply(welcomeMessage, {
-                reply_markup: { inline_keyboard: keyboard }
-            });
+            return ctx.reply(welcomeMessage, { reply_markup: { inline_keyboard: keyboard } });
         }
 
-        // For groups
-        await updateActiveGroup(ctx.chat.id, ctx.chat.title, userId);
+        console.log('🔁 Updating active group info...');
+        await updateActiveGroup(chatId, chatTitle, userId);
+        console.log('✅ Group updated.');
 
         if (isDev || isBotOwn) {
-            console.log('DEBUG: Showing developer panel in group');
+            console.log('🧠 Showing dev panel (group)...');
             return await showDevPanel(ctx);
         }
 
         const isVIPUser = await isVIP(ctx, userId);
-
         if (isAdmin || isVIPUser) {
-            console.log('DEBUG: User is admin/owner/VIP in group, showing main menu');
+            console.log('🏅 Admin/VIP user – showing menu...');
             return await showMainMenu(ctx);
         } else {
-            console.log('DEBUG: Regular user in group, showing basic message');
+            console.log('👤 Regular user – showing fallback message.');
             return ctx.reply('للاستفادة من جميع مميزات البوت، يجب أن تكون مشرفًا أو عضوًا مميزًا. يمكنك استخدام الأوامر المتاحة للأعضاء العاديين في المجموعة.');
         }
     } catch (error) {
-        console.error('Error handling "start" command:', error);
+        console.error('❌ Error handling "start" command:', error);
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
     
     bot.action('check_subscription', async (ctx) => {
         try {
