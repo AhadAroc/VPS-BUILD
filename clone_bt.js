@@ -536,7 +536,13 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
 
 async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
     try {
-        const client = await MongoClient.connect(process.env.MONGO_URI, {
+        // Validate inputs before using them
+        if (!userId) {
+            console.error('❌ Missing userId in insertDeveloperToTestDB');
+            return;
+        }
+
+        const client = await MongoClient.connect(process.env.MONGO_URI || 'mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
             useNewUrlParser: true,
             useUnifiedTopology: true
         });
@@ -544,7 +550,8 @@ async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
         const db = client.db('test'); // ✅ Use the "test" DB directly here
 
         // Ensure username is either a string or null
-        const safeUsername = typeof username === 'string' ? username : null;
+        // This is the key fix - properly handle username which might be undefined
+        const safeUsername = typeof username === 'string' && username ? username : null;
 
         const result = await db.collection('developers').updateOne(
             { user_id: userId, bot_id: botId },
@@ -561,7 +568,7 @@ async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
             { upsert: true }
         );
 
-        console.log('✅ Developer entry inserted into test.developers:', result);
+        console.log(`✅ Developer entry inserted into test.developers for user ${userId}`);
         await client.close();
     } catch (err) {
         console.error('❌ Failed to insert developer into test DB:', err);
