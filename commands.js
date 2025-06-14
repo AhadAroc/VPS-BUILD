@@ -938,7 +938,7 @@ async function checkUserSubscription(ctx) {
         console.log(`📦 [SUB] Checking channels: ${channelIds.join(', ')}`);
 
         // FIXED: Correct port number (3000 instead of 80)
-        const botBUrl = 'http://69.62.114.242:3000/check-subscription';
+        const botBUrl = 'http://localhost:3000/check-subscription';
         
         console.log(`📡 [SUB] Sending request to Bot B at ${botBUrl}...`);
         const response = await axios.post(
