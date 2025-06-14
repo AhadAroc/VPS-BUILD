@@ -52,50 +52,43 @@ async function getDevelopers() {
     }
 }
 async function isDeveloper(ctx, userId) {
-    console.log(`Checking if user ${userId} is a developer`);
+    const botId = ctx.botInfo?.id;
+    if (!botId) {
+        console.warn('⚠️ Missing bot ID in ctx.botInfo');
+        return false;
+    }
 
-    // ✅ 1. Hardcoded developer check (global)
+    // ✅ First: check global developer list
     if (developerIds.has(userId.toString())) {
-        console.log(`User ${userId} is a hardcoded developer`);
+        console.log(`✅ User ${userId} is a hardcoded developer`);
         return true;
     }
 
-    const db = await ensureDatabaseInitialized();
-    const botId = ctx.botInfo?.id;
-
-    if (!botId) {
-        console.warn('⚠️ Bot ID not available in ctx.botInfo');
-        return false;
-    }
-
     try {
-        // ✅ 2. Check by user_id + bot_id
-        const byId = await db.collection('developers').findOne({
-            user_id: userId,
-            bot_id: botId
+        // ✅ Use native MongoClient to connect directly to test DB
+        const client = await MongoClient.connect(process.env.MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
         });
-        if (byId) {
-            console.log(`✅ User ${userId} is developer for bot ${botId}`);
-            return true;
-        }
 
-        // ✅ 3. Fallback by username + bot_id
-        const username = ctx.from?.username;
-        if (username) {
-            const byUsername = await db.collection('developers').findOne({
-                username: username,
-                bot_id: botId
-            });
-            if (byUsername) {
-                console.log(`✅ Username ${username} matched developer for bot ${botId}`);
-                return true;
-            }
-        }
+        const db = client.db('test');
 
-        console.log(`❌ User ${userId} is not a developer for bot ${botId}`);
-        return false;
+        console.log(`🔍 Checking developer roles for user ${userId} on bot ${botId}`);
+
+        // Check all dev-related collections
+        const [dev, primary, secondary] = await Promise.all([
+            db.collection('developers').findOne({ user_id: userId, bot_id: botId }),
+            db.collection('primary_developers').findOne({ user_id: userId, bot_id: botId }),
+            db.collection('secondary_developers').findOne({ user_id: userId, bot_id: botId })
+        ]);
+
+        await client.close();
+
+        const result = !!(dev || primary || secondary);
+        console.log('✅ isDeveloper result:', result);
+        return result;
     } catch (error) {
-        console.error('❌ Error in isDeveloper():', error);
+        console.error('❌ Error in isDeveloper:', error);
         return false;
     }
 }
