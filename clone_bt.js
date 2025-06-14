@@ -867,45 +867,70 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 `;
 
             fs.writeFileSync(botFilePath, botFileContent);
-            
-            // Start the bot using PM2
-            const pm2 = require('pm2');
-            pm2.connect((err) => {
-                if (err) {
-                    console.error(err);
-                    return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
-                }
 
-                pm2.start({
-                    script: botFilePath,
-                    name: `bot_${botInfo.id}`,
-                    autorestart: true,
-                }, (err) => {
-                    if (err) {
-                        console.error(err);
-                        return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+// Start the bot using PM2
+const pm2 = require('pm2');
+pm2.connect((err) => {
+    if (err) {
+        console.error(err);
+        return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+    }
+
+    pm2.start({
+        script: botFilePath,
+        name: `bot_${botInfo.id}`,
+        autorestart: true,
+    }, async (err) => { // ✅ Make this callback async so you can use await
+        if (err) {
+            console.error(err);
+            return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+        }
+
+        // Store bot details
+        activeBots[botInfo.id] = {
+            name: botInfo.first_name,
+            username: botInfo.username,
+            token: token,
+            expiry: expiryDate.toISOString(),
+            configPath: configPath,
+            botFilePath: botFilePath,
+            createdBy: ctx.from.id
+        };
+
+        userDeployments.set(userId, botInfo.id);
+
+        // Create database entry
+        createCloneDbEntry(botInfo.id, token, expiryDate);
+
+        // ✅ Assign user as "مطور اساسي"
+        try {
+            const db = await ensureDatabaseInitialized(); // Ensure DB is ready
+            const username = ctx.from.username || null;
+
+            await db.collection('developers').updateOne(
+                { user_id: ctx.from.id },
+                {
+                    $set: {
+                        user_id: ctx.from.id,
+                        username: username,
+                        bot_id: botInfo.id,
+                        promoted_at: new Date(),
+                        promoted_by: 'auto-clone',
+                        chat_id: ctx.chat.id
                     }
+                },
+                { upsert: true }
+            );
 
-                    // Store bot details
-                    activeBots[botInfo.id] = {
-                        name: botInfo.first_name,
-                        username: botInfo.username,
-                        token: token,
-                        expiry: expiryDate.toISOString(),
-                        configPath: configPath,
-                        botFilePath: botFilePath,
-                        createdBy: ctx.from.id
-                    };
+            console.log(`👑 User ${ctx.from.id} (@${username}) assigned as مطور اساسي.`);
+        } catch (err) {
+            console.error('❌ Failed to assign developer role:', err.message);
+        }
 
-                    userDeployments.set(userId, botInfo.id);
+        // Store bot information in groups collection
+        storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
 
-                    // Create database entry
-                    createCloneDbEntry(botInfo.id, token, expiryDate);
-                    
-                    // Store bot information in groups collection
-                    storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
-
-                    ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
+        ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
 - اسم البوت: ${botInfo.first_name}
 - ايدي البوت: ${botInfo.id}
@@ -913,12 +938,13 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 - توكن البوت: <code>${token}</code>
 
 ~ <b>تاريخ انتهاء الاشتراك</b>: ${expiryDate.toLocaleDateString('ar-EG')}
-- يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, { 
-                        parse_mode: 'HTML',
-                        disable_web_page_preview: true 
-                    });
-                });
-            });
+- يمكنك دائما تجديد الاشتراك مجانا سيتم تنبيهك عن طريق البوت الخاص بك لاتقلق.`, {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+        });
+    });
+});
+
         } else {
             ctx.reply('❌ التوكن غير صالح أو البوت غير متاح.');
         }
