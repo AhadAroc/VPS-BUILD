@@ -102,7 +102,7 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 
-const PORT = process.env.PORT || 10001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Bot B server running on port ${PORT}`);
     console.log(`📊 Health check: http://0.0.0.0:${PORT}/health`);
