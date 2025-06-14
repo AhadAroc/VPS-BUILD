@@ -34,7 +34,57 @@ let client = null;
 
 let _mongoClient = null;
 let _mongoDbs = {};
+async function connectToMongoDB(customDbName = null) {
+  try {
+    console.log('📡 Attempting to connect to MongoDB...');
 
+    const dbNameToUse = customDbName || defaultDbName;
+
+    // Inject DB name into URI if missing
+    let uriToUse = mongoUri;
+    if (!mongoUri.includes(`/${dbNameToUse}`)) {
+      const [base, query] = mongoUri.split('?');
+      uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
+    }
+
+    const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+    console.log(`🔐 Connecting to: ${sanitizedUri}`);
+
+    // If already connected to same DB
+    if (mongooseConnected && currentMongooseDb === dbNameToUse) {
+      console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
+      return db;
+    }
+
+    // Close existing connection if switching DB
+    if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
+      console.log('♻️ Closing existing mongoose connection...');
+      await mongoose.disconnect();
+      mongooseConnected = false;
+      currentMongooseDb = null;
+    }
+
+    // Race connection against timeout
+    const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
+    );
+
+    await Promise.race([connectPromise, timeoutPromise]);
+
+    mongooseConnected = true;
+    currentMongooseDb = dbNameToUse;
+    db = mongoose.connection.db;
+
+    console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
+    return db;
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    mongooseConnected = false;
+    currentMongooseDb = null;
+    return createMockDatabase();
+  }
+}
 async function getDatabaseForBot(botId) {
     try {
         const uri = process.env.MONGODB_URI || mongoUri;
@@ -114,57 +164,7 @@ function createMockDatabase() {
         createCollection: async () => null
     };
 }
-async function connectToMongoDB(customDbName = null) {
-  try {
-    console.log('📡 Attempting to connect to MongoDB...');
 
-    const dbNameToUse = customDbName || defaultDbName;
-
-    // Inject DB name into URI if missing
-    let uriToUse = mongoUri;
-    if (!mongoUri.includes(`/${dbNameToUse}`)) {
-      const [base, query] = mongoUri.split('?');
-      uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
-    }
-
-    const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
-    console.log(`🔐 Connecting to: ${sanitizedUri}`);
-
-    // If already connected to same DB
-    if (mongooseConnected && currentMongooseDb === dbNameToUse) {
-      console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
-      return db;
-    }
-
-    // Close existing connection if switching DB
-    if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
-      console.log('♻️ Closing existing mongoose connection...');
-      await mongoose.disconnect();
-      mongooseConnected = false;
-      currentMongooseDb = null;
-    }
-
-    // Race connection against timeout
-    const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
-    );
-
-    await Promise.race([connectPromise, timeoutPromise]);
-
-    mongooseConnected = true;
-    currentMongooseDb = dbNameToUse;
-    db = mongoose.connection.db;
-
-    console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
-    return db;
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    mongooseConnected = false;
-    currentMongooseDb = null;
-    return createMockDatabase();
-  }
-}
 
 async function getDatabaseForBot(botId) {
     try {
