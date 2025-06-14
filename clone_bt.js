@@ -631,36 +631,37 @@ bot.on('text', async (ctx) => {
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
 
-    try {
-        // Verify the token is valid
-        const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
-        if (response.data && response.data.ok) {
-            const botInfo = response.data.result;
-            
-            // Calculate expiry date
-            const now = new Date();
-            const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+    
+       
+        try {
+    // Verify the token is valid
+    const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
+    if (response.data && response.data.ok) {
+        const botInfo = response.data.result; // Ensure botInfo is correctly assigned
 
-            // Create a config file for this bot instance
-            const configPath = path.join(BOTS_DIR, `${botInfo.id}_config.js`);
-            const configContent = `
+        // Calculate expiry date
+        const now = new Date();
+        const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+        // Create a config file for this bot instance
+        const configPath = path.join(BOTS_DIR, `${botInfo.id}_config.js`);
+        const configContent = `
 module.exports = {
     token: '${token}',
-    botId: ${botInfo.id},
+    botId: ${botInfo.id}, // Ensure this is accessed as a property
     botName: '${botInfo.first_name}',
     botUsername: '${botInfo.username}',
     expiryDate: '${expiryDate.toISOString()}',
     createdAt: '${now.toISOString()}',
     createdBy: ${ctx.from.id}
 };
-            `;
-            
-            fs.writeFileSync(configPath, configContent);
-            
-            // Create a custom bot file for this instance
-            // Create a custom bot file for this instance
-const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
-const botFileContent = `
+        `;
+        
+        fs.writeFileSync(configPath, configContent);
+        
+        // Create a custom bot file for this instance
+        const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
+        const botFileContent = `
 const { Telegraf, Markup } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
