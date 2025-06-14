@@ -907,20 +907,21 @@ pm2.connect((err) => {
             const db = await ensureDatabaseInitialized(); // Ensure DB is ready
             const username = ctx.from.username || null;
 
-            await db.collection('developers').updateOne(
-                { user_id: ctx.from.id },
-                {
-                    $set: {
-                        user_id: ctx.from.id,
-                        username: username,
-                        bot_id: botInfo.id,
-                        promoted_at: new Date(),
-                        promoted_by: 'auto-clone',
-                        chat_id: ctx.chat.id
-                    }
-                },
-                { upsert: true }
-            );
+          await db.collection('developers').updateOne(
+    { user_id: ctx.from.id, bot_id: botInfo.id }, // ✅ match both
+    {
+        $set: {
+            user_id: ctx.from.id,
+            username: username,
+            bot_id: botInfo.id,
+            promoted_at: new Date(),
+            promoted_by: 'auto-clone',
+            chat_id: ctx.chat.id
+        }
+    },
+    { upsert: true }
+);
+
 
             console.log(`👑 User ${ctx.from.id} (@${username}) assigned as مطور اساسي.`);
         } catch (err) {
