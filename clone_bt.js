@@ -543,12 +543,15 @@ async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
 
         const db = client.db('test'); // ✅ Use the "test" DB directly here
 
+        // Ensure username is either a string or null
+        const safeUsername = typeof username === 'string' ? username : null;
+
         const result = await db.collection('developers').updateOne(
             { user_id: userId, bot_id: botId },
             {
                 $set: {
                     user_id: userId,
-                    username: username || null,
+                    username: safeUsername,
                     bot_id: botId,
                     promoted_at: new Date(),
                     promoted_by: 'auto-clone',
@@ -938,39 +941,33 @@ pm2.connect((err) => {
 
         // ✅ Assign user as "مطور اساسي"
         try {
-    if (!process.env.MONGO_URI) {
-        console.error('❌ MONGO_URI is not defined in environment variables.');
-        return;
-    }
+            const client = await MongoClient.connect(process.env.MONGO_URI, {
+                useNewUrlParser: true,
+                useUnifiedTopology: true
+            });
 
-    const client = await MongoClient.connect(process.env.MONGO_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    });
+            const db = client.db('test'); // ✅ connect directly to the test DB
 
-    const db = client.db('test'); // ✅ ensure you're writing to test DB
+            await db.collection('developers').updateOne(
+                { user_id: userId, bot_id: botInfo.id },
+                {
+                    $set: {
+                        user_id: userId,
+                        username: username || null, // Add null check here
+                        bot_id: botInfo.id,
+                        promoted_at: new Date(),
+                        promoted_by: 'auto-clone',
+                        chat_id: chatId
+                    }
+                },
+                { upsert: true }
+            );
 
-    const result = await db.collection('developers').updateOne(
-        { user_id: userId, bot_id: botInfo.id },
-        {
-            $set: {
-                user_id: userId,
-                username: username,
-                bot_id: botInfo.id,
-                promoted_at: new Date(),
-                promoted_by: 'auto-clone',
-                chat_id: chatId
-            }
-        },
-        { upsert: true }
-    );
-
-    console.log(`👑 Developer role assigned to user ${userId} (@${username}) for bot ${botInfo.id}.`);
-    console.log('📝 Mongo update result:', result);
-    await client.close();
-} catch (err) {
-    console.error('❌ Failed to assign developer role to test DB:', err);
-}
+            console.log(`👑 User ${userId} (@${username}) assigned as مطور اساسي.`);
+            await client.close();
+        } catch (err) {
+            console.error('❌ Failed to assign developer role to test DB:', err.message);
+        }
 
         // Store bot information in groups collection
         storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
