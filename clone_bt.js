@@ -938,33 +938,39 @@ pm2.connect((err) => {
 
         // ✅ Assign user as "مطور اساسي"
         try {
-            const client = await MongoClient.connect(process.env.MONGO_URI, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true
-            });
+    if (!process.env.MONGO_URI) {
+        console.error('❌ MONGO_URI is not defined in environment variables.');
+        return;
+    }
 
-            const db = client.db('test'); // ✅ connect directly to the test DB
+    const client = await MongoClient.connect(process.env.MONGO_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    });
 
-            await db.collection('developers').updateOne(
-                { user_id: userId, bot_id: botInfo.id },
-                {
-                    $set: {
-                        user_id: userId,
-                        username: username,
-                        bot_id: botInfo.id,
-                        promoted_at: new Date(),
-                        promoted_by: 'auto-clone',
-                        chat_id: chatId
-                    }
-                },
-                { upsert: true }
-            );
+    const db = client.db('test'); // ✅ ensure you're writing to test DB
 
-            console.log(`👑 User ${userId} (@${username}) assigned as مطور اساسي.`);
-            await client.close();
-        } catch (err) {
-            console.error('❌ Failed to assign developer role to test DB:', err.message);
-        }
+    const result = await db.collection('developers').updateOne(
+        { user_id: userId, bot_id: botInfo.id },
+        {
+            $set: {
+                user_id: userId,
+                username: username,
+                bot_id: botInfo.id,
+                promoted_at: new Date(),
+                promoted_by: 'auto-clone',
+                chat_id: chatId
+            }
+        },
+        { upsert: true }
+    );
+
+    console.log(`👑 Developer role assigned to user ${userId} (@${username}) for bot ${botInfo.id}.`);
+    console.log('📝 Mongo update result:', result);
+    await client.close();
+} catch (err) {
+    console.error('❌ Failed to assign developer role to test DB:', err);
+}
 
         // Store bot information in groups collection
         storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
