@@ -1,6 +1,6 @@
 const { developerIds } = require('./config');
 //const { isSubscribed } = require('./commands');
-const { getDb, pool } = require('./database');
+const { getDb, pool ,ensureDatabaseInitialized} = require('./database');
 const axios = require('axios');
 // Add this at the top of the file with other imports
 const SUBSCRIPTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
