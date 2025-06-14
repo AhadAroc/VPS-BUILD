@@ -2,6 +2,7 @@ const { MongoClient } = require('mongodb');
 const { mongoUri, dbName, developerIds } = require('./config');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const defaultDbName = process.env.DB_NAME || 'replays';
 
 const mongooseOptions = {
     useNewUrlParser: true,
