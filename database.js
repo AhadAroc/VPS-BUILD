@@ -720,24 +720,35 @@ async function getDevelopers() {
 }
 
 // Add the isDeveloper function
-async function isDeveloper(userId) {
+async function isDeveloper(ctx, userId) {
+    const botId = ctx.botInfo?.id;
+    if (!botId) {
+        console.warn('⚠️ Missing bot ID in ctx.botInfo');
+        return false;
+    }
+
     try {
-        console.log('DEBUG: Checking if user is developer:', userId);
-        
-        // Check in all developer collections
-        const developer = await db.collection('developers').findOne({ user_id: userId });
-        const primaryDev = await db.collection('primary_developers').findOne({ user_id: userId });
-        const secondaryDev = await db.collection('secondary_developers').findOne({ user_id: userId });
-        
-        const result = !!(developer || primaryDev || secondaryDev);
-        console.log('DEBUG: isDeveloper result for user', userId, ':', result);
-        
+        const db = await ensureDatabaseInitialized();
+
+        console.log('DEBUG: Checking developer roles for user', userId, 'on bot', botId);
+
+        // Check all developer role collections
+        const [dev, primary, secondary] = await Promise.all([
+            db.collection('developers').findOne({ user_id: userId, bot_id: botId }),
+            db.collection('primary_developers').findOne({ user_id: userId, bot_id: botId }),
+            db.collection('secondary_developers').findOne({ user_id: userId, bot_id: botId })
+        ]);
+
+        const result = !!(dev || primary || secondary);
+        console.log('DEBUG: isDeveloper result:', result);
+
         return result;
     } catch (error) {
-        console.error('Error in isDeveloper:', error);
+        console.error('❌ Error in isDeveloper:', error);
         return false;
     }
 }
+
 
 async function addDeveloper(userId, username) {
     try {
