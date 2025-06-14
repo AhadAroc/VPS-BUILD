@@ -29,6 +29,9 @@ app.post('/check-subscription', async (req, res) => {
 
     res.json({ subscribed });
 });
+app.get('/ping', (req, res) => {
+    res.send('pong');
+});
 
 const PORT = 3000;
 app.listen(PORT, () => {
