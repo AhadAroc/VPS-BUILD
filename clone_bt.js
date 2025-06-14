@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const database = require('./database');
 const { fork } = require('child_process');
@@ -15,7 +16,7 @@ const subscriptionCache = {};
 const mongoURI = process.env.MONGODB_URI;
 // Store user deployments
 const userDeployments = new Map();
-require('dotenv').config();
+
 //const Heroku = require('heroku-client');
 const mongoose = require('mongoose');
 mongoose.connect(mongoURI, {
@@ -23,7 +24,15 @@ mongoose.connect(mongoURI, {
   useUnifiedTopology: true,
   ssl: true,
   tls: true,
-  tlsAllowInvalidCertificates: false
+  tlsAllowInvalidCertificates: false,
+  connectTimeoutMS: 30000, // 30 seconds timeout
+  socketTimeoutMS: 45000   // 45 seconds timeout
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  // Implement a fallback or retry mechanism here
+  console.log('Attempting to continue without MongoDB connection...');
 });
 const activeGroups = new Map();
 // Add this at the top of your file with other imports
@@ -39,7 +48,7 @@ const MAX_TOTAL_BOTS = 10;    // Maximum total bots on the server
 const BOT_TOKEN = '7901374595:AAGTDSReIu3gRhsDRXxUIR2UJR5MIK4kMCE'; // Your clone manager bot token
 const ADMIN_ID = 7308214106; // Your Telegram Admin ID (Lorsiv)
 const EXPIRY_DATE = '2025/03/15';
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10001;
 
 // Store active bot processes and their info
 const activeBots = {};
@@ -1189,27 +1198,40 @@ function loadExistingBots() {
     });
 }
 // Store bot information in groups collection
-async function storeGroupInfo(botId, botName, botUsername, botToken, ownerId) {
+async function storeGroupInfo(botId, botUsername, botName, botToken) {
     try {
-        const db = await ensureDatabaseInitialized('test');
+        const db = await database.setupDatabase();
         
-        // Create a document for the groups collection
-        await db.collection('groups').insertOne({
-            bot_id: parseInt(botId),
-            bot_name: botName,
-            bot_username: botUsername,
-            bot_token: botToken,
-            owner_id: ownerId,
-            is_active: true,
-            created_at: new Date(),
-            group_id: null,  // Will be populated when bot is added to a group
-            title: null,     // Will be populated when bot is added to a group
-            type: 'bot_info' // Indicates this is a bot info entry
-        });
+        // Create a unique identifier for the bot info record
+        const infoId = `bot_info_${botId}`;
         
-        console.log(`Bot information stored in groups collection for bot ${botId}`);
+        // Store bot info in a special document with type='bot_info'
+        await db.collection('groups').updateOne(
+            { 
+                type: 'bot_info',
+                bot_id: botId 
+            },
+            {
+                $set: {
+                    type: 'bot_info',
+                    bot_id: botId,
+                    bot_username: botUsername,
+                    bot_name: botName,
+                    bot_token: botToken,
+                    updated_at: new Date()
+                },
+                $setOnInsert: {
+                    created_at: new Date()
+                }
+            },
+            { upsert: true }
+        );
+        
+        console.log(`✅ Bot info stored for @${botUsername} (${botId})`);
+        return true;
     } catch (error) {
-        console.error(`Error storing bot information in groups collection for bot ${botId}:`, error);
+        console.error('❌ Error storing group info:', error);
+        return false;
     }
 }
 async function ensureDatabaseInitialized(databaseName = 'test') {
