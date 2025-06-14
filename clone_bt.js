@@ -4,7 +4,7 @@ const database = require('./database');
 const { fork } = require('child_process');
 const { exec } = require('child_process');
 const { execSync } = require('child_process');
-
+const { MongoClient } = require('mongodb');
 const FormData = require('form-data');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
@@ -896,7 +896,11 @@ process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 `;
 
-            fs.writeFileSync(botFilePath, botFileContent);
+            const userId = ctx.from.id;
+const username = ctx.from.username || null;
+const chatId = ctx.chat.id;
+
+fs.writeFileSync(botFilePath, botFileContent);
 
 // Start the bot using PM2
 const pm2 = require('pm2');
@@ -910,7 +914,7 @@ pm2.connect((err) => {
         script: botFilePath,
         name: `bot_${botInfo.id}`,
         autorestart: true,
-    }, async (err) => { // ✅ Make this callback async so you can use await
+    }, async (err) => {
         if (err) {
             console.error(err);
             return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
@@ -924,7 +928,7 @@ pm2.connect((err) => {
             expiry: expiryDate.toISOString(),
             configPath: configPath,
             botFilePath: botFilePath,
-            createdBy: ctx.from.id
+            createdBy: userId
         };
 
         userDeployments.set(userId, botInfo.id);
@@ -934,35 +938,33 @@ pm2.connect((err) => {
 
         // ✅ Assign user as "مطور اساسي"
         try {
-    const username = ctx.from.username || null;
+            const client = await MongoClient.connect(process.env.MONGO_URI, {
+                useNewUrlParser: true,
+                useUnifiedTopology: true
+            });
 
-    const client = await MongoClient.connect(process.env.MONGO_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    });
+            const db = client.db('test'); // ✅ connect directly to the test DB
 
-    const db = client.db('test'); // ✅ connect directly to the test DB
+            await db.collection('developers').updateOne(
+                { user_id: userId, bot_id: botInfo.id },
+                {
+                    $set: {
+                        user_id: userId,
+                        username: username,
+                        bot_id: botInfo.id,
+                        promoted_at: new Date(),
+                        promoted_by: 'auto-clone',
+                        chat_id: chatId
+                    }
+                },
+                { upsert: true }
+            );
 
-    await db.collection('developers').updateOne(
-        { user_id: ctx.from.id, bot_id: botInfo.id },
-        {
-            $set: {
-                user_id: ctx.from.id,
-                username: username,
-                bot_id: botInfo.id,
-                promoted_at: new Date(),
-                promoted_by: 'auto-clone',
-                chat_id: ctx.chat.id
-            }
-        },
-        { upsert: true }
-    );
-
-    console.log(`👑 User ${ctx.from.id} (@${username}) assigned as مطور اساسي.`);
-    await client.close(); // ✅ close the client manually since this is temporary
-} catch (err) {
-    console.error('❌ Failed to assign developer role to test DB:', err.message);
-}
+            console.log(`👑 User ${userId} (@${username}) assigned as مطور اساسي.`);
+            await client.close();
+        } catch (err) {
+            console.error('❌ Failed to assign developer role to test DB:', err.message);
+        }
 
         // Store bot information in groups collection
         storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
