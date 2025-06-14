@@ -924,80 +924,18 @@ async function assignBotOwnership(ctx) {
 async function checkUserSubscription(ctx) {
     try {
         const userId = ctx.from.id;
-        const subscriptionStatusCache = new Map();
+        console.log(`🔓 [SUB] Bypassing subscription check for user ${userId} (TEMPORARY OVERRIDE)`);
 
-        console.log(`🔍 [SUB] Starting subscription check for user ${userId}`);
+        // Always assume the user is subscribed
+        return true;
 
-        // Define the channels that require subscription
-        const requiredChannels = [
-            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
-        ];
-
-        const channelIds = requiredChannels.map(channel => channel.id);
-        console.log(`📦 [SUB] Checking channels: ${channelIds.join(', ')}`);
-
-        // FIXED: Correct port number (3000 instead of 80)
-        const botBUrl = 'http://localhost:3000/check-subscription';
-        
-        console.log(`📡 [SUB] Sending request to Bot B at ${botBUrl}...`);
-        const response = await axios.post(
-            botBUrl,
-            { userId, channels: channelIds },
-            { 
-                timeout: 8000, // 8-second timeout
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'TelegramBot/1.0'
-                }
-            }
-        );
-
-        console.log(`✅ [SUB] Bot B response received:`, response.data);
-
-        const { subscribed } = response.data;
-
-        if (subscribed) {
-            console.log(`🎉 [SUB] User ${userId} is subscribed.`);
-            subscriptionStatusCache.set(userId, true);
-            return true;
-        } else {
-            console.log(`⚠️ [SUB] User ${userId} is NOT subscribed.`);
-            const subscriptionMessage = '⚠️ لاستخدام البوت، يرجى الاشتراك في القنوات التالية:';
-            const inlineKeyboard = [
-                [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-                [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-                [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-            ];
-
-            if (ctx.callbackQuery) {
-                console.log(`↩️ [SUB] Sending callback query alert.`);
-                await ctx.answerCbQuery('❗ اشترك أولاً');
-                await ctx.editMessageText(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                }).catch(err => console.error('editMessageText error:', err));
-            } else {
-                console.log(`↩️ [SUB] Sending subscription prompt message.`);
-                await ctx.reply(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            }
-            return false;
-        }
+        // NOTE: Remove this override when the backend is fixed
     } catch (error) {
-        console.error(`❌ [SUB] Subscription check error for user ${ctx.from?.id}:`, {
-            message: error.message,
-            code: error.code,
-            response: error.response?.status,
-            isTimeout: error.code === 'ECONNABORTED'
-        });
-        
-        if (ctx.callbackQuery) {
-            await ctx.answerCbQuery('❌ خطأ أثناء التحقق.', { show_alert: true }).catch(() => { });
-        }
+        console.error(`❌ [SUB] Subscription bypass failed unexpectedly:`, error);
         return false;
     }
 }
+
 
 
 
