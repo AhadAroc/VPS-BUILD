@@ -4864,7 +4864,7 @@ async function handleUserPromotion(ctx) {
                 collection = 'primary_creators';
                 successMessage = `✅ تم ترقية المستخدم @${username} إلى منشئ اساسي.`;
                 break;
-            case 'مطور':
+            case 'مطور اساسي':
             case 'developer':
                 collection = 'developers';
                 successMessage = `✅ تم ترقية المستخدم @${username} إلى مطور.`;
