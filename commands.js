@@ -939,7 +939,7 @@ async function checkUserSubscription(ctx) {
 
         console.log(`📡 [SUB] Sending request to Bot B...`);
         const response = await axios.post(
-            'http://69.62.114.242:80/check-subscription',
+            'http://69.62.114.242:10000/check-subscription',
             { userId, channels: channelIds },
             { timeout: 5000 } // 5-second timeout for the HTTP request
         );
