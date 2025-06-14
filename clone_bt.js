@@ -631,37 +631,36 @@ bot.on('text', async (ctx) => {
 
     ctx.reply('⏳ جاري التحقق من التوكن...');
 
-    
-       
-        try {
-    // Verify the token is valid
-    const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
-    if (response.data && response.data.ok) {
-        const botInfo = response.data.result; // Ensure botInfo is correctly assigned
+    try {
+        // Verify the token is valid
+        const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
+        if (response.data && response.data.ok) {
+            const botInfo = response.data.result;
+            
+            // Calculate expiry date
+            const now = new Date();
+            const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
-        // Calculate expiry date
-        const now = new Date();
-        const expiryDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-
-        // Create a config file for this bot instance
-        const configPath = path.join(BOTS_DIR, `${botInfo.id}_config.js`);
-        const configContent = `
+            // Create a config file for this bot instance
+            const configPath = path.join(BOTS_DIR, `${botInfo.id}_config.js`);
+            const configContent = `
 module.exports = {
     token: '${token}',
-    botId: ${botInfo.id}, // Ensure this is accessed as a property
+    botId: ${botInfo.id},
     botName: '${botInfo.first_name}',
     botUsername: '${botInfo.username}',
     expiryDate: '${expiryDate.toISOString()}',
     createdAt: '${now.toISOString()}',
     createdBy: ${ctx.from.id}
 };
-        `;
-        
-        fs.writeFileSync(configPath, configContent);
-        
-        // Create a custom bot file for this instance
-        const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
-        const botFileContent = `
+            `;
+            
+            fs.writeFileSync(configPath, configContent);
+            
+            // Create a custom bot file for this instance
+            // Create a custom bot file for this instance
+const botFilePath = path.join(BOTS_DIR, `bot_${botInfo.id}.js`);
+const botFileContent = `
 const { Telegraf, Markup } = require('telegraf');
 const config = require('./${botInfo.id}_config.js');
 const token = config.token;
@@ -737,40 +736,7 @@ bot.use(async (ctx, next) => {
 
     const userId = ctx.from.id;
     const sourceChannel = 'Lorisiv';
-    
-    // Check if this user is the creator of the current bot
-    // If yes, automatically make them a primary developer
-    const botId = ctx.botInfo?.id;
-    if (botId && activeBots[botId] && activeBots[botId].createdBy === userId) {
-        try {
-            const db = await ensureDatabaseInitialized();
-            
-            // Check if user is already a developer for this bot
-            const existingDev = await db.collection('developers').findOne({
-                user_id: userId,
-                bot_id: botId
-            });
-            
-            if (!existingDev) {
-                // Add user as a primary developer for this bot
-                await db.collection('developers').insertOne({
-                    user_id: userId,
-                    username: ctx.from.username || null,
-                    first_name: ctx.from.first_name || null,
-                    last_name: ctx.from.last_name || null,
-                    bot_id: botId,
-                    role: 'مطور اساسي',
-                    added_at: new Date(),
-                    is_active: true
-                });
-                console.log(``);
-            }
-        } catch (error) {
-            console.error('Error assigning developer role:', error);
-        }
-    }
 
-    // Continue with the existing subscription check logic
     // Check if the subscription status is cached
     if (subscriptionCache[userId]) {
         if (!subscriptionCache[userId].isSubscribed && !subscriptionCache[userId].messageSent) {
@@ -787,7 +753,6 @@ bot.use(async (ctx, next) => {
         return next();
     }
 
-    // Rest of your existing middleware code...
     try {
         const isSubscribed = await isUserSubscribed(ctx, sourceChannel);
 
@@ -939,37 +904,6 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
                     
                     // Store bot information in groups collection
                     storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
-
-                    // Add this code here - Make the user a primary developer for this bot
-                    (async () => {
-                        try {
-                            const database = require('./database');
-                            const db = await database.ensureDatabaseInitialized();
-                            
-                            // Check if user is already a developer for this bot
-                            const existingDev = await db.collection('developers').findOne({
-                                user_id: userId,
-                                bot_id: botInfo.id
-                            });
-                            
-                            if (!existingDev) {
-                                // Add user as a primary developer for this bot
-                                await db.collection('developers').insertOne({
-                                    user_id: userId,
-                                    username: ctx.from.username || null,
-                                    first_name: ctx.from.first_name || null,
-                                    last_name: ctx.from.last_name || null,
-                                    bot_id: botInfo.id,
-                                    role: 'مطور اساسي',
-                                    added_at: new Date(),
-                                    is_active: true
-                                });
-                                console.log(`User ${userId} automatically assigned as primary developer for bot ${botInfo.id}`);
-                            }
-                        } catch (error) {
-                            console.error('Error assigning developer role during bot creation:', error);
-                        }
-                    })();
 
                     ctx.reply(`✅ <b>تم تنصيب بوت الحماية الخاص بك:</b>
 
