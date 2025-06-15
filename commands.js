@@ -2662,37 +2662,32 @@ async function isPrimaryCreator(ctx, userId) {
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        
-        // First, try to assign ownership (this will only work for the first user)
+        console.log(`🟢 [بدء] Command triggered by user ${userId}`);
+
+        // Try assigning ownership
+        console.log('🔍 Attempting assignBotOwnership...');
         const ownershipAssigned = await assignBotOwnership(ctx);
         
-        // If ownership was just assigned to this user, we don't need to do the other checks
         if (ownershipAssigned) {
-            console.log(`DEBUG: Ownership assigned to user ${userId}`);
-            return; // Exit early since we already sent the ownership confirmation message
+            console.log(`✅ Ownership just assigned to user ${userId}`);
+            return;
         }
-        
-        // If we get here, either:
-        // 1. The bot already had an owner (not this user)
-        // 2. The bot already had an owner (this user)
-        
-        // Check if the current user is the owner
+
         if (userId === ownerId) {
-            console.log(`DEBUG: Owner ${userId} used the بدء command`);
-            
-            // Owner can always use the command
+            console.log(`👑 User ${userId} is already the bot owner`);
+
             const subscribed = await checkUserSubscription(ctx);
-            
+
             if (subscribed) {
                 if (ctx.chat.type === 'private') {
-                    console.log('DEBUG: Showing Dev Panel to owner (private)');
+                    console.log('📲 Owner in private chat – showing Dev Panel');
                     await showDevPanel(ctx);
                 } else {
-                    console.log('DEBUG: Showing Main Menu to owner (group)');
+                    console.log('👥 Owner in group – showing Main Menu');
                     await showMainMenu(ctx);
                 }
             } else {
-                console.log('DEBUG: Owner not subscribed, sending subscription buttons.');
+                console.warn('⚠️ Owner is not subscribed to required channels');
                 const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
 
                 const inlineKeyboard = [
@@ -2707,25 +2702,39 @@ bot.hears('بدء', async (ctx) => {
             }
             return;
         }
-        
-        // If we get here, the user is not the owner
-        // Check if they are a secondary developer, admin, or VIP
-         const isPrimaryCreator = await isPrimaryCreator(ctx, userId);
-        const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        const isDev = await isDeveloper(ctx, userId);
-        const isBotOwn = await isBotOwner(ctx, userId);
-        const isBotAdm = await isBotAdmin(ctx, userId);
-       
-      
-        
 
-        // Only proceed if the user is a dev, admin, sec dev, bot admin, bot owner, or primary creator
-        if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimaryCreator) {
+        console.log(`🔍 Checking user ${userId} roles...`);
+
+        let isPrimary = false;
+        try {
+            isPrimary = await isPrimaryCreator(ctx, userId);
+            console.log(`🔎 isPrimaryCreator for ${userId}:`, isPrimary);
+        } catch (err) {
+            console.error(`❌ Error in isPrimaryCreator for ${userId}:`, err);
+        }
+
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        console.log(`🔎 isSecondaryDeveloper: ${isSecDev}`);
+
+        const isVIPUser = await isVIP(ctx, userId);
+        console.log(`🔎 isVIPUser: ${isVIPUser}`);
+
+        const isDev = await isDeveloper(ctx, userId);
+        console.log(`🔎 isDeveloper: ${isDev}`);
+
+        const isBotOwn = await isBotOwner(ctx, userId);
+        console.log(`🔎 isBotOwner: ${isBotOwn}`);
+
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        console.log(`🔎 isBotAdmin: ${isBotAdm}`);
+
+        if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimary) {
+            console.log(`🚫 User ${userId} has no sufficient role — rejecting`);
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
 
         if (ctx.from) {
+            console.log('📝 Updating last interaction timestamp...');
             await updateLastInteraction(
                 ctx.from.id, 
                 ctx.from.username, 
@@ -2735,19 +2744,18 @@ bot.hears('بدء', async (ctx) => {
         }
 
         const subscribed = await checkUserSubscription(ctx);
-
-        console.log(`DEBUG: بدء triggered | userId: ${userId} | subscribed: ${subscribed}`);
+        console.log(`✅ Subscription check complete. Subscribed: ${subscribed}`);
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
-                console.log('DEBUG: Showing Dev Panel (private)');
+                console.log('📲 User in private – showing Dev Panel');
                 await showDevPanel(ctx);
             } else {
-                console.log('DEBUG: Showing Main Menu (group)');
+                console.log('👥 User in group – showing Main Menu');
                 await showMainMenu(ctx);
             }
         } else {
-            console.log('DEBUG: User not subscribed, sending subscription buttons.');
+            console.warn('⚠️ User not subscribed – sending subscription message');
             const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
 
             const inlineKeyboard = [
@@ -2761,10 +2769,11 @@ bot.hears('بدء', async (ctx) => {
             });
         }
     } catch (error) {
-        console.error('Error handling "بدء" command:', error);
-        ctx.reply('يرجى التواصل مع صانع البوت او المالك ');
+        console.error('💥 Error handling "بدء" command:', error);
+        ctx.reply('❌ حدث خطأ. يرجى التواصل مع المالك أو المطور.');
     }
 });
+
 
 // Add this function to your commands.js file
 async function listVIPUsers(ctx) {
