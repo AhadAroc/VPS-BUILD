@@ -4473,7 +4473,7 @@ async function isImportant(ctx, userId) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
         }
     }
-    async function promoteUser(ctx, role) {
+    async function promsteUser(ctx, role) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
