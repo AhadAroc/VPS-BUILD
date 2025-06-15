@@ -2643,7 +2643,7 @@ bot.hears('بدء', async (ctx) => {
 
             if (subscribed) {
                 if (ctx.chat.type === 'private') {
-                    console.log('📲 Owner in private chat – skipping Dev Panel');
+                    console.log('📲 Owner in private chat – sending neutral confirmation');
                     await ctx.reply('✅ اشتراكك مكتمل، استخدم الأوامر أو أضف البوت إلى مجموعتك.');
                 } else {
                     console.log('👥 Owner in group – showing Main Menu');
@@ -2711,8 +2711,8 @@ bot.hears('بدء', async (ctx) => {
 
         if (subscribed) {
             if (ctx.chat.type === 'private') {
-                console.log('📲 User in private – showing Dev Panel');
-                await showDevPanel(ctx);
+                console.log('📲 User in private – sending neutral confirmation');
+                await ctx.reply('✅ اشتراكك مكتمل، استخدم الأوامر أو أضف البوت إلى مجموعتك.');
             } else {
                 console.log('👥 User in group – showing Main Menu');
                 await showMainMenu(ctx);
@@ -2736,6 +2736,7 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ. يرجى التواصل مع المالك أو المطور.');
     }
 });
+
 
 
 
