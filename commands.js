@@ -3429,157 +3429,7 @@ async function enableStickerSharing(ctx) {
     }
 }
 
-async function checkUserRank(ctx) {
-    try {
-        const userId = ctx.from.id;
-        const username = ctx.from.username;
-        const chatId = ctx.chat.id;
-        const botId = ctx.botInfo.id;
-        let rank = 'عضو عادي'; // Default rank
-        let rankEmoji = '👤';
 
-        const db = await ensureDatabaseInitialized();
-
-        // Check if user is the owner
-        if (username === 'Lorisiv') {
-            rank = 'المطور الأساسي';
-            rankEmoji = '👑';
-        } 
-        else if (await isDeveloper(ctx, userId)) {
-            rank = 'مطور';
-            rankEmoji = '⚙️';
-        } 
-        else if (await isSecondaryDeveloper(ctx, userId)) {
-            rank = 'مطور ثانوي';
-            rankEmoji = '🔧';
-        } 
-        else if (await isBotOwner(ctx, userId)) {
-            rank = 'اساسي';
-            rankEmoji = '🛡️';
-        }
-        else if (await isBotAdmin(userId)) {
-            rank = 'مشرف بوت';
-            rankEmoji = '🛠️';
-        }
-        else if (await isAdminOrOwner(ctx, userId)) {
-            try {
-                const member = await ctx.telegram.getChatMember(chatId, userId);
-                if (member.status === 'creator') {
-                    rank = 'المالك';
-                    rankEmoji = '👑';
-                } else {
-                    rank = 'مشرف';
-                    rankEmoji = '🔰';
-                }
-            } catch (error) {
-                console.log('Error getting chat member status:', error);
-                rank = 'مشرف';
-                rankEmoji = '🔰';
-            }
-        }
-        else if (await isVIP(ctx, userId)) {
-            rank = 'مميز';
-            rankEmoji = '💎';
-        }
-        // 🔥 UPDATED: Check if user is in primary_creators with proper query
-        else {
-            // Create a query that matches either user_id or username, and also checks bot_id and chat_id
-            const primaryQuery = {
-                $and: [
-                    { 
-                        $or: [
-                            // Check by user_id if available
-                            userId ? { user_id: userId } : { $exists: false },
-                            // Check by username if available
-                            username ? { username: username } : { $exists: false }
-                        ]
-                    },
-                    // Match the current bot_id
-                    { bot_id: botId },
-                    // Optional: Match the current chat_id if you want to restrict by chat
-                    // { chat_id: chatId }
-                ]
-            };
-
-            const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
-            if (isPrimary) {
-                rank = 'منشئ اساسي';
-                rankEmoji = '👑';
-            }
-        }
-
-        const userMention = username 
-            ? `@${username}` 
-            : ctx.from.first_name;
-
-        await ctx.reply(
-            `${rankEmoji} *المستخدم:* ${userMention}\n` +
-            `🆔 *الايدي:* \`${userId}\`\n` +
-            `🏅 *الرتبة:* ${rank}`,
-            { parse_mode: 'Markdown' }
-        );
-    } catch (error) {
-        console.error('Error checking user rank:', error);
-        await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
-    }
-}
-
-// Create a middleware to enforce sticker restrictions
-const stickerRestrictionMiddleware = async (ctx, next) => {
-    // Skip if not in a group or not a message
-    if (!ctx.message || ctx.chat.type === 'private') {
-        return next();
-    }
-
-    const chatId = ctx.chat.id;
-    const userId = ctx.from.id;
-    
-    // Check if stickers are restricted in this chat
-    if (stickerRestrictionStatus.get(chatId)) {
-        // Check for all types of stickers
-        const hasSticker = ctx.message.sticker;
-        const hasAnimatedSticker = hasSticker && ctx.message.sticker.is_animated;
-        const hasVideoSticker = hasSticker && ctx.message.sticker.is_video;
-        const hasCustomEmoji = ctx.message.entities && 
-            ctx.message.entities.some(entity => entity.type === 'custom_emoji');
-        
-        // If any type of sticker is detected
-        if (hasSticker || hasAnimatedSticker || hasVideoSticker || hasCustomEmoji) {
-            // Check if the user is an admin, VIP, or has special permissions
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            const isVIPUser = await isVIP(ctx, userId);
-            const isPremium = await isPremiumUser(userId);
-            const isBotAdm = await isBotAdmin(ctx, userId);
-
-            if (!isAdmin && !isVIPUser && !isPremium && !isBotAdm) {
-                // Delete the sticker
-                try {
-                    await ctx.deleteMessage();
-                    
-                    // Get sticker type for the message
-                    let stickerType = "ملصق";
-                    if (hasAnimatedSticker) stickerType = "ملصق متحرك";
-                    if (hasVideoSticker) stickerType = "ملصق فيديو";
-                    if (hasCustomEmoji) stickerType = "إيموجي مخصص";
-                    
-                    await ctx.reply(
-                        `⚠️ @${ctx.from.username || ctx.from.first_name}، مشاركة ${stickerType} غير مسموحة للأعضاء العاديين في هذه المجموعة.`,
-                        { reply_to_message_id: ctx.message.message_id }
-                    );
-                    
-                    // Log the restriction
-                    console.log(`Deleted ${stickerType} from user ${userId} in chat ${chatId}`);
-                    
-                    return; // Don't call next() to prevent further processing
-                } catch (error) {
-                    console.error('Error deleting restricted sticker:', error);
-                }
-            }
-        }
-    }
-
-    return next();
-};
 async function loadStickerRestrictions() {
     try {
         const db = await ensureDatabaseInitialized();
@@ -5232,7 +5082,157 @@ async function getGroupLink(ctx) {
 
 
 
+async function checkUserRank(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const username = ctx.from.username;
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+        let rank = 'عضو عادي'; // Default rank
+        let rankEmoji = '👤';
 
+        const db = await ensureDatabaseInitialized();
+
+        // Check if user is the owner
+        if (username === 'Lorisiv') {
+            rank = 'المطور الأساسي';
+            rankEmoji = '👑';
+        } 
+        else if (await isDeveloper(ctx, userId)) {
+            rank = 'مطور';
+            rankEmoji = '⚙️';
+        } 
+        else if (await isSecondaryDeveloper(ctx, userId)) {
+            rank = 'مطور ثانوي';
+            rankEmoji = '🔧';
+        } 
+        else if (await isBotOwner(ctx, userId)) {
+            rank = 'اساسي';
+            rankEmoji = '🛡️';
+        }
+        else if (await isBotAdmin(userId)) {
+            rank = 'مشرف بوت';
+            rankEmoji = '🛠️';
+        }
+        else if (await isAdminOrOwner(ctx, userId)) {
+            try {
+                const member = await ctx.telegram.getChatMember(chatId, userId);
+                if (member.status === 'creator') {
+                    rank = 'المالك';
+                    rankEmoji = '👑';
+                } else {
+                    rank = 'مشرف';
+                    rankEmoji = '🔰';
+                }
+            } catch (error) {
+                console.log('Error getting chat member status:', error);
+                rank = 'مشرف';
+                rankEmoji = '🔰';
+            }
+        }
+        else if (await isVIP(ctx, userId)) {
+            rank = 'مميز';
+            rankEmoji = '💎';
+        }
+        // 🔥 UPDATED: Check if user is in primary_creators with proper query
+        else {
+            // Create a query that matches either user_id or username, and also checks bot_id and chat_id
+            const primaryQuery = {
+                $and: [
+                    { 
+                        $or: [
+                            // Check by user_id if available
+                            userId ? { user_id: userId } : { $exists: false },
+                            // Check by username if available
+                            username ? { username: username } : { $exists: false }
+                        ]
+                    },
+                    // Match the current bot_id
+                    { bot_id: botId },
+                    // Optional: Match the current chat_id if you want to restrict by chat
+                    // { chat_id: chatId }
+                ]
+            };
+
+            const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
+            if (isPrimary) {
+                rank = 'منشئ اساسي';
+                rankEmoji = '👑';
+            }
+        }
+
+        const userMention = username 
+            ? `@${username}` 
+            : ctx.from.first_name;
+
+        await ctx.reply(
+            `${rankEmoji} *المستخدم:* ${userMention}\n` +
+            `🆔 *الايدي:* \`${userId}\`\n` +
+            `🏅 *الرتبة:* ${rank}`,
+            { parse_mode: 'Markdown' }
+        );
+    } catch (error) {
+        console.error('Error checking user rank:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+}
+
+// Create a middleware to enforce sticker restrictions
+const stickerRestrictionMiddleware = async (ctx, next) => {
+    // Skip if not in a group or not a message
+    if (!ctx.message || ctx.chat.type === 'private') {
+        return next();
+    }
+
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    
+    // Check if stickers are restricted in this chat
+    if (stickerRestrictionStatus.get(chatId)) {
+        // Check for all types of stickers
+        const hasSticker = ctx.message.sticker;
+        const hasAnimatedSticker = hasSticker && ctx.message.sticker.is_animated;
+        const hasVideoSticker = hasSticker && ctx.message.sticker.is_video;
+        const hasCustomEmoji = ctx.message.entities && 
+            ctx.message.entities.some(entity => entity.type === 'custom_emoji');
+        
+        // If any type of sticker is detected
+        if (hasSticker || hasAnimatedSticker || hasVideoSticker || hasCustomEmoji) {
+            // Check if the user is an admin, VIP, or has special permissions
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVIPUser = await isVIP(ctx, userId);
+            const isPremium = await isPremiumUser(userId);
+            const isBotAdm = await isBotAdmin(ctx, userId);
+
+            if (!isAdmin && !isVIPUser && !isPremium && !isBotAdm) {
+                // Delete the sticker
+                try {
+                    await ctx.deleteMessage();
+                    
+                    // Get sticker type for the message
+                    let stickerType = "ملصق";
+                    if (hasAnimatedSticker) stickerType = "ملصق متحرك";
+                    if (hasVideoSticker) stickerType = "ملصق فيديو";
+                    if (hasCustomEmoji) stickerType = "إيموجي مخصص";
+                    
+                    await ctx.reply(
+                        `⚠️ @${ctx.from.username || ctx.from.first_name}، مشاركة ${stickerType} غير مسموحة للأعضاء العاديين في هذه المجموعة.`,
+                        { reply_to_message_id: ctx.message.message_id }
+                    );
+                    
+                    // Log the restriction
+                    console.log(`Deleted ${stickerType} from user ${userId} in chat ${chatId}`);
+                    
+                    return; // Don't call next() to prevent further processing
+                } catch (error) {
+                    console.error('Error deleting restricted sticker:', error);
+                }
+            }
+        }
+    }
+
+    return next();
+};
 
 
 
