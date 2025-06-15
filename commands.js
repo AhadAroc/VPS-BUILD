@@ -481,7 +481,7 @@ const isVIPUser = await isVIP(ctx, userId);
 //nst isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 
-const isSpecialUser = isAdmin || isSecDev || isVIPUser || isBotAdm || isPrimary; // 👈 Updated check
+const isSpecialUser = isAdmin || isSecDev || isVIPUser || isPrimary; // 👈 Updated check
 
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
