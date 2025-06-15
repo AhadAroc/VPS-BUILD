@@ -4542,7 +4542,7 @@ async function isImportant(ctx, userId) {
                 collection = 'developers';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
                 break;
-            case 'مطور ثانوي':
+            case '//ثان/ي':
             case 'secondary developer':
                 collection = 'secondary_developers';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
