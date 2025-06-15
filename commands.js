@@ -1083,40 +1083,35 @@ async function isSubscribed(ctx, userId) {
 async function checkUserRank(ctx) {
     try {
         const userId = ctx.from.id;
+        const username = ctx.from.username;
         const chatId = ctx.chat.id;
         const botId = ctx.botInfo.id;
         let rank = 'عضو عادي'; // Default rank
         let rankEmoji = '👤';
 
-        // Get database connection
         const db = await ensureDatabaseInitialized();
 
         // Check if user is the owner
-        if (ctx.from.username === 'Lorisiv') {
+        if (username === 'Lorisiv') {
             rank = 'المطور الأساسي';
             rankEmoji = '👑';
         } 
-        // Check if user is a developer
         else if (await isDeveloper(ctx, userId)) {
             rank = 'مطور';
             rankEmoji = '⚙️';
         } 
-        // Check if user is a secondary developer
         else if (await isSecondaryDeveloper(ctx, userId)) {
             rank = 'مطور ثانوي';
             rankEmoji = '🔧';
         } 
-        // Check if user is a bot owner (اساسي)
         else if (await isBotOwner(ctx, userId)) {
             rank = 'اساسي';
             rankEmoji = '🛡️';
         }
-        // Check if user is a bot admin
         else if (await isBotAdmin(userId)) {
             rank = 'مشرف بوت';
             rankEmoji = '🛠️';
         }
-        // Check if user is a group admin
         else if (await isAdminOrOwner(ctx, userId)) {
             try {
                 const member = await ctx.telegram.getChatMember(chatId, userId);
@@ -1132,19 +1127,30 @@ async function checkUserRank(ctx) {
                 rank = 'مشرف';
                 rankEmoji = '🔰';
             }
-        } 
-        // Check if user is VIP
+        }
         else if (await isVIP(ctx, userId)) {
             rank = 'مميز';
             rankEmoji = '💎';
         }
+        // 🔥 NEW: Check if user is in primary_creators
+        else {
+            const primaryQuery = userId
+                ? { user_id: userId }
+                : username ? { username } : null;
 
-        // Get user mention
-        const userMention = ctx.from.username 
-            ? `@${ctx.from.username}` 
+            if (primaryQuery) {
+                const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
+                if (isPrimary) {
+                    rank = 'منشئ اساسي';
+                    rankEmoji = '👑';
+                }
+            }
+        }
+
+        const userMention = username 
+            ? `@${username}` 
             : ctx.from.first_name;
 
-        // Send the rank message
         await ctx.reply(
             `${rankEmoji} *المستخدم:* ${userMention}\n` +
             `🆔 *الايدي:* \`${userId}\`\n` +
@@ -1156,6 +1162,7 @@ async function checkUserRank(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
+
 
 // Function to send commands list with buttons
 async function sendCommandListTelegraf(ctx) {
