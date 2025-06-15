@@ -2668,7 +2668,52 @@ async function removeAllVIPUsers(ctx) {
         return ctx.reply('❌ حدث خطأ أثناء محاولة إزالة جميع المستخدمين المميزين.');
     }
 }   
-
+async function isPrimaryCreator(ctx, userId) {
+    try {
+        const botId = ctx.botInfo.id;
+        const db = await ensureDatabaseInitialized();
+        
+        console.log(`Checking if user ${userId} is a primary creator for bot ${botId}`);
+        
+        // Check by user_id
+        const creatorByUserId = await db.collection('primary_creators').findOne({ 
+            user_id: userId,
+            bot_id: botId
+        });
+        
+        if (creatorByUserId) {
+            console.log(`User ${userId} is a primary creator by user_id`);
+            return true;
+        }
+        
+        // If not found by user_id, check by username if the user has one
+        if (ctx.from && ctx.from.username) {
+            const creatorByUsername = await db.collection('primary_creators').findOne({ 
+                username: ctx.from.username,
+                bot_id: botId,
+                user_id: null // This means the record was created with only a username
+            });
+            
+            if (creatorByUsername) {
+                console.log(`User ${userId} (${ctx.from.username}) is a primary creator by username`);
+                
+                // Update the record with the user_id for future lookups
+                await db.collection('primary_creators').updateOne(
+                    { _id: creatorByUsername._id },
+                    { $set: { user_id: userId } }
+                );
+                
+                return true;
+            }
+        }
+        
+        console.log(`User ${userId} is not a primary creator`);
+        return false;
+    } catch (error) {
+        console.error('Error checking primary creator status:', error);
+        return false;
+    }
+}
 // Add this action handler for the configure_quiz button
 bot.action('configure_quiz', async (ctx) => {
     try {
@@ -2691,9 +2736,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-// Update the "بدء" command handler
-// Now update the "بدء" command handler
-// Update the "بدء" command handler
+
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
@@ -2750,10 +2793,12 @@ bot.hears('بدء', async (ctx) => {
         const isDev = await isDeveloper(ctx, userId);
         const isBotOwn = await isBotOwner(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-       
+        
+        // NEW: Check if user is a primary creator
+        const isPrimaryCreator = await isPrimaryCreator(ctx, userId);
 
-        // Only proceed if the user is a dev, admin, sec dev, bot admin, or bot owner
-        if (!isDev && !isSecDev && !isBotOwn && !isBotAdm) {
+        // Only proceed if the user is a dev, admin, sec dev, bot admin, bot owner, or primary creator
+        if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimaryCreator) {
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
 
