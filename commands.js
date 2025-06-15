@@ -4455,7 +4455,7 @@ async function isImportant(ctx, userId) {
                 collection = 'creators';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
                 break;
-            case 'منشئ اساسي':
+            case 'ظظ ظظظ':
             case 'primary creator':
                 collection = 'primary_creators';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
@@ -4632,7 +4632,7 @@ async function isImportant(ctx, userId) {
                     successMessage += '- مطور ثانوي\n';
                     break;
                 case 'primary_creators':
-                    successMessage += '- منشئ اساسي\n';
+                    successMessage += '- ظظظ ظظظظ\n';
                     break;
                 case 'creators':
                     successMessage += '- منشئ\n';
