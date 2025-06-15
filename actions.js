@@ -18,7 +18,7 @@ let awaitingBotName = false;
 let awaitingDeleteReplyWord = false;
 
 const cloudinary = require('cloudinary').v2;
-const { getLeaderboard, getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty, isSecondaryDeveloper,handleCommandCallbacks,promoteUser } = require('./commands');
+const { getLeaderboard, getUserStatistics, getDifficultyLevels, getQuestionsForDifficulty, isSecondaryDeveloper,handleCommandCallbacks, } = require('./commands');
 const chatStates = new Map();
 // Add these global variables at the top of your file
 const activeQuizzes = new Map(); // Map to store active quizzes by chat ID
@@ -461,52 +461,7 @@ async function setupCyclingReply(ctx, triggerWord, texts) {
     }
 }
 
-async function isPrimaryCreator(ctx, userId) {
-    try {
-        const botId = ctx.botInfo.id;
-        const db = await ensureDatabaseInitialized();
-        
-        console.log(`Checking if user ${userId} is a primary creator for bot ${botId}`);
-        
-        // Check by user_id
-        const creatorByUserId = await db.collection('primary_creators').findOne({ 
-            user_id: userId,
-            bot_id: botId
-        });
-        
-        if (creatorByUserId) {
-            console.log(`User ${userId} is a primary creator by user_id`);
-            return true;
-        }
-        
-        // If not found by user_id, check by username if the user has one
-        if (ctx.from && ctx.from.username) {
-            const creatorByUsername = await db.collection('primary_creators').findOne({ 
-                username: ctx.from.username,
-                bot_id: botId,
-                user_id: null // This means the record was created with only a username
-            });
-            
-            if (creatorByUsername) {
-                console.log(`User ${userId} (${ctx.from.username}) is a primary creator by username`);
-                
-                // Update the record with the user_id for future lookups
-                await db.collection('primary_creators').updateOne(
-                    { _id: creatorByUsername._id },
-                    { $set: { user_id: userId } }
-                );
-                
-                return true;
-            }
-        }
-        
-        console.log(`User ${userId} is not a primary creator`);
-        return false;
-    } catch (error) {
-        console.error('Error checking primary creator status:', error);
-        return false;
-    }
-}
+
 // Add this function to check subscription status directly
 async function checkSubscriptionStatus(ctx, userId) {
     try {
@@ -4236,20 +4191,8 @@ bot.action('show_current_bot_name', async (ctx) => {
    
 
 
-    bot.command('تنزيل مطور', async (ctx) => {
-        await demoteUser(ctx, 'developer');
-    });
     
-    bot.hears(/^تنزيل مطور/, async (ctx) => {
-        await demoteUser(ctx, 'developer');
-    });
-    // Add these lines to your existing command handlers
-//bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, (ctx) => {
-   // const role = ctx.match[1];
-  //  promoteUser(ctx, role);
-//});
-
-bot.hears('تنزيل', (ctx) => demoteUser(ctx));
+  
 
 
 bot.on('left_chat_member', (ctx) => {
@@ -5342,89 +5285,8 @@ async function handleTextMessage(ctx) {
     const text = ctx.message.text.trim();
     const userAnswer = text.toLowerCase();
 
-    // ✅ Case 1: Reply-based promotion like [reply] رفع مطور
-    const promotionMatch = text.match(/^رفع\s+(.*)$/); // e.g., رفع مطور
-    if (promotionMatch && ctx.message.reply_to_message) {
-        const role = promotionMatch[1]; // "مطور"
-        await promoteUser(ctx, role);
-        return;
-    }
-
-    // ✅ Case 2: @username رفع مطور — only works if user is stored in DB
-    const usernamePromotionMatch = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
-    if (usernamePromotionMatch) {
-        const mentionedUsername = usernamePromotionMatch[1];
-        const role = usernamePromotionMatch[2];
-
-        try {
-            const db = await ensureDatabaseInitialized();
-            const userRecord = await db.collection('known_users').findOne({ username: mentionedUsername });
-
-            if (!userRecord) {
-                await ctx.reply(`❌ لا أستطيع ترقية @${mentionedUsername}. لم أره من قبل.`);
-                return;
-            }
-
-            // Simulate a reply to that user
-            ctx.message.reply_to_message = {
-                from: {
-                    id: userRecord.user_id,
-                    username: userRecord.username,
-                    first_name: userRecord.first_name || 'User'
-                }
-            };
-            ctx.message.text = `رفع ${role}`;
-
-            await promoteUser(ctx, role);
-            return;
-        } catch (err) {
-            console.error('❌ Failed to promote by @username:', err.message);
-            await ctx.reply(`❌ حدث خطأ أثناء محاولة ترقية @${mentionedUsername}`);
-            return;
-        }
-    }
-
-    // ✅ Case 3: Reply-based demotion like [reply] تنزيل مطور
-    const demotionMatch = text.match(/^تنزيل\s+(.*)$/); // e.g., تنزيل مطور
-    if (demotionMatch && ctx.message.reply_to_message) {
-        await demoteUser(ctx);
-        return;
-    }
-
-    // ✅ Case 4: @username تنزيل مطور — only works if user is stored in DB
-    const usernameDemotionMatch = text.match(/^@(\w+)\s+تنزيل\s+(.*)$/);
-    if (usernameDemotionMatch) {
-        const mentionedUsername = usernameDemotionMatch[1];
-
-        try {
-            const db = await ensureDatabaseInitialized();
-            const userRecord = await db.collection('known_users').findOne({ username: mentionedUsername });
-
-            if (!userRecord) {
-                await ctx.reply(`❌ لا أستطيع تنزيل @${mentionedUsername}. لم أره من قبل.`);
-                return;
-            }
-
-            // Simulate a reply to that user
-            ctx.message.reply_to_message = {
-                from: {
-                    id: userRecord.user_id,
-                    username: userRecord.username,
-                    first_name: userRecord.first_name || 'User'
-                }
-            };
-            
-            // We don't need to set the role for demotion as demoteUser checks all roles
-            await demoteUser(ctx);
-            return;
-        } catch (err) {
-            console.error('❌ Failed to demote by @username:', err.message);
-            await ctx.reply(`❌ حدث خطأ أثناء محاولة تنزيل @${mentionedUsername}`);
-            return;
-        }
-    }
-
-    // Check for active quiz
+    
+    // Check for active quiza
     if (activeQuizzes.has(chatId)) {
         await handleQuizAnswer(ctx, chatId, userId, userAnswer);
         return;
@@ -6869,4 +6731,4 @@ bot.action('check_subscription', forceCheckSubscription);
 }
 
 module.exports = { setupActions,
-    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates,forceCheckSubscription,confirmSubscription,isPrimaryCreator};
+    activeQuizzes,endQuiz , ensureDatabaseInitialized,configureQuiz,startAddingCustomQuestions,chatStates,forceCheckSubscription,confirmSubscription,};
