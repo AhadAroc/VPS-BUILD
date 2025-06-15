@@ -417,12 +417,14 @@ async function showMainMenu(ctx) {
     try {
         const userId = ctx.from.id;
 
-        const isAdmin = await isAdminOrOwner(ctx, userId);
-        const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        const isBotAdm = await isBotAdmin(userId);
+      //const isAdmin = await isAdminOrOwner(ctx, userId);
+const isSecDev = await isSecondaryDeveloper(ctx, userId);
+const isVIPUser = await isVIP(ctx, userId);
+const isBotAdm = await isBotAdmin(userId);
+const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 
-        const isSpecialUser = isAdmin || isSecDev || isVIPUser || isBotAdm;
+const isSpecialUser = isAdmin || isSecDev || isVIPUser || isBotAdm || isPrimary; // 👈 Updated check
+
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
 
@@ -1428,7 +1430,7 @@ bot.use(stickerRestrictionMiddleware);
         console.log(`📥 /start triggered by ${userId} (${username}) in ${ctx.chat.type}`);
 
         console.log('🛠️ Assigning bot ownership...');
-        const ownershipAssigned = await assignBotOwnership(ctx);
+        //nst ownershipAssigned = await assignBotOwnership(ctx);
         console.log('✅ Ownership checked.');
 
         if (ownershipAssigned && isDM) {
@@ -2666,7 +2668,7 @@ bot.hears('بدء', async (ctx) => {
 
         // Try assigning ownership
         console.log('🔍 Attempting assignBotOwnership...');
-        const ownershipAssigned = await assignBotOwnership(ctx);
+       //onst ownershipAssigned = await assignBotOwnership(ctx);
         
         if (ownershipAssigned) {
             console.log(`✅ Ownership just assigned to user ${userId}`);
