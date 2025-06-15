@@ -67,7 +67,7 @@ async function isDeveloper(ctx, userId) {
 
     try {
         // ✅ Use native MongoClient to connect directly to test DB
-        const client = await MongoClient.connect(process.env.MONGO_URI, {
+        const client = await MongoClient.connect(process.env.MONGODB_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true
         });
