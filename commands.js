@@ -403,7 +403,65 @@ async function documentRestrictionMiddleware(ctx, next) {
     }
     return next();
 }
+async function isPrimaryCreator(ctx, userId) {
+    console.log('🧭 [isPrimaryCreator] Function entry');
+    console.log('➡️ ctx:', ctx ? 'available' : 'undefined');
+    console.log('➡️ userId:', userId);
 
+    try {
+        const botId = ctx?.botInfo?.id;
+        if (!botId) {
+            console.warn('⚠️ botId is undefined in ctx.botInfo');
+        } else {
+            console.log(`📦 botId: ${botId}`);
+        }
+
+        const db = await ensureDatabaseInitialized();
+        if (!db) {
+            console.error('❌ Database connection failed in isPrimaryCreator');
+        }
+
+        console.log(`🔍 Checking primary creator (by user_id) for user: ${userId}, bot: ${botId}`);
+        const creatorByUserId = await db.collection('primary_creators').findOne({ 
+            user_id: userId,
+            bot_id: botId
+        });
+
+        if (creatorByUserId) {
+            console.log(`✅ User ${userId} is a primary creator (by user_id)`);
+            return true;
+        }
+
+        const username = ctx?.from?.username;
+        if (username) {
+            console.log(`🔍 Checking primary creator (by username): ${username}`);
+            const creatorByUsername = await db.collection('primary_creators').findOne({ 
+                username: username,
+                bot_id: botId,
+                user_id: null
+            });
+
+            if (creatorByUsername) {
+                console.log(`✅ User ${userId} (${username}) is a primary creator (by username)`);
+
+                await db.collection('primary_creators').updateOne(
+                    { _id: creatorByUsername._id },
+                    { $set: { user_id: userId } }
+                );
+                console.log('🔁 Updated primary_creators entry with user_id');
+                return true;
+            }
+        } else {
+            console.warn('⚠️ ctx.from.username is not available');
+        }
+
+        console.log(`❌ User ${userId} is not a primary creator`);
+        return false;
+    } catch (error) {
+        console.error('💥 Error in isPrimaryCreator:', error);
+        return false;
+    }
+}
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
@@ -420,7 +478,7 @@ async function showMainMenu(ctx) {
       //const isAdmin = await isAdminOrOwner(ctx, userId);
 const isSecDev = await isSecondaryDeveloper(ctx, userId);
 const isVIPUser = await isVIP(ctx, userId);
-const isBotAdm = await isBotAdmin(userId);
+//nst isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 
 const isSpecialUser = isAdmin || isSecDev || isVIPUser || isBotAdm || isPrimary; // 👈 Updated check
@@ -2593,65 +2651,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
     await showQuizMenu(ctx);
 });
 
-async function isPrimaryCreator(ctx, userId) {
-    console.log('🧭 [isPrimaryCreator] Function entry');
-    console.log('➡️ ctx:', ctx ? 'available' : 'undefined');
-    console.log('➡️ userId:', userId);
 
-    try {
-        const botId = ctx?.botInfo?.id;
-        if (!botId) {
-            console.warn('⚠️ botId is undefined in ctx.botInfo');
-        } else {
-            console.log(`📦 botId: ${botId}`);
-        }
-
-        const db = await ensureDatabaseInitialized();
-        if (!db) {
-            console.error('❌ Database connection failed in isPrimaryCreator');
-        }
-
-        console.log(`🔍 Checking primary creator (by user_id) for user: ${userId}, bot: ${botId}`);
-        const creatorByUserId = await db.collection('primary_creators').findOne({ 
-            user_id: userId,
-            bot_id: botId
-        });
-
-        if (creatorByUserId) {
-            console.log(`✅ User ${userId} is a primary creator (by user_id)`);
-            return true;
-        }
-
-        const username = ctx?.from?.username;
-        if (username) {
-            console.log(`🔍 Checking primary creator (by username): ${username}`);
-            const creatorByUsername = await db.collection('primary_creators').findOne({ 
-                username: username,
-                bot_id: botId,
-                user_id: null
-            });
-
-            if (creatorByUsername) {
-                console.log(`✅ User ${userId} (${username}) is a primary creator (by username)`);
-
-                await db.collection('primary_creators').updateOne(
-                    { _id: creatorByUsername._id },
-                    { $set: { user_id: userId } }
-                );
-                console.log('🔁 Updated primary_creators entry with user_id');
-                return true;
-            }
-        } else {
-            console.warn('⚠️ ctx.from.username is not available');
-        }
-
-        console.log(`❌ User ${userId} is not a primary creator`);
-        return false;
-    } catch (error) {
-        console.error('💥 Error in isPrimaryCreator:', error);
-        return false;
-    }
-}
 
 bot.hears('بدء', async (ctx) => {
     try {
