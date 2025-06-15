@@ -2696,14 +2696,15 @@ bot.hears('بدء', async (ctx) => {
         
         // If we get here, the user is not the owner
         // Check if they are a secondary developer, admin, or VIP
+         const isPrimaryCreator = await isPrimaryCreator(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isDev = await isDeveloper(ctx, userId);
         const isBotOwn = await isBotOwner(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
+       
+      
         
-        // NEW: Check if user is a primary creator
-        const isPrimaryCreator = await isPrimaryCreator(ctx, userId);
 
         // Only proceed if the user is a dev, admin, sec dev, bot admin, bot owner, or primary creator
         if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimaryCreator) {
