@@ -480,8 +480,8 @@ const isSecDev = await isSecondaryDeveloper(ctx, userId);
 const isVIPUser = await isVIP(ctx, userId);
 const isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
-
-const isSpecialUser =  isSecDev || isVIPUser || isBotAdm || isPrimary; // 👈 Updated check
+const isDev = await isDeveloper(ctx, userId);
+const isSpecialUser =  isSecDev || isVIPUser || isBotAdm || isPrimary ||isDev;
 
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
