@@ -4491,7 +4491,7 @@ async function isImportant(ctx, userId) {
                 userId = user.user.id;
                 userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
             } catch (error) {
-                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
+                return ctx.reply('❌ لم يتم العثور على feawsfeawsefawsfasfasfasdfasfasfasfsaFASالمستخدم.');
             }
         } else {
             return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
@@ -4542,7 +4542,7 @@ async function isImportant(ctx, userId) {
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
                 break;
             case '///ي':
-            case 'secondary developer':
+            case 'sesdxdssy ':
                 collection = 'secondary_developers';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
                 break;
