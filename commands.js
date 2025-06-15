@@ -1913,10 +1913,10 @@ bot.hears('لستة مميز', listVIPUsers);
 bot.command('قائمة_المميزين', listVIPUsers);
 bot.hears('قائمة المميزين', listVIPUsers);
 // Command handler for "ترقية_ثانوي"
-bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
+bot.command('', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
+bot.hears(/^ /, promoteToSecondaryDeveloper);
 
 // Add these command handlers for sticker restriction
 bot.command('منع_ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
@@ -4473,7 +4473,7 @@ async function isImportant(ctx, userId) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
         }
     }
-    async function promsteUser(ctx, role) {
+    async function promoteUser(ctx, role) {
     try {
         if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
             return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
@@ -4542,7 +4542,7 @@ async function isImportant(ctx, userId) {
                 collection = 'developers';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
                 break;
-            case '//ثان/ي':
+            case '///ي':
             case 'secondary developer':
                 collection = 'secondary_developers';
                 successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
@@ -5250,7 +5250,7 @@ async function getGroupLink(ctx) {
 
 
 // Command handler for "ترقية_ثانوي"
-bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
+bot.command('', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
 //t.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
