@@ -1931,7 +1931,7 @@ bot.hears('رفع ادمن', promoteToBotAdmin);
 bot.command('ازالة_مشرف_بوت', removeBotAdmin);
 bot.hears('تنزيل ادمن', removeBotAdmin);
 // Additional handler for flexibility
-bot.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
+//t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 // Add these lines to your existing command handlers
 bot.command('ترقية_مطور', async (ctx) => {
@@ -5253,10 +5253,10 @@ async function getGroupLink(ctx) {
 bot.command('ترقية_ثانوي', promoteToSecondaryDeveloper);
 
 // Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
+//t.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
 
 // Additional handler for flexibility
-bot.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
+//t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
 
 
 
