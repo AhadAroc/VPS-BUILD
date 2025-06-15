@@ -2666,15 +2666,6 @@ bot.hears('بدء', async (ctx) => {
         const userId = ctx.from.id;
         console.log(`🟢 [بدء] Command triggered by user ${userId}`);
 
-        // Try assigning ownership
-        console.log('🔍 Attempting assignBotOwnership...');
-       //onst ownershipAssigned = await assignBotOwnership(ctx);
-        
-     // if (ownershipAssigned) {
-        //  console.log(`✅ Ownership just assigned to user ${userId}`);
-        //  return;
-       //
-
         if (userId === ownerId) {
             console.log(`👑 User ${userId} is already the bot owner`);
 
@@ -2738,9 +2729,9 @@ bot.hears('بدء', async (ctx) => {
         if (ctx.from) {
             console.log('📝 Updating last interaction timestamp...');
             await updateLastInteraction(
-                ctx.from.id, 
-                ctx.from.username, 
-                ctx.from.first_name, 
+                ctx.from.id,
+                ctx.from.username,
+                ctx.from.first_name,
                 ctx.from.last_name
             );
         }
@@ -2775,6 +2766,7 @@ bot.hears('بدء', async (ctx) => {
         ctx.reply('❌ حدث خطأ. يرجى التواصل مع المالك أو المطور.');
     }
 });
+
 
 
 // Add this function to your commands.js file
