@@ -4919,6 +4919,14 @@ async function handleUserPromotion(ctx) {
             await ctx.reply(`ℹ️ المستخدم @${username} لديه بالفعل رتبة ${role}.`);
         } else {
             // User doesn't have this role yet, create a new entry
+            console.log(`⚠️ Inserting user into ${collection}:`, {
+    user_id: targetUserId,
+    username: username,
+    bot_id: botId,
+    promoted_by: fromUserId,
+    chat_id: ctx.chat.id
+});
+
             await db.collection(collection).insertOne({ 
                 user_id: targetUserId, // May be null
                 username: username,
