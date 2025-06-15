@@ -1433,10 +1433,10 @@ bot.use(stickerRestrictionMiddleware);
         //nst ownershipAssigned = await assignBotOwnership(ctx);
         console.log('✅ Ownership checked.');
 
-        if (ownershipAssigned && isDM) {
-            console.log('👑 Ownership assigned and in DM, exiting.');
-            return;
-        }
+       //f (ownershipAssigned && isDM) {
+          //console.log('👑 Ownership assigned and in DM, exiting.');
+           //eturn;
+      //}
 
         console.log('🔍 Checking ranks...');
         const isDev = await isDeveloper(ctx, userId);
@@ -2670,10 +2670,10 @@ bot.hears('بدء', async (ctx) => {
         console.log('🔍 Attempting assignBotOwnership...');
        //onst ownershipAssigned = await assignBotOwnership(ctx);
         
-        if (ownershipAssigned) {
-            console.log(`✅ Ownership just assigned to user ${userId}`);
-            return;
-        }
+     // if (ownershipAssigned) {
+        //  console.log(`✅ Ownership just assigned to user ${userId}`);
+        //  return;
+       //
 
         if (userId === ownerId) {
             console.log(`👑 User ${userId} is already the bot owner`);
