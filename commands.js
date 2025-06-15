@@ -467,8 +467,8 @@ async function hasRequiredPermissions(ctx, userId) {
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
     const isBotAdm = await isBotAdmin(userId);
     const isPremium = await isPremiumUser(userId);
-    
-    return isAdmin || isSecDev || isBotAdm || isPremium;
+    const isPrimary = await isPrimaryCreator(ctx, userId);
+    return isAdmin || isSecDev || isVIPUser || isBotAdm || isPrimary;
 }
 // ✅ Display main menu
 async function showMainMenu(ctx) {
@@ -478,10 +478,10 @@ async function showMainMenu(ctx) {
       //const isAdmin = await isAdminOrOwner(ctx, userId);
 const isSecDev = await isSecondaryDeveloper(ctx, userId);
 const isVIPUser = await isVIP(ctx, userId);
-//nst isBotAdm = await isBotAdmin(userId);
+const isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 
-const isSpecialUser =   isSecDev || isVIPUser || isPrimary; // 👈 Updated check
+const isSpecialUser =  isSecDev || isVIPUser || isBotAdm || isPrimary; // 👈 Updated check
 
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
