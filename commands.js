@@ -1890,17 +1890,10 @@ bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
 bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
 
 
-bot.command('promote', (ctx) => promoteUser(ctx, 'مطور'));
-bot.command('promote', (ctx) => promoteUser(ctx, 'developer'));
+
 bot.command('مساعدة', showHelp);
 bot.hears('مساعدة', showHelp);
-bot.command('تنزيل مطور', async (ctx) => {
-    await demoteUser(ctx, 'developer');
-});
-;
-bot.hears(/^تنزيل مطور/, async (ctx) => {
-    await demoteUser(ctx, 'developer');
-});
+
 bot.hears('كتم', adminOnly((ctx) => muteUser(ctx, true)));
 bot.hears('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
 bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
@@ -1931,11 +1924,6 @@ bot.command('ازالة_مشرف_بوت', removeBotAdmin);
 bot.hears('تنزيل ادمن', removeBotAdmin);
 // Additional handler for flexibility
 //t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
-bot.hears('تنزيل', (ctx) => demoteUser(ctx));
-// Add these lines to your existing command handlers
-bot.command('ترقية_مطور', async (ctx) => {
-    await promoteUser(ctx, 'مطور');
-});
 
 // Add these command handlers for the new command
 bot.command('رفع_اساسي', promoteToBotOwner);
@@ -2000,9 +1988,7 @@ bot.command('لستة_مميز', listImportantUsers);
 bot.hears('لستة مميز', listImportantUsers);
 bot.command('قائمة_المميزين', listImportantUsers);
 bot.hears('قائمة المميزين', listImportantUsers);
-bot.hears(/^رفع مطور/, async (ctx) => {
-    await promoteUser(ctx, 'مطور');
-});
+
 // Handle "نكتة" text command
 bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
@@ -2011,8 +1997,7 @@ bot.hears('ازالة الروابط', (ctx) => removeLinks(ctx));
 bot.command('معرفي', (ctx) => showUserId(ctx));
 bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
 bot.hears('ايدي', (ctx) => showUserId(ctx));
-bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
+
 bot.hears('فتح روابط', adminOnly((ctx) => enableLinkSharing(ctx)));
 bot.hears('منع روابط', adminOnly((ctx) => disableLinkSharing(ctx)));
 bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
@@ -2041,19 +2026,14 @@ bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx))
 
 bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
 bot.hears('فتح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
-// Add command handlers for promoting and demoting VIP users
-bot.command('ترقية_مميز', (ctx) => promoteUser(ctx, 'مميز'));
-bot.command('تنزيل_مميز', demoteUser);
 
-// Add hears handlers for promoting and demoting VIP users
-bot.hears(/^رفع  مسابقات/, (ctx) => promoteUser(ctx, 'مميز'));
-bot.hears(/^تنزيل ادمن مسابقات/, demoteUser);
+
+
 
 bot.command('معرفي', (ctx) => showUserId(ctx));
 
 bot.hears('ايدي', (ctx) => showUserId(ctx));
-bot.command('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
-bot.hears('تنزيل', adminOnly((ctx) => demoteUser(ctx)));
+
 
 bot.command('كتم', adminOnly((ctx) => muteUser(ctx, true)));
 bot.command('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
@@ -2070,8 +2050,7 @@ bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx))
 // Also add handlers for text commands without the underscore
 bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
 bot.hears('فتح متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
-bot.command('ترقية_مطور', (ctx) => promoteUser(ctx, 'مطور'));
-bot.hears(/^ترقية مطوسر/, (ctx) => promoteUser(ctx, 'مطور'));
+
 
 
 bot.command('منع_مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
@@ -4472,296 +4451,8 @@ async function isImportant(ctx, userId) {
             ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل مشاركة الصور المتحركة.');
         }
     }
-    async function promoteUser(ctx, role) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-        }
-
-        let userId, userMention;
-        const args = ctx.message.text.split(' ').slice(1);
-
-        if (ctx.message.reply_to_message) {
-            userId = ctx.message.reply_to_message.from.id;
-            userMention = `[${ctx.message.reply_to_message.from.first_name}](tg://user?id=${userId})`;
-        } else if (args.length > 0) {
-            const username = args[0].replace('@', '');
-            try {
-                const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
-                userId = user.user.id;
-                userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
-            } catch (error) {
-                return ctx.reply('❌ لم يتم العثور على feawsfeawsefawsfasfasfasdfasfasfasfsaFASالمستخدم.');
-            }
-        } else {
-            return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) لترقيته.');
-        }
-
-        const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo.id; // Use the bot's ID as a unique identifier
-        let collection, successMessage;
-
-        switch (role.toLowerCase()) {
-            case 'مميز':
-            case 'vip':
-                collection = 'vip_users';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن مسابقات (VIP).`;
-                break;
-            case 'verynull':
-            case 'verynull':
-                collection = 'verynull';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى ادمن.`;
-                // Promote the user to admin in the Telegram group
-                await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                    can_change_info: true,
-                    can_delete_messages: true,
-                    can_invite_users: true,
-                    can_restrict_members: true,
-                    can_pin_messages: true,
-                    can_promote_members: false
-                });
-                break;
-            case 'مدير':
-            case 'manager':
-                collection = 'managers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مدير.`;
-                break;
-            case 'منشئ':
-            case 'creator':
-                collection = 'creators';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ.`;
-                break;
-            case 'ظظ ظظظ':
-            case 'primary creator':
-                collection = 'primary_creators';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى منشئ اساسي.`;
-                break;
-            case 'مطور':
-            case 'developer':
-                collection = 'developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور.`;
-                break;
-            case '///ي':
-            case 'sesdxdssy ':
-                collection = 'secondary_developers';
-                successMessage = `✅ تم ترقية المستخدم ${userMention} إلى مطور ثانوي.`;
-                break;
-            default:
-                return ctx.reply('❌ نوع الترقية غير صالح.');
-        }
-
-        // First check if the user already exists in the collection
-        const existingUser = await db.collection(collection).findOne({ user_id: userId });
-        
-        if (existingUser) {
-            // User already has this role, just update their information
-            await db.collection(collection).updateOne(
-                { user_id: userId },
-                { 
-                    $set: { 
-                        bot_id: botId,
-                        username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
-                        updated_at: new Date(),
-                        updated_by: ctx.from.id
-                    }
-                }
-            );
-            return ctx.replyWithMarkdown(`ℹ️ المستخدم ${userMention} لديه بالفعل رتبة ${role}.`);
-        } else {
-            // User doesn't have this role yet, create a new entry
-            await db.collection(collection).insertOne({ 
-                user_id: userId, 
-                bot_id: botId,
-                username: ctx.message.reply_to_message ? ctx.message.reply_to_message.from.username : args[0],
-                promoted_at: new Date(),
-                promoted_by: ctx.from.id
-            });
-            
-            ctx.replyWithMarkdown(successMessage);
-            console.log(`User ${userId} promoted to ${role} by bot ${botId}`);
-        }
-    } catch (error) {
-        console.error(`Error promoting user to ${role}:`, error);
-        ctx.reply(`❌ حدث خطأ أثناء ترقية المستخدم إلى ${role}. الرجاء المحاولة مرة أخرى لاحقًا.`);
-    }
-}
-    // ✅ Demote user
-    // ✅ Demote user u check this
-   async function demoteUser(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-        }
-
-        let userId, userMention, username;
-        const replyMessage = ctx.message.reply_to_message;
-
-        if (replyMessage) {
-            userId = replyMessage.from.id;
-            username = replyMessage.from.username;
-            userMention = `[${replyMessage.from.first_name}](tg://user?id=${userId})`;
-        } else {
-            const args = ctx.message.text.split(' ').slice(1);
-            if (args.length === 0) {
-                return ctx.reply('❌ يجب الرد على رسالة المستخدم أو ذكر معرفه (@username) أو معرفه الرقمي.');
-            }
-            
-            const identifier = args[0].replace('@', '');
-            
-            // Try to get user by username or ID
-            try {
-                // Check if it's a numeric ID
-                if (/^\d+$/.test(identifier)) {
-                    userId = parseInt(identifier);
-                    try {
-                        const user = await ctx.telegram.getChat(userId);
-                        username = user.username;
-                        userMention = `[${user.first_name}](tg://user?id=${userId})`;
-                    } catch (error) {
-                        // If we can't get the user info, just use the ID
-                        userMention = `المستخدم (${userId})`;
-                    }
-                } else {
-                    // It's a username
-                    username = identifier;
-                    try {
-                        const user = await ctx.telegram.getChatMember(ctx.chat.id, username);
-                        userId = user.user.id;
-                        userMention = `[${user.user.first_name}](tg://user?id=${userId})`;
-                    } catch (error) {
-                        // If we can't get the user ID, just use the username
-                        userMention = `@${username}`;
-                    }
-                }
-            } catch (error) {
-                console.error('Error getting user info:', error);
-                return ctx.reply('❌ لم يتم العثور على المستخدم. تأكد من المعرف أو قم بالرد على رسالة المستخدم.');
-            }
-        }
-
-        const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo?.id || 'unknown'; // Fallback if bot info is not available
-        
-        // Build query based on available information
-        let query = {};
-        if (userId) {
-            query.user_id = userId;
-        } else if (username) {
-            query.username = username;
-        } else {
-            return ctx.reply('❌ لم يتم العثور على معلومات كافية عن المستخدم.');
-        }
-
-        // Check all possible roles
-        const roles = [
-            'developers', 
-            'secondary_developers', 
-            'primary_creators',
-            'creators',
-            'managers', 
-            'admins', 
-            'vip_users',
-            'bot_owners',
-            'bot_admins'
-        ];
-        
-        let userRoles = [];
-        let removedRoles = [];
-
-        // Check each collection for the user
-        for (const role of roles) {
-            try {
-                const result = await db.collection(role).findOne(query);
-                if (result) {
-                    userRoles.push(role);
-                    // Remove the user from this collection
-                    await db.collection(role).deleteOne({ _id: result._id });
-                    removedRoles.push(role);
-                }
-            } catch (error) {
-                console.error(`Error checking ${role} collection:`, error);
-            }
-        }
-
-        // Special handling for "مطور" (developer) command
-        const commandText = ctx.message.text.toLowerCase();
-        if (commandText.includes('تنزيل مطور')) {
-            // If specifically demoting a developer, check if they were removed from developers collection
-            if (!removedRoles.includes('developers') && !removedRoles.includes('secondary_developers')) {
-                return ctx.reply('❌ هذا المستخدم ليس مطورًا.');
-            }
-        }
-
-        if (removedRoles.length === 0) {
-            return ctx.reply('❌ هذا المستخدم ليس لديه أي رتبة خاصة للإزالة.');
-        }
-
-        // Generate success message based on removed roles
-        let successMessage = `✅ تم إزالة الرتب التالية من المستخدم ${userMention}:\n`;
-        
-        for (const role of removedRoles) {
-            switch (role) {
-                case 'developers':
-                    successMessage += '- مطور\n';
-                    break;
-                case 'secondary_developers':
-                    successMessage += '- مطور ثانوي\n';
-                    break;
-                case 'primary_creators':
-                    successMessage += '- ظظظ ظظظظ\n';
-                    break;
-                case 'creators':
-                    successMessage += '- منشئ\n';
-                    break;
-                case 'managers':
-                    successMessage += '- مدير\n';
-                    break;
-                case 'admins':
-                    successMessage += '- ادمن\n';
-                    // Try to remove admin privileges in the Telegram group
-                    try {
-                        await ctx.telegram.promoteChatMember(ctx.chat.id, userId, {
-                            can_change_info: false,
-                            can_delete_messages: false,
-                            can_invite_users: false,
-                            can_restrict_members: false,
-                            can_pin_messages: false,
-                            can_promote_members: false
-                        });
-                    } catch (error) {
-                        console.error('Error removing admin privileges:', error);
-                    }
-                    break;
-                case 'vip_users':
-                    successMessage += '- مميز (VIP)\n';
-                    break;
-                case 'bot_owners':
-                    successMessage += '- مالك البوت\n';
-                    break;
-                case 'bot_admins':
-                    successMessage += '- ادمن البوت\n';
-                    break;
-            }
-        }
-
-        // Add record to demotions collection for audit trail
-        await db.collection('demotions').insertOne({
-            user_id: userId,
-            username: username,
-            demoted_by: ctx.from.id,
-            demoted_at: new Date(),
-            removed_roles: removedRoles,
-            chat_id: ctx.chat.id,
-            bot_id: botId
-        });
-
-        ctx.replyWithMarkdown(successMessage);
-
-    } catch (error) {
-        console.error('Error in demoteUser:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة إزالة رتبة المستخدم.');
-    }
-}
+    
+   
     //call command
     async function callEveryone(ctx) {
         try {
@@ -5322,5 +5013,5 @@ bot.start(async (ctx) => {
 }
 
 
-module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,handleCommandCallbacks,isBotOwner,isBotAdmin,promoteUser,isSubscribed };
+module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,handleCommandCallbacks,isBotOwner,isBotAdmin,isSubscribed };
 
