@@ -1913,10 +1913,9 @@ bot.hears('لستة مميز', listVIPUsers);
 bot.command('قائمة_المميزين', listVIPUsers);
 bot.hears('قائمة المميزين', listVIPUsers);
 // Command handler for "ترقية_ثانوي"
-bot.command('', promoteToSecondaryDeveloper);
+
 
 // Text handler for "ترقية ثانوي" (without underscore)
-bot.hears(/^ /, promoteToSecondaryDeveloper);
 
 // Add these command handlers for sticker restriction
 bot.command('منع_ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
