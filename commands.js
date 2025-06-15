@@ -2697,7 +2697,7 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const isPrimaryCreator = await isPrimaryCreator(ctx, userId);
+        
         // First, try to assign ownership (this will only work for the first user)
         const ownershipAssigned = await assignBotOwnership(ctx);
         
@@ -2752,7 +2752,7 @@ bot.hears('بدء', async (ctx) => {
         const isBotAdm = await isBotAdmin(ctx, userId);
         
         // NEW: Check if user is a primary creator
-        
+        const isPrimaryCreator = await isPrimaryCreator(ctx, userId);
 
         // Only proceed if the user is a dev, admin, sec dev, bot admin, bot owner, or primary creator
         if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimaryCreator) {
