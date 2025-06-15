@@ -634,54 +634,7 @@ async function isPremiumUser(userId) {
     }
 }
 
-function isPrimaryCreator(ctx, userId) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const botId = ctx.botInfo.id;
-            const db = await ensureDatabaseInitialized();
-            
-            console.log(`Checking if user ${userId} is a primary creator for bot ${botId}`);
-            
-            // Check by user_id
-            const creatorByUserId = await db.collection('primary_creators').findOne({ 
-                user_id: userId,
-                bot_id: botId
-            });
-            
-            if (creatorByUserId) {
-                console.log(`User ${userId} is a primary creator by user_id`);
-                return resolve(true);
-            }
-            
-            // If not found by user_id, check by username if the user has one
-            if (ctx.from && ctx.from.username) {
-                const creatorByUsername = await db.collection('primary_creators').findOne({ 
-                    username: ctx.from.username,
-                    bot_id: botId,
-                    user_id: null // This means the record was created with only a username
-                });
-                
-                if (creatorByUsername) {
-                    console.log(`User ${userId} (${ctx.from.username}) is a primary creator by username`);
-                    
-                    // Update the record with the user_id for future lookups
-                    await db.collection('primary_creators').updateOne(
-                        { _id: creatorByUsername._id },
-                        { $set: { user_id: userId } }
-                    );
-                    
-                    return resolve(true);
-                }
-            }
-            
-            console.log(`User ${userId} is not a primary creator`);
-            resolve(false);
-        } catch (error) {
-            console.error('Error checking primary creator status:', error);
-            resolve(false);
-        }
-    });
-}
+
 
 async function showQuizMenu(ctx) {
     try {
@@ -1047,7 +1000,52 @@ async function checkUserSubscription(ctx) {
     }
 }
 
-
+async function isPrimaryCreator(ctx, userId) {
+    try {
+        const botId = ctx.botInfo.id;
+        const db = await ensureDatabaseInitialized();
+        
+        console.log(`Checking if user ${userId} is a primary creator for bot ${botId}`);
+        
+        // Check by user_id
+        const creatorByUserId = await db.collection('primary_creators').findOne({ 
+            user_id: userId,
+            bot_id: botId
+        });
+        
+        if (creatorByUserId) {
+            console.log(`User ${userId} is a primary creator by user_id`);
+            return true;
+        }
+        
+        // If not found by user_id, check by username if the user has one
+        if (ctx.from && ctx.from.username) {
+            const creatorByUsername = await db.collection('primary_creators').findOne({ 
+                username: ctx.from.username,
+                bot_id: botId,
+                user_id: null // This means the record was created with only a username
+            });
+            
+            if (creatorByUsername) {
+                console.log(`User ${userId} (${ctx.from.username}) is a primary creator by username`);
+                
+                // Update the record with the user_id for future lookups
+                await db.collection('primary_creators').updateOne(
+                    { _id: creatorByUsername._id },
+                    { $set: { user_id: userId } }
+                );
+                
+                return true;
+            }
+        }
+        
+        console.log(`User ${userId} is not a primary creator`);
+        return false;
+    } catch (error) {
+        console.error('Error checking primary creator status:', error);
+        return false;
+    }
+}
 
 // Call this once when your bot starts to verify connectivity
 // testBotBConnection();
@@ -1126,100 +1124,6 @@ async function isSubscribed(ctx, userId) {
             statusChanged: false,
             notSubscribedChannels: []
         };
-    }
-}
-async function checkUserRank(ctx) {
-    try {
-        const userId = ctx.from.id;
-        const username = ctx.from.username;
-        const chatId = ctx.chat.id;
-        const botId = ctx.botInfo.id;
-        let rank = 'عضو عادي'; // Default rank
-        let rankEmoji = '👤';
-
-        const db = await ensureDatabaseInitialized();
-
-        // Check if user is the owner
-        if (username === 'Lorisiv') {
-            rank = 'المطور الأساسي';
-            rankEmoji = '👑';
-        } 
-        else if (await isDeveloper(ctx, userId)) {
-            rank = 'مطور';
-            rankEmoji = '⚙️';
-        } 
-        else if (await isSecondaryDeveloper(ctx, userId)) {
-            rank = 'مطور ثانوي';
-            rankEmoji = '🔧';
-        } 
-        else if (await isBotOwner(ctx, userId)) {
-            rank = 'اساسي';
-            rankEmoji = '🛡️';
-        }
-        else if (await isBotAdmin(userId)) {
-            rank = 'مشرف بوت';
-            rankEmoji = '🛠️';
-        }
-        else if (await isAdminOrOwner(ctx, userId)) {
-            try {
-                const member = await ctx.telegram.getChatMember(chatId, userId);
-                if (member.status === 'creator') {
-                    rank = 'المالك';
-                    rankEmoji = '👑';
-                } else {
-                    rank = 'مشرف';
-                    rankEmoji = '🔰';
-                }
-            } catch (error) {
-                console.log('Error getting chat member status:', error);
-                rank = 'مشرف';
-                rankEmoji = '🔰';
-            }
-        }
-        else if (await isVIP(ctx, userId)) {
-            rank = 'مميز';
-            rankEmoji = '💎';
-        }
-        // 🔥 UPDATED: Check if user is in primary_creators with proper query
-        else {
-            // Create a query that matches either user_id or username, and also checks bot_id and chat_id
-            const primaryQuery = {
-                $and: [
-                    { 
-                        $or: [
-                            // Check by user_id if available
-                            userId ? { user_id: userId } : { $exists: false },
-                            // Check by username if available
-                            username ? { username: username } : { $exists: false }
-                        ]
-                    },
-                    // Match the current bot_id
-                    { bot_id: botId },
-                    // Optional: Match the current chat_id if you want to restrict by chat
-                    // { chat_id: chatId }
-                ]
-            };
-
-            const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
-            if (isPrimary) {
-                rank = 'منشئ اساسي';
-                rankEmoji = '👑';
-            }
-        }
-
-        const userMention = username 
-            ? `@${username}` 
-            : ctx.from.first_name;
-
-        await ctx.reply(
-            `${rankEmoji} *المستخدم:* ${userMention}\n` +
-            `🆔 *الايدي:* \`${userId}\`\n` +
-            `🏅 *الرتبة:* ${rank}`,
-            { parse_mode: 'Markdown' }
-        );
-    } catch (error) {
-        console.error('Error checking user rank:', error);
-        await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
 
@@ -3525,6 +3429,100 @@ async function enableStickerSharing(ctx) {
     }
 }
 
+async function checkUserRank(ctx) {
+    try {
+        const userId = ctx.from.id;
+        const username = ctx.from.username;
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+        let rank = 'عضو عادي'; // Default rank
+        let rankEmoji = '👤';
+
+        const db = await ensureDatabaseInitialized();
+
+        // Check if user is the owner
+        if (username === 'Lorisiv') {
+            rank = 'المطور الأساسي';
+            rankEmoji = '👑';
+        } 
+        else if (await isDeveloper(ctx, userId)) {
+            rank = 'مطور';
+            rankEmoji = '⚙️';
+        } 
+        else if (await isSecondaryDeveloper(ctx, userId)) {
+            rank = 'مطور ثانوي';
+            rankEmoji = '🔧';
+        } 
+        else if (await isBotOwner(ctx, userId)) {
+            rank = 'اساسي';
+            rankEmoji = '🛡️';
+        }
+        else if (await isBotAdmin(userId)) {
+            rank = 'مشرف بوت';
+            rankEmoji = '🛠️';
+        }
+        else if (await isAdminOrOwner(ctx, userId)) {
+            try {
+                const member = await ctx.telegram.getChatMember(chatId, userId);
+                if (member.status === 'creator') {
+                    rank = 'المالك';
+                    rankEmoji = '👑';
+                } else {
+                    rank = 'مشرف';
+                    rankEmoji = '🔰';
+                }
+            } catch (error) {
+                console.log('Error getting chat member status:', error);
+                rank = 'مشرف';
+                rankEmoji = '🔰';
+            }
+        }
+        else if (await isVIP(ctx, userId)) {
+            rank = 'مميز';
+            rankEmoji = '💎';
+        }
+        // 🔥 UPDATED: Check if user is in primary_creators with proper query
+        else {
+            // Create a query that matches either user_id or username, and also checks bot_id and chat_id
+            const primaryQuery = {
+                $and: [
+                    { 
+                        $or: [
+                            // Check by user_id if available
+                            userId ? { user_id: userId } : { $exists: false },
+                            // Check by username if available
+                            username ? { username: username } : { $exists: false }
+                        ]
+                    },
+                    // Match the current bot_id
+                    { bot_id: botId },
+                    // Optional: Match the current chat_id if you want to restrict by chat
+                    // { chat_id: chatId }
+                ]
+            };
+
+            const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
+            if (isPrimary) {
+                rank = 'منشئ اساسي';
+                rankEmoji = '👑';
+            }
+        }
+
+        const userMention = username 
+            ? `@${username}` 
+            : ctx.from.first_name;
+
+        await ctx.reply(
+            `${rankEmoji} *المستخدم:* ${userMention}\n` +
+            `🆔 *الايدي:* \`${userId}\`\n` +
+            `🏅 *الرتبة:* ${rank}`,
+            { parse_mode: 'Markdown' }
+        );
+    } catch (error) {
+        console.error('Error checking user rank:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+}
 
 // Create a middleware to enforce sticker restrictions
 const stickerRestrictionMiddleware = async (ctx, next) => {
