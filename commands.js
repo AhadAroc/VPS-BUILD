@@ -1132,18 +1132,30 @@ async function checkUserRank(ctx) {
             rank = 'مميز';
             rankEmoji = '💎';
         }
-        // 🔥 NEW: Check if user is in primary_creators
+        // 🔥 UPDATED: Check if user is in primary_creators with proper query
         else {
-            const primaryQuery = userId
-                ? { user_id: userId }
-                : username ? { username } : null;
+            // Create a query that matches either user_id or username, and also checks bot_id and chat_id
+            const primaryQuery = {
+                $and: [
+                    { 
+                        $or: [
+                            // Check by user_id if available
+                            userId ? { user_id: userId } : { $exists: false },
+                            // Check by username if available
+                            username ? { username: username } : { $exists: false }
+                        ]
+                    },
+                    // Match the current bot_id
+                    { bot_id: botId },
+                    // Optional: Match the current chat_id if you want to restrict by chat
+                    // { chat_id: chatId }
+                ]
+            };
 
-            if (primaryQuery) {
-                const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
-                if (isPrimary) {
-                    rank = 'منشئ اساسي';
-                    rankEmoji = '👑';
-                }
+            const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
+            if (isPrimary) {
+                rank = 'منشئ اساسي';
+                rankEmoji = '👑';
             }
         }
 
