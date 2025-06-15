@@ -4199,10 +4199,10 @@ bot.action('show_current_bot_name', async (ctx) => {
         await demoteUser(ctx, 'developer');
     });
     // Add these lines to your existing command handlers
-bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, (ctx) => {
-    const role = ctx.match[1];
-    promoteUser(ctx, role);
-});
+//bot.hears(/^ترقية (مميز|ادمن|مدير|منشئ|منشئ اساسي|مطور|مطور ثانوي)/, (ctx) => {
+   // const role = ctx.match[1];
+  //  promoteUser(ctx, role);
+//});
 
 bot.hears('تنزيل', (ctx) => demoteUser(ctx));
 
