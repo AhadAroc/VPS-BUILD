@@ -1429,15 +1429,6 @@ bot.use(stickerRestrictionMiddleware);
 
         console.log(`📥 /start triggered by ${userId} (${username}) in ${ctx.chat.type}`);
 
-        console.log('🛠️ Assigning bot ownership...');
-        //nst ownershipAssigned = await assignBotOwnership(ctx);
-        console.log('✅ Ownership checked.');
-
-       //f (ownershipAssigned && isDM) {
-          //console.log('👑 Ownership assigned and in DM, exiting.');
-           //eturn;
-      //}
-
         console.log('🔍 Checking ranks...');
         const isDev = await isDeveloper(ctx, userId);
         const isAdmin = await isAdminOrOwner(ctx, userId);
@@ -1531,6 +1522,7 @@ bot.use(stickerRestrictionMiddleware);
         ctx.reply('❌ حدث خطأ أثناء معالجة الأمر. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
 
     
     bot.action('check_subscription', async (ctx) => {
