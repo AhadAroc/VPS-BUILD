@@ -2643,8 +2643,8 @@ bot.hears('بدء', async (ctx) => {
 
             if (subscribed) {
                 if (ctx.chat.type === 'private') {
-                    console.log('📲 Owner in private chat – showing Dev Panel');
-                    await showDevPanel(ctx);
+                    console.log('📲 Owner in private chat – skipping Dev Panel');
+                    await ctx.reply('✅ اشتراكك مكتمل، استخدم الأوامر أو أضف البوت إلى مجموعتك.');
                 } else {
                     console.log('👥 Owner in group – showing Main Menu');
                     await showMainMenu(ctx);
