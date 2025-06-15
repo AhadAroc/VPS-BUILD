@@ -1,50 +1,5 @@
 //ultragayshit 
-async function isPrimaryCreator(ctx, userId) {
-    try {
-        const botId = ctx.botInfo.id;
-        const db = await ensureDatabaseInitialized();
-        
-        console.log(`Checking if user ${userId} is a primary creator for bot ${botId}`);
-        
-        // Check by user_id
-        const creatorByUserId = await db.collection('primary_creators').findOne({ 
-            user_id: userId,
-            bot_id: botId
-        });
-        
-        if (creatorByUserId) {
-            console.log(`User ${userId} is a primary creator by user_id`);
-            return true;
-        }
-        
-        // If not found by user_id, check by username if the user has one
-        if (ctx.from && ctx.from.username) {
-            const creatorByUsername = await db.collection('primary_creators').findOne({ 
-                username: ctx.from.username,
-                bot_id: botId,
-                user_id: null // This means the record was created with only a username
-            });
-            
-            if (creatorByUsername) {
-                console.log(`User ${userId} (${ctx.from.username}) is a primary creator by username`);
-                
-                // Update the record with the user_id for future lookups
-                await db.collection('primary_creators').updateOne(
-                    { _id: creatorByUsername._id },
-                    { $set: { user_id: userId } }
-                );
-                
-                return true;
-            }
-        }
-        
-        console.log(`User ${userId} is not a primary creator`);
-        return false;
-    } catch (error) {
-        console.error('Error checking primary creator status:', error);
-        return false;
-    }
-}
+
 const { adminOnly,setupMiddlewares } = require('./middlewares');
 const { developerIds } = require('./handlers');
 const { ensureDatabaseInitialized } = require('./database');
@@ -679,7 +634,54 @@ async function isPremiumUser(userId) {
     }
 }
 
-
+function isPrimaryCreator(ctx, userId) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const botId = ctx.botInfo.id;
+            const db = await ensureDatabaseInitialized();
+            
+            console.log(`Checking if user ${userId} is a primary creator for bot ${botId}`);
+            
+            // Check by user_id
+            const creatorByUserId = await db.collection('primary_creators').findOne({ 
+                user_id: userId,
+                bot_id: botId
+            });
+            
+            if (creatorByUserId) {
+                console.log(`User ${userId} is a primary creator by user_id`);
+                return resolve(true);
+            }
+            
+            // If not found by user_id, check by username if the user has one
+            if (ctx.from && ctx.from.username) {
+                const creatorByUsername = await db.collection('primary_creators').findOne({ 
+                    username: ctx.from.username,
+                    bot_id: botId,
+                    user_id: null // This means the record was created with only a username
+                });
+                
+                if (creatorByUsername) {
+                    console.log(`User ${userId} (${ctx.from.username}) is a primary creator by username`);
+                    
+                    // Update the record with the user_id for future lookups
+                    await db.collection('primary_creators').updateOne(
+                        { _id: creatorByUsername._id },
+                        { $set: { user_id: userId } }
+                    );
+                    
+                    return resolve(true);
+                }
+            }
+            
+            console.log(`User ${userId} is not a primary creator`);
+            resolve(false);
+        } catch (error) {
+            console.error('Error checking primary creator status:', error);
+            resolve(false);
+        }
+    });
+}
 
 async function showQuizMenu(ctx) {
     try {
