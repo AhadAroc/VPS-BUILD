@@ -9,6 +9,7 @@ const videoRestrictionStatus = new Map();
 const gifRestrictionStatus = new Map();
 const linkRestrictionStatus = new Map();
 const photoRestrictionStatus = new Map();
+const forwardingRestrictionStatus = new Map();
 const { MongoClient } = require('mongodb');
 // Add this near the top of your file, with other global variables
 const documentRestrictionStatus = new Map();
@@ -2027,6 +2028,10 @@ bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx))
 bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
 bot.hears('فتح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
 
+bot.command('منع_توجيه', disableForwarding);
+bot.command('فتح_توجيه', enableForwarding);
+bot.hears(/^منع توجيه$/, disableForwarding);
+bot.hears(/^فتح توجيه$/, enableForwarding);
 
 
 
@@ -3448,42 +3453,58 @@ async function checkUserRank(ctx) {
             rankEmoji = '🛠️';
         }
         else {
-            // Check if user is a contest admin (in vip_users collection)
-            const contestAdmin = await db.collection('vip_users').findOne({
+            // Check if user is in the muters collection
+            const isMuter = await db.collection('muters').findOne({
                 $or: [
                     { user_id: userId },
                     { username: username }
                 ],
                 bot_id: botId
             });
-            if (contestAdmin) {
-                rank = 'ادمن مسابقات';
-                rankEmoji = '🎯';
+
+            if (isMuter) {
+                rank = 'كاتم';
+                rankEmoji = '🎤';
             } else {
-                // Check if user is an important user
-                const importantUser = await db.collection('important_users').findOne({
+                // Check if user is a contest admin
+                const contestAdmin = await db.collection('vip_users').findOne({
                     $or: [
                         { user_id: userId },
                         { username: username }
                     ],
                     bot_id: botId
                 });
-                if (importantUser) {
-                    rank = 'مميز';
-                    rankEmoji = '💎';
+
+                if (contestAdmin) {
+                    rank = 'ادمن مسابقات';
+                    rankEmoji = '🎯';
                 } else {
-                    // fallback: group role check
-                    try {
-                        const member = await ctx.telegram.getChatMember(chatId, userId);
-                        if (member.status === 'creator') {
-                            rank = 'مالك المجموعة';
-                            rankEmoji = '👑';
-                        } else if (member.status === 'administrator') {
-                            rank = 'مشرف مجموعة';
-                            rankEmoji = '🔰';
+                    // Check if user is an important user
+                    const importantUser = await db.collection('important_users').findOne({
+                        $or: [
+                            { user_id: userId },
+                            { username: username }
+                        ],
+                        bot_id: botId
+                    });
+
+                    if (importantUser) {
+                        rank = 'مميز';
+                        rankEmoji = '💎';
+                    } else {
+                        // fallback: group role
+                        try {
+                            const member = await ctx.telegram.getChatMember(chatId, userId);
+                            if (member.status === 'creator') {
+                                rank = 'مالك المجموعة';
+                                rankEmoji = '👑';
+                            } else if (member.status === 'administrator') {
+                                rank = 'مشرف مجموعة';
+                                rankEmoji = '🔰';
+                            }
+                        } catch (error) {
+                            console.log('⚠️ Error checking chat member role:', error.message);
                         }
-                    } catch (error) {
-                        console.log('⚠️ Error checking chat member role:', error.message);
                     }
                 }
             }
@@ -4792,8 +4813,17 @@ async function pinMessage(ctx) {
 // Mute/Unmute user
 async function muteUser(ctx, mute = true) {
     try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        const db = await ensureDatabaseInitialized();
+        const fromId = ctx.from.id;
+
+        // ✅ Check if user is allowed to mute
+        const isAllowed =
+            await db.collection('muters').findOne({ user_id: fromId }) ||
+            await isBotAdmin(ctx, fromId) ||
+            await isDeveloper(ctx, fromId);
+
+        if (!isAllowed) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين أو الكاتمين فقط.');
         }
 
         let userId, userMention;
@@ -4822,7 +4852,7 @@ async function muteUser(ctx, mute = true) {
                 can_send_other_messages: false,
                 can_add_web_page_previews: false
             });
-            ctx.replyWithMarkdown(`✅ تم كتم المستخدم ${userMention}.`);
+            await ctx.replyWithMarkdown(`✅ تم كتم المستخدم ${userMention}.`);
         } else {
             await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
                 can_send_messages: true,
@@ -4830,13 +4860,15 @@ async function muteUser(ctx, mute = true) {
                 can_send_other_messages: true,
                 can_add_web_page_previews: true
             });
-            ctx.replyWithMarkdown(`✅ تم إلغاء كتم المستخدم ${userMention}.`);
+            await ctx.replyWithMarkdown(`✅ تم إلغاء كتم المستخدم ${userMention}.`);
         }
+
     } catch (error) {
-        console.error('Error in muteUser:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة كتم/إلغاء كتم المستخدم.');
+        console.error('❌ Error in muteUser:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة كتم/إلغاء كتم المستخدم.');
     }
 }
+
 
 //call command
 async function callEveryone(ctx) {
@@ -4923,7 +4955,125 @@ async function getGroupLink(ctx) {
 
 
 
+// Function to disable message forwarding
+async function disableForwarding(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
 
+        const chatId = ctx.chat.id;
+        
+        // Store restriction in database for persistence
+        const db = await ensureDatabaseInitialized();
+        await db.collection('chat_restrictions').updateOne(
+            { chat_id: chatId },
+            { $set: { forwarding_restricted: true, updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Update in-memory cache
+        forwardingRestrictionStatus.set(chatId, true);
+        
+        ctx.reply('✅ تم تعطيل إعادة توجيه الرسائل للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إعادة توجيه الرسائل الآن.');
+    } catch (error) {
+        console.error('Error in disableForwarding:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل إعادة توجيه الرسائل.');
+    }
+}
+
+// Function to enable message forwarding
+async function enableForwarding(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const chatId = ctx.chat.id;
+        
+        // Update database
+        const db = await ensureDatabaseInitialized();
+        await db.collection('chat_restrictions').updateOne(
+            { chat_id: chatId },
+            { $set: { forwarding_restricted: false, updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Update in-memory cache
+        forwardingRestrictionStatus.set(chatId, false);
+        
+        ctx.reply('✅ تم تفعيل إعادة توجيه الرسائل للجميع.');
+    } catch (error) {
+        console.error('Error in enableForwarding:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل إعادة توجيه الرسائل.');
+    }
+}
+
+// Create a middleware to enforce forwarding restrictions
+const forwardingRestrictionMiddleware = async (ctx, next) => {
+    // Skip if not in a group or not a message
+    if (!ctx.message || ctx.chat.type === 'private') {
+        return next();
+    }
+
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    
+    // Check if forwarding is restricted in this chat
+    if (forwardingRestrictionStatus.get(chatId)) {
+        // Check if the message is forwarded
+        const isForwarded = ctx.message.forward_date || ctx.message.forward_from || 
+                           ctx.message.forward_from_chat || ctx.message.forward_sender_name;
+        
+        if (isForwarded) {
+            // Check if the user is an admin, VIP, or has special permissions
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVIPUser = await isVIP(ctx, userId);
+            const isPremium = await isPremiumUser(userId);
+            const isBotAdm = await isBotAdmin(ctx, userId);
+
+            if (!isAdmin && !isVIPUser && !isPremium && !isBotAdm) {
+                // Delete the forwarded message
+                try {
+                    await ctx.deleteMessage();
+                    
+                    await ctx.reply(
+                        `⚠️ @${ctx.from.username || ctx.from.first_name}، إعادة توجيه الرسائل غير مسموحة للأعضاء العاديين في هذه المجموعة.`,
+                        { reply_to_message_id: ctx.message.message_id }
+                    );
+                    
+                    // Log the restriction
+                    console.log(`Deleted forwarded message from user ${userId} in chat ${chatId}`);
+                    
+                    return; // Don't call next() to prevent further processing
+                } catch (error) {
+                    console.error('Error deleting forwarded message:', error);
+                }
+            }
+        }
+    }
+
+    return next();
+};
+
+// Function to load forwarding restrictions from database
+async function loadForwardingRestrictions() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const restrictions = await db.collection('chat_restrictions').find(
+            { forwarding_restricted: true }
+        ).toArray();
+        
+        // Update the in-memory cache
+        restrictions.forEach(restriction => {
+            forwardingRestrictionStatus.set(restriction.chat_id, true);
+        });
+        
+        console.log(`Loaded ${restrictions.length} forwarding restrictions from database`);
+    } catch (error) {
+        console.error('Error loading forwarding restrictions:', error);
+    }
+}
 
 
 
