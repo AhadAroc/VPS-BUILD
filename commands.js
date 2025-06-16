@@ -468,7 +468,7 @@ async function hasRequiredPermissions(ctx, userId) {
     const isBotAdm = await isBotAdmin(userId);
     const isPremium = await isPremiumUser(userId);
     const isPrimary = await isPrimaryCreator(ctx, userId);
-    return isAdmin || isSecDev || isVIPUser || isBotAdm || isPrimary;
+    return isAdmin || isSecDev || isVIPUser ||  isPrimary;
 }
 // ✅ Display main menu
 async function showMainMenu(ctx) {
@@ -478,10 +478,10 @@ async function showMainMenu(ctx) {
       //const isAdmin = await isAdminOrOwner(ctx, userId);
 const isSecDev = await isSecondaryDeveloper(ctx, userId);
 const isVIPUser = await isVIP(ctx, userId);
-const isBotAdm = await isBotAdmin(userId);
+//const isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 const isDev = await isDeveloper(ctx, userId);
-const isSpecialUser =  isSecDev || isVIPUser || isBotAdm || isPrimary ||isDev;
+const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev;
 
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
@@ -705,7 +705,7 @@ async function showQuizMenu(ctx) {
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
         const isBotAdm = await isBotAdmin(userId);
-        
+        const isSecDev = await isSecDeveloper(userId);
         console.log(`Quiz menu permissions for user ${userId}:`, {
             isAdmin,
             isVIPUser,
@@ -1489,12 +1489,12 @@ bot.use(stickerRestrictionMiddleware);
 
         console.log('🔍 Checking ranks...');
         const isDev = await isDeveloper(ctx, userId);
-        const isAdmin = await isAdminOrOwner(ctx, userId);
+        //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        const isBotOwn = await isBotOwner(ctx, userId);
+        //const isBotOwn = await isBotOwner(ctx, userId);
         console.log('✅ Ranks checked.');
 
-        if (!isDev && !isAdmin && !isSecDev && !isBotOwn) {
+        if (!isDev && !isSecDev ) {
             console.log('⛔ Not allowed: user lacks required role.');
             return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
         }
@@ -2651,11 +2651,11 @@ bot.hears('بدء', async (ctx) => {
             console.error(`❌ Error in isPrimaryCreator for ${userId}:`, err);
         }
 
-        const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        const isVIPUser = await isVIP(ctx, userId);
-        const isDev = await isDeveloper(ctx, userId);
-        const isBotOwn = await isBotOwner(ctx, userId);
-        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId); // must
+        const isVIPUser = await isVIP(ctx, userId); // can access only quiz
+        const isDev = await isDeveloper(ctx, userId); // must 
+       // const isBotOwn = await isBotOwner(ctx, userId); uncounted due to recent change
+        const isBotAdm = await isBotAdmin(ctx, userId); // main menu only
 
         console.log(`🔎 isSecondaryDeveloper: ${isSecDev}`);
         console.log(`🔎 isVIPUser: ${isVIPUser}`);
