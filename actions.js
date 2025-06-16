@@ -4792,144 +4792,117 @@ if (reply) {
 // Updated handleMediaReply function to check both global and user-specific states
 async function handleUserPromotion(ctx) {
     try {
-        // Check if the message matches the pattern @username رفع role OR رفع role @username
         const text = ctx.message.text?.trim();
         let match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
-        
         if (!match) {
-            // Try the alternative pattern: رفع role @username
             match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
-            if (match) {
-                // Swap the positions for the second pattern
-                match = [match[0], match[2], match[1]];
-            } else {
-                return false; // Not a promotion command
-            }
+            if (match) match = [match[0], match[2], match[1]];
+            else return false;
         }
-        
-        // Extract username and role
+
         const username = match[1];
-        const role = match[2];
-        
-        // Check if the user executing the command is an admin or owner
-        const fromUserId = ctx.from.id; // Use ctx.from.id instead of userId
-        if (!(await isAdminOrOwner(ctx, fromUserId))) {
-            await ctx.reply('❌ هذا الأمر مخصص للمشرفين والمالك فقط.');
-            return true; // Command was handled
-        }
-        
-        // Rest of the function remains the same...
-        // Initialize database
+        const role = match[2].toLowerCase();
+        const fromUserId = ctx.from.id;
+
         const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo?.id || 'unknown'; // Fallback if bot info is not available
-        
-        // Determine collection and success message based on role
-        let collection, successMessage;
-        
-        switch (role.toLowerCase()) {
-            case 'مميز':
-            case 'vip':
-                collection = 'vip_users';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى مميز (VIP).`;
-                break;
-            case 'ادمن':
-            case 'admin':
-                collection = 'admins';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى ادمن.`;
-                break;
-            case 'مدير':
-            case 'manager':
-                collection = 'managers';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى مدير.`;
-                break;
-            case 'منشئ':
-            case 'creator':
-                collection = 'creators';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى منشئ.`;
-                break;
-            case 'منشئ اساسي':
-            case 'primary creator':
-                collection = 'primary_creators';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى منشئ اساسي.`;
-                break;
-            case 'مطور اساسي':
-            case 'developer':
-                collection = 'developers';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى مطور.`;
-                break;
-            case 'مطور ثانوي':
-            case 'secondary developer':
-                collection = 'secondary_developers';
-                successMessage = `✅ تم ترقية المستخدم @${username} إلى مطور ثانوي.`;
-                break;
-            default:
-                await ctx.reply('❌ نوع الترقية غير صالح.');
-                return true; // Command was handled
+        const botId = ctx.botInfo?.id || 'unknown';
+
+        // Role hierarchy
+        const roleMap = {
+            'developer': 'dev',
+            'secondary developer': 'secdev',
+            'primary creator': 'primary',
+            'manager': 'manager',
+            'admin': 'admin',
+            'vip': 'vip',
+            'مطور اساسي': 'dev',
+            'مطور ثانوي': 'secdev',
+            'منشئ اساسي': 'primary',
+            'مدير': 'manager',
+            'ادمن': 'admin',
+            'مميز': 'vip',
+            'vip user': 'vip',
+        };
+
+        const canPromote = {
+            dev: ['secdev', 'primary', 'manager', 'admin', 'vip'],
+            secdev: ['primary', 'manager', 'admin', 'vip'],
+            primary: ['manager', 'admin', 'vip'],
+            manager: ['admin', 'vip'],
+            admin: ['vip'],
+        };
+
+        // Get rank of the promoter
+        let promoterRank = 'unknown';
+        if (await isDeveloper(ctx, fromUserId)) promoterRank = 'dev';
+        else if (await isSecondaryDeveloper(ctx, fromUserId)) promoterRank = 'secdev';
+        else if (await isPrimaryCreator(ctx, fromUserId)) promoterRank = 'primary';
+        else if (await isManager(ctx, fromUserId)) promoterRank = 'manager';
+        else if (await isAdminOrOwner(ctx, fromUserId)) promoterRank = 'admin';
+        else if (await isVIP(ctx, fromUserId)) promoterRank = 'vip';
+
+        const normalizedTargetRank = roleMap[role];
+        if (!normalizedTargetRank) {
+            await ctx.reply('❌ نوع الترقية غير صالح.');
+            return true;
         }
-        
-        // Try to get user ID if possible, but don't fail if we can't
+
+        if (!canPromote[promoterRank] || !canPromote[promoterRank].includes(normalizedTargetRank)) {
+            await ctx.reply('❌ ليس لديك صلاحية لترقية هذا النوع.');
+            return true;
+        }
+
+        // Determine target collection
+        const collectionMap = {
+            vip: 'vip_users',
+            admin: 'admins',
+            manager: 'managers',
+            creator: 'creators',
+            primary: 'primary_creators',
+            dev: 'developers',
+            secdev: 'secondary_developers'
+        };
+        const collection = collectionMap[normalizedTargetRank];
+        const successMessage = `✅ تم ترقية المستخدم @${username} إلى ${role}.`;
+
+        // Attempt to resolve target user
         let targetUserId = null;
         try {
-            // First try to get from chat member
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
             targetUserId = chatMember.user.id;
         } catch (error) {
-            console.log(`Could not get user ID for @${username}, will store by username only: ${error.message}`);
-            
-            // Try to find in known_users collection
-            try {
-                const knownUser = await db.collection('known_users').findOne({ username: username });
-                if (knownUser) {
-                    targetUserId = knownUser.user_id;
-                }
-            } catch (dbError) {
-                console.log(`Database lookup failed for @${username}: ${dbError.message}`);
-            }
+            const knownUser = await db.collection('known_users').findOne({ username });
+            if (knownUser) targetUserId = knownUser.user_id;
         }
-        
-        // Check if user already exists in the collection
-        const query = targetUserId ? { user_id: targetUserId } : { username: username };
+
+        const query = targetUserId ? { user_id: targetUserId } : { username };
         const existingUser = await db.collection(collection).findOne(query);
-        
+
         if (existingUser) {
-            // User already has this role, just update their information
-            await db.collection(collection).updateOne(
-                query,
-                { 
-                    $set: { 
-                        bot_id: botId,
-                        username: username,
-                        updated_at: new Date(),
-                        updated_by: fromUserId
-                    }
+            await db.collection(collection).updateOne(query, {
+                $set: {
+                    bot_id: botId,
+                    username: username,
+                    updated_at: new Date(),
+                    updated_by: fromUserId
                 }
-            );
+            });
             await ctx.reply(`ℹ️ المستخدم @${username} لديه بالفعل رتبة ${role}.`);
         } else {
-            // User doesn't have this role yet, create a new entry
-            console.log(`⚠️ Inserting user into ${collection}:`, {
-    user_id: targetUserId,
-    username: username,
-    bot_id: botId,
-    promoted_by: fromUserId,
-    chat_id: ctx.chat.id
-});
-
-            await db.collection(collection).insertOne({ 
-                user_id: targetUserId, // May be null
-                username: username,
+            await db.collection(collection).insertOne({
+                user_id: targetUserId,
+                username,
                 bot_id: botId,
+                chat_id: ctx.chat.id,
                 promoted_at: new Date(),
-                promoted_by: fromUserId,
-                chat_id: ctx.chat.id
+                promoted_by: fromUserId
             });
-            
-            // Also add to known_users collection for future reference
+
             if (targetUserId) {
                 await db.collection('known_users').updateOne(
-                    { username: username },
-                    { 
-                        $set: { 
+                    { username },
+                    {
+                        $set: {
                             user_id: targetUserId,
                             last_seen: new Date(),
                             last_seen_chat: ctx.chat.id
@@ -4938,18 +4911,18 @@ async function handleUserPromotion(ctx) {
                     { upsert: true }
                 );
             }
-            
+
             await ctx.reply(successMessage);
-            console.log(`User @${username}${targetUserId ? ` (${targetUserId})` : ''} promoted to ${role} by user ${fromUserId}`);
         }
-        
-        return true; // Command was handled
+
+        return true;
     } catch (error) {
         console.error('Error in handleUserPromotion:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم. الرجاء المحاولة مرة أخرى لاحقًا.');
-        return true; // Command was handled, even though it failed
+        await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
+        return true;
     }
 }
+
 
 // Add this function to handle user demotion
 async function handleUserDemotion(ctx) {
