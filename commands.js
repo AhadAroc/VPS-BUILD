@@ -2634,39 +2634,14 @@ bot.action('back_to_quiz_menu', async (ctx) => {
 bot.hears('بدء', async (ctx) => {
     try {
         const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+
         console.log(`🟢 [بدء] Command triggered by user ${userId}`);
 
-        if (userId === ownerId) {
-            console.log(`👑 User ${userId} is already the bot owner`);
-
-            const subscribed = await checkUserSubscription(ctx);
-
-            if (subscribed) {
-                if (ctx.chat.type === 'private') {
-                    console.log('📲 Owner in private chat – sending neutral confirmation');
-                    await ctx.reply('✅ اشتراكك مكتمل، استخدم الأوامر أو أضف البوت إلى مجموعتك.');
-                } else {
-                    console.log('👥 Owner in group – showing Main Menu');
-                    await showMainMenu(ctx);
-                }
-            } else {
-                console.warn('⚠️ Owner is not subscribed to required channels');
-                const subscriptionMessage = '⚠️ لم تشترك في جميع القنوات بعد! يرجى الاشتراك:';
-
-                const inlineKeyboard = [
-                    [{ text: '📢 قناة السورس', url: 'https://t.me/sub2vea' }],
-                    [{ text: '📢 القناة الرسمية', url: 'https://t.me/leavemestary' }],
-                    [{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]
-                ];
-
-                await ctx.reply(subscriptionMessage, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            }
-            return;
-        }
-
         console.log(`🔍 Checking user ${userId} roles...`);
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo.id;
 
         let isPrimary = false;
         try {
@@ -2677,19 +2652,41 @@ bot.hears('بدء', async (ctx) => {
         }
 
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        console.log(`🔎 isSecondaryDeveloper: ${isSecDev}`);
-
         const isVIPUser = await isVIP(ctx, userId);
-        console.log(`🔎 isVIPUser: ${isVIPUser}`);
-
         const isDev = await isDeveloper(ctx, userId);
-        console.log(`🔎 isDeveloper: ${isDev}`);
-
         const isBotOwn = await isBotOwner(ctx, userId);
-        console.log(`🔎 isBotOwner: ${isBotOwn}`);
-
         const isBotAdm = await isBotAdmin(ctx, userId);
+
+        console.log(`🔎 isSecondaryDeveloper: ${isSecDev}`);
+        console.log(`🔎 isVIPUser: ${isVIPUser}`);
+        console.log(`🔎 isDeveloper: ${isDev}`);
+        console.log(`🔎 isBotOwner: ${isBotOwn}`);
         console.log(`🔎 isBotAdmin: ${isBotAdm}`);
+
+        let chatMember;
+        try {
+            chatMember = await ctx.telegram.getChatMember(chatId, userId);
+        } catch (err) {
+            console.error('❌ Failed to fetch chat member info:', err);
+        }
+
+        const isGroupOwner = chatMember?.status === 'creator';
+
+        // 🆕 If group owner and not already a primary creator, assign
+        if (isGroupOwner && !isPrimary) {
+            await db.collection('primary_creators').insertOne({
+                user_id: userId,
+                username: ctx.from.username || null,
+                bot_id: botId,
+                chat_id: chatId,
+                promoted_by: 'group_owner',
+                promoted_at: new Date()
+            });
+
+            isPrimary = true;
+            await ctx.reply(`✅ تم تعيينك كـ "منشئ اساسي" لأنك مالك المجموعة.`);
+            console.log(`✅ User ${userId} promoted to primary creator`);
+        }
 
         if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimary) {
             console.log(`🚫 User ${userId} has no sufficient role — rejecting`);
