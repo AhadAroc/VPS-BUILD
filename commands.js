@@ -1972,6 +1972,10 @@ bot.command('تا', demoteFromBotOwner); // Command version of the shortcut
 bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
 
 
+bot.command('منع_توجيه', disableForwarding);
+bot.command('فتح_توجيه', enableForwarding);
+bot.hears(/^منع توجيه$/, disableForwarding);
+bot.hears(/^فتح توجيه$/, enableForwarding);
 
 
 
@@ -3259,7 +3263,126 @@ function botAdminOnly(handler) {
     };
 }
 
+    // Function to disable message forwarding
+async function disableForwarding(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const chatId = ctx.chat.id;
+        
+        // Store restriction in database for persistence
+        const db = await ensureDatabaseInitialized();
+        await db.collection('chat_restrictions').updateOne(
+            { chat_id: chatId },
+            { $set: { forwarding_restricted: true, updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Update in-memory cache
+        forwardingRestrictionStatus.set(chatId, true);
+        
+        ctx.reply('✅ تم تعطيل إعادة توجيه الرسائل للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إعادة توجيه الرسائل الآن.');
+    } catch (error) {
+        console.error('Error in disableForwarding:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل إعادة توجيه الرسائل.');
+    }
+}
+
+// Function to enable message forwarding
+async function enableForwarding(ctx) {
+    try {
+        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
+            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
+        }
+
+        const chatId = ctx.chat.id;
+        
+        // Update database
+        const db = await ensureDatabaseInitialized();
+        await db.collection('chat_restrictions').updateOne(
+            { chat_id: chatId },
+            { $set: { forwarding_restricted: false, updated_at: new Date() } },
+            { upsert: true }
+        );
+        
+        // Update in-memory cache
+        forwardingRestrictionStatus.set(chatId, false);
+        
+        ctx.reply('✅ تم تفعيل إعادة توجيه الرسائل للجميع.');
+    } catch (error) {
+        console.error('Error in enableForwarding:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل إعادة توجيه الرسائل.');
+    }
+}
+
+// Create a middleware to enforce forwarding restrictions
+const forwardingRestrictionMiddleware = async (ctx, next) => {
+    // Skip if not in a group or not a message
+    if (!ctx.message || ctx.chat.type === 'private') {
+        return next();
+    }
+
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
     
+    // Check if forwarding is restricted in this chat
+    if (forwardingRestrictionStatus.get(chatId)) {
+        // Check if the message is forwarded
+        const isForwarded = ctx.message.forward_date || ctx.message.forward_from || 
+                           ctx.message.forward_from_chat || ctx.message.forward_sender_name;
+        
+        if (isForwarded) {
+            // Check if the user is an admin, VIP, or has special permissions
+            const isAdmin = await isAdminOrOwner(ctx, userId);
+            const isVIPUser = await isVIP(ctx, userId);
+            const isPremium = await isPremiumUser(userId);
+            const isBotAdm = await isBotAdmin(ctx, userId);
+
+            if (!isAdmin && !isVIPUser && !isPremium && !isBotAdm) {
+                // Delete the forwarded message
+                try {
+                    await ctx.deleteMessage();
+                    
+                    await ctx.reply(
+                        `⚠️ @${ctx.from.username || ctx.from.first_name}، إعادة توجيه الرسائل غير مسموحة للأعضاء العاديين في هذه المجموعة.`,
+                        { reply_to_message_id: ctx.message.message_id }
+                    );
+                    
+                    // Log the restriction
+                    console.log(`Deleted forwarded message from user ${userId} in chat ${chatId}`);
+                    
+                    return; // Don't call next() to prevent further processing
+                } catch (error) {
+                    console.error('Error deleting forwarded message:', error);
+                }
+            }
+        }
+    }
+
+    return next();
+};
+
+// Function to load forwarding restrictions from database
+async function loadForwardingRestrictions() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const restrictions = await db.collection('chat_restrictions').find(
+            { forwarding_restricted: true }
+        ).toArray();
+        
+        // Update the in-memory cache
+        restrictions.forEach(restriction => {
+            forwardingRestrictionStatus.set(restriction.chat_id, true);
+        });
+        
+        console.log(`Loaded ${restrictions.length} forwarding restrictions from database`);
+    } catch (error) {
+        console.error('Error loading forwarding restrictions:', error);
+    }
+}
+
  // Add this function near the top of your file with other utility functions
 async function updateLastInteraction(userId, username, firstName, lastName) {
     try {
@@ -4952,125 +5075,6 @@ async function getGroupLink(ctx) {
 
 
 
-// Function to disable message forwarding
-async function disableForwarding(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-
-        const chatId = ctx.chat.id;
-        
-        // Store restriction in database for persistence
-        const db = await ensureDatabaseInitialized();
-        await db.collection('chat_restrictions').updateOne(
-            { chat_id: chatId },
-            { $set: { forwarding_restricted: true, updated_at: new Date() } },
-            { upsert: true }
-        );
-        
-        // Update in-memory cache
-        forwardingRestrictionStatus.set(chatId, true);
-        
-        ctx.reply('✅ تم تعطيل إعادة توجيه الرسائل للأعضاء العاديين. فقط المشرفين والأعضاء المميزين (VIP) يمكنهم إعادة توجيه الرسائل الآن.');
-    } catch (error) {
-        console.error('Error in disableForwarding:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تعطيل إعادة توجيه الرسائل.');
-    }
-}
-
-// Function to enable message forwarding
-async function enableForwarding(ctx) {
-    try {
-        if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-            return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-        }
-
-        const chatId = ctx.chat.id;
-        
-        // Update database
-        const db = await ensureDatabaseInitialized();
-        await db.collection('chat_restrictions').updateOne(
-            { chat_id: chatId },
-            { $set: { forwarding_restricted: false, updated_at: new Date() } },
-            { upsert: true }
-        );
-        
-        // Update in-memory cache
-        forwardingRestrictionStatus.set(chatId, false);
-        
-        ctx.reply('✅ تم تفعيل إعادة توجيه الرسائل للجميع.');
-    } catch (error) {
-        console.error('Error in enableForwarding:', error);
-        ctx.reply('❌ حدث خطأ أثناء محاولة تفعيل إعادة توجيه الرسائل.');
-    }
-}
-
-// Create a middleware to enforce forwarding restrictions
-const forwardingRestrictionMiddleware = async (ctx, next) => {
-    // Skip if not in a group or not a message
-    if (!ctx.message || ctx.chat.type === 'private') {
-        return next();
-    }
-
-    const chatId = ctx.chat.id;
-    const userId = ctx.from.id;
-    
-    // Check if forwarding is restricted in this chat
-    if (forwardingRestrictionStatus.get(chatId)) {
-        // Check if the message is forwarded
-        const isForwarded = ctx.message.forward_date || ctx.message.forward_from || 
-                           ctx.message.forward_from_chat || ctx.message.forward_sender_name;
-        
-        if (isForwarded) {
-            // Check if the user is an admin, VIP, or has special permissions
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            const isVIPUser = await isVIP(ctx, userId);
-            const isPremium = await isPremiumUser(userId);
-            const isBotAdm = await isBotAdmin(ctx, userId);
-
-            if (!isAdmin && !isVIPUser && !isPremium && !isBotAdm) {
-                // Delete the forwarded message
-                try {
-                    await ctx.deleteMessage();
-                    
-                    await ctx.reply(
-                        `⚠️ @${ctx.from.username || ctx.from.first_name}، إعادة توجيه الرسائل غير مسموحة للأعضاء العاديين في هذه المجموعة.`,
-                        { reply_to_message_id: ctx.message.message_id }
-                    );
-                    
-                    // Log the restriction
-                    console.log(`Deleted forwarded message from user ${userId} in chat ${chatId}`);
-                    
-                    return; // Don't call next() to prevent further processing
-                } catch (error) {
-                    console.error('Error deleting forwarded message:', error);
-                }
-            }
-        }
-    }
-
-    return next();
-};
-
-// Function to load forwarding restrictions from database
-async function loadForwardingRestrictions() {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const restrictions = await db.collection('chat_restrictions').find(
-            { forwarding_restricted: true }
-        ).toArray();
-        
-        // Update the in-memory cache
-        restrictions.forEach(restriction => {
-            forwardingRestrictionStatus.set(restriction.chat_id, true);
-        });
-        
-        console.log(`Loaded ${restrictions.length} forwarding restrictions from database`);
-    } catch (error) {
-        console.error('Error loading forwarding restrictions:', error);
-    }
-}
 
 
 
@@ -5091,10 +5095,6 @@ bot.command('', promoteToSecondaryDeveloper);
 //t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
 
 
-bot.command('منع_توجيه', disableForwarding);
-bot.command('فتح_توجيه', enableForwarding);
-bot.hears(/^منع توجيه$/, disableForwarding);
-bot.hears(/^فتح توجيه$/, enableForwarding);
 
 
 
