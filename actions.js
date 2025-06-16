@@ -4837,7 +4837,7 @@ async function handleUserPromotion(ctx) {
         if (await isDeveloper(ctx, fromUserId)) promoterRank = 'dev';
         else if (await isSecondaryDeveloper(ctx, fromUserId)) promoterRank = 'secdev';
         else if (await isPrimaryCreator(ctx, fromUserId)) promoterRank = 'primary';
-        else if (await isManager(ctx, fromUserId)) promoterRank = 'manager';
+        //else if (await isManager(ctx, fromUserId)) promoterRank = 'manager';
         else if (await isAdminOrOwner(ctx, fromUserId)) promoterRank = 'admin';
         else if (await isVIP(ctx, fromUserId)) promoterRank = 'vip';
 
