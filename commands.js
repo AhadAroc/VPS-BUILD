@@ -3427,7 +3427,6 @@ async function checkUserRank(ctx) {
         let rank = 'عضو عادي'; // Default
         let rankEmoji = '👤';
 
-        // Start checking top-down
         if (username === 'Lorisiv') {
             rank = 'المطور الأساسي';
             rankEmoji = '👑';
@@ -3445,26 +3444,48 @@ async function checkUserRank(ctx) {
             rankEmoji = '👑';
         } 
         else if (await isBotAdmin(ctx, userId)) {
-            rank = ' مدير';
+            rank = 'مدير';
             rankEmoji = '🛠️';
-        } 
-        else if (await isVIP(ctx, userId)) {
-            rank = 'مميز';
-            rankEmoji = '💎';
         }
         else {
-            // fallback: check if user is group owner or admin
-            try {
-                const member = await ctx.telegram.getChatMember(chatId, userId);
-                if (member.status === 'creator') {
-                    rank = 'مالك المجموعة';
-                    rankEmoji = '👑';
-                } else if (member.status === 'administrator') {
-                    rank = 'مشرف مجموعة';
-                    rankEmoji = '🔰';
+            // Check if user is a contest admin (in vip_users collection)
+            const contestAdmin = await db.collection('vip_users').findOne({
+                $or: [
+                    { user_id: userId },
+                    { username: username }
+                ],
+                bot_id: botId
+            });
+            if (contestAdmin) {
+                rank = 'ادمن مسابقات';
+                rankEmoji = '🎯';
+            } else {
+                // Check if user is an important user
+                const importantUser = await db.collection('important_users').findOne({
+                    $or: [
+                        { user_id: userId },
+                        { username: username }
+                    ],
+                    bot_id: botId
+                });
+                if (importantUser) {
+                    rank = 'مميز';
+                    rankEmoji = '💎';
+                } else {
+                    // fallback: group role check
+                    try {
+                        const member = await ctx.telegram.getChatMember(chatId, userId);
+                        if (member.status === 'creator') {
+                            rank = 'مالك المجموعة';
+                            rankEmoji = '👑';
+                        } else if (member.status === 'administrator') {
+                            rank = 'مشرف مجموعة';
+                            rankEmoji = '🔰';
+                        }
+                    } catch (error) {
+                        console.log('⚠️ Error checking chat member role:', error.message);
+                    }
                 }
-            } catch (error) {
-                console.log('⚠️ Error checking chat member role:', error.message);
             }
         }
 
@@ -3484,6 +3505,7 @@ async function checkUserRank(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
+
 
 // Create a middleware to enforce sticker restrictions
 const stickerRestrictionMiddleware = async (ctx, next) => {
