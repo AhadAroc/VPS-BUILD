@@ -3421,12 +3421,13 @@ async function checkUserRank(ctx) {
         const username = ctx.from.username;
         const chatId = ctx.chat.id;
         const botId = ctx.botInfo.id;
-        let rank = 'عضو عادي'; // Default rank
-        let rankEmoji = '👤';
 
         const db = await ensureDatabaseInitialized();
 
-        // Check if user is the owner
+        let rank = 'عضو عادي'; // Default
+        let rankEmoji = '👤';
+
+        // Start checking top-down
         if (username === 'Lorisiv') {
             rank = 'المطور الأساسي';
             rankEmoji = '👑';
@@ -3439,58 +3440,31 @@ async function checkUserRank(ctx) {
             rank = 'مطور ثانوي';
             rankEmoji = '🔧';
         } 
-        else if (await isBotOwner(ctx, userId)) {
-            rank = 'اساسي';
-            rankEmoji = '🛡️';
-        }
-        else if (await isBotAdmin(userId)) {
+        else if (await isPrimaryCreator(ctx, userId)) {
+            rank = 'منشئ اساسي';
+            rankEmoji = '👑';
+        } 
+        else if (await isBotAdmin(ctx, userId)) {
             rank = 'مشرف بوت';
             rankEmoji = '🛠️';
-        }
-        else if (await isAdminOrOwner(ctx, userId)) {
-            try {
-                const member = await ctx.telegram.getChatMember(chatId, userId);
-                if (member.status === 'creator') {
-                    rank = 'المالك';
-                    rankEmoji = '👑';
-                } else {
-                    rank = 'مشرف';
-                    rankEmoji = '🔰';
-                }
-            } catch (error) {
-                console.log('Error getting chat member status:', error);
-                rank = 'مشرف';
-                rankEmoji = '🔰';
-            }
-        }
+        } 
         else if (await isVIP(ctx, userId)) {
             rank = 'مميز';
             rankEmoji = '💎';
         }
-        // 🔥 UPDATED: Check if user is in primary_creators with proper query
         else {
-            // Create a query that matches either user_id or username, and also checks bot_id and chat_id
-            const primaryQuery = {
-                $and: [
-                    { 
-                        $or: [
-                            // Check by user_id if available
-                            userId ? { user_id: userId } : { $exists: false },
-                            // Check by username if available
-                            username ? { username: username } : { $exists: false }
-                        ]
-                    },
-                    // Match the current bot_id
-                    { bot_id: botId },
-                    // Optional: Match the current chat_id if you want to restrict by chat
-                    // { chat_id: chatId }
-                ]
-            };
-
-            const isPrimary = await db.collection('primary_creators').findOne(primaryQuery);
-            if (isPrimary) {
-                rank = 'منشئ اساسي';
-                rankEmoji = '👑';
+            // fallback: check if user is group owner or admin
+            try {
+                const member = await ctx.telegram.getChatMember(chatId, userId);
+                if (member.status === 'creator') {
+                    rank = 'مالك المجموعة';
+                    rankEmoji = '👑';
+                } else if (member.status === 'administrator') {
+                    rank = 'مشرف مجموعة';
+                    rankEmoji = '🔰';
+                }
+            } catch (error) {
+                console.log('⚠️ Error checking chat member role:', error.message);
             }
         }
 
@@ -3504,8 +3478,9 @@ async function checkUserRank(ctx) {
             `🏅 *الرتبة:* ${rank}`,
             { parse_mode: 'Markdown' }
         );
+
     } catch (error) {
-        console.error('Error checking user rank:', error);
+        console.error('❌ Error checking user rank:', error);
         await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
