@@ -1411,7 +1411,8 @@ bot.use(videoRestrictionMiddleware);
 bot.use(gifRestrictionMiddleware);
 bot.use(documentRestrictionMiddleware);
 bot.use(stickerRestrictionMiddleware);
-
+bot.use(stickerRestrictionMiddleware);
+bot.use(forwardingRestrictionMiddleware)
     bot.use(async (ctx, next) => {
         try {
             const userId = ctx.from?.id;
