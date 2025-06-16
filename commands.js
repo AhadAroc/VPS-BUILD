@@ -2028,10 +2028,7 @@ bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx))
 bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
 bot.hears('فتح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
 
-bot.command('منع_توجيه', disableForwarding);
-bot.command('فتح_توجيه', enableForwarding);
-bot.hears(/^منع توجيه$/, disableForwarding);
-bot.hears(/^فتح توجيه$/, enableForwarding);
+
 
 
 
@@ -5094,7 +5091,10 @@ bot.command('', promoteToSecondaryDeveloper);
 //t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
 
 
-
+bot.command('منع_توجيه', disableForwarding);
+bot.command('فتح_توجيه', enableForwarding);
+bot.hears(/^منع توجيه$/, disableForwarding);
+bot.hears(/^فتح توجيه$/, enableForwarding);
 
 
 
