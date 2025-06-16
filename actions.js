@@ -4817,16 +4817,17 @@ async function handleUserPromotion(ctx) {
             'مطور ثانوي': 'secdev',
             'منشئ اساسي': 'primary',
             'مدير': 'manager',
-            'مميز': 'vip',
-            'vip': 'vip',
+            'ادمن مسابقات': 'contest_admin',
+            'مميز': 'important',
+            'important': 'important'
         };
 
         // Who can promote what
         const canPromote = {
-            dev: ['secdev', 'primary', 'manager', 'vip'],
-            secdev: ['primary', 'manager', 'vip'],
-            primary: ['manager', 'vip'],
-            manager: ['vip']
+            dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important'],
+            secdev: ['primary', 'manager', 'contest_admin', 'important'],
+            primary: ['manager', 'contest_admin', 'important'],
+            manager: ['contest_admin', 'important']
         };
 
         // Detect promoter rank
@@ -4835,7 +4836,7 @@ async function handleUserPromotion(ctx) {
         else if (await isSecondaryDeveloper(ctx, fromUserId)) promoterRank = 'secdev';
         else if (await isPrimaryCreator(ctx, fromUserId)) promoterRank = 'primary';
         else if (await isBotAdmin(ctx, fromUserId)) promoterRank = 'manager';
-        else if (await isVIP(ctx, fromUserId)) promoterRank = 'vip'; // not allowed to promote anything
+        else if (await isVIP(ctx, fromUserId)) promoterRank = 'important'; // cannot promote
 
         const normalizedTargetRank = roleMap[role];
         if (!normalizedTargetRank) {
@@ -4850,7 +4851,8 @@ async function handleUserPromotion(ctx) {
 
         // Map to correct MongoDB collection
         const collectionMap = {
-            vip: 'vip_users',
+            important: 'important_users',
+            contest_admin: 'vip_users',
             manager: 'bot_admins',
             primary: 'primary_creators',
             dev: 'developers',
@@ -4920,6 +4922,7 @@ async function handleUserPromotion(ctx) {
 
 
 
+
 // Add this function to handle user demotion
 async function handleUserDemotion(ctx) {
     try {
@@ -4949,8 +4952,9 @@ async function handleUserDemotion(ctx) {
             'primary creator': 'primary',
             'مدير': 'manager',
             'manager': 'manager',
-            'مميز': 'vip',
-            'vip': 'vip'
+            'ادمن مسابقات': 'contest_admin',
+            'مميز': 'important',
+            'important': 'important'
         };
 
         const collectionMap = {
@@ -4958,7 +4962,8 @@ async function handleUserDemotion(ctx) {
             secdev: 'secondary_developers',
             primary: 'primary_creators',
             manager: 'bot_admins',
-            vip: 'vip_users'
+            contest_admin: 'vip_users',
+            important: 'important_users'
         };
 
         const targetRank = roleMap[role];
@@ -4969,10 +4974,10 @@ async function handleUserDemotion(ctx) {
 
         // Permission rules: who can demote what
         const canDemote = {
-            dev: ['secdev', 'primary', 'manager', 'vip'],
-            secdev: ['primary', 'manager', 'vip'],
-            primary: ['manager', 'vip'],
-            manager: ['vip']
+            dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important'],
+            secdev: ['primary', 'manager', 'contest_admin', 'important'],
+            primary: ['manager', 'contest_admin', 'important'],
+            manager: ['contest_admin', 'important']
         };
 
         // Determine sender rank
@@ -4981,15 +4986,14 @@ async function handleUserDemotion(ctx) {
         else if (await isSecondaryDeveloper(ctx, fromUserId)) senderRank = 'secdev';
         else if (await isPrimaryCreator(ctx, fromUserId)) senderRank = 'primary';
         else if (await isBotAdmin(ctx, fromUserId)) senderRank = 'manager';
-        else if (await isVIP(ctx, fromUserId)) senderRank = 'vip';
+        else if (await isVIP(ctx, fromUserId)) senderRank = 'important';
 
-        // Check if demotion is allowed
         if (!canDemote[senderRank] || !canDemote[senderRank].includes(targetRank)) {
             await ctx.reply('❌ ليس لديك صلاحية لتنزيل هذه الرتبة.');
             return true;
         }
 
-        // Try to get user ID
+        // Try to resolve user
         let targetUserId = null;
         try {
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
@@ -5020,6 +5024,7 @@ async function handleUserDemotion(ctx) {
         return true;
     }
 }
+
 
 // Helper function to get Arabic names for media types
 // Add this helper function
