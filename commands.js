@@ -3445,7 +3445,7 @@ async function checkUserRank(ctx) {
             rankEmoji = '👑';
         } 
         else if (await isBotAdmin(ctx, userId)) {
-            rank = 'مشرف بوت';
+            rank = ' مدير';
             rankEmoji = '🛠️';
         } 
         else if (await isVIP(ctx, userId)) {
