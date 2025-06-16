@@ -4807,39 +4807,35 @@ async function handleUserPromotion(ctx) {
         const db = await ensureDatabaseInitialized();
         const botId = ctx.botInfo?.id || 'unknown';
 
-        // Role hierarchy
+        // Normalize input roles to internal short keys
         const roleMap = {
             'developer': 'dev',
             'secondary developer': 'secdev',
             'primary creator': 'primary',
             'manager': 'manager',
-            'admin': 'admin',
-            'vip': 'vip',
             'مطور اساسي': 'dev',
             'مطور ثانوي': 'secdev',
             'منشئ اساسي': 'primary',
             'مدير': 'manager',
-            'ادمن': 'admin',
             'مميز': 'vip',
-            'vip user': 'vip',
+            'vip': 'vip',
         };
 
+        // Who can promote what
         const canPromote = {
-            dev: ['secdev', 'primary', 'manager', 'admin', 'vip'],
-            secdev: ['primary', 'manager', 'admin', 'vip'],
-            primary: ['manager', 'admin', 'vip'],
-            manager: ['admin', 'vip'],
-            admin: ['vip'],
+            dev: ['secdev', 'primary', 'manager', 'vip'],
+            secdev: ['primary', 'manager', 'vip'],
+            primary: ['manager', 'vip'],
+            manager: ['vip']
         };
 
-        // Get rank of the promoter
+        // Detect promoter rank
         let promoterRank = 'unknown';
         if (await isDeveloper(ctx, fromUserId)) promoterRank = 'dev';
         else if (await isSecondaryDeveloper(ctx, fromUserId)) promoterRank = 'secdev';
         else if (await isPrimaryCreator(ctx, fromUserId)) promoterRank = 'primary';
-        else if (await isBotAdmin(ctx, fromUserId)) promoterRank = 'manager'; //remember to add and speard its stuff 
-        else if (await isAdminOrOwner(ctx, fromUserId)) promoterRank = 'admin';
-        else if (await isVIP(ctx, fromUserId)) promoterRank = 'vip';
+        else if (await isBotAdmin(ctx, fromUserId)) promoterRank = 'manager';
+        else if (await isVIP(ctx, fromUserId)) promoterRank = 'vip'; // not allowed to promote anything
 
         const normalizedTargetRank = roleMap[role];
         if (!normalizedTargetRank) {
@@ -4852,20 +4848,19 @@ async function handleUserPromotion(ctx) {
             return true;
         }
 
-        // Determine target collection
+        // Map to correct MongoDB collection
         const collectionMap = {
             vip: 'vip_users',
-            admin: 'admins',
             manager: 'bot_admins',
-            creator: 'creators',
             primary: 'primary_creators',
             dev: 'developers',
             secdev: 'secondary_developers'
         };
+
         const collection = collectionMap[normalizedTargetRank];
         const successMessage = `✅ تم ترقية المستخدم @${username} إلى ${role}.`;
 
-        // Attempt to resolve target user
+        // Attempt to resolve the user
         let targetUserId = null;
         try {
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
@@ -4922,6 +4917,7 @@ async function handleUserPromotion(ctx) {
         return true;
     }
 }
+
 
 
 // Add this function to handle user demotion
