@@ -2646,6 +2646,10 @@ bot.action('show_commands_part4', async (ctx) => {
             '🔹 *فتح روابط* – السماح بمشاركة الروابط\n' +
             '🔹 *منع روابط* – منع مشاركة الروابط\n\n' +
             
+            '*↩️ أوامر إعادة التوجيه*\n' +
+            '🔹 *منع توجيه* – منع إعادة توجيه الرسائل\n' +
+            '🔹 *فتح توجيه* – السماح بإعادة توجيه الرسائل\n\n' +
+            
             '*🎭 أوامر الترفيه*\n' +
             '🔹 *نكتة* – إرسال نكتة';
 
@@ -4807,7 +4811,6 @@ async function handleUserPromotion(ctx) {
         const db = await ensureDatabaseInitialized();
         const botId = ctx.botInfo?.id || 'unknown';
 
-        // Normalize input roles to internal short keys
         const roleMap = {
             'developer': 'dev',
             'secondary developer': 'secdev',
@@ -4819,24 +4822,24 @@ async function handleUserPromotion(ctx) {
             'مدير': 'manager',
             'ادمن مسابقات': 'contest_admin',
             'مميز': 'important',
-            'important': 'important'
+            'important': 'important',
+            'كاتم': 'muter',
+            'mute': 'muter'
         };
 
-        // Who can promote what
         const canPromote = {
-            dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important'],
-            secdev: ['primary', 'manager', 'contest_admin', 'important'],
-            primary: ['manager', 'contest_admin', 'important'],
-            manager: ['contest_admin', 'important']
+            dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important', 'muter'],
+            secdev: ['primary', 'manager', 'contest_admin', 'important', 'muter'],
+            primary: ['manager', 'contest_admin', 'important', 'muter'],
+            manager: ['contest_admin', 'important', 'muter']
         };
 
-        // Detect promoter rank
         let promoterRank = 'unknown';
         if (await isDeveloper(ctx, fromUserId)) promoterRank = 'dev';
         else if (await isSecondaryDeveloper(ctx, fromUserId)) promoterRank = 'secdev';
         else if (await isPrimaryCreator(ctx, fromUserId)) promoterRank = 'primary';
         else if (await isBotAdmin(ctx, fromUserId)) promoterRank = 'manager';
-        else if (await isVIP(ctx, fromUserId)) promoterRank = 'important'; // cannot promote
+        else if (await isVIP(ctx, fromUserId)) promoterRank = 'important';
 
         const normalizedTargetRank = roleMap[role];
         if (!normalizedTargetRank) {
@@ -4849,20 +4852,19 @@ async function handleUserPromotion(ctx) {
             return true;
         }
 
-        // Map to correct MongoDB collection
         const collectionMap = {
             important: 'important_users',
             contest_admin: 'vip_users',
             manager: 'bot_admins',
             primary: 'primary_creators',
             dev: 'developers',
-            secdev: 'secondary_developers'
+            secdev: 'secondary_developers',
+            muter: 'muters'
         };
 
         const collection = collectionMap[normalizedTargetRank];
         const successMessage = `✅ تم ترقية المستخدم @${username} إلى ${role}.`;
 
-        // Attempt to resolve the user
         let targetUserId = null;
         try {
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
@@ -4923,6 +4925,7 @@ async function handleUserPromotion(ctx) {
 
 
 
+
 // Add this function to handle user demotion
 async function handleUserDemotion(ctx) {
     try {
@@ -4954,16 +4957,20 @@ async function handleUserDemotion(ctx) {
             'manager': 'manager',
             'ادمن مسابقات': 'contest_admin',
             'مميز': 'important',
-            'important': 'important'
+            'important': 'important',
+            'كاتم': 'muter',
+            'mute': 'muter'
         };
 
+        // Collection per role
         const collectionMap = {
             dev: 'developers',
             secdev: 'secondary_developers',
             primary: 'primary_creators',
             manager: 'bot_admins',
             contest_admin: 'vip_users',
-            important: 'important_users'
+            important: 'important_users',
+            muter: 'muters'
         };
 
         const targetRank = roleMap[role];
@@ -4972,12 +4979,12 @@ async function handleUserDemotion(ctx) {
             return true;
         }
 
-        // Permission rules: who can demote what
+        // Permission rules
         const canDemote = {
-            dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important'],
-            secdev: ['primary', 'manager', 'contest_admin', 'important'],
-            primary: ['manager', 'contest_admin', 'important'],
-            manager: ['contest_admin', 'important']
+            dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important', 'muter'],
+            secdev: ['primary', 'manager', 'contest_admin', 'important', 'muter'],
+            primary: ['manager', 'contest_admin', 'important', 'muter'],
+            manager: ['contest_admin', 'important', 'muter']
         };
 
         // Determine sender rank
