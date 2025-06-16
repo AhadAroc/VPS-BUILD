@@ -1411,8 +1411,7 @@ bot.use(videoRestrictionMiddleware);
 bot.use(gifRestrictionMiddleware);
 bot.use(documentRestrictionMiddleware);
 bot.use(stickerRestrictionMiddleware);
-bot.use(stickerRestrictionMiddleware);
-bot.use(forwardingRestrictionMiddleware)
+
     bot.use(async (ctx, next) => {
         try {
             const userId = ctx.from?.id;
@@ -3383,7 +3382,7 @@ async function loadForwardingRestrictions() {
         console.error('Error loading forwarding restrictions:', error);
     }
 }
-
+bot.use(forwardingRestrictionMiddleware)
  // Add this function near the top of your file with other utility functions
 async function updateLastInteraction(userId, username, firstName, lastName) {
     try {
