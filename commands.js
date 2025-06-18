@@ -1895,8 +1895,8 @@ bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
 bot.command('مساعدة', showHelp);
 bot.hears('مساعدة', showHelp);
 
-bot.hears('كتم', adminOnly((ctx) => muteUser(ctx, true)));
-bot.hears('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
+//bot.hears('كتم', adminOnly((ctx) => muteUser(ctx, true)));
+//bot.hears('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
 bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
 bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
 bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
@@ -2013,8 +2013,8 @@ bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
 bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
 bot.hears('طرد', adminOnly((ctx) => kickUser(ctx)));
 // Add these command handlers
-bot.command('كتم', (ctx) => muteUser(ctx, true));
-bot.command('الغاء_كتم', (ctx) => muteUser(ctx, false));
+//bot.command('كتم', (ctx) => muteUser(ctx, true));
+//bot.command('الغاء_كتم', (ctx) => muteUser(ctx, false));
 
 // Add these hears handlers
 bot.hears('كتم', (ctx) => muteUser(ctx, true));
@@ -2041,8 +2041,8 @@ bot.command('معرفي', (ctx) => showUserId(ctx));
 bot.hears('ايدي', (ctx) => showUserId(ctx));
 
 
-bot.command('كتم', adminOnly((ctx) => muteUser(ctx, true)));
-bot.command('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
+//bot.command('كتم', adminOnly((ctx) => muteUser(ctx, true)));
+//bot.command('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
 
 bot.command('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
 bot.command('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
