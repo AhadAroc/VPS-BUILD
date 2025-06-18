@@ -4863,24 +4863,43 @@ async function handleUserPromotion(ctx) {
         };
 
         const collection = collectionMap[normalizedTargetRank];
-        const successMessage = `✅ تم ترقية المستخدم @${username} إلى ${role}.`;
-
+        
+        // Try to resolve user ID from username
         let targetUserId = null;
         try {
+            console.log(`Attempting to resolve user ID for @${username}`);
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
             targetUserId = chatMember.user.id;
+            console.log(`Successfully resolved user ID: ${targetUserId} for @${username}`);
         } catch (error) {
+            console.log(`Could not get user ID from chat member: ${error.message}`);
+            
+            // Try to find user ID from known_users collection
             const knownUser = await db.collection('known_users').findOne({ username });
-            if (knownUser) targetUserId = knownUser.user_id;
+            if (knownUser && knownUser.user_id) {
+                targetUserId = knownUser.user_id;
+                console.log(`Found user ID ${targetUserId} for @${username} in known_users collection`);
+            } else {
+                // If we can't resolve the user ID, inform the user
+                await ctx.reply(`⚠️ لم أتمكن من العثور على معرف المستخدم @${username}. يرجى التأكد من أن المستخدم موجود في المجموعة أو قام بإرسال رسالة مؤخرًا.`);
+                return true;
+            }
         }
 
-        const query = targetUserId ? { user_id: targetUserId } : { username };
+        // Only proceed if we have a valid user ID
+        if (!targetUserId) {
+            await ctx.reply(`❌ لا يمكن ترقية المستخدم @${username} بدون معرف المستخدم. يرجى التأكد من أن المستخدم موجود في المجموعة.`);
+            return true;
+        }
+
+        // Check if user already has this role
+        const query = { user_id: targetUserId, bot_id: botId };
         const existingUser = await db.collection(collection).findOne(query);
 
         if (existingUser) {
+            // Update existing record
             await db.collection(collection).updateOne(query, {
                 $set: {
-                    bot_id: botId,
                     username: username,
                     updated_at: new Date(),
                     updated_by: fromUserId
@@ -4888,6 +4907,7 @@ async function handleUserPromotion(ctx) {
             });
             await ctx.reply(`ℹ️ المستخدم @${username} لديه بالفعل رتبة ${role}.`);
         } else {
+            // Insert new record with valid user ID
             await db.collection(collection).insertOne({
                 user_id: targetUserId,
                 username,
@@ -4897,20 +4917,20 @@ async function handleUserPromotion(ctx) {
                 promoted_by: fromUserId
             });
 
-            if (targetUserId) {
-                await db.collection('known_users').updateOne(
-                    { username },
-                    {
-                        $set: {
-                            user_id: targetUserId,
-                            last_seen: new Date(),
-                            last_seen_chat: ctx.chat.id
-                        }
-                    },
-                    { upsert: true }
-                );
-            }
+            // Update known_users collection
+            await db.collection('known_users').updateOne(
+                { username },
+                {
+                    $set: {
+                        user_id: targetUserId,
+                        last_seen: new Date(),
+                        last_seen_chat: ctx.chat.id
+                    }
+                },
+                { upsert: true }
+            );
 
+            const successMessage = `✅ تم ترقية المستخدم @${username} (${targetUserId}) إلى ${role}.`;
             await ctx.reply(successMessage);
         }
 
