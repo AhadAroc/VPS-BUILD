@@ -4874,13 +4874,7 @@ async function handleUserPromotion(ctx) {
             if (knownUser) targetUserId = knownUser.user_id;
         }
 
-        // ❌ Don't proceed if user ID is missing
-        if (!targetUserId) {
-            await ctx.reply(`❌ لا يمكن العثور على معرف المستخدم @${username} لترقيته. تأكد أنه موجود في المجموعة أو تمت مشاهدته سابقًا.`);
-            return true;
-        }
-
-        const query = { user_id: targetUserId };
+        const query = targetUserId ? { user_id: targetUserId } : { username };
         const existingUser = await db.collection(collection).findOne(query);
 
         if (existingUser) {
@@ -4903,24 +4897,26 @@ async function handleUserPromotion(ctx) {
                 promoted_by: fromUserId
             });
 
-            await db.collection('known_users').updateOne(
-                { username },
-                {
-                    $set: {
-                        user_id: targetUserId,
-                        last_seen: new Date(),
-                        last_seen_chat: ctx.chat.id
-                    }
-                },
-                { upsert: true }
-            );
+            if (targetUserId) {
+                await db.collection('known_users').updateOne(
+                    { username },
+                    {
+                        $set: {
+                            user_id: targetUserId,
+                            last_seen: new Date(),
+                            last_seen_chat: ctx.chat.id
+                        }
+                    },
+                    { upsert: true }
+                );
+            }
 
             await ctx.reply(successMessage);
         }
 
         return true;
     } catch (error) {
-        console.error('❌ Error in handleUserPromotion:', error);
+        console.error('Error in handleUserPromotion:', error);
         await ctx.reply('❌ حدث خطأ أثناء محاولة ترقية المستخدم.');
         return true;
     }
