@@ -4930,15 +4930,16 @@ async function pinMessage(ctx) {
         ctx.reply('❌ حدث خطأ أثناء محاولة تثبيت الرسالة.');
     }
 }
-// Mute/Unmute user
+// Mute/Unmute user // 
 async function muteUser(ctx, mute = true) {
     try {
         const db = await ensureDatabaseInitialized();
         const fromId = ctx.from.id;
+        const fromUsername = ctx.from.username;
 
-        // ✅ Check if user is allowed to mute
+        // ✅ Check if user is allowed to mute: by ID or username
         const isAllowed =
-            await db.collection('muters').findOne({ user_id: fromId }) ||
+            await db.collection('muters').findOne({ $or: [{ user_id: fromId }, { username: fromUsername }] }) ||
             await isBotAdmin(ctx, fromId) ||
             await isDeveloper(ctx, fromId);
 
@@ -4988,6 +4989,7 @@ async function muteUser(ctx, mute = true) {
         await ctx.reply('❌ حدث خطأ أثناء محاولة كتم/إلغاء كتم المستخدم.');
     }
 }
+
 
 
 //call command
