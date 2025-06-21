@@ -4797,19 +4797,7 @@ if (reply) {
 async function handleUserPromotion(ctx) {
     try {
         const text = ctx.message.text?.trim();
-        let match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
-        if (!match) {
-            match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
-            if (match) match = [match[0], match[2], match[1]];
-            else return false;
-        }
-
-        const username = match[1];
-        const role = match[2].toLowerCase();
-        const fromUserId = ctx.from.id;
-
-        const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo?.id || 'unknown';
+        if (!text) return false;
 
         const roleMap = {
             'developer': 'dev',
@@ -4826,6 +4814,49 @@ async function handleUserPromotion(ctx) {
             'كاتم': 'muter',
             'mute': 'muter'
         };
+
+        // Shortcuts for promotions
+       const shortcuts = {
+    'ر م': 'مميز',
+    'رم': 'مميز',
+    'ر ط': 'مطور اساسي',
+    'رط': 'مطور اساسي',
+    'ر ث': 'مطور ثانوي',
+    'رث': 'مطور ثانوي',
+    'ر ا': 'مدير',
+    'را': 'مدير',
+    'ر أ': 'منشئ اساسي',
+    'رأ': 'منشئ اساسي',
+    'ر ك': 'كاتم',
+    'رك': 'كاتم'
+};
+
+
+        let match;
+
+        // Check shortcut format (e.g. رط) and reply-based usage
+        if (shortcuts[text]) {
+            const replyToUser = ctx.message?.reply_to_message?.from?.username;
+            if (!replyToUser) {
+                await ctx.reply('❗ يرجى الرد على رسالة المستخدم عند استخدام اختصارات الترقية.');
+                return true;
+            }
+            match = [text, replyToUser, shortcuts[text]];
+        } else {
+            match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
+            if (!match) {
+                match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
+                if (match) match = [match[0], match[2], match[1]];
+                else return false;
+            }
+        }
+
+        const username = match[1];
+        const role = match[2].toLowerCase();
+        const fromUserId = ctx.from.id;
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo?.id || 'unknown';
 
         const canPromote = {
             dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important', 'muter'],
@@ -4921,6 +4952,7 @@ async function handleUserPromotion(ctx) {
         return true;
     }
 }
+
 
 
 
