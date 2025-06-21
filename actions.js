@@ -4986,20 +4986,7 @@ if (!isShortcut) {
 async function handleUserDemotion(ctx) {
     try {
         const text = ctx.message.text?.trim();
-        let match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
-
-        if (!match) {
-            const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
-            if (altMatch) match = [altMatch[0], altMatch[2], altMatch[1]];
-            else return false;
-        }
-
-        const username = match[1].trim();
-        const role = match[2].trim().toLowerCase();
-        const fromUserId = ctx.from.id;
-
-        const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo?.id || 'unknown';
+        if (!text) return false;
 
         // Role key map
         const roleMap = {
@@ -5018,7 +5005,67 @@ async function handleUserDemotion(ctx) {
             'mute': 'muter'
         };
 
-        // Collection per role
+        const shortcuts = {
+            'ن ط': 'مطور اساسي',
+            'نط': 'مطور اساسي',
+            'ن ث': 'مطور ثانوي',
+            'نث': 'مطور ثانوي',
+            'ن أ': 'منشئ اساسي',
+            'نأ': 'منشئ اساسي',
+            'ن ا': 'مدير',
+            'نا': 'مدير',
+            'ن م': 'مميز',
+            'نم': 'مميز',
+            'ن ك': 'كاتم',
+            'نك': 'كاتم'
+        };
+
+        let match;
+        let isShortcut = false;
+
+        for (const [key, roleName] of Object.entries(shortcuts)) {
+            const escapedKey = key.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
+
+            // Case 1: @username <shortcut>
+            const matchWithUsername = text.match(new RegExp(`^@?(\\w+)\\s*${escapedKey}$`));
+            if (matchWithUsername) {
+                match = [text, matchWithUsername[1], roleName];
+                isShortcut = true;
+                break;
+            }
+
+            // Case 2: <shortcut> @username
+            const matchShortcutFirst = text.match(new RegExp(`^${escapedKey}\\s*@?(\\w+)$`));
+            if (matchShortcutFirst) {
+                match = [text, matchShortcutFirst[1], roleName];
+                isShortcut = true;
+                break;
+            }
+
+            // Case 3: <shortcut> as reply
+            if (text === key && ctx.message?.reply_to_message?.from?.username) {
+                match = [text, ctx.message.reply_to_message.from.username, roleName];
+                isShortcut = true;
+                break;
+            }
+        }
+
+        if (!isShortcut) {
+            match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
+            if (!match) {
+                const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
+                if (altMatch) match = [altMatch[0], altMatch[2], altMatch[1]];
+                else return false;
+            }
+        }
+
+        const username = match[1].trim();
+        const role = match[2].trim().toLowerCase();
+        const fromUserId = ctx.from.id;
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo?.id || 'unknown';
+
         const collectionMap = {
             dev: 'developers',
             secdev: 'secondary_developers',
@@ -5035,7 +5082,6 @@ async function handleUserDemotion(ctx) {
             return true;
         }
 
-        // Permission rules
         const canDemote = {
             dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important', 'muter'],
             secdev: ['primary', 'manager', 'contest_admin', 'important', 'muter'],
@@ -5043,7 +5089,6 @@ async function handleUserDemotion(ctx) {
             manager: ['contest_admin', 'important', 'muter']
         };
 
-        // Determine sender rank
         let senderRank = 'unknown';
         if (await isDeveloper(ctx, fromUserId)) senderRank = 'dev';
         else if (await isSecondaryDeveloper(ctx, fromUserId)) senderRank = 'secdev';
@@ -5056,7 +5101,6 @@ async function handleUserDemotion(ctx) {
             return true;
         }
 
-        // Try to resolve user
         let targetUserId = null;
         try {
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
@@ -5087,6 +5131,7 @@ async function handleUserDemotion(ctx) {
         return true;
     }
 }
+
 
 
 // Helper function to get Arabic names for media types
