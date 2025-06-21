@@ -4834,22 +4834,34 @@ async function handleUserPromotion(ctx) {
 
         let match;
 
-        // Check shortcut format (e.g. رط) and reply-based usage
-        if (shortcuts[text]) {
-            const replyToUser = ctx.message?.reply_to_message?.from?.username;
-            if (!replyToUser) {
-                await ctx.reply('❗ يرجى الرد على رسالة المستخدم عند استخدام اختصارات الترقية.');
-                return true;
-            }
-            match = [text, replyToUser, shortcuts[text]];
-        } else {
-            match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
-            if (!match) {
-                match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
-                if (match) match = [match[0], match[2], match[1]];
-                else return false;
-            }
-        }
+       // Normalize shortcut if used
+let isShortcut = false;
+for (const [key, mappedRole] of Object.entries(shortcuts)) {
+    // Case: message is like "@user رك"
+    const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${key}$`));
+    if (matchWithUsername) {
+        match = [text, matchWithUsername[1], mappedRole];
+        isShortcut = true;
+        break;
+    }
+
+    // Case: message is only shortcut like "رك" and it's a reply
+    if (text === key && ctx.message?.reply_to_message?.from?.username) {
+        match = [text, ctx.message.reply_to_message.from.username, mappedRole];
+        isShortcut = true;
+        break;
+    }
+}
+
+if (!isShortcut) {
+    match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
+    if (!match) {
+        match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
+        if (match) match = [match[0], match[2], match[1]];
+        else return false;
+    }
+}
+
 
         const username = match[1];
         const role = match[2].toLowerCase();
