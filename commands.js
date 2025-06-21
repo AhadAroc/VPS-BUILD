@@ -1506,7 +1506,9 @@ bot.use(stickerRestrictionMiddleware);
 
         if (!isDev && !isSecDev ) {
             console.log('⛔ Not allowed: user lacks required role.');
-            return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
+            return ctx.reply('❌يرجى الحصول على الصلاحيات الكافية لغرض الاستخدام');
+
+
         }
 
         if (ctx.from) {
@@ -2705,7 +2707,9 @@ bot.hears('بدء', async (ctx) => {
 
         if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimary) {
             console.log(`🚫 User ${userId} has no sufficient role — rejecting`);
-            return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمطورين والمشرفين فقط.');
+            return ctx.reply('❌يرجى الحصول على الصلاحيات الكافية لغرض الاستخدام');
+
+
         }
 
         if (ctx.from) {
