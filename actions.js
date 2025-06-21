@@ -4838,7 +4838,9 @@ async function handleUserPromotion(ctx) {
 let isShortcut = false;
 for (const [key, mappedRole] of Object.entries(shortcuts)) {
     // Case: message is like "@user رك"
-    const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${key}$`));
+    const escapedKey = key.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
+const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${escapedKey}$`));
+
     if (matchWithUsername) {
         match = [text, matchWithUsername[1], mappedRole];
         isShortcut = true;
@@ -4864,7 +4866,8 @@ if (!isShortcut) {
 
 
         const username = match[1];
-        const role = match[2].toLowerCase();
+        const role = match[2];
+
         const fromUserId = ctx.from.id;
 
         const db = await ensureDatabaseInitialized();
