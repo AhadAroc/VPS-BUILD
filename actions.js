@@ -4980,7 +4980,12 @@ if (!match || !match[1] || !match[2]) {
 async function handleUserDemotion(ctx) {
     try {
         const text = ctx.message.text?.trim();
-        if (!text) return false;
+        console.log('Demotion function called with text:', text); // DEBUG
+        
+        if (!text) {
+            console.log('No text found, returning false'); // DEBUG
+            return false;
+        }
 
         // Shortcuts for demotion
         const shortcuts = {
@@ -4997,6 +5002,8 @@ async function handleUserDemotion(ctx) {
             'ت ك': 'كاتم',
             'تك': 'كاتم'
         };
+
+        console.log('Available shortcuts:', Object.keys(shortcuts)); // DEBUG
 
         // Role key map
         const roleMap = {
@@ -5029,21 +5036,31 @@ async function handleUserDemotion(ctx) {
         let isShortcut = false;
 
         for (const [key, mappedRole] of Object.entries(shortcuts)) {
+            console.log(`Checking shortcut: "${key}" -> "${mappedRole}"`); // DEBUG
+            
             const escapedKey = key.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
             
             // Case 1: message is like "@user تك" (username first, then shortcut)
-            const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${escapedKey}$`));
+            const pattern1 = new RegExp(`^@(\\w+)\\s*${escapedKey}$`);
+            const matchWithUsername = text.match(pattern1);
+            console.log(`Pattern 1: ${pattern1} - Match:`, matchWithUsername); // DEBUG
+            
             if (matchWithUsername) {
                 match = [text, matchWithUsername[1], mappedRole];
                 isShortcut = true;
+                console.log('Found match with username first:', match); // DEBUG
                 break;
             }
 
             // Case 2: message is like "تك @user" (shortcut first, then username)
-            const matchWithShortcutFirst = text.match(new RegExp(`^${escapedKey}\\s*@(\\w+)$`));
+            const pattern2 = new RegExp(`^${escapedKey}\\s*@(\\w+)$`);
+            const matchWithShortcutFirst = text.match(pattern2);
+            console.log(`Pattern 2: ${pattern2} - Match:`, matchWithShortcutFirst); // DEBUG
+            
             if (matchWithShortcutFirst) {
                 match = [text, matchWithShortcutFirst[1], mappedRole];
                 isShortcut = true;
+                console.log('Found match with shortcut first:', match); // DEBUG
                 break;
             }
 
@@ -5051,15 +5068,33 @@ async function handleUserDemotion(ctx) {
             if (text === key && ctx.message?.reply_to_message?.from?.username) {
                 match = [text, ctx.message.reply_to_message.from.username, mappedRole];
                 isShortcut = true;
+                console.log('Found match with reply:', match); // DEBUG
                 break;
             }
         }
-        
+
+        if (!isShortcut) {
+            console.log('No shortcut found, trying regular patterns'); // DEBUG
+            match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
+            if (!match) {
+                const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
+                if (altMatch) match = [altMatch[0], altMatch[2], altMatch[1]];
+                else {
+                    console.log('No pattern matched, returning false'); // DEBUG
+                    return false;
+                }
+            }
+        }
+
+        console.log('Final match:', match); // DEBUG
 
         const username = match[1].trim();
         const role = match[2].trim();
         const fromUserId = ctx.from.id;
 
+        console.log(`Processing demotion: ${username} from role ${role} by user ${fromUserId}`); // DEBUG
+
+        // Rest of your existing code...
         const db = await ensureDatabaseInitialized();
         const botId = ctx.botInfo?.id || 'unknown';
 
