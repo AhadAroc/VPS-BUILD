@@ -2692,7 +2692,7 @@ bot.hears('بدء', async (ctx) => {
         console.log(`🔎 isSecondaryDeveloper: ${isSecDev}`);
         console.log(`🔎 isVIPUser: ${isVIPUser}`);
         console.log(`🔎 isDeveloper: ${isDev}`);
-        console.log(`🔎 isBotOwner: ${isBotOwn}`);
+        //console.log(`🔎 isBotOwner: ${isBotOwn}`);
         console.log(`🔎 isBotAdmin: ${isBotAdm}`);
 
         let chatMember;
