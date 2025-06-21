@@ -4834,33 +4834,33 @@ async function handleUserPromotion(ctx) {
 
         let match;
 
-       
-// Normalize shortcut if used
+       // Normalize shortcut if used
 let isShortcut = false;
 for (const [key, mappedRole] of Object.entries(shortcuts)) {
+    // Case: message is like "@user رك"
     const escapedKey = key.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
-    
-    // Case 1: message is like "@user رك" (username first, then shortcut)
-    const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${escapedKey}$`));
+const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${escapedKey}$`));
+
     if (matchWithUsername) {
         match = [text, matchWithUsername[1], mappedRole];
         isShortcut = true;
         break;
     }
 
-    // Case 2: message is like "رك @user" (shortcut first, then username)
-    const matchWithShortcutFirst = text.match(new RegExp(`^${escapedKey}\\s*@(\\w+)$`));
-    if (matchWithShortcutFirst) {
-        match = [text, matchWithShortcutFirst[1], mappedRole];
-        isShortcut = true;
-        break;
-    }
-
-    // Case 3: message is only shortcut like "رك" and it's a reply
+    // Case: message is only shortcut like "رك" and it's a reply
     if (text === key && ctx.message?.reply_to_message?.from?.username) {
         match = [text, ctx.message.reply_to_message.from.username, mappedRole];
         isShortcut = true;
         break;
+    }
+}
+
+if (!isShortcut) {
+    match = text.match(/^@(\w+)\s+رفع\s+(.*)$/);
+    if (!match) {
+        match = text.match(/^رفع\s+(.*)\s+@(\w+)$/);
+        if (match) match = [match[0], match[2], match[1]];
+        else return false;
     }
 }
 
