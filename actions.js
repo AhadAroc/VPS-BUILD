@@ -4864,7 +4864,10 @@ for (const [key, mappedRole] of Object.entries(shortcuts)) {
     }
 }
 
-
+if (!match || !match[1] || !match[2]) {
+    await ctx.reply('❌ لم يتم التعرف على التنسيق. تأكد من استخدام الأمر بالشكل الصحيح.');
+    return true;
+}
         const username = match[1];
         const role = match[2];
 
@@ -5027,6 +5030,8 @@ async function handleUserDemotion(ctx) {
 
         for (const [key, mappedRole] of Object.entries(shortcuts)) {
             const escapedKey = key.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
+            
+            // Case 1: message is like "@user تك" (username first, then shortcut)
             const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${escapedKey}$`));
             if (matchWithUsername) {
                 match = [text, matchWithUsername[1], mappedRole];
@@ -5034,21 +5039,22 @@ async function handleUserDemotion(ctx) {
                 break;
             }
 
+            // Case 2: message is like "تك @user" (shortcut first, then username)
+            const matchWithShortcutFirst = text.match(new RegExp(`^${escapedKey}\\s*@(\\w+)$`));
+            if (matchWithShortcutFirst) {
+                match = [text, matchWithShortcutFirst[1], mappedRole];
+                isShortcut = true;
+                break;
+            }
+
+            // Case 3: message is only shortcut like "تك" and it's a reply
             if (text === key && ctx.message?.reply_to_message?.from?.username) {
                 match = [text, ctx.message.reply_to_message.from.username, mappedRole];
                 isShortcut = true;
                 break;
             }
         }
-
-        if (!isShortcut) {
-            match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
-            if (!match) {
-                const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
-                if (altMatch) match = [altMatch[0], altMatch[2], altMatch[1]];
-                else return false;
-            }
-        }
+        
 
         const username = match[1].trim();
         const role = match[2].trim();
