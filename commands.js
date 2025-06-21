@@ -1413,66 +1413,75 @@ bot.use(documentRestrictionMiddleware);
 bot.use(stickerRestrictionMiddleware);
 
     bot.use(async (ctx, next) => {
-        try {
-            const userId = ctx.from?.id;
-            if (!userId) {
-                return next();
-            }
-    
-            // Check if the user has a specific rank
-            const isDev = await isDeveloper(ctx, userId);
-            const isAdmin = await isAdminOrOwner(ctx, userId);
-            const isSecDev = await isSecondaryDeveloper(ctx, userId);
-    
-            // Only proceed with the subscription check if the user is not a dev, admin, or sec dev
-            if (!isDev && !isAdmin && !isSecDev) {
-                return next();
-            }
-    
-            // allow if it's a private message without buttons
-            if (ctx.chat?.type === 'private' && !ctx.callbackQuery) {
-                return next();
-            }
-    
-            const requiredChannels = [
-                { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
-                { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
-            ];
-    
-            const channelIds = requiredChannels.map(channel => channel.id);
-    
-            const response = await axios.post('http://localhost:3000/check-subscription', {
-                userId,
-                channels: channelIds
-            });
-    
-            const { subscribed } = response.data;
-    
-            if (subscribed) {
-                // user is good -> continue to whatever command they pressed
-                return next();
-            } else {
-                // user is not subscribed -> block everything else and show subscription message
-                if (ctx.callbackQuery) {
-                    await ctx.answerCbQuery('❌ يرجى الاشتراك أولاً!', { show_alert: true });
-                }
-    
-                const inlineKeyboard = requiredChannels.map(channel => 
-                    [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
-                );
-                inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
-    
-                await ctx.reply('⚠️ للاستخدام الكامل للبوت، يرجى الاشتراك في القنوات التالية:', {
-                    reply_markup: {
-                        inline_keyboard: inlineKeyboard
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Middleware subscription check error:', error);
-            return next(); // let the bot work even if check fails (fail-safe)
+    try {
+        // Skip subscription check for non-command messages
+        const isCommand = ctx.message?.text?.startsWith('/') || 
+                         (ctx.callbackQuery && ctx.callbackQuery.data);
+        
+        // If it's not a command, proceed without checking subscription
+        if (!isCommand) {
+            return next();
         }
-    });
+        
+        const userId = ctx.from?.id;
+        if (!userId) {
+            return next();
+        }
+
+        // Check if the user has a specific rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+
+        // Skip subscription check for privileged users
+        if (isDev || isAdmin || isSecDev) {
+            return next();
+        }
+
+        // Allow if it's a private message without buttons
+        if (ctx.chat?.type === 'private' && !ctx.callbackQuery) {
+            return next();
+        }
+
+        const requiredChannels = [
+            { id: -1002555424660, username: 'sub2vea', title: 'قناة السورس' },
+            { id: -1002331727102, username: 'leavemestary', title: 'القناة الرسمية' }
+        ];
+
+        const channelIds = requiredChannels.map(channel => channel.id);
+
+        const response = await axios.post('http://localhost:3000/check-subscription', {
+            userId,
+            channels: channelIds
+        });
+
+        const { subscribed } = response.data;
+
+        if (subscribed) {
+            // User is subscribed -> continue to command processing
+            return next();
+        } else {
+            // User is not subscribed -> block command and show subscription message
+            if (ctx.callbackQuery) {
+                await ctx.answerCbQuery('❌ يرجى الاشتراك أولاً!', { show_alert: true });
+            }
+
+            const inlineKeyboard = requiredChannels.map(channel => 
+                [{ text: `📢 ${channel.title}`, url: `https://t.me/${channel.username}` }]
+            );
+            inlineKeyboard.push([{ text: '✅ تحقق من الاشتراك', callback_data: 'check_subscription' }]);
+
+            await ctx.reply('⚠️ للاستخدام الكامل للبوت، يرجى الاشتراك في القنوات التالية:', {
+                reply_markup: {
+                    inline_keyboard: inlineKeyboard
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Middleware subscription check error:', error);
+        return next(); // let the bot work even if check fails (fail-safe)
+    }
+});
     
    bot.command('start', async (ctx) => {
     try {
