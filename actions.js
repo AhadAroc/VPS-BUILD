@@ -4864,10 +4864,6 @@ for (const [key, mappedRole] of Object.entries(shortcuts)) {
     }
 }
 
-if (!match || !match[1] || !match[2]) {
-    await ctx.reply('❌ لم يتم التعرف على التنسيق. تأكد من استخدام الأمر بالشكل الصحيح.');
-    return true;
-}
 
         const username = match[1];
         const role = match[2];
@@ -4981,23 +4977,20 @@ if (!match || !match[1] || !match[2]) {
 async function handleUserDemotion(ctx) {
     try {
         const text = ctx.message.text?.trim();
-        if (!text) return false;
+        let match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
 
-        // Shortcuts for demotion
-        const shortcuts = {
-            'ت م': 'مميز',
-            'تم': 'مميز',
-            'ت ط': 'مطور اساسي',
-            'تط': 'مطور اساسي',
-            'ت ث': 'مطور ثانوي',
-            'تث': 'مطور ثانوي',
-            'ت ا': 'مدير',
-            'تا': 'مدير',
-            'ت أ': 'منشئ اساسي',
-            'تأ': 'منشئ اساسي',
-            'ت ك': 'كاتم',
-            'تك': 'كاتم'
-        };
+        if (!match) {
+            const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
+            if (altMatch) match = [altMatch[0], altMatch[2], altMatch[1]];
+            else return false;
+        }
+
+        const username = match[1].trim();
+        const role = match[2].trim().toLowerCase();
+        const fromUserId = ctx.from.id;
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo?.id || 'unknown';
 
         // Role key map
         const roleMap = {
@@ -5016,6 +5009,7 @@ async function handleUserDemotion(ctx) {
             'mute': 'muter'
         };
 
+        // Collection per role
         const collectionMap = {
             dev: 'developers',
             secdev: 'secondary_developers',
@@ -5026,47 +5020,13 @@ async function handleUserDemotion(ctx) {
             muter: 'muters'
         };
 
-        let match;
-        let isShortcut = false;
-
-        for (const [key, mappedRole] of Object.entries(shortcuts)) {
-            const escapedKey = key.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
-            const matchWithUsername = text.match(new RegExp(`^@(\\w+)\\s*${escapedKey}$`));
-            if (matchWithUsername) {
-                match = [text, matchWithUsername[1], mappedRole];
-                isShortcut = true;
-                break;
-            }
-
-            if (text === key && ctx.message?.reply_to_message?.from?.username) {
-                match = [text, ctx.message.reply_to_message.from.username, mappedRole];
-                isShortcut = true;
-                break;
-            }
-        }
-
-        if (!isShortcut) {
-            match = text.match(/^@(\w+)\s+تنزيل\s+(.+)$/);
-            if (!match) {
-                const altMatch = text.match(/^تنزيل\s+(.+)\s+@(\w+)$/);
-                if (altMatch) match = [altMatch[0], altMatch[2], altMatch[1]];
-                else return false;
-            }
-        }
-
-        const username = match[1].trim();
-        const role = match[2].trim();
-        const fromUserId = ctx.from.id;
-
-        const db = await ensureDatabaseInitialized();
-        const botId = ctx.botInfo?.id || 'unknown';
-
         const targetRank = roleMap[role];
         if (!targetRank || !collectionMap[targetRank]) {
             await ctx.reply('❌ نوع الرتبة غير صالح.');
             return true;
         }
 
+        // Permission rules
         const canDemote = {
             dev: ['secdev', 'primary', 'manager', 'contest_admin', 'important', 'muter'],
             secdev: ['primary', 'manager', 'contest_admin', 'important', 'muter'],
@@ -5074,6 +5034,7 @@ async function handleUserDemotion(ctx) {
             manager: ['contest_admin', 'important', 'muter']
         };
 
+        // Determine sender rank
         let senderRank = 'unknown';
         if (await isDeveloper(ctx, fromUserId)) senderRank = 'dev';
         else if (await isSecondaryDeveloper(ctx, fromUserId)) senderRank = 'secdev';
@@ -5086,11 +5047,13 @@ async function handleUserDemotion(ctx) {
             return true;
         }
 
+        // Try to resolve user
         let targetUserId = null;
         try {
             const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, `@${username}`);
             targetUserId = chatMember.user.id;
         } catch (error) {
+            console.log(`Could not get user ID for @${username}: ${error.message}`);
             const knownUser = await db.collection('known_users').findOne({ username });
             if (knownUser) targetUserId = knownUser.user_id;
         }
@@ -5115,7 +5078,6 @@ async function handleUserDemotion(ctx) {
         return true;
     }
 }
-
 
 
 // Helper function to get Arabic names for media types
