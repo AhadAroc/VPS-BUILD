@@ -5283,7 +5283,7 @@ function setupRoleListCommands(bot) {
         await listUsersByRole(ctx, 'كاتم');
     });
 }
-
+setupRoleListCommands(bot);
 
 // Helper function to get Arabic names for media types
 // Add this helper function
