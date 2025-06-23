@@ -2502,7 +2502,30 @@ bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
 });
 
 
-
+bot.hears(['رتبتي', 'ما رتبتي', 'رتبة', 'الرتبة', 'my rank'], async (ctx) => {
+    try {
+        // Update user's last interaction time
+        if (ctx.from) {
+            await updateLastInteraction(
+                ctx.from.id, 
+                ctx.from.username, 
+                ctx.from.first_name, 
+                ctx.from.last_name
+            );
+        }
+        
+        // If in a group, update group activity
+        if (ctx.chat && ctx.chat.type !== 'private') {
+            await updateActiveGroup(ctx.chat.id, ctx.chat.title, ctx.from.id);
+        }
+        
+        // Call the checkUserRank function
+        await checkUserRank(ctx);
+    } catch (error) {
+        console.error('Error in rank check command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من رتبتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
 
 
