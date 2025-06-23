@@ -5231,46 +5231,44 @@ async function isImportant(ctx, userId) {
 }
     // Delete latest message
     async function deleteLatestMessage(ctx) {
-        try {
-            if (!(await isAdminOrOwner(ctx, ctx.from.id))) {
-                return ctx.reply('❌ هذا الأمر مخصص للمشرفين فقط.');
-            }
-    
-            let messageToDelete;
-    
-            if (ctx.message.reply_to_message) {
-                // If the command is replying to a message, delete that message
-                messageToDelete = ctx.message.reply_to_message.message_id;
-            } else {
-                // If not replying, delete the message before the command
-                messageToDelete = ctx.message.message_id - 1;
-            }
-    
-            try {
-                await ctx.telegram.deleteMessage(ctx.chat.id, messageToDelete);
-                console.log(`Deleted message with ID: ${messageToDelete}`);
-    
-                // Delete the command message itself
-                await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
-                console.log(`Deleted command message with ID: ${ctx.message.message_id}`);
-    
-                // Send a confirmation message and delete it after 3 seconds
-                const confirmationMessage = await ctx.reply('✅ تم حذف الرسالة.');
-                setTimeout(() => {
-                    ctx.telegram.deleteMessage(ctx.chat.id, confirmationMessage.message_id)
-                        .catch(error => console.error('Error deleting confirmation message:', error));
-                }, 3000);
-    
-            } catch (deleteError) {
-                console.error('Error deleting message:', deleteError);
-                await ctx.reply('❌ لم أتمكن من حذف الرسالة. قد تكون قديمة جدًا أو غير موجودة.');
-            }
-    
-        } catch (error) {
-            console.error('Error in deleteLatestMessage:', error);
-            await ctx.reply('❌ حدث خطأ أثناء محاولة حذف الرسالة.');
+    try {
+        // Permission check removed to allow any user to delete messages
+        
+        let messageToDelete;
+
+        if (ctx.message.reply_to_message) {
+            // If the command is replying to a message, delete that message
+            messageToDelete = ctx.message.reply_to_message.message_id;
+        } else {
+            // If not replying, delete the message before the command
+            messageToDelete = ctx.message.message_id - 1;
         }
+
+        try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, messageToDelete);
+            console.log(`Deleted message with ID: ${messageToDelete}`);
+
+            // Delete the command message itself
+            await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
+            console.log(`Deleted command message with ID: ${ctx.message.message_id}`);
+
+            // Send a confirmation message and delete it after 3 seconds
+            const confirmationMessage = await ctx.reply('✅ تم حذف الرسالة.');
+            setTimeout(() => {
+                ctx.telegram.deleteMessage(ctx.chat.id, confirmationMessage.message_id)
+                    .catch(error => console.error('Error deleting confirmation message:', error));
+            }, 3000);
+
+        } catch (deleteError) {
+            console.error('Error deleting message:', deleteError);
+            await ctx.reply('❌ لم أتمكن من حذف الرسالة. قد تكون قديمة جدًا أو غير موجودة.');
+        }
+
+    } catch (error) {
+        console.error('Error in deleteLatestMessage:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة حذف الرسالة.');
     }
+}
 // Add this function to check if the chat is a group
 function isGroupChat(ctx) {
     return ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
