@@ -2065,15 +2065,441 @@ setupRoleListCommands(bot);
 
 
 
+// Media restriction commands
+bot.hears('منع الصور', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await disablePhotoSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for منع الصور command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears('فتح الصور', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await enablePhotoSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for فتح الصور command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
 
 
+bot.hears('منع فيديو', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await disableVideoSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for منع فيديو command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears('فتح فيديو', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await enableVideoSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for فتح فيديو command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
 
+bot.hears('منع متحركة', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await disableGifSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for منع متحركة command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears('فتح متحركة', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await enableGifSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for فتح متحركة command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
 
+bot.hears('منع ملصقات', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await disableStickerSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for منع ملصقات command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears('فتح ملصقات', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await enableStickerSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for فتح ملصقات command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
 
+// Forwarding commands with rank restrictions
+bot.hears(/^منع توجيه$/, async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await disableForwarding(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for منع توجيه command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears(/^فتح توجيه$/, async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await enableForwarding(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for فتح توجيه command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+// Link sharing commands with rank restrictions
+bot.hears('منع روابط', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await disableLinkSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for منع روابط command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears('فتح روابط', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await enableLinkSharing(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for فتح روابط command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+
+// Message management commands with rank restrictions
+bot.hears('تثبيت', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await pinMessage(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for تثبيت command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+bot.hears('مسح سحكة', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await deleteLatestMessage(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for مسح command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+
+bot.hears('مسح الصور', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await deleteLatestPhotos(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for مسح الصور command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+// User management commands with rank restrictions
+bot.hears('طرد', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await kickUser(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for طرد command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+// Remove links command with rank restrictions
+bot.hears('ازالة الروابط', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await removeLinks(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for ازالة الروابط command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+
+// Call everyone command with rank restrictions
+bot.hears('نداء الجميع', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm) {
+            await callEveryone(ctx, true);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for نداء الجميع command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
+
+
+// Commands list with rank restrictions
+bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        
+        // Allow the command for all ranks including VIP users
+        if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser) {
+            await sendCommandListTelegraf(ctx);
+        } else {
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين والأعضاء المميزين.');
+        }
+    } catch (error) {
+        console.error('Error checking user rank for الأوامر command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
+    }
+});
 
 
 
@@ -2082,186 +2508,80 @@ setupRoleListCommands(bot);
 
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
-bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
-bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true)));
-
-
-
-bot.command('مساعدة', showHelp);
+//bot.hears('نداء الجميع', adminOnly((ctx) => callEveryone(ctx, true))); 
 bot.hears('مساعدة', showHelp);
-
-//bot.hears('كتم', adminOnly((ctx) => muteUser(ctx, true)));
-//bot.hears('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
-bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
-bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
-bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
-// Add these command handlers
-bot.command('لستة_مميز', listVIPUsers);
-bot.hears('لستة مميز', listVIPUsers);
-bot.command('قائمة_المميزين', listVIPUsers);
-bot.hears('قائمة المميزين', listVIPUsers);
-// Command handler for "ترقية_ثانوي"
-
-
-// Text handler for "ترقية ثانوي" (without underscore)
-
-// Add these command handlers for sticker restriction
-bot.command('منع_ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
-bot.command('تفعيل_ملصقات', adminOnly((ctx) => enableStickerSharing(ctx)));
-
 // Also add handlers for text commands without the underscore
-bot.hears('منع ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
-bot.hears('فتح ملصقات', adminOnly((ctx) => enableStickerSharing(ctx)));
-bot.command('ترقية_مشرف_بوت', promoteToBotAdmin);
-bot.hears('رفع ادمن', promoteToBotAdmin);
-
-bot.command('ازالة_مشرف_بوت', removeBotAdmin);
-bot.hears('تنزيل ادمن', removeBotAdmin);
-// Additional handler for flexibility
-//t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
-
-// Add these command handlers for the new command
-bot.command('رفع_اساسي', promoteToBotOwner);
-bot.hears(/^رفع اساسي/, promoteToBotOwner);
-
-
-//shortcuts 
-//bot.hears(/^رفع مميز/, promoteToImportant);
-bot.hears(/^ر م/, promoteToImportant); // Shortcut for رفع مميز
-bot.hears(/^رم/, promoteToImportant); // Alternative shortcut without space
-bot.command('رم', promoteToImportant); // Command version of the shortcut
-bot.command('ر_م', promoteToImportant); // Command version with underscore
-
-// Similarly, let's add shortcuts for demoting VIP users
-//bot.hears(/^تنزيل مميز/, demoteFromImportant);
-bot.hears(/^ت م/, demoteFromImportant); // Shortcut for تنزيل مميز
-bot.hears(/^تم/, demoteFromImportant); // Alternative shortcut without space
-bot.command('تم', demoteFromImportant); // Command version of the shortcut
-bot.command('ت_م', demoteFromImportant); // Command version with underscore
-
-// Let's also add shortcuts for listing VIP users
-//bot.hears('لستة مميز', listImportantUsers);
-bot.hears('ل م', listImportantUsers); // Shortcut for لستة مميز
-bot.hears('لم', listImportantUsers); // Alternative shortcut without space
-bot.command('لم', listImportantUsers); // Command version of the shortcut
-bot.command('ل_م', listImportantUsers); // Command version with underscore
-
-// for id 
-bot.hears('ايدي', (ctx) => showUserId(ctx));
-bot.hears('اد', (ctx) => showUserId(ctx));
-bot.hears('ا د', (ctx) => showUserId(ctx));
-
-
-bot.hears(/^ر ا/, promoteToBotOwner); // Shortcut for رفع اساسي
-bot.hears(/^را/, promoteToBotOwner); // Alternative shortcut without space
-bot.command('را', promoteToBotOwner); // Command version of the shortcut
-bot.command('ر_ا', promoteToBotOwner); // Command version with underscores
-
-
-
-// Add shortcuts for تنزيل اساسي
-bot.hears(/^ت س/, demoteFromBotOwner); // Shortcut for تنزيل اساسي
-bot.hears(/^تس/, demoteFromBotOwner); // Alternative shortcut without space
-bot.command('تا', demoteFromBotOwner); // Command version of the shortcut
-bot.command('ت_ا', demoteFromBotOwner); // Command version with underscore
-
-
-bot.command('منع_توجيه', disableForwarding);
-bot.command('فتح_توجيه', enableForwarding);
-bot.hears(/^منع توجيه$/, disableForwarding);
-bot.hears(/^فتح توجيه$/, enableForwarding);
-
-
-
-
-
-
-// Add these command handlers to your bot setup
-bot.command('رفع_مميز', promoteToImportant);
-//bot.hears(/^رفع مميز/, promoteToImportant);
-bot.command('تنزيل_مميز', demoteFromImportant);
-//bot.hears(/^تنزيل مميز/, demoteFromImportant);
-
-// Update command handlers for listing important users
-bot.command('لستة_مميز', listImportantUsers);
-bot.hears('لستة مميز', listImportantUsers);
-bot.command('قائمة_المميزين', listImportantUsers);
-bot.hears('قائمة المميزين', listImportantUsers);
-
+//bot.hears('منع ملصقات', adminOnly((ctx) => disableStickerSharing(ctx)));
+//bot.hears('فتح ملصقات', adminOnly((ctx) => enableStickerSharing(ctx)));
+//bot.hears(/^منع توجيه$/, disableForwarding);
+//bot.hears(/^فتح توجيه$/, enableForwarding);
 // Handle "نكتة" text command
 bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
-bot.command('ازالة الروابط', adminOnly((ctx) => removeLinks(ctx)));
-bot.hears('ازالة الروابط', (ctx) => removeLinks(ctx));
-bot.command('معرفي', (ctx) => showUserId(ctx));
-bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
-bot.hears('ايدي', (ctx) => showUserId(ctx));
-
-bot.hears('فتح روابط', adminOnly((ctx) => enableLinkSharing(ctx)));
-bot.hears('منع روابط', adminOnly((ctx) => disableLinkSharing(ctx)));
-bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
-bot.hears('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
-bot.command('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
-bot.command('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
-bot.command('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-bot.command('طرد', adminOnly((ctx) => kickUser(ctx)));
-bot.hears('طرد', adminOnly((ctx) => kickUser(ctx)));
-// Add these command handlers
-//bot.command('كتم', (ctx) => muteUser(ctx, true));
-//bot.command('الغاء_كتم', (ctx) => muteUser(ctx, false));
-
+//bot.hears('ازالة الروابط', (ctx) => removeLinks(ctx));
+//bot.hears('مسح الصور', (ctx) => deleteLatestPhotos(ctx));
+//bot.hears('فتح روابط', adminOnly((ctx) => enableLinkSharing(ctx)));
+//bot.hears('منع روابط', adminOnly((ctx) => disableLinkSharing(ctx)));
+//bot.hears('تثبيت', adminOnly((ctx) => pinMessage(ctx)));
+//bot.hears('مسح', adminOnly((ctx) => deleteLatestMessage(ctx)));
+//bot.hears('طرد', adminOnly((ctx) => kickUser(ctx)));
 // Add these hears handlers
-bot.hears('كتم', (ctx) => muteUser(ctx, true));
-bot.hears('الغاء كتم', (ctx) => muteUser(ctx, false));
+//bot.hears('كتم', (ctx) => muteUser(ctx, true)); CHECK ACTUAL FUNCTION FOR PREMISSIONS
+//bot.hears('الغاء كتم', (ctx) => muteUser(ctx, false));
 // Handle "نكتة" text command
 bot.hears('نكتة', adminOnly((ctx) => sendJoke(ctx)));
-
-bot.command('مسح الصور', adminOnly((ctx) => deleteLatestPhotos(ctx)));
-bot.command('ازالة_الروابط', adminOnly((ctx) => removeLinks(ctx)));
-
-bot.command('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
-
-bot.command('تفعيل الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
-
-bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
-bot.hears('فتح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
-
-
-
-
-
-bot.command('معرفي', (ctx) => showUserId(ctx));
-
-bot.hears('ايدي', (ctx) => showUserId(ctx));
-
-
-//bot.command('كتم', adminOnly((ctx) => muteUser(ctx, true)));
-//bot.command('الغاء_كتم', adminOnly((ctx) => muteUser(ctx, false)));
-
-bot.command('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
-bot.command('تفعيل فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
-
+//bot.hears('منع الصور', adminOnly((ctx) => disablePhotoSharing(ctx)));
+//bot.hears('فتح الصور', adminOnly((ctx) => enablePhotoSharing(ctx)));
 // Also add handlers for text commands without the slash
-bot.hears('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
-bot.hears('فتح فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
-bot.command('منع_متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
-bot.command('تفعيل_متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
-
+//bot.hears('منع فيديو', adminOnly((ctx) => disableVideoSharing(ctx)));
+//bot.hears('فتح فيديو', adminOnly((ctx) => enableVideoSharing(ctx)));
 // Also add handlers for text commands without the underscore
-bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
-bot.hears('فتح متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
+//bot.hears('منع متحركة', adminOnly((ctx) => disableGifSharing(ctx)));
+//bot.hears('فتح متحركة', adminOnly((ctx) => enableGifSharing(ctx)));
+bot.hears(/^ابلاغ$/, reportMessage);
+bot.hears(/^تبليغ$/, reportMessage);
+// Handle the command with buttons
+//bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
+ //   await sendCommandListTelegraf(ctx);
+//});
 
 
 
-bot.command('منع_مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
-bot.command('تفعيل_مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
-bot.command('رتبتي', checkUserRank);
-    bot.hears('رتبتي', checkUserRank);
-// Also add handlers for text commands without the underscore
-//bot.hears('منع مستندات', adminOnly((ctx) => disableDocumentSharing(ctx)));
-//bot.hears('تفعيل مستندات', adminOnly((ctx) => enableDocumentSharing(ctx)));
-// Add this handler for the warning command
+
+
+
+
+
+
+
+
+// Add this near your other command handlers
+bot.command('stop', async (ctx) => {
+    try {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        
+        // Check if the user is a bot admin or owner
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isBotOwn = await isBotOwner(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        // Only allow bot admins and owners to stop quizzes
+        if (!isAdmin && !isBotAdm && !isBotOwn) {
+            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين ومالك البوت.');
+        }
+        
+        if (activeQuizzes.has(chatId)) {
+            await endQuiz(ctx, chatId);
+            await ctx.reply('✅ تم إيقاف المسابقة بنجاح.');
+        } else {
+            await ctx.reply('ℹ️ لا توجد مسابقة نشطة حالياً.');
+        }
+    } catch (error) {
+        console.error('Error handling stop command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة إيقاف المسابقة.');
+    }
+});
+
 bot.hears('تحذير', async (ctx) => {
     try {
         // Check if this is a reply to another message
@@ -2383,46 +2703,34 @@ bot.hears('تحذير', async (ctx) => {
     }
 });
 
-
-// Add these command handlers in your setupCommands function
-bot.command('report', reportMessage);
-bot.command('ابلاغ', reportMessage);
-bot.hears(/^ابلاغ$/, reportMessage);
-bot.hears(/^تبليغ$/, reportMessage);
-bot.command('تبليغ', reportMessage);
-
-// Handle the command with buttons
-bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
-    await sendCommandListTelegraf(ctx);
-});
-
-// Add this near your other command handlers
-bot.command('stop', async (ctx) => {
+// With this restricted version:
+bot.hears('ايدي', async (ctx) => {
     try {
         const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
         
-        // Check if the user is a bot admin or owner
-        const isAdmin = await isAdminOrOwner(ctx, userId);
+        // Check user's rank
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        const isBotOwn = await isBotOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
-        // Only allow bot admins and owners to stop quizzes
-        if (!isAdmin && !isBotAdm && !isBotOwn) {
-            return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين ومالك البوت.');
-        }
         
-        if (activeQuizzes.has(chatId)) {
-            await endQuiz(ctx, chatId);
-            await ctx.reply('✅ تم إيقاف المسابقة بنجاح.');
+        // Allow the command only for specific ranks
+        if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser) {
+            await showUserId(ctx);
         } else {
-            await ctx.reply('ℹ️ لا توجد مسابقة نشطة حالياً.');
+            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين والأعضاء المميزين.');
         }
     } catch (error) {
-        console.error('Error handling stop command:', error);
-        await ctx.reply('❌ حدث خطأ أثناء محاولة إيقاف المسابقة.');
+        console.error('Error checking user rank for ايدي command:', error);
+        await ctx.reply('❌ حدث خطأ أثناء التحقق من صلاحياتك. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 });
+
+
+
+
+
  // Add this action handler for the show_stats button
 bot.action('show_stats', async (ctx) => {
     try {
@@ -4782,41 +5090,96 @@ async function isImportant(ctx, userId) {
     
    
     //call command
-    async function callEveryone(ctx) {
-        try {
-            // Detailed permission check
-            const botInfo = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
-            console.log('Bot permissions:', JSON.stringify(botInfo, null, 2));
-    
-            if (!botInfo || botInfo.status !== "administrator") {
-                return ctx.reply('❌ البوت ليس مشرفًا في هذه المجموعة.');
+    async function callEveryone(ctx, mentionAll = false) {
+    try {
+        // Detailed permission check
+        const botInfo = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+        console.log('Bot permissions:', JSON.stringify(botInfo, null, 2));
+
+        if (!botInfo || botInfo.status !== "administrator") {
+            return ctx.reply('❌ البوت ليس مشرفًا في هذه المجموعة.');
+        }
+
+        // Check for essential permissions
+        const requiredPermissions = [
+            'can_manage_chat',
+            'can_delete_messages',
+            'can_invite_users',
+            'can_restrict_members',
+            'can_pin_messages'
+        ];
+
+        const missingPermissions = requiredPermissions.filter(perm => !botInfo[perm]);
+
+        if (missingPermissions.length > 0) {
+            return ctx.reply(`❌ البوت يفتقد الصلاحيات التالية: ${missingPermissions.join(', ')}. يرجى تعديل صلاحيات البوت.`);
+        }
+
+        // Get chat information
+        const chat = await ctx.telegram.getChat(ctx.chat.id);
+        
+        // Send initial notification
+        await ctx.reply("⏳ جاري تحضير النداء لجميع الأعضاء...");
+
+        if (mentionAll) {
+            // Get all chat members (this might be limited by Telegram API)
+            try {
+                // First, get chat administrators
+                const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+                
+                // Start with admins message
+                const chunkSize = 4000; // Slightly smaller to account for formatting
+                let message = "🚨 *نداء عام* 🚨\n\n👑 *المشرفين:*\n";
+                
+                // Add admins to the message
+                for (const admin of admins) {
+                    if (admin.user.is_bot) continue; // Skip bots
+                    const mention = `[${admin.user.first_name || 'Admin'}](tg://user?id=${admin.user.id})`;
+                    
+                    if (message.length + mention.length + 2 > chunkSize) {
+                        await ctx.reply(message, { parse_mode: "Markdown" });
+                        message = "👑 *متابعة المشرفين:*\n";
+                    }
+                    message += `${mention}, `;
+                }
+                
+                // Send admins message if not empty
+                if (message !== "🚨 *نداء عام* 🚨\n\n👑 *المشرفين:*\n" && 
+                    message !== "👑 *متابعة المشرفين:*\n") {
+                    await ctx.reply(message, { parse_mode: "Markdown" });
+                }
+                
+                // Now try to get recent members from message history
+                await ctx.reply("👥 *نداء لجميع الأعضاء:*\n\nيرجى الانتباه إلى هذا الإعلان الهام!", { parse_mode: "Markdown" });
+                
+                // Send a special message that will ping everyone
+                await ctx.reply("@all @everyone @here\n\n" + 
+                               "🔔 *تنبيه هام لجميع الأعضاء!*\n" +
+                               "يرجى الانتباه إلى هذا الإعلان من إدارة المجموعة.", 
+                               { parse_mode: "Markdown" });
+                
+                // Pin the message for extra visibility
+                try {
+                    const pinMessage = await ctx.reply("📌 *إعلان مثبت*\n\n" + 
+                                                     "هذا إعلان هام من إدارة المجموعة. يرجى من جميع الأعضاء الاطلاع عليه.",
+                                                     { parse_mode: "Markdown" });
+                    await ctx.telegram.pinChatMessage(ctx.chat.id, pinMessage.message_id);
+                } catch (pinError) {
+                    console.error('Error pinning message:', pinError);
+                }
+                
+            } catch (memberError) {
+                console.error('Error getting members:', memberError);
+                await ctx.reply("⚠️ لم أتمكن من الوصول إلى جميع الأعضاء. تم إرسال النداء العام فقط.");
             }
-    
-            // Check for essential permissions
-            const requiredPermissions = [
-                'can_manage_chat',
-                'can_delete_messages',
-                'can_invite_users',
-                'can_restrict_members',
-                'can_pin_messages'
-            ];
-    
-            const missingPermissions = requiredPermissions.filter(perm => !botInfo[perm]);
-    
-            if (missingPermissions.length > 0) {
-                return ctx.reply(`❌ البوت يفتقد الصلاحيات التالية: ${missingPermissions.join(', ')}. يرجى تعديل صلاحيات البوت.`);
-            }
-    
-            // Get chat information
-            const chat = await ctx.telegram.getChat(ctx.chat.id);
-    
-            // Get chat administrators
+        } else {
+            // Original behavior - only mention admins
             const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
-    
+            
             if (admins.length === 0) {
                 return ctx.reply('❌ لم يتم العثور على مشرفين في المجموعة.');
             }
-    
+            
             // Mention administrators
             const chunkSize = 4096;
             let message = "🚨 نداء للمشرفين:\n";
@@ -4829,18 +5192,20 @@ async function isImportant(ctx, userId) {
                 }
                 message += ` ${mention}`;
             }
-    
+            
             if (message !== "🚨 نداء للمشرفين:\n" && message !== "🚨 متابعة النداء للمشرفين:\n") {
                 await ctx.reply(message, { parse_mode: "Markdown" });
             }
-    
-            // Send a general message for all members
-            await ctx.reply("🔔 تنبيه لجميع الأعضاء! يرجى الانتباه إلى هذا الإعلان الهام.", { parse_mode: "Markdown" });
-        } catch (error) {
-            console.error('Error in callEveryone:', error);
-            ctx.reply('❌ حدث خطأ أثناء محاولة نداء الجميع.');
         }
+        
+        // Final confirmation message
+        await ctx.reply("✅ تم إرسال النداء بنجاح!", { parse_mode: "Markdown" });
+        
+    } catch (error) {
+        console.error('Error in callEveryone:', error);
+        ctx.reply('❌ حدث خطأ أثناء محاولة نداء الجميع.');
     }
+}
     // Delete latest message
     async function deleteLatestMessage(ctx) {
         try {
