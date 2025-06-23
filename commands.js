@@ -1912,6 +1912,174 @@ bot.hears('broadcast', async (ctx) => {
 
     await broadcastMessage(ctx, mediaType, mediaId, caption);
 });
+
+
+
+
+async function listUsersByRole(ctx, roleType) {
+    try {
+        const chatId = ctx.chat.id;
+        const botId = ctx.botInfo.id;
+        
+        // Map of role types to their collection names and Arabic display names
+        const roleMap = {
+            'مطور': { collection: 'developers', displayName: 'المطورين الاساسيين' },
+            'ثانوي': { collection: 'secondary_developers', displayName: 'المطورين الثانويين' },
+            'منشئ': { collection: 'primary_creators', displayName: 'المنشئين الاساسيين' },
+            'مدير': { collection: 'bot_admins', displayName: 'المدراء' },
+            'مميز': { collection: 'vip_users', displayName: 'الاعضاء المميزين' },
+            'مهم': { collection: 'important_users', displayName: 'الاعضاء المهمين' },
+            'كاتم': { collection: 'muters', displayName: 'المستخدمين المكتومين' }
+        };
+        
+        // Check if the role type exists in our map
+        if (!roleMap[roleType]) {
+            return await ctx.reply('❌ نوع الرتبة غير صالح.');
+        }
+        
+        const { collection, displayName } = roleMap[roleType];
+        
+        // Check if user has permission to view this list
+        const userId = ctx.from.id;
+        const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isPrimary = await isPrimaryCreator(ctx, userId);
+        
+        if (!isAdmin && !isDev && !isSecDev && !isPrimary) {
+            return await ctx.reply('❌ ليس لديك صلاحية لعرض هذه القائمة.');
+        }
+        
+        const db = await ensureDatabaseInitialized();
+        
+        // Find users with this role in the current group
+        const users = await db.collection(collection).find({
+            $or: [
+                { chat_id: chatId },
+                { chat_id: { $exists: false } } // Include global entries
+            ],
+            bot_id: botId
+        }).toArray();
+        
+        if (!users || users.length === 0) {
+            return await ctx.reply(`ℹ️ لا يوجد ${displayName} في هذه المجموعة.`);
+        }
+        
+        // Format the list of users
+        let message = `📋 قائمة ${displayName} في هذه المجموعة:\n\n`;
+        
+        for (let i = 0; i < users.length; i++) {
+            const user = users[i];
+            const username = user.username ? `@${user.username}` : 'غير معروف';
+            const userId = user.user_id ? `\`${user.user_id}\`` : 'غير معروف';
+            
+            message += `${i + 1}. ${username} - الايدي: ${userId}\n`;
+            
+            // Add promotion info if available
+            if (user.promoted_by) {
+                const promoter = await db.collection('known_users').findOne({ user_id: user.promoted_by });
+                const promoterName = promoter ? `@${promoter.username}` : `المستخدم ${user.promoted_by}`;
+                message += `   ↳ تمت الترقية بواسطة: ${promoterName}\n`;
+            }
+            
+            // Add promotion date if available
+            if (user.promoted_at) {
+                const date = new Date(user.promoted_at).toLocaleDateString('ar-SA');
+                message += `   ↳ تاريخ الترقية: ${date}\n`;
+            }
+            
+            message += '\n';
+        }
+        
+        await ctx.replyWithMarkdown(message);
+        
+    } catch (error) {
+        console.error(`Error in listUsersByRole (${roleType}):`, error);
+        await ctx.reply('❌ حدث خطأ أثناء محاولة عرض القائمة. الرجاء المحاولة مرة أخرى لاحقًا.');
+    }
+}
+
+// Add these command handlers to your bot setup
+function setupRoleListCommands(bot) {
+    // Command to list developers
+    bot.hears(/^لستة مطور(ين)?$/, async (ctx) => {
+        await listUsersByRole(ctx, 'مطور');
+    });
+    
+    // Command to list secondary developers
+    bot.hears(/^لستة (مطور(ين)? )?ثانوي(ين)?$/, async (ctx) => {
+        await listUsersByRole(ctx, 'ثانوي');
+    });
+    
+    // Command to list primary creators
+    bot.hears(/^لستة منشئ(ين)?( اساسي(ين)?)?$/, async (ctx) => {
+        await listUsersByRole(ctx, 'منشئ');
+    });
+    
+    // Command to list managers
+    bot.hears(/^لستة مدير(ين)?$/, async (ctx) => {
+        await listUsersByRole(ctx, 'مدير');
+    });
+    
+    // Command to list VIP users
+    bot.hears(/^لستة مميز(ين)?$/, async (ctx) => {
+        await listUsersByRole(ctx, 'مميز');
+    });
+    
+    // Command to list important users
+    bot.hears(/^لستة مهم(ين)?$/, async (ctx) => {
+        await listUsersByRole(ctx, 'مهم');
+    });
+    
+    // Command to list muted users
+    bot.hears(/^لستة (كاتم(ين)?|مكتوم(ين)?)$/, async (ctx) => {
+        await listUsersByRole(ctx, 'كاتم');
+    });
+    
+    // Combined command that shows all lists
+    bot.hears(/^لستة الكل$/, async (ctx) => {
+        const userId = ctx.from.id;
+        const isDev = await isDeveloper(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        
+        if (!isDev && !isSecDev) {
+            return await ctx.reply('❌ هذا الأمر متاح فقط للمطورين.');
+        }
+        
+        // Show all lists one by one
+        await listUsersByRole(ctx, 'مطور');
+        await listUsersByRole(ctx, 'ثانوي');
+        await listUsersByRole(ctx, 'منشئ');
+        await listUsersByRole(ctx, 'مدير');
+        await listUsersByRole(ctx, 'مميز');
+        await listUsersByRole(ctx, 'مهم');
+        await listUsersByRole(ctx, 'كاتم');
+    });
+}
+setupRoleListCommands(bot);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Add this to your existing command handlers
 bot.hears('رابط المجموعة', (ctx) => getGroupLink(ctx));
 bot.command('رابط_المجموعة', (ctx) => getGroupLink(ctx));
