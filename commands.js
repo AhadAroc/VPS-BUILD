@@ -2080,7 +2080,7 @@ bot.hears('منع الصور', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await disablePhotoSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for منع الصور command:', error);
@@ -2102,7 +2102,7 @@ bot.hears('فتح الصور', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await enablePhotoSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for فتح الصور command:', error);
@@ -2126,7 +2126,7 @@ bot.hears('منع فيديو', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await disableVideoSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for منع فيديو command:', error);
@@ -2148,7 +2148,7 @@ bot.hears('فتح فيديو', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await enableVideoSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for فتح فيديو command:', error);
@@ -2171,7 +2171,7 @@ bot.hears('منع متحركة', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await disableGifSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for منع متحركة command:', error);
@@ -2193,7 +2193,7 @@ bot.hears('فتح متحركة', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await enableGifSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for فتح متحركة command:', error);
@@ -2216,7 +2216,7 @@ bot.hears('منع ملصقات', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await disableStickerSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for منع ملصقات command:', error);
@@ -2238,7 +2238,7 @@ bot.hears('فتح ملصقات', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await enableStickerSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for فتح ملصقات command:', error);
@@ -2262,7 +2262,7 @@ bot.hears(/^منع توجيه$/, async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await disableForwarding(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for منع توجيه command:', error);
@@ -2284,7 +2284,7 @@ bot.hears(/^فتح توجيه$/, async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await enableForwarding(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for فتح توجيه command:', error);
@@ -2307,7 +2307,7 @@ bot.hears('منع روابط', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await disableLinkSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for منع روابط command:', error);
@@ -2329,7 +2329,7 @@ bot.hears('فتح روابط', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await enableLinkSharing(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for فتح روابط command:', error);
@@ -2353,7 +2353,7 @@ bot.hears('تثبيت', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await pinMessage(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for تثبيت command:', error);
@@ -2375,7 +2375,7 @@ bot.hears('مسح سحكة', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await deleteLatestMessage(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for مسح command:', error);
@@ -2398,7 +2398,7 @@ bot.hears('مسح الصور', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await deleteLatestPhotos(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for مسح الصور command:', error);
@@ -2421,7 +2421,7 @@ bot.hears('طرد', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await kickUser(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for طرد command:', error);
@@ -2444,7 +2444,7 @@ bot.hears('ازالة الروابط', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await removeLinks(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for ازالة الروابط command:', error);
@@ -2468,7 +2468,7 @@ bot.hears('نداء الجميع', async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm) {
             await callEveryone(ctx, true);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for نداء الجميع command:', error);
@@ -2493,7 +2493,7 @@ bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
         if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser) {
             await sendCommandListTelegraf(ctx);
         } else {
-            await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين والأعضاء المميزين.');
+            await ctx.reply('❌ لا توجد رتبة صالحة ');
         }
     } catch (error) {
         console.error('Error checking user rank for الأوامر command:', error);
@@ -5253,7 +5253,7 @@ async function isImportant(ctx, userId) {
             console.log(`Deleted command message with ID: ${ctx.message.message_id}`);
 
             // Send a confirmation message and delete it after 3 seconds
-            const confirmationMessage = await ctx.reply('✅ تم حذف الرسالة.');
+            const confirmationMessage = await ctx.reply(' شبيك تباوع 😒 .');
             setTimeout(() => {
                 ctx.telegram.deleteMessage(ctx.chat.id, confirmationMessage.message_id)
                     .catch(error => console.error('Error deleting confirmation message:', error));
