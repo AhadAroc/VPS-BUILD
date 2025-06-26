@@ -4275,531 +4275,191 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     // For the text handler that's causing errors, update it to:
     // Register the text handler
    
-     bot.on('text', async (ctx) => {
-    try {
+  // ✅ CLEANED & STRUCTURED TEXT HANDLER FOR YOUR BOT
+// Prioritized: Reply System first, then Quiz, Broadcast, Warnings, etc.
+bot.on('text', async (ctx) => {
+  try {
+    const userId = ctx.from.id;
+    const chatId = ctx.chat.id;
+    const text = ctx.message.text?.trim();
+    const lowerText = text?.toLowerCase();
+    const botId = ctx.botInfo.id;
+    const chatType = ctx.chat.type;
 
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-        const text = ctx.message.text?.trim();
-        const userAnswer = text?.toLowerCase();
- // First, handle any awaiting states
-            if (await handleAwaitingReplyResponse(ctx)) return;
-            
-       
-            
-            // Handle awaiting states in private chats
-            if (ctx.chat.type === 'private') {
-                if (awaitingReplyWord) {
-                    tempReplyWord = text;
-                    ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-                    awaitingReplyWord = false;
-                    awaitingReplyResponse = true;
-                    return;
-                } else if (awaitingReplyResponse) {
-                    const replyResponse = ctx.message.text;
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        const botId = ctx.botInfo.id; // Get current bot ID
-                        
-                        await db.collection('replies').updateOne(
-                            { trigger_word: tempReplyWord, bot_id: botId },
-                            { $set: { 
-                                trigger_word: tempReplyWord, 
-                                reply_text: replyResponse,
-                                bot_id: botId,
-                                type: "text"
-                            }},
-                            { upsert: true }
-                        );
-                        
-                        ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${replyResponse}`);
-                        awaitingReplyResponse = false;
-                        return;
-                    } catch (error) {
-                        console.error('Error saving reply:', error);
-                        ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                        awaitingReplyResponse = false;
-                        return;
-                    }
-                } else if (awaitingDeleteReplyWord) {
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        const botId = ctx.botInfo.id;
-                        
-                        const result = await db.collection('replies').deleteOne({ 
-                            trigger_word: text,
-                            bot_id: botId
-                        });
-                        
-                        if (result.deletedCount > 0) {
-                            ctx.reply(`تم حذف الرد للكلمة "${text}" بنجاح.`);
-                        } else {
-                            // Try to delete global reply if bot-specific not found
-                            const globalResult = await db.collection('replies').deleteOne({ 
-                                trigger_word: text,
-                                bot_id: { $exists: false }
-                            });
-                            
-                            if (globalResult.deletedCount > 0) {
-                                ctx.reply(`تم حذف الرد العام للكلمة "${text}" بنجاح.`);
-                            } else {
-                                ctx.reply(`لم يتم العثور على رد للكلمة "${text}".`);
-                            }
-                        }
-                        awaitingDeleteReplyWord = false;
-                        return;
-                    } catch (error) {
-                        console.error('Error deleting reply:', error);
-                        ctx.reply('حدث خطأ أثناء حذف الرد. الرجاء المحاولة مرة أخرى.');
-                        awaitingDeleteReplyWord = false;
-                        return;
-                    }
-                } else if (awaitingBotName) {
-                    try {
-                        await ctx.telegram.setMyName(text);
-                        ctx.reply(`تم تغيير اسم البوت بنجاح إلى: ${text}`);
-                        awaitingBotName = false;
-                        return;
-                    } catch (error) {
-                        console.error('Error changing bot name:', error);
-                        ctx.reply('حدث خطأ أثناء تغيير اسم البوت. الرجاء المحاولة مرة أخرى.');
-                        awaitingBotName = false;
-                        return;
-                    }
-                }
-                
-                // Handle user states for adding replies
-                const userState = userStates.get(userId);
-                if (userState) {
-                    if (userState.action === 'adding_reply' && userState.step === 'awaiting_trigger') {
-                        userState.trigger = text;
-                        userState.step = 'awaiting_response';
-                        userStates.set(userId, userState);
-                        
-                        await ctx.reply(`تم استلام الكلمة: "${text}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`, {
-                            reply_markup: {
-                                inline_keyboard: [[{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]]
-                            }
-                        });
-                        return;
-                    } else if (userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
-                        const replyText = text;
-                        const triggerWord = userState.trigger;
-                        const botId = userState.botId || ctx.botInfo.id;
-                        
-                        try {
-                            const db = await ensureDatabaseInitialized(botId);
-                            await db.collection('replies').updateOne(
-                                { trigger_word: triggerWord, bot_id: botId },
-                                { $set: { 
-                                    trigger_word: triggerWord, 
-                                    reply_text: replyText,
-                                    bot_id: botId,
-                                    type: "text"
-                                }},
-                                { upsert: true }
-                            );
-                            
-                            await ctx.reply(`✅ تم إضافة الرد بنجاح!\n\nالكلمة: ${triggerWord}\nالرد: ${replyText}`);
-                            userStates.delete(userId);
-                        } catch (error) {
-                            console.error('Error saving reply:', error);
-                            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                        }
-                        return;
-                    }
-                }
-            }
-            
-        // Handle broadcast state first
-        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
+    // ✅ Handle dynamic reply additions in private chats (word ➜ response)
+    if (chatType === 'private') {
+      if (await handleAwaitingReplyResponse(ctx)) return;
 
-        // ✅ Handle promotions
-        const handled = await handleUserPromotion(ctx);
-        if (handled) return;
+      if (awaitingReplyWord) {
+        tempReplyWord = lowerText;
+        awaitingReplyWord = false;
+        awaitingReplyResponse = true;
+        return ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+      }
 
-        // ✅ Handle demotions
-        const demoted = await handleUserDemotion(ctx);
-        if (demoted) return;
-        // Check if there's an active quiz in this chat
-        if (activeQuizzes && activeQuizzes.has(chatId) && 
-            activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
-            
-            const quiz = activeQuizzes.get(chatId);
-            const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-            
-            if (currentQuestion) {
-                // Check if this user has already attempted this question
-                if (!quiz.attempts.has(`${userId}_${quiz.currentQuestionIndex}`)) {
-                    // Mark that this user has attempted this question
-                    quiz.attempts.set(`${userId}_${quiz.currentQuestionIndex}`, true);
-                    
-                    // Check if the answer is correct (case insensitive comparison)
-                    const correctAnswer = currentQuestion.answer.toLowerCase();
-                    const isCorrect = userAnswer === correctAnswer;
-                    
-                    if (isCorrect) {
-                        // Update user's score
-                        const currentScore = quiz.scores.get(userId) || 0;
-                        quiz.scores.set(userId, currentScore + 1);
-                        
-                        // Get user info
-                        const firstName = ctx.from.first_name || '';
-                        
-                        // Clear any pending timeouts for this question
-                        while (quiz.timeouts.length) {
-                            clearTimeout(quiz.timeouts.pop());
-                        }
-                        
-                        // Send congratulatory message
-                        await ctx.reply(`🎉 إجابة صحيحة من ${firstName}! (+1 نقطة)`);
-                        
-                        // Move to the next question
-                        quiz.currentQuestionIndex++;
-                        
-                        // Check if we've reached the end of the quiz
-                        if (quiz.currentQuestionIndex >= quiz.questions.length) {
-                            await endQuiz(ctx, chatId);
-                        } else {
-                            // Ask the next question after a short delay
-                            setTimeout(() => askNextQuestion(chatId, ctx.telegram), 2000);
-                        }
-                    }
-                }
-                return; // Stop processing this message further
-            }
-        }
-        
-        // Continue with other text message handling...
-        
-    } catch (error) {
-        console.error('Error in text handler:', error);
-    }
-        // Handle bot name change
-        if (ctx.session?.awaitingBotName) {
-            const newBotName = ctx.message.text.trim();
-            
-            try {
-                const db = await ensureDatabaseInitialized();
-                await db.collection('bot_names').updateOne(
-                    { chat_id: chatId },
-                    { $set: { name: newBotName } },
-                    { upsert: true }
-                );
-    
-                // Save a default reply for the new bot name
-                await db.collection('replies').updateOne(
-                    { trigger_word: newBotName, chat_id: chatId },
-                    { $set: { 
-                        trigger_word: newBotName, 
-                        reply_text: `عيونه 🙌: ${newBotName}`,
-                        chat_id: chatId,
-                        type: "text"
-                    }},
-                    { upsert: true }
-                );
-    
-                await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
-                ctx.session.awaitingBotName = false;
-                return;
-            } catch (error) {
-                console.error('Error updating bot name:', error);
-                await ctx.reply('❌ حدث خطأ أثناء تحديث اسم البوت. يرجى المحاولة مرة أخرى.');
-                ctx.session.awaitingBotName = false;
-                return;
-            }
-        }
-        
-        // Handle warning settings update
-        const userId = ctx.from.id;
-        const chatId = ctx.chat.id;
-        const userState = userStates.get(userId);
-        const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
-        const state = userStates.get(userId);
-         const text = ctx.message.text?.trim();
-        const userAnswer = text?.toLowerCase();
-        if (state && state.action && state.action.startsWith('edit_warning_')) {
-            const count = parseInt(text);
-            const action = state.action;
-            const botId = state.botId || ctx.botInfo.id;
-            
-            if (isNaN(count) || count < 1) {
-                return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
-            }
-            
-            let updateField;
-            switch (action) {
-                case 'edit_warning_kick':
-                    updateField = { kick: count };
-                    break;
-                case 'edit_warning_mute':
-                    updateField = { mute: count };
-                    break;
-                case 'edit_warning_restrict_media':
-                    updateField = { restrictMedia: count };
-                    break;
-                default:
-                    return;
-            }
-            
-            try {
-                await updateWarningSettings(botId, chatId, updateField);
-                await ctx.reply('✅ تم تحديث الإعدادات بنجاح.');
-            } catch (error) {
-                console.error('Error updating warning settings:', error);
-                await ctx.reply('❌ حدث خطأ أثناء تحديث الإعدادات.');
-            }
-            
-            userStates.delete(userId);
-            return;
-        }
-        
-        // Handle broadcasting
-        if (isBroadcasting && text) {
-            try {
-                await broadcastMessage(ctx, null, null, text);
-
-                if (awaitingBroadcastPhoto) {
-                    awaitingBroadcastPhoto = false;
-                    await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
-                }
-
-                return; // 🛑 Prevent further processing of this broadcast message
-            } catch (error) {
-                console.error('Error broadcasting text:', error);
-                await ctx.reply('❌ حدث خطأ أثناء بث الرسالة.');
-                return;
-            }
-        }
-
-
-    if (userState) {
-        if (userState.step === 'awaiting_trigger') {
-            userState.triggerWord = text;
-            userState.step = 'awaiting_response';
-            await ctx.reply(`تم استلام الكلمة "${text}". الآن أرسل الرد (نص أو وسائط):`);
-            return;
-        }
+      if (awaitingReplyResponse) {
         const db = await ensureDatabaseInitialized();
-        const trigger = text.toLowerCase();
-        const reply = await db.collection('replies').findOne({ trigger_word: trigger });
-        if (userState.step === 'awaiting_response') {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                bot_id: userState.botId,
-                trigger_word: userState.triggerWord,
-                type: 'text',
-                text: text,
-                created_by: userId,
-                created_at: new Date()
-            });
+        await db.collection('replies').updateOne(
+          { trigger_word: tempReplyWord, bot_id: botId },
+          { $set: {
+            trigger_word: tempReplyWord,
+            reply_text: text,
+            bot_id: botId,
+            type: "text"
+          }},
+          { upsert: true }
+        );
+        awaitingReplyResponse = false;
+        return ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${text}`);
+      }
 
-            await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${userState.triggerWord}"`);
-            pendingReplies.delete(userId);
-            return;
+      if (awaitingDeleteReplyWord) {
+        const db = await ensureDatabaseInitialized();
+        const deleted = await db.collection('replies').deleteOne({ trigger_word: lowerText, bot_id: botId });
+
+        if (deleted.deletedCount > 0) {
+          ctx.reply(`تم حذف الرد للكلمة "${lowerText}" بنجاح.`);
+        } else {
+          const globalDeleted = await db.collection('replies').deleteOne({ trigger_word: lowerText, bot_id: { $exists: false } });
+          if (globalDeleted.deletedCount > 0) {
+            ctx.reply(`تم حذف الرد العام للكلمة "${lowerText}" بنجاح.`);
+          } else {
+            ctx.reply(`لم يتم العثور على رد للكلمة "${lowerText}".`);
+          }
         }
-    }
+        awaitingDeleteReplyWord = false;
+        return;
+      }
+
+      if (awaitingBotName) {
         try {
-            console.log('Received message:', ctx.message.text);
-            
-           
-            // Check for automatic replies
-            try {
-                const db = await ensureDatabaseInitialized();
-                console.log('Searching for reply with keyword:', text);
-                
-                // First try to find a bot-specific reply
-                const botId = ctx.botInfo.id; // Get the current bot's ID
-                let reply = await db.collection('replies').findOne({
-                    bot_id: botId,
-                    $or: [
-                        { trigger_word: text },
-                        { word: text }
-                    ]
-                });
-                
-                // If no bot-specific reply is found, try to find a global reply
-                if (!reply) {
-                    reply = await db.collection('replies').findOne({
-                        $or: [
-                            { trigger_word: text },
-                            { word: text }
-                        ],
-                        bot_id: { $exists: false }
-                    });
-                }
-                
-                console.log('Reply search result:', reply);
-                
-                if (reply) {
-                    // Handle different reply structures
-                    if (reply.reply_text) {
-                        await ctx.reply(reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                        return;
-                    }
-                    
-                    // Handle typed replies
-if (reply) {
-    try {
-        switch (reply.type) {
-            case "text":
-                if (reply.text || reply.reply_text) {
-                    await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error('No valid text content found in reply');
-                }
-                break;
-            case "photo":
-                if (reply.file_id) {
-                    await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error('No valid photo file_id found in reply');
-                }
-                break;
-            // ✅ Add this case to handle 'media' replies
-            case "media":
-                if (!reply.media_type) {
-                    throw new Error('Missing media_type in media reply');
-                }
-        
-                switch (reply.media_type) {
-                    case "photo":
-                        await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        break;
-                    case "video":
-                        await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        break;
-                    case "animation":
-                        await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        break;
-                    case "document":
-                        await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        break;
-                    case "sticker":
-                        await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                        break;
-                    default:
-                        throw new Error(`Unsupported media_type: ${reply.media_type}`);
-                }
-                break;
-            case "animation":
-            case "video":
-            case "sticker":
-            case "document":
-                if (reply.file_id) {
-                    const method = {
-                        animation: ctx.replyWithAnimation,
-                        video: ctx.replyWithVideo,
-                        sticker: ctx.replyWithSticker,
-                        document: ctx.replyWithDocument
-                    }[reply.type];
-                    await method.call(ctx, reply.file_id, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error(`No valid ${reply.type} file_id found in reply`);
-                }
-                break;
-            default:
-                // If nothing matched and we still have some text, send it
-                if (reply.text || reply.reply_text) {
-                    await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
-                } else {
-                    throw new Error('No valid content found in reply');
-                }
+          await ctx.telegram.setMyName(text);
+          ctx.reply(`تم تغيير اسم البوت بنجاح إلى: ${text}`);
+        } catch (e) {
+          ctx.reply('حدث خطأ أثناء تغيير اسم البوت. الرجاء المحاولة مرة أخرى.');
         }
-        
-
-    } catch (error) {
-        console.error('Error handling reply:', error.message);
-        console.error('Reply object:', JSON.stringify(reply, null, 2));
-        await ctx.reply('عذرًا، حدث خطأ أثناء معالجة الرد. يرجى المحاولة مرة أخرى أو الاتصال بمسؤول النظام.');
+        awaitingBotName = false;
+        return;
+      }
     }
-} else {
-    console.log('No reply found for the given trigger');
-}
-                    return;
-                }
-            } catch (error) {
-                console.error('Error checking for automatic replies:', error);
+
+    // ✅ Handle saved replies (Reply System — text/media)
+    try {
+      const db = await ensureDatabaseInitialized();
+      let reply = await db.collection('replies').findOne({ bot_id: botId, $or: [{ trigger_word: lowerText }, { word: lowerText }] });
+      if (!reply) {
+        reply = await db.collection('replies').findOne({ $or: [{ trigger_word: lowerText }, { word: lowerText }], bot_id: { $exists: false } });
+      }
+
+      if (reply) {
+        switch (reply.type) {
+          case 'text':
+            await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
+            break;
+          case 'photo':
+            await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+            break;
+          case 'video':
+            await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+            break;
+          case 'animation':
+            await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+            break;
+          case 'document':
+            await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+            break;
+          case 'sticker':
+            await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id });
+            break;
+          case 'media':
+            switch (reply.media_type) {
+              case 'photo':
+                await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id }); break;
+              case 'video':
+                await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id }); break;
+              case 'animation':
+                await ctx.replyWithAnimation(reply.file_id, { reply_to_message_id: ctx.message.message_id }); break;
+              case 'document':
+                await ctx.replyWithDocument(reply.file_id, { reply_to_message_id: ctx.message.message_id }); break;
+              case 'sticker':
+                await ctx.replyWithSticker(reply.file_id, { reply_to_message_id: ctx.message.message_id }); break;
+              default:
+                await ctx.reply('⚠️ نوع الوسائط غير مدعوم.');
             }
-            
-            // Handle quiz answers if there's an active quiz
-            if (activeQuizzes.has(chatId) && activeQuizzes.get(chatId).state === QUIZ_STATE.ACTIVE) {
-                await handleQuizAnswer(ctx);
-                return;
-            }
-            
-            // Update last interaction for the user
-            updateLastInteraction(userId);
-            
-            // If in a group, update the group's active status
-            if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-                updateActiveGroups(ctx);
-            }
-            
-        } catch (error) {
-            console.error('Error in text handler:', error);
+            break;
+          default:
+            await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
         }
-         // Check if there's an active quiz in this chat
-        if (!activeQuizzes.has(chatId) || activeQuizzes.get(chatId).state !== QUIZ_STATE.ACTIVE) {
-            return; // No active quiz, so continue with other handlers
-        }
-        
-        const quiz = activeQuizzes.get(chatId);
-        const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-        
-        if (!currentQuestion) {
-            return; // No current question
-        }
-        
-        // Check if this user has already attempted this question
-        if (quiz.attempts.has(`${userId}_${quiz.currentQuestionIndex}`)) {
-            return; // User already attempted this question
-        }
-        
-        // Mark that this user has attempted this question
-        quiz.attempts.set(`${userId}_${quiz.currentQuestionIndex}`, true);
-        
-        // Check if the answer is correct (case insensitive comparison)
-        const correctAnswer = currentQuestion.answer.toLowerCase();
-        const isCorrect = userAnswer === correctAnswer;
-        
-        if (isCorrect) {
-            // Update user's score
-            const currentScore = quiz.scores.get(userId) || 0;
-            quiz.scores.set(userId, currentScore + 1);
-            
-            // Get user info for the leaderboard
-            const firstName = ctx.from.first_name || '';
-            const lastName = ctx.from.last_name || '';
-            const username = ctx.from.username || '';
-            
-            // Save the score to the database
-            try {
-                await database.saveQuizScore(chatId, userId, firstName, lastName, username, 1);
-            } catch (dbError) {
-                console.error('Error saving quiz score:', dbError);
-            }
-            
-            // Clear any pending timeouts for this question
-            while (quiz.timeouts.length) {
-                clearTimeout(quiz.timeouts.pop());
-            }
-            
-            // Send congratulatory message
-            await ctx.reply(`🎉 إجابة صحيحة من ${firstName}! (+1 نقطة)`);
-            
-            // Move to the next question
+        return; // 🛑 Do not continue — reply system matched.
+      }
+    } catch (error) {
+      console.error('Error in reply system:', error);
+    }
+
+    // ✅ Continue with promotions, demotions, quizzes, warnings, broadcasts, etc.
+    if (await handleUserPromotion(ctx)) return;
+    if (await handleUserDemotion(ctx)) return;
+
+    if (chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto) {
+      await broadcastMessage(ctx, null, null, text);
+      if (awaitingBroadcastPhoto) {
+        awaitingBroadcastPhoto = false;
+        await ctx.reply('✅ تم إرسال الرسالة.\n🛑 تم إيقاف وضع الإذاعة اليدوي.');
+      }
+      return;
+    }
+
+    // ✅ Warnings Settings
+    const state = userStates.get(userId);
+    if (state?.action?.startsWith('edit_warning_')) {
+      const count = parseInt(text);
+      if (isNaN(count) || count < 1) return ctx.reply('❌ يرجى إدخال رقم صحيح أكبر من 0.');
+
+      let field = null;
+      if (state.action === 'edit_warning_kick') field = { kick: count };
+      else if (state.action === 'edit_warning_mute') field = { mute: count };
+      else if (state.action === 'edit_warning_restrict_media') field = { restrictMedia: count };
+      if (!field) return;
+
+      await updateWarningSettings(botId, chatId, field);
+      userStates.delete(userId);
+      return ctx.reply('✅ تم تحديث الإعدادات بنجاح.');
+    }
+
+    // ✅ Quiz answers
+    if (activeQuizzes.has(chatId)) {
+      const quiz = activeQuizzes.get(chatId);
+      if (quiz.state === QUIZ_STATE.ACTIVE) {
+        const indexKey = `${userId}_${quiz.currentQuestionIndex}`;
+        const currentQ = quiz.questions[quiz.currentQuestionIndex];
+        if (!quiz.attempts.has(indexKey) && currentQ) {
+          quiz.attempts.set(indexKey, true);
+          if (lowerText === currentQ.answer.toLowerCase()) {
+            const score = quiz.scores.get(userId) || 0;
+            quiz.scores.set(userId, score + 1);
+            while (quiz.timeouts.length) clearTimeout(quiz.timeouts.pop());
+            await ctx.reply(`🎉 إجابة صحيحة من ${ctx.from.first_name || ''}! (+1 نقطة)`);
             quiz.currentQuestionIndex++;
-            
-            // Check if we've reached the end of the quiz
             if (quiz.currentQuestionIndex >= quiz.questions.length) {
-                await endQuiz(ctx, chatId);
+              await endQuiz(ctx, chatId);
             } else {
-                // Ask the next question after a short delay
-                setTimeout(() => askNextQuestion(chatId, ctx.telegram), 2000);
+              setTimeout(() => askNextQuestion(chatId, ctx.telegram), 2000);
             }
+          }
         }
-    });
+        return;
+      }
+    }
+
+    // ✅ Default updates (tracking, group activity, etc.)
+    updateLastInteraction(userId);
+    if (chatType === 'group' || chatType === 'supergroup') updateActiveGroups(ctx);
+
+  } catch (err) {
+    console.error('💥 Error in text handler:', err);
+  }
+});
+
 
 
 
