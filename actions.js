@@ -5594,7 +5594,28 @@ async function handleMediaReply(ctx, mediaType) {
         return false; // Error occurred
     }
 }
-
+async function updateUserActivity(userId, username, firstName, lastName) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botId = global.botInfo ? global.botInfo.id : null;
+        
+        await db.collection('users').updateOne(
+            { user_id: userId, bot_id: botId },
+            { 
+                $set: { 
+                    last_activity: new Date(),
+                    username: username || null,
+                    first_name: firstName || null,
+                    last_name: lastName || null,
+                    bot_id: botId
+                } 
+            },
+            { upsert: true }
+        );
+    } catch (error) {
+        console.error('Error updating user activity:', error);
+    }
+}
 // Helper function to get Arabic names for media types
 function getMediaTypeInArabic(mediaType) {
     const mediaTypes = {
@@ -6204,15 +6225,65 @@ bot.action('main_bot_dev', async (ctx) => {
 });
 
     
-    bot.action('clean_subscribers', async (ctx) => {
-        await ctx.answerCbQuery();
-        const cleanedCount = await cleanSubscribers();
+   bot.action('clean_subscribers', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('جاري تنظيف المشتركين غير النشطين...');
+        
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo.id;
+        
+        // Calculate the date 15 days ago
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+        
+        // Find users who haven't been active in the last 15 days
+        const inactiveUsers = await db.collection('users').find({
+            bot_id: botId,
+            last_activity: { $lt: fifteenDaysAgo }
+        }).toArray();
+        
+        const inactiveUserIds = inactiveUsers.map(user => user.user_id);
+        let cleanedCount = 0;
+        
+        if (inactiveUserIds.length > 0) {
+            // Delete inactive users from the users collection
+            const result = await db.collection('users').deleteMany({
+                user_id: { $in: inactiveUserIds },
+                bot_id: botId
+            });
+            
+            cleanedCount = result.deletedCount;
+            
+            // Also remove these users from other relevant collections
+            await Promise.all([
+                db.collection('subscribers').deleteMany({ 
+                    user_id: { $in: inactiveUserIds },
+                    bot_id: botId 
+                }),
+                db.collection('user_stats').deleteMany({ 
+                    user_id: { $in: inactiveUserIds },
+                    bot_id: botId 
+                }),
+                // Don't delete from important collections like developers, admins, etc.
+                // Only delete from activity-based collections
+            ]);
+            
+            console.log(`Cleaned ${cleanedCount} inactive users who haven't used the bot for 15+ days`);
+        }
+        
         await ctx.editMessageText(
-            `🧹 تم تنظيف المشتركين:\n\n` +
-            `تم إزالة ${cleanedCount} مشترك غير نشط.`,
+            `🧹 تم تنظيف المشتركين غير النشطين:\n\n` +
+            `تم إزالة ${cleanedCount} مشترك لم يستخدم البوت لمدة 15 يوم أو أكثر.`,
             { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
         );
-    });
+    } catch (error) {
+        console.error('Error cleaning subscribers:', error);
+        await ctx.editMessageText(
+            `❌ حدث خطأ أثناء تنظيف المشتركين:\n${error.message}`,
+            { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
+        );
+    }
+});
     
     bot.action('clean_groups', async (ctx) => {
         await ctx.answerCbQuery();
