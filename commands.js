@@ -3104,6 +3104,19 @@ bot.action('cancel_remove_all_vips', async (ctx) => {
     await ctx.answerCbQuery('✅ تم إلغاء العملية.', { show_alert: true });
     await listImportantUsers(ctx);
 });
+async function isGoofyOwner(ctx, userId) {
+    const db = await ensureDatabaseInitialized();
+    const botId = ctx.botInfo.id;
+    const chatId = ctx.chat.id;
+
+    const result = await db.collection('goofy_owners').findOne({
+        user_id: userId,
+        bot_id: botId,
+        chat_id: chatId
+    });
+
+    return !!result;
+}
 
 // Add this function to remove all VIP users
 async function removeAllVIPUsers(ctx) {
@@ -3169,11 +3182,10 @@ bot.hears('بدء', async (ctx) => {
         const chatId = ctx.chat.id;
 
         console.log(`🟢 [بدء] Command triggered by user ${userId}`);
-
-        console.log(`🔍 Checking user ${userId} roles...`);
-
         const db = await ensureDatabaseInitialized();
         const botId = ctx.botInfo.id;
+
+        console.log(`🔍 Checking user ${userId} roles...`);
 
         let isPrimary = false;
         try {
@@ -3183,16 +3195,16 @@ bot.hears('بدء', async (ctx) => {
             console.error(`❌ Error in isPrimaryCreator for ${userId}:`, err);
         }
 
-        const isSecDev = await isSecondaryDeveloper(ctx, userId); // must
-        const isVIPUser = await isVIP(ctx, userId); // can access only quiz
-        const isDev = await isDeveloper(ctx, userId); // must 
-       // const isBotOwn = await isBotOwner(ctx, userId); uncounted due to recent change
-        const isBotAdm = await isBotAdmin(ctx, userId); // main menu only
+        const isGoofy = await isGoofyOwner(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isVIPUser = await isVIP(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
 
+        console.log(`🔎 isGoofyOwner: ${isGoofy}`);
         console.log(`🔎 isSecondaryDeveloper: ${isSecDev}`);
         console.log(`🔎 isVIPUser: ${isVIPUser}`);
         console.log(`🔎 isDeveloper: ${isDev}`);
-        //console.log(`🔎 isBotOwner: ${isBotOwn}`);
         console.log(`🔎 isBotAdmin: ${isBotAdm}`);
 
         let chatMember;
@@ -3204,27 +3216,24 @@ bot.hears('بدء', async (ctx) => {
 
         const isGroupOwner = chatMember?.status === 'creator';
 
-        // 🆕 If group owner and not already a primary creator, assign
-        if (isGroupOwner && !isPrimary) {
-            await db.collection('primary_creators').insertOne({
+        // 🆕 Promote to primary creator or goofy_owner
+        if (isGroupOwner && !isPrimary && !isGoofy) {
+            await db.collection('goofy_owners').insertOne({
                 user_id: userId,
                 username: ctx.from.username || null,
                 bot_id: botId,
                 chat_id: chatId,
-                promoted_by: 'group_owner',
-                promoted_at: new Date()
+                assigned_by: 'system',
+                assigned_at: new Date()
             });
 
-            isPrimary = true;
-            await ctx.reply(`✅ تم تعيينك كـ "منشئ اساسي" لأنك مالك المجموعة.`);
-            console.log(`✅ User ${userId} promoted to primary creator`);
+            await ctx.reply(`🤡 تم تعيينك كـ "goofy owner" لأنك مالك المجموعة، لكن بصلاحيات محدودة.`);
+            console.log(`🤡 User ${userId} assigned as goofy owner`);
         }
 
-        if (!isDev && !isSecDev && !isBotOwn && !isBotAdm && !isPrimary) {
+        if (!isDev && !isSecDev && !isBotAdm && !isPrimary && !isGoofy) {
             console.log(`🚫 User ${userId} has no sufficient role — rejecting`);
-            return ctx.reply('❌يرجى الحصول على الصلاحيات الكافية لغرض الاستخدام');
-
-
+            return ctx.reply('❌ يرجى الحصول على الصلاحيات الكافية لغرض الاستخدام');
         }
 
         if (ctx.from) {
@@ -3262,11 +3271,13 @@ bot.hears('بدء', async (ctx) => {
                 reply_markup: { inline_keyboard: inlineKeyboard }
             });
         }
+
     } catch (error) {
         console.error('💥 Error handling "بدء" command:', error);
         ctx.reply('❌ حدث خطأ. يرجى التواصل مع المالك أو المطور.');
     }
 });
+
 
 
 
