@@ -4360,25 +4360,27 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                 );
     
                 // Save a default reply for the new bot name
-                await db.collection('replies').updateOne(
-    { trigger_word: newBotName, chat_id: chatId },
-    {
-        $set: {
-            trigger_word: newBotName,
-            chat_id: chatId,
-            type: "text_cycle", // <- Indicate that multiple replies are available
-            reply_texts: [
-                `عيونه 🙌: ${newBotName}`,
-                `وت ${newBotName}؟`,
-                `${newBotName} موجود؟`,
-                `احلى اسم هو ${newBotName}`,
-                `وينك يا ${newBotName}؟ 😎`
-            ],
-            cycle_index: 0 // Start from the first one
-        }
-    },
-    { upsert: true }
+               await db.collection('replies').updateOne(
+  { trigger_word: newBotName, chat_id: chatId },
+  {
+    $set: {
+      trigger_word: newBotName,
+      chat_id: chatId,
+      type: "text_cycle",
+      reply_texts: [
+        `عيونه 🙌: ${newBotName}`,
+        `وت ${newBotName}؟`,
+        `${newBotName} موجود؟`,
+        `احلى اسم هو ${newBotName}`,
+        `وينك يا ${newBotName}؟ 😎`
+      ],
+      reply_text: `عيونه 🙌: ${newBotName}`, // ✅ fallback to avoid error
+      cycle_index: 0
+    }
+  },
+  { upsert: true }
 );
+
 
     
                 await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
@@ -6750,45 +6752,36 @@ async function getCustomBotName(chatId) {
 //check this later maybe its not saving the replays because of this 
 async function sendReply(ctx, reply) {
     try {
-        console.log('[sendReply] Invoked with type:', reply.type);
-
         if (reply.type === 'text') {
-            await ctx.reply(reply.text || reply.reply_text, {
-                reply_to_message_id: ctx.message.message_id
-            });
+            await ctx.reply(reply.text || reply.reply_text, { reply_to_message_id: ctx.message.message_id });
         } else if (reply.type === 'text_cycle') {
-            const texts = Array.isArray(reply.reply_texts) ? reply.reply_texts : [];
+            const texts = reply.reply_texts;
+            if (texts && texts.length > 0) {
+                const currentIndex = reply.cycle_index || 0;
+                const textToSend = texts[currentIndex];
 
-            if (texts.length === 0) {
-                console.error('[text_cycle] reply_texts is empty');
-                await ctx.reply('❌ لا توجد نصوص صالحة للرد.', {
-                    reply_to_message_id: ctx.message.message_id
-                });
-                return;
+                console.log(`Current index: ${currentIndex}, Text to send: ${textToSend}`);
+
+                await ctx.reply(textToSend, { reply_to_message_id: ctx.message.message_id });
+
+                const newIndex = (currentIndex + 1) % texts.length;
+                console.log(`New index: ${newIndex}`);
+
+                const db = await ensureDatabaseInitialized();
+                await db.collection('replies').updateOne(
+                    { _id: reply._id },
+                    { $set: { cycle_index: newIndex } }
+                );
+            } else {
+                console.error('No valid texts found in reply_texts for text_cycle type.');
+                await ctx.reply('❌ لا توجد نصوص صالحة للرد.', { reply_to_message_id: ctx.message.message_id });
             }
-
-            const currentIndex = reply.cycle_index || 0;
-            const textToSend = texts[currentIndex];
-
-            console.log(`[text_cycle] Index: ${currentIndex}, Text: ${textToSend}`);
-
-            await ctx.reply(textToSend, {
-                reply_to_message_id: ctx.message.message_id
-            });
-
-            const nextIndex = (currentIndex + 1) % texts.length;
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').updateOne(
-                { _id: reply._id },
-                { $set: { cycle_index: nextIndex } }
-            );
         } else if (reply.type === 'media') {
             switch (reply.media_type) {
                 case 'photo':
                     await ctx.replyWithPhoto(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                     break;
                 case 'blank':
-                case 'video':
                     await ctx.replyWithVideo(reply.file_id, { reply_to_message_id: ctx.message.message_id });
                     break;
                 case 'animation':
@@ -6806,18 +6799,13 @@ async function sendReply(ctx, reply) {
             }
         } else {
             console.error('Unknown reply type:', reply.type);
-            await ctx.reply('❌ نوع الرد غير معروف.', {
-                reply_to_message_id: ctx.message.message_id
-            });
+            await ctx.reply('❌ نوع الرد غير معروف.', { reply_to_message_id: ctx.message.message_id });
         }
     } catch (error) {
         console.error('Error sending reply:', error);
-        await ctx.reply('❌ حدث خطأ أثناء إرسال الرد.', {
-            reply_to_message_id: ctx.message.message_id
-        });
+        await ctx.reply('❌ حدث خطأ أثناء إرسال الرد.', { reply_to_message_id: ctx.message.message_id });
     }
 }
-
 
 
 bot.action('check_subscription', forceCheckSubscription);
