@@ -4361,15 +4361,25 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
     
                 // Save a default reply for the new bot name
                 await db.collection('replies').updateOne(
-                    { trigger_word: newBotName, chat_id: chatId },
-                    { $set: { 
-                        trigger_word: newBotName, 
-                        reply_text: `عيونه 🙌: ${newBotName}`,
-                        chat_id: chatId,
-                        type: "text"
-                    }},
-                    { upsert: true }
-                );
+    { trigger_word: newBotName, chat_id: chatId },
+    {
+        $set: {
+            trigger_word: newBotName,
+            chat_id: chatId,
+            type: "text_cycle", // <- Indicate that multiple replies are available
+            reply_texts: [
+                `عيونه 🙌: ${newBotName}`,
+                `وت ${newBotName}؟`,
+                `${newBotName} موجود؟`,
+                `احلى اسم هو ${newBotName}`,
+                `وينك يا ${newBotName}؟ 😎`
+            ],
+            cycle_index: 0 // Start from the first one
+        }
+    },
+    { upsert: true }
+);
+
     
                 await ctx.reply(`✅ تم تغيير اسم البوت إلى "${newBotName}" وحفظ الرد الافتراضي.`);
                 ctx.session.awaitingBotName = false;
