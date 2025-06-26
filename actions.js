@@ -38,7 +38,7 @@ const { addQuizQuestion,connectToMongoDB, ensureDatabaseInitialized } = require(
 // Add this at the top of your file
 const database = require('./database');
 const { Markup } = require('telegraf');
-const { updateActiveGroup } = require('./database');
+const { updateActiveGroup,cleanGroups,getOverallStats } = require('./database');
 
 // Quiz state constants
 const QUIZ_STATE = {
@@ -6100,17 +6100,17 @@ bot.action('main_bot_dev', async (ctx) => {
     });
 
 
-    bot.action('overall_stats', async (ctx) => {
-        await ctx.answerCbQuery();
-        const stats = await getOverallStats();
-        await ctx.editMessageText(
-            `📊 الإحصائيات العامة:\n\n` +
-            `👥 عدد المشتركين: ${stats.subscribers}\n` +
-            `👥 عدد المجموعات: ${stats.groups}\n` +
-            `📈 إجمالي المستخدمين: ${stats.total}`,
-            { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
-        );
-    });
+   bot.action('overall_stats', async (ctx) => {
+    await ctx.answerCbQuery();
+    const stats = await getOverallStats(ctx.botInfo.id);
+    await ctx.editMessageText(
+        `📊 الإحصائيات العامة:\n\n` +
+        `👥 عدد المشتركين: ${stats.subscribers}\n` +
+        `👥 عدد المجموعات: ${stats.groups}\n` +
+        `📈 إجمالي المستخدمين: ${stats.total}`,
+        { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
+    );
+});
     
     bot.action('subscribers_stats', async (ctx) => {
         await ctx.answerCbQuery();
