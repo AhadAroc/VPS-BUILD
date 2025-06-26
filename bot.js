@@ -4,7 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { token } = require('./config');
 const database = require('./database');
-const { setupActions } = require('./actions');
+const { setupActions,updateUserActivity } = require('./actions');
 const { setupMiddlewares } = require('./middlewares');
 const { setupCommands, isSubscribed } = require('./commands');
 
