@@ -228,17 +228,11 @@ bot.on('my_chat_member', async (ctx) => {
 bot.command('add', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
 
-  if (!ctx.message || !ctx.message.text) {
-    return ctx.reply("❌ لا يمكن قراءة الأمر. حاول مرة أخرى.");
-  }
+  const args = ctx.message.text.split(" ");
+  if (args.length !== 3) return ctx.reply("❌ الصيغة: /add @username أو userId YYYY-MM-DD");
 
-  const args = ctx.message.text.trim().split(" ");
   const identifier = args[1];
   const dateStr = args[2];
-
-  if (!identifier || !dateStr) {
-    return ctx.reply("❌ الصيغة: /add @username أو userId YYYY-MM-DD");
-  }
 
   // Validate date
   const expiresAt = new Date(`${dateStr}T23:59:59Z`);
@@ -277,7 +271,6 @@ bot.command('add', async (ctx) => {
     return ctx.reply("❌ حدث خطأ أثناء الحفظ أو المعالجة.");
   }
 });
-
 
 bot.command('revoke', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
