@@ -81,15 +81,7 @@ const cloneSchema = new mongoose.Schema({
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
-// MongoDB connection
-mongoose.connect('mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/test?retryWrites=true&w=majority', {
 
-    useNewUrlParser: true, 
-    useUnifiedTopology: true 
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
-// Set up a simple route for health checks
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
@@ -2235,7 +2227,8 @@ process.once('SIGINT', () => {
             }
             
             // Filter bot processes
-            const botProcesses = list.filter(proc => proc.name.startsWith('bot_'));
+            const botProcesses = list.filter(proc => proc.name && proc.name.startsWith('bot_'))
+
             
             if (botProcesses.length === 0) {
                 bot.stop('SIGINT');
