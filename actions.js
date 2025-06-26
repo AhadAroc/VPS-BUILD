@@ -5594,28 +5594,7 @@ async function handleMediaReply(ctx, mediaType) {
         return false; // Error occurred
     }
 }
-async function updateUserActivity(userId, username, firstName, lastName) {
-    try {
-        const db = await ensureDatabaseInitialized();
-        const botId = global.botInfo ? global.botInfo.id : null;
-        
-        await db.collection('users').updateOne(
-            { user_id: userId, bot_id: botId },
-            { 
-                $set: { 
-                    last_activity: new Date(),
-                    username: username || null,
-                    first_name: firstName || null,
-                    last_name: lastName || null,
-                    bot_id: botId
-                } 
-            },
-            { upsert: true }
-        );
-    } catch (error) {
-        console.error('Error updating user activity:', error);
-    }
-}
+
 // Helper function to get Arabic names for media types
 function getMediaTypeInArabic(mediaType) {
     const mediaTypes = {
@@ -6728,7 +6707,28 @@ bot.action('delete_secondary_developers', async (ctx) => {
     }
 });
 
-
+async function updateUserActivity(userId, username, firstName, lastName) {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botId = global.botInfo ? global.botInfo.id : null;
+        
+        await db.collection('users').updateOne(
+            { user_id: userId, bot_id: botId },
+            { 
+                $set: { 
+                    last_activity: new Date(),
+                    username: username || null,
+                    first_name: firstName || null,
+                    last_name: lastName || null,
+                    bot_id: botId
+                } 
+            },
+            { upsert: true }
+        );
+    } catch (error) {
+        console.error('Error updating user activity:', error);
+    }
+}
 
 // ✅ Show list of active groups
 async function getActiveGroups(ctx) {
