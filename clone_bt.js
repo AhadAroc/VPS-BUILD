@@ -72,30 +72,36 @@ const app = express();
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
+
+
+
 async function getMongooseConnection() {
-  if (mongooseConnection && mongooseConnection.readyState === 1) {
-    return mongooseConnection;
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
-  
+
+  if (mongoose.connection.readyState === 2) {
+    return new Promise((resolve, reject) => {
+      mongoose.connection.once('connected', () => resolve(mongoose.connection));
+      mongoose.connection.once('error', reject);
+    });
+  }
+
   try {
     console.log('📡 Setting up new MongoDB connection...');
-    
-    // Close any existing connection first
-    if (mongooseConnection) {
+
+    // Disconnect if needed
+    if (mongoose.connection.readyState !== 0) {
       console.log('♻️ Closing existing mongoose connection...');
-      await mongoose.connection.close();
+      await mongoose.disconnect();
     }
-    
-    // Connect with proper options
-    mongooseConnection = await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      ssl: true,
-      tls: true,
+
+    // ✅ Modern driver — remove deprecated options
+    mongooseConnection = await mongoose.connect(process.env.MONGODB_URI, {
       connectTimeoutMS: 30000,
       socketTimeoutMS: 45000
     });
-    
+
     console.log('✅ Connected to MongoDB successfully');
     return mongooseConnection;
   } catch (err) {
@@ -103,6 +109,7 @@ async function getMongooseConnection() {
     throw err;
   }
 }
+
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
