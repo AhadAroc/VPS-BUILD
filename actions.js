@@ -6107,10 +6107,18 @@ bot.action('main_bot_dev', async (ctx) => {
         `📊 الإحصائيات العامة:\n\n` +
         `👥 عدد المشتركين: ${stats.subscribers}\n` +
         `👥 عدد المجموعات: ${stats.groups}\n` +
-        `📈 إجمالي المستخدمين: ${stats.total}`,
-        { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
+        `📈 إجمالي المستخدمين: ${stats.total}\n\n` +
+        `ℹ️ هذه المعلومات قد تختلف بسبب بعض القيود.`,
+        {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]
+                ]
+            }
+        }
     );
 });
+
     
     bot.action('subscribers_stats', async (ctx) => {
         await ctx.answerCbQuery();
