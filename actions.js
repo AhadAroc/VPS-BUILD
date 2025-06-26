@@ -4132,40 +4132,13 @@ async function getCustomQuestionsForChat(chatId) {
     }
 }
 bot.action('change_bot_name', async (ctx) => {
-    try {
+      const chatId = ctx.chat.id;
+    if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery();
-        
-        // Make sure we have the chat ID before using it
-        const chatId = ctx.chat ? ctx.chat.id : ctx.callbackQuery.message.chat.id;
-        
-        // Store the chat ID in the context state for later use
-        ctx.session = ctx.session || {};
-        ctx.session.changingBotNameChatId = chatId;
-        
-        await ctx.editMessageText(
-            'الرجاء إرسال الاسم الجديد للبوت:',
-            {
-                reply_markup: {
-                    inline_keyboard: [[{ text: '🔙 إلغاء', callback_data: 'cancel_bot_name_change' }]]
-                }
-            }
-        );
-        
-        // Set a flag to indicate we're waiting for a new bot name
-        awaitingBotNameChange = true;
-    } catch (error) {
-        console.error('Error initiating bot name change:', error);
-        await ctx.answerCbQuery('حدث خطأ أثناء محاولة تغيير اسم البوت', { show_alert: true });
-    }
-});
-// Add a handler for the cancel action
-bot.action('cancel_bot_name_change', async (ctx) => {
-    try {
-        await ctx.answerCbQuery('تم إلغاء تغيير اسم البوت');
-        awaitingBotNameChange = false;
-        showBotNameMenu(ctx);
-    } catch (error) {
-        console.error('Error canceling bot name change:', error);
+        await ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
+        ctx.session.awaitingBotName = true;
+    } else {
+        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
     }
 });
 async function checkBotNameAndReply(ctx) {
