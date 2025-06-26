@@ -210,6 +210,8 @@ bot.command('add', async (ctx) => {
   if (!ctx.message || !ctx.message.text) {
     return ctx.reply("❌ لا يمكن قراءة الأمر. حاول مرة أخرى.");
   }
+console.log("Parsed identifier:", identifier);
+console.log("Parsed date:", dateStr);
 
   const args = ctx.message.text.trim().split(" ");
   const identifier = args[1];
@@ -231,7 +233,8 @@ bot.command('add', async (ctx) => {
     if (/^\d+$/.test(identifier)) {
       // Raw numeric ID
       userId = parseInt(identifier);
-    } else if (identifier.startsWith("@")) {
+    } else if (typeof identifier === 'string' && identifier.startsWith("@")) {
+
       try {
         const user = await ctx.telegram.getChat(identifier);
         userId = user.id;
@@ -261,17 +264,20 @@ bot.command('add', async (ctx) => {
 bot.command('revoke', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
 
-  const args = ctx.message.text.split(" ");
-  if (args.length !== 2) return ctx.reply("❌ الصيغة: /revoke @username أو userId");
+  const messageText = ctx.message?.text;
+  if (!messageText) return ctx.reply("❌ لا يمكن قراءة الأمر.");
 
-  const identifier = args[1];
+  const args = messageText.trim().split(/\s+/);
+  const identifier = args[1] || "";
+
+  if (!identifier) return ctx.reply("❌ الصيغة: /revoke @username أو userId");
+
   let userId;
 
   try {
     if (/^\d+$/.test(identifier)) {
-      // Raw numeric ID
       userId = parseInt(identifier);
-    } else if (identifier.startsWith("@")) {
+    } else if (typeof identifier === 'string' && identifier.startsWith("@")) {
       try {
         const user = await ctx.telegram.getChat(identifier);
         userId = user.id;
@@ -283,50 +289,36 @@ bot.command('revoke', async (ctx) => {
       return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
     }
 
-    // Check if user has premium status
     const premiumUser = await PremiumUser.findOne({ userId });
-    
-    if (!premiumUser) {
-      return ctx.reply(`⚠️ المستخدم (${userId}) ليس لديه اشتراك مميز.`);
-    }
+    if (!premiumUser) return ctx.reply(`⚠️ المستخدم (${userId}) ليس لديه اشتراك مميز.`);
 
-    // Delete the premium user record
     await PremiumUser.deleteOne({ userId });
-    
-    // Update all related collections to remove premium status
     const db = await database.setupDatabase();
-    
-    // 1. Remove from VIP users collection if they exist there
-    await db.collection('vip_users').deleteMany({ user_id: userId });
-    
-    // 2. Remove from important_users collection if they exist there
-    await db.collection('important_users').deleteMany({ user_id: userId });
-    
-    // 3. Update any other collections that might store premium status
-    // For example, if you have a user_roles or permissions collection
-    await db.collection('user_roles').updateMany(
-      { user_id: userId },
-      { $pull: { roles: "premium" } }
-    );
-    
-    // 4. Clear any cached premium status
-    if (subscriptionCache && subscriptionCache[userId]) {
-      delete subscriptionCache[userId];
-    }
-    
-    // Try to notify the user that their premium status has been revoked
+
+    await Promise.all([
+      db.collection('vip_users').deleteMany({ user_id: userId }),
+      db.collection('important_users').deleteMany({ user_id: userId }),
+      db.collection('user_roles').updateMany(
+        { user_id: userId },
+        { $pull: { roles: "premium" } }
+      )
+    ]);
+
+    if (subscriptionCache?.[userId]) delete subscriptionCache[userId];
+
     try {
       await ctx.telegram.sendMessage(userId, '⚠️ تم إلغاء صلاحيتك المميزة. للاستفسار راسل المطور.');
     } catch (notifyError) {
-      console.log(`Could not notify user ${userId} about revocation: ${notifyError.message}`);
+      console.log(`⚠️ لم أتمكن من إرسال إشعار للمستخدم ${userId}: ${notifyError.message}`);
     }
 
-    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح وإزالة جميع الامتيازات المرتبطة.`);
+    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح.`);
   } catch (err) {
     console.error("❌ Error in /revoke:", err.message);
-    return ctx.reply("✅تم الغاء الصلاحية يرجى استخدام /premium_users للتأكد");
+    return ctx.reply("✅ تم الغاء الصلاحية. استخدم /premium_users للتأكد.");
   }
 });
+
 
 // Add a command to list all premium users
 bot.command('premium_users', async (ctx) => {
@@ -369,19 +361,21 @@ bot.command('premium_users', async (ctx) => {
   }
 });
 bot.command('check_premium', async (ctx) => {
-  const args = ctx.message.text.split(" ");
+  const messageText = ctx.message?.text;
+  if (!messageText) return ctx.reply("❌ لا يمكن قراءة الأمر.");
+
+  const args = messageText.trim().split(/\s+/);
+  const identifier = args[1] || "";
   let userId;
-  
+
   if (args.length === 2) {
-    // Check another user (admin only)
     if (ctx.from.id !== ADMIN_ID) {
       return ctx.reply("⛔ فقط المالك يمكنه التحقق من حالة المستخدمين الآخرين.");
     }
-    
-    const identifier = args[1];
+
     if (/^\d+$/.test(identifier)) {
       userId = parseInt(identifier);
-    } else if (identifier.startsWith("@")) {
+    } else if (typeof identifier === 'string' && identifier.startsWith("@")) {
       try {
         const user = await ctx.telegram.getChat(identifier);
         userId = user.id;
@@ -392,50 +386,48 @@ bot.command('check_premium', async (ctx) => {
       return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
     }
   } else {
-    // Check own status
     userId = ctx.from.id;
   }
-  
+
   try {
-    // Check premium status directly from database
     const premiumUser = await PremiumUser.findOne({ userId });
-    
-    // Check VIP status
     const db = await database.setupDatabase();
-    const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
-    
-    // Check important status
-    const importantUser = await db.collection('important_users').findOne({ user_id: userId });
-    
+
+    const [vipUser, importantUser] = await Promise.all([
+      db.collection('vip_users').findOne({ user_id: userId }),
+      db.collection('important_users').findOne({ user_id: userId }),
+    ]);
+
     if (!premiumUser && !vipUser && !importantUser) {
       return ctx.reply(`المستخدم (${userId}) ليس لديه أي صلاحيات مميزة.`);
     }
-    
+
     let message = `📊 *حالة المستخدم (${userId}):*\n\n`;
-    
+
     if (premiumUser) {
       const expiryDate = new Date(premiumUser.expiresAt).toLocaleDateString('ar-EG');
       const isExpired = new Date(premiumUser.expiresAt) < new Date();
       const status = isExpired ? "🔴 منتهي" : "🟢 نشط";
-      
+
       message += `🌟 *اشتراك مميز:* ${status}\n`;
       message += `📅 *تاريخ الانتهاء:* ${expiryDate}\n\n`;
     }
-    
+
     if (vipUser) {
       message += `👑 *مستخدم VIP:* نعم\n`;
     }
-    
+
     if (importantUser) {
       message += `⭐ *مستخدم مهم:* نعم\n`;
     }
-    
+
     return ctx.reply(message, { parse_mode: 'Markdown' });
   } catch (err) {
     console.error("❌ Error in /check_premium:", err.message);
     return ctx.reply("❌ حدث خطأ أثناء التحقق من الصلاحيات.");
   }
 });
+
 async function saveFile(fileLink, fileName) {
     try {
         const mediaDir = path.join(__dirname, 'media');
