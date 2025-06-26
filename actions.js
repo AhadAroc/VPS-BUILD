@@ -6264,15 +6264,67 @@ bot.action('main_bot_dev', async (ctx) => {
     }
 });
     
-    bot.action('clean_groups', async (ctx) => {
-        await ctx.answerCbQuery();
-        const cleanedCount = await cleanGroups();
+   bot.action('clean_groups', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('جاري تنظيف المجموعات غير النشطة...');
+        
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx.botInfo.id;
+        
+        // Calculate the date 15 days ago
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+        
+        // Find groups that haven't been active in the last 15 days
+        const inactiveGroups = await db.collection('groups').find({
+            bot_id: botId,
+            updated_at: { $lt: fifteenDaysAgo }
+        }).toArray();
+        
+        const inactiveGroupIds = inactiveGroups.map(group => group.group_id);
+        let cleanedCount = 0;
+        
+        if (inactiveGroupIds.length > 0) {
+            // Delete inactive groups from the groups collection
+            const result = await db.collection('groups').deleteMany({
+                group_id: { $in: inactiveGroupIds },
+                bot_id: botId
+            });
+            
+            cleanedCount = result.deletedCount;
+            
+            // Also remove these groups from other relevant collections
+            await Promise.all([
+                db.collection('active_groups').deleteMany({ 
+                    group_id: { $in: inactiveGroupIds },
+                    bot_id: botId 
+                }),
+                db.collection('group_settings').deleteMany({ 
+                    group_id: { $in: inactiveGroupIds },
+                    bot_id: botId 
+                }),
+                db.collection('quiz_settings').deleteMany({ 
+                    chat_id: { $in: inactiveGroupIds },
+                    bot_id: botId 
+                })
+            ]);
+            
+            console.log(`Cleaned ${cleanedCount} inactive groups that haven't been active for 15+ days`);
+        }
+        
         await ctx.editMessageText(
-            `🧹 تم تنظيف المجموعات:\n\n` +
-            `تم إزالة ${cleanedCount} مجموعة غير نشطة.`,
+            `🧹 تم تنظيف المجموعات غير النشطة:\n\n` +
+            `تم إزالة ${cleanedCount} مجموعة لم تكن نشطة لمدة 15 يوم أو أكثر.`,
             { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
         );
-    });
+    } catch (error) {
+        console.error('Error cleaning groups:', error);
+        await ctx.editMessageText(
+            `❌ حدث خطأ أثناء تنظيف المجموعات:\n${error.message}`,
+            { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_statistics' }]] } }
+        );
+    }
+});
     
     bot.action('back_to_statistics', async (ctx) => {
         await ctx.answerCbQuery();
