@@ -596,27 +596,28 @@ async function setupDatabase() {
     }
 }
 async function createIndexSafely(collection, keys, options = {}) {
+    if (!collection || typeof collection.indexes !== 'function') {
+        console.warn('⚠️ Skipping index creation: Invalid collection object.');
+        return;
+    }
+
     try {
-        // Generate the index name that MongoDB would use
         const indexName = Object.keys(keys).map(key => `${key}_${keys[key]}`).join('_');
-        
-        // Check if index already exists
         const indexes = await collection.indexes();
-        const existingIndex = indexes.find(idx => idx.name === indexName);
-        
-        if (existingIndex) {
-            console.log(`Index ${indexName} already exists on collection ${collection.collectionName}`);
+        const exists = indexes.find(idx => idx.name === indexName);
+
+        if (exists) {
+            console.log(`Index ${indexName} already exists on ${collection.collectionName}`);
             return;
         }
-        
-        // Create the index if it doesn't exist
+
         await collection.createIndex(keys, options);
-        console.log(`Created index ${indexName} on collection ${collection.collectionName}`);
-    } catch (error) {
-        console.error(`Error creating index on collection ${collection.collectionName}:`, error);
-        // Don't throw the error to allow other operations to continue
+        console.log(`Created index ${indexName} on ${collection.collectionName}`);
+    } catch (err) {
+        console.error(`❌ Error creating index on ${collection?.collectionName || 'unknown'}:`, err);
     }
 }
+
 // Add a new function for quiz-related operations
 async function saveQuizScore(chatId, userId, firstName, lastName, username, score) {
     try {
