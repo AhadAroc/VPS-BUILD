@@ -2270,9 +2270,9 @@ process.once('SIGTERM', () => {
                 return;
             }
             
-            // Filter bot processes
-            const botProcesses = list.filter(proc => proc.name && proc.name.startsWith('bot_'));
-
+            const botProcesses = list.filter(proc => {
+                return proc && proc.name && typeof proc.name === 'string' && proc.name.startsWith('bot_');
+            });
             
             if (botProcesses.length === 0) {
                 bot.stop('SIGTERM');
