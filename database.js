@@ -596,27 +596,25 @@ async function setupDatabase() {
     }
 }
 async function createIndexSafely(collection, keys, options = {}) {
-    if (!collection || typeof collection.indexes !== 'function') {
-        console.warn('⚠️ Skipping index creation: Invalid collection object.');
-        return;
+  if (!collection || typeof collection.createIndex !== 'function') {
+    console.warn('⚠️ Skipping index creation: Invalid collection object.');
+    return;
+  }
+
+  try {
+    const indexName = Object.keys(keys).map(key => `${key}_${keys[key]}`).join('_');
+    const indexes = await collection.indexes();
+    if (!indexes.find(i => i.name === indexName)) {
+      await collection.createIndex(keys, options);
+      console.log(`✅ Created index ${indexName} on ${collection.collectionName}`);
+    } else {
+      console.log(`ℹ️ Index ${indexName} already exists on ${collection.collectionName}`);
     }
-
-    try {
-        const indexName = Object.keys(keys).map(key => `${key}_${keys[key]}`).join('_');
-        const indexes = await collection.indexes();
-        const exists = indexes.find(idx => idx.name === indexName);
-
-        if (exists) {
-            console.log(`Index ${indexName} already exists on ${collection.collectionName}`);
-            return;
-        }
-
-        await collection.createIndex(keys, options);
-        console.log(`Created index ${indexName} on ${collection.collectionName}`);
-    } catch (err) {
-        console.error(`❌ Error creating index on ${collection?.collectionName || 'unknown'}:`, err);
-    }
+  } catch (err) {
+    console.error(`❌ Failed to create index on ${collection?.collectionName}:`, err);
+  }
 }
+
 
 // Add a new function for quiz-related operations
 async function saveQuizScore(chatId, userId, firstName, lastName, username, score) {
