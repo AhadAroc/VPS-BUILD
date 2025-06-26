@@ -18,6 +18,7 @@ const mongoURI = process.env.MONGODB_URI;
 const userDeployments = new Map();
 let mongooseConnection = null;
 //const Heroku = require('heroku-client');
+const mongoose = require('mongoose');
 
 const activeGroups = new Map();
 // Add this at the top of your file with other imports
