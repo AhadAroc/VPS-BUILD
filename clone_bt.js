@@ -565,76 +565,88 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
 }
 
 async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
+  let client;
   try {
-    // Add validation for the MongoDB URI
+    // Get MongoDB URI from environment
     const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
     
     if (!mongoURI) {
-      throw new Error('MongoDB URI is not defined. Please check your environment variables (MONGODB_URI or MONGO_URI)');
+      throw new Error('MongoDB URI not found in environment variables');
     }
     
-    // Validate URI format
-    if (!mongoURI.startsWith('mongodb://') && !mongoURI.startsWith('mongodb+srv://')) {
-      throw new Error('Invalid MongoDB URI format. Must start with mongodb:// or mongodb+srv://');
-    }
+    console.log('🔐 Connecting to MongoDB Atlas...');
     
-    console.log('🔐 Using MongoDB URI:', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@'));
-    
-    // Use the MongoClient directly instead of mongoose for this operation
-    const client = new MongoClient(mongoURI, {
+    // Create MongoDB client
+    client = new MongoClient(mongoURI, {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
-      connectTimeoutMS: 30000,
-      maxPoolSize: 10,
-      minPoolSize: 5,
-      retryWrites: true,
-      w: 'majority'
+      connectTimeoutMS: 30000
     });
     
-    console.log('🔄 Attempting to connect to MongoDB...');
     await client.connect();
-    console.log('✅ Connected to MongoDB for developer insertion');
+    console.log('✅ Connected to MongoDB Atlas');
     
-    const db = client.db('test'); // Use the test database explicitly
+    // Connect to test database and developers collection
+    const db = client.db('test');
+    const developersCollection = db.collection('developers');
     
-    // Add validation for required parameters
+    // Validate required parameters
     if (!userId || !botId) {
-      throw new Error('userId and botId are required parameters');
+      throw new Error('userId and botId are required');
     }
     
-    console.log(`📝 Inserting developer: userId=${userId}, botId=${botId}, username=${username}`);
+    console.log(`📝 Targeting developers collection for userId=${userId}, botId=${botId}`);
     
-    const result = await db.collection('developers').updateOne(
-      { user_id: parseInt(userId), bot_id: parseInt(botId) }, // Ensure integers
-      {
-        $set: {
-          user_id: parseInt(userId),
-          username: username || null,
-          bot_id: parseInt(botId),
-          promoted_at: new Date(),
-          promoted_by: 'auto-clone',
-          chat_id: chatId ? parseInt(chatId) : null,
-          is_active: true
-        }
-      },
+    // Insert/update developer record
+    const developerDoc = {
+      user_id: parseInt(userId),
+      username: username || null,
+      bot_id: parseInt(botId),
+      promoted_at: new Date(),
+      promoted_by: 'auto-clone',
+      chat_id: chatId ? parseInt(chatId) : null,
+      is_active: true,
+      role: 'developer'
+    };
+    
+    const result = await developersCollection.updateOne(
+      { user_id: parseInt(userId), bot_id: parseInt(botId) },
+      { $set: developerDoc },
       { upsert: true }
     );
     
-    console.log('✅ Developer entry result:', {
+    console.log('✅ Developer record updated in test.developers:', {
       matched: result.matchedCount,
       modified: result.modifiedCount,
       upserted: result.upsertedCount,
       upsertedId: result.upsertedId
     });
     
-    await client.close();
-    console.log('🔌 MongoDB connection closed');
+    // Also check if we should add to secondary_developers collection
+    const secondaryDevsCollection = db.collection('secondary_developers');
+    const secondaryResult = await secondaryDevsCollection.updateOne(
+      { user_id: parseInt(userId), bot_id: parseInt(botId) },
+      { $set: { ...developerDoc, role: 'secondary_developer' } },
+      { upsert: true }
+    );
+    
+    console.log('✅ Secondary developer record updated:', {
+      matched: secondaryResult.matchedCount,
+      modified: secondaryResult.modifiedCount,
+      upserted: secondaryResult.upsertedCount
+    });
+    
     return true;
     
   } catch (err) {
-    console.error('❌ Failed to insert developer into test DB:', err.message);
-    console.error('Stack trace:', err.stack);
+    console.error('❌ Failed to assign developer role to test DB:', err.message);
+    console.error('Error details:', err);
     return false;
+  } finally {
+    if (client) {
+      await client.close();
+      console.log('🔌 MongoDB connection closed');
+    }
   }
 }
 
