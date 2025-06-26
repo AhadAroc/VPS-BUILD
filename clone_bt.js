@@ -717,67 +717,74 @@ fs.writeFileSync(botFilePath, botFileContent);
 
 // Start the bot using PM2
 const pm2 = require('pm2');
+const { MongoClient } = require('mongodb');
+
 pm2.connect((err) => {
+  if (err) {
+    console.error(err);
+    return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+  }
+
+  pm2.start({
+    script: botFilePath,
+    name: `bot_${botInfo.id}`,
+    autorestart: true,
+  }, async (err) => {
     if (err) {
-        console.error(err);
-        return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
+      console.error(err);
+      return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
     }
 
-    pm2.start({
-        script: botFilePath,
-        name: `bot_${botInfo.id}`,
-        autorestart: true,
-    }, async (err) => {
-        if (err) {
-            console.error(err);
-            return ctx.reply('❌ حدث خطأ أثناء تشغيل البوت.');
-        }
+    // Store bot details
+    activeBots[botInfo.id] = {
+      name: botInfo.first_name,
+      username: botInfo.username,
+      token: token,
+      expiry: expiryDate.toISOString(),
+      configPath: configPath,
+      botFilePath: botFilePath,
+      createdBy: userId
+    };
 
-        // Store bot details
-        activeBots[botInfo.id] = {
-            name: botInfo.first_name,
-            username: botInfo.username,
-            token: token,
-            expiry: expiryDate.toISOString(),
-            configPath: configPath,
-            botFilePath: botFilePath,
-            createdBy: userId
-        };
+    userDeployments.set(userId, botInfo.id);
 
-        userDeployments.set(userId, botInfo.id);
+    // Create database entry
+    createCloneDbEntry(botInfo.id, token, expiryDate);
 
-        // Create database entry
-        createCloneDbEntry(botInfo.id, token, expiryDate);
+    // ✅ Assign user as "مطور اساسي"
+    try {
+      if (!process.env.MONGO_URI) {
+        console.error('❌ MONGO_URI is not defined');
+        return ctx.reply('⚠️ لم يتم تعريف MONGO_URI في إعدادات السيرفر.');
+      }
 
-        // ✅ Assign user as "مطور اساسي"
-        try {
-            const client = await MongoClient.connect(process.env.MONGO_URI, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true
-            });
+      const client = await MongoClient.connect(process.env.MONGO_URI, {
+        connectTimeoutMS: 30000,
+        socketTimeoutMS: 45000
+      });
 
-            const db = client.db('test'); // ✅ connect directly to the test DB
+      const db = client.db('test');
 
-            await db.collection('developers').updateOne(
-                { user_id: userId, bot_id: botInfo.id },
-                {
-                    $set: {
-                        user_id: userId,
-                        username: username,
-                        bot_id: botInfo.id,
-                        promoted_at: new Date(),
-                        promoted_by: 'auto-clone',
-                        chat_id: chatId
-                    }
-                },
-                { upsert: true }
-            );
+      await db.collection('developers').updateOne(
+        { user_id: userId, bot_id: botInfo.id },
+        {
+          $set: {
+            user_id: userId,
+            username: username,
+            bot_id: botInfo.id,
+            promoted_at: new Date(),
+            promoted_by: 'auto-clone',
+            chat_id: chatId
+          }
+        },
+        { upsert: true }
+      );
 
-            console.log(`👑 User ${userId} (@${username}) assigned as مطور اساسي.`);
-            await client.close();
-        } catch (err) {
-            console.error('❌ Failed to assign developer role to test DB:', err.message);
-        }
+      console.log(`👑 User ${userId} (@${username}) assigned as مطور اساسي.`);
+      await client.close();
+    } catch (err) {
+      console.error('❌ Failed to assign developer role to test DB:', err);
+    }
 
         // Store bot information in groups collection
         storeGroupInfo(botInfo.id, botInfo.first_name, botInfo.username, token, userId);
