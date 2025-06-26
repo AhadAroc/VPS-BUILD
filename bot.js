@@ -125,5 +125,23 @@ process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 module.exports = { bot, updateBotStats };
-// Start the application
+// Start the application// Add this to your middleware setup
+bot.use(async (ctx, next) => {
+    // Store bot info globally for use in other functions
+    if (!global.botInfo && ctx.botInfo) {
+        global.botInfo = ctx.botInfo;
+    }
+    
+    // Update user activity on every interaction
+    if (ctx.from) {
+        await updateUserActivity(
+            ctx.from.id,
+            ctx.from.username,
+            ctx.from.first_name,
+            ctx.from.last_name
+        );
+    }
+    
+    return next();
+});
 initializeApp();
