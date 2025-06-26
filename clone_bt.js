@@ -384,21 +384,30 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
     }
 }
 
-async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
+async function insertDeveloperToTestDB(input = {}) {
+  if (typeof input !== 'object' || input === null) {
+    console.error('❌ insertDeveloperToTestDB was called with invalid argument:', input);
+    return false;
+  }
+
+  const { userId, username, botId, chatId } = input;
+
+  if (!userId || !botId) {
+    console.error('❌ insertDeveloperToTestDB: Missing required fields:', { userId, botId });
+    return false;
+  }
+
   try {
-    // Use the MongoClient directly instead of mongoose for this operation
     const client = new MongoClient(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      ssl: true,
-      tls: true
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000
     });
-    
+
     await client.connect();
     console.log('✅ Connected to MongoDB for developer insertion');
-    
-    const db = client.db('test'); // Use the test database explicitly
-    
+
+    const db = client.db('test'); // Use the 'test' database explicitly
+
     const result = await db.collection('developers').updateOne(
       { user_id: userId, bot_id: botId },
       {
@@ -413,7 +422,7 @@ async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
       },
       { upsert: true }
     );
-    
+
     console.log('✅ Developer entry inserted into test.developers:', result.upsertedId || 'updated existing');
     await client.close();
     return true;
