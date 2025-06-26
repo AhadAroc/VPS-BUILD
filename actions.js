@@ -4277,11 +4277,140 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
    
      bot.on('text', async (ctx) => {
     try {
+
         const userId = ctx.from.id;
         const chatId = ctx.chat.id;
         const text = ctx.message.text?.trim();
         const userAnswer = text?.toLowerCase();
-
+ // First, handle any awaiting states
+            if (await handleAwaitingReplyResponse(ctx)) return;
+            
+       
+            
+            // Handle awaiting states in private chats
+            if (ctx.chat.type === 'private') {
+                if (awaitingReplyWord) {
+                    tempReplyWord = text;
+                    ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
+                    awaitingReplyWord = false;
+                    awaitingReplyResponse = true;
+                    return;
+                } else if (awaitingReplyResponse) {
+                    const replyResponse = ctx.message.text;
+                    try {
+                        const db = await ensureDatabaseInitialized();
+                        const botId = ctx.botInfo.id; // Get current bot ID
+                        
+                        await db.collection('replies').updateOne(
+                            { trigger_word: tempReplyWord, bot_id: botId },
+                            { $set: { 
+                                trigger_word: tempReplyWord, 
+                                reply_text: replyResponse,
+                                bot_id: botId,
+                                type: "text"
+                            }},
+                            { upsert: true }
+                        );
+                        
+                        ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${replyResponse}`);
+                        awaitingReplyResponse = false;
+                        return;
+                    } catch (error) {
+                        console.error('Error saving reply:', error);
+                        ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                        awaitingReplyResponse = false;
+                        return;
+                    }
+                } else if (awaitingDeleteReplyWord) {
+                    try {
+                        const db = await ensureDatabaseInitialized();
+                        const botId = ctx.botInfo.id;
+                        
+                        const result = await db.collection('replies').deleteOne({ 
+                            trigger_word: text,
+                            bot_id: botId
+                        });
+                        
+                        if (result.deletedCount > 0) {
+                            ctx.reply(`تم حذف الرد للكلمة "${text}" بنجاح.`);
+                        } else {
+                            // Try to delete global reply if bot-specific not found
+                            const globalResult = await db.collection('replies').deleteOne({ 
+                                trigger_word: text,
+                                bot_id: { $exists: false }
+                            });
+                            
+                            if (globalResult.deletedCount > 0) {
+                                ctx.reply(`تم حذف الرد العام للكلمة "${text}" بنجاح.`);
+                            } else {
+                                ctx.reply(`لم يتم العثور على رد للكلمة "${text}".`);
+                            }
+                        }
+                        awaitingDeleteReplyWord = false;
+                        return;
+                    } catch (error) {
+                        console.error('Error deleting reply:', error);
+                        ctx.reply('حدث خطأ أثناء حذف الرد. الرجاء المحاولة مرة أخرى.');
+                        awaitingDeleteReplyWord = false;
+                        return;
+                    }
+                } else if (awaitingBotName) {
+                    try {
+                        await ctx.telegram.setMyName(text);
+                        ctx.reply(`تم تغيير اسم البوت بنجاح إلى: ${text}`);
+                        awaitingBotName = false;
+                        return;
+                    } catch (error) {
+                        console.error('Error changing bot name:', error);
+                        ctx.reply('حدث خطأ أثناء تغيير اسم البوت. الرجاء المحاولة مرة أخرى.');
+                        awaitingBotName = false;
+                        return;
+                    }
+                }
+                
+                // Handle user states for adding replies
+                const userState = userStates.get(userId);
+                if (userState) {
+                    if (userState.action === 'adding_reply' && userState.step === 'awaiting_trigger') {
+                        userState.trigger = text;
+                        userState.step = 'awaiting_response';
+                        userStates.set(userId, userState);
+                        
+                        await ctx.reply(`تم استلام الكلمة: "${text}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`, {
+                            reply_markup: {
+                                inline_keyboard: [[{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]]
+                            }
+                        });
+                        return;
+                    } else if (userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
+                        const replyText = text;
+                        const triggerWord = userState.trigger;
+                        const botId = userState.botId || ctx.botInfo.id;
+                        
+                        try {
+                            const db = await ensureDatabaseInitialized(botId);
+                            await db.collection('replies').updateOne(
+                                { trigger_word: triggerWord, bot_id: botId },
+                                { $set: { 
+                                    trigger_word: triggerWord, 
+                                    reply_text: replyText,
+                                    bot_id: botId,
+                                    type: "text"
+                                }},
+                                { upsert: true }
+                            );
+                            
+                            await ctx.reply(`✅ تم إضافة الرد بنجاح!\n\nالكلمة: ${triggerWord}\nالرد: ${replyText}`);
+                            userStates.delete(userId);
+                        } catch (error) {
+                            console.error('Error saving reply:', error);
+                            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
+                        }
+                        return;
+                    }
+                }
+            }
+            
         // Handle broadcast state first
         const isBroadcasting = chatBroadcastStates.get(chatId) || awaitingBroadcastPhoto;
 
@@ -4473,137 +4602,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         try {
             console.log('Received message:', ctx.message.text);
             
-            // First, handle any awaiting states
-            if (await handleAwaitingReplyResponse(ctx)) return;
-            
-            const text = ctx.message.text.trim().toLowerCase();
-            const chatId = ctx.chat.id;
-            const userId = ctx.from.id;
-            
-            // Handle awaiting states in private chats
-            if (ctx.chat.type === 'private') {
-                if (awaitingReplyWord) {
-                    tempReplyWord = text;
-                    ctx.reply(`تم استلام الكلمة: "${tempReplyWord}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`);
-                    awaitingReplyWord = false;
-                    awaitingReplyResponse = true;
-                    return;
-                } else if (awaitingReplyResponse) {
-                    const replyResponse = ctx.message.text;
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        const botId = ctx.botInfo.id; // Get current bot ID
-                        
-                        await db.collection('replies').updateOne(
-                            { trigger_word: tempReplyWord, bot_id: botId },
-                            { $set: { 
-                                trigger_word: tempReplyWord, 
-                                reply_text: replyResponse,
-                                bot_id: botId,
-                                type: "text"
-                            }},
-                            { upsert: true }
-                        );
-                        
-                        ctx.reply(`تم إضافة الرد بنجاح!\nالكلمة: ${tempReplyWord}\nالرد: ${replyResponse}`);
-                        awaitingReplyResponse = false;
-                        return;
-                    } catch (error) {
-                        console.error('Error saving reply:', error);
-                        ctx.reply('حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                        awaitingReplyResponse = false;
-                        return;
-                    }
-                } else if (awaitingDeleteReplyWord) {
-                    try {
-                        const db = await ensureDatabaseInitialized();
-                        const botId = ctx.botInfo.id;
-                        
-                        const result = await db.collection('replies').deleteOne({ 
-                            trigger_word: text,
-                            bot_id: botId
-                        });
-                        
-                        if (result.deletedCount > 0) {
-                            ctx.reply(`تم حذف الرد للكلمة "${text}" بنجاح.`);
-                        } else {
-                            // Try to delete global reply if bot-specific not found
-                            const globalResult = await db.collection('replies').deleteOne({ 
-                                trigger_word: text,
-                                bot_id: { $exists: false }
-                            });
-                            
-                            if (globalResult.deletedCount > 0) {
-                                ctx.reply(`تم حذف الرد العام للكلمة "${text}" بنجاح.`);
-                            } else {
-                                ctx.reply(`لم يتم العثور على رد للكلمة "${text}".`);
-                            }
-                        }
-                        awaitingDeleteReplyWord = false;
-                        return;
-                    } catch (error) {
-                        console.error('Error deleting reply:', error);
-                        ctx.reply('حدث خطأ أثناء حذف الرد. الرجاء المحاولة مرة أخرى.');
-                        awaitingDeleteReplyWord = false;
-                        return;
-                    }
-                } else if (awaitingBotName) {
-                    try {
-                        await ctx.telegram.setMyName(text);
-                        ctx.reply(`تم تغيير اسم البوت بنجاح إلى: ${text}`);
-                        awaitingBotName = false;
-                        return;
-                    } catch (error) {
-                        console.error('Error changing bot name:', error);
-                        ctx.reply('حدث خطأ أثناء تغيير اسم البوت. الرجاء المحاولة مرة أخرى.');
-                        awaitingBotName = false;
-                        return;
-                    }
-                }
-                
-                // Handle user states for adding replies
-                const userState = userStates.get(userId);
-                if (userState) {
-                    if (userState.action === 'adding_reply' && userState.step === 'awaiting_trigger') {
-                        userState.trigger = text;
-                        userState.step = 'awaiting_response';
-                        userStates.set(userId, userState);
-                        
-                        await ctx.reply(`تم استلام الكلمة: "${text}". الآن أرسل الرد الذي تريد إضافته لهذه الكلمة:`, {
-                            reply_markup: {
-                                inline_keyboard: [[{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]]
-                            }
-                        });
-                        return;
-                    } else if (userState.action === 'adding_reply' && userState.step === 'awaiting_response') {
-                        const replyText = text;
-                        const triggerWord = userState.trigger;
-                        const botId = userState.botId || ctx.botInfo.id;
-                        
-                        try {
-                            const db = await ensureDatabaseInitialized(botId);
-                            await db.collection('replies').updateOne(
-                                { trigger_word: triggerWord, bot_id: botId },
-                                { $set: { 
-                                    trigger_word: triggerWord, 
-                                    reply_text: replyText,
-                                    bot_id: botId,
-                                    type: "text"
-                                }},
-                                { upsert: true }
-                            );
-                            
-                            await ctx.reply(`✅ تم إضافة الرد بنجاح!\n\nالكلمة: ${triggerWord}\nالرد: ${replyText}`);
-                            userStates.delete(userId);
-                        } catch (error) {
-                            console.error('Error saving reply:', error);
-                            await ctx.reply('❌ حدث خطأ أثناء حفظ الرد. الرجاء المحاولة مرة أخرى.');
-                        }
-                        return;
-                    }
-                }
-            }
-            
+           
             // Check for automatic replies
             try {
                 const db = await ensureDatabaseInitialized();
@@ -5169,62 +5168,7 @@ function getMediaTypeInArabic(mediaType) {
      // Replace the problematic message handler with this one
      
     bot.on('message', async (ctx, next) => {
-        try {
-        const userId = ctx.from.id;
-        const userState = userStates.get(userId);
         
-        // Check if the user is in the process of adding a reply
-        if (userState && userState.action === 'adding_reply') {
-            if (userState.step === 'awaiting_trigger') {
-                // User sent the trigger word, now ask for the reply content
-                const triggerWord = ctx.message.text.trim();
-                
-                // Update user state
-                userStates.set(userId, {
-                    ...userState,
-                    step: 'awaiting_content',
-                    triggerWord: triggerWord
-                });
-                
-                // Ask for the reply content
-                await ctx.reply(`تم استلام الكلمة: "${triggerWord}"\n\nالآن أرسل الرد الذي سيظهر عند كتابة هذه الكلمة:`, {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]
-                        ]
-                    }
-                });
-                
-            } else if (userState.step === 'awaiting_content') {
-                // User sent the reply content, save it to the database
-                const replyContent = ctx.message.text;
-                const { botId, triggerWord } = userState;
-                
-                // Save the reply to the database
-                const result = await addReplyToBotDatabase(botId, triggerWord, replyContent);
-                
-                if (result.success) {
-                    await ctx.reply(`✅ تم إضافة الرد بنجاح!\n\nالكلمة: ${triggerWord}\nالرد: ${replyContent}`);
-                } else {
-                    await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. الرجاء المحاولة مرة أخرى.');
-                }
-                
-                // Clear user state
-                userStates.delete(userId);
-            }
-            
-            // Return to prevent other handlers from processing this message
-            return;
-        }
-        
-        // If we get here, the message wasn't part of adding a reply,
-        // so other handlers can process it
-        
-    } catch (error) {
-        console.error('Error processing message for adding reply:', error);
-        await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة. الرجاء المحاولة مرة أخرى.');
-    }
-
         await updateGroupInfo(ctx);
     next();
     try {
