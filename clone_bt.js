@@ -978,12 +978,12 @@ pm2.connect((err) => {
 
     // ✅ Assign user as "مطور اساسي"
     try {
-      if (!process.env.MONGO_URI) {
+      if (!process.env.MONGODB_URI) {
         console.error('❌ MONGO_URI is not defined');
         return ctx.reply('⚠️ لم يتم تعريف MONGO_URI في إعدادات السيرفر.');
       }
 
-      const client = await MongoClient.connect(process.env.MONGO_URI, {
+      const client = await MongoClient.connect(process.env.MONGODB_URI, {
         connectTimeoutMS: 30000,
         socketTimeoutMS: 45000
       });
