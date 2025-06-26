@@ -19,7 +19,21 @@ const userDeployments = new Map();
 let mongooseConnection = null;
 //const Heroku = require('heroku-client');
 const mongoose = require('mongoose');
-
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  ssl: true,
+  tls: true,
+  tlsAllowInvalidCertificates: false,
+  connectTimeoutMS: 30000, // 30 seconds timeout
+  socketTimeoutMS: 45000   // 45 seconds timeout
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  // Implement a fallback or retry mechanism here
+  console.log('Attempting to continue without MongoDB connection...');
+});
 const activeGroups = new Map();
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
@@ -63,44 +77,46 @@ const cloneSchema = new mongoose.Schema({
     // add any other fields you use
   });
   
-  const Clone = mongoose.models.Clone || mongoose.model('Clone', cloneSchema);
-
+  const Clone = mongoose.model('Clone', cloneSchema);
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
+// MongoDB connection
+mongoose.connect('mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/test?retryWrites=true&w=majority', {
 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true 
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
+// Set up a simple route for health checks
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-
-
 async function getMongooseConnection() {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
+  if (mongooseConnection && mongooseConnection.readyState === 1) {
+    return mongooseConnection;
   }
-
-  if (mongoose.connection.readyState === 2) {
-    return new Promise((resolve, reject) => {
-      mongoose.connection.once('connected', () => resolve(mongoose.connection));
-      mongoose.connection.once('error', reject);
-    });
-  }
-
+  
   try {
     console.log('📡 Setting up new MongoDB connection...');
-
-    // Disconnect if needed
-    if (mongoose.connection.readyState !== 0) {
+    
+    // Close any existing connection first
+    if (mongooseConnection) {
       console.log('♻️ Closing existing mongoose connection...');
-      await mongoose.disconnect();
+      await mongoose.connection.close();
     }
-
-    // ✅ Modern driver — remove deprecated options
-    mongooseConnection = await mongoose.connect(process.env.MONGODB_URI, {
+    
+    // Connect with proper options
+    mongooseConnection = await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      ssl: true,
+      tls: true,
       connectTimeoutMS: 30000,
       socketTimeoutMS: 45000
     });
-
+    
     console.log('✅ Connected to MongoDB successfully');
     return mongooseConnection;
   } catch (err) {
@@ -108,7 +124,6 @@ async function getMongooseConnection() {
     throw err;
   }
 }
-
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
@@ -210,10 +225,122 @@ bot.on('my_chat_member', async (ctx) => {
         console.log(`🚪 Bot left/kicked from '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
+bot.command('add', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
 
+  const args = ctx.message.text.split(" ");
+  if (args.length !== 3) return ctx.reply("❌ الصيغة: /add @username أو userId YYYY-MM-DD");
 
+  const identifier = args[1];
+  const dateStr = args[2];
 
+  // Validate date
+  const expiresAt = new Date(`${dateStr}T23:59:59Z`);
+  if (isNaN(expiresAt.getTime())) {
+    return ctx.reply("❌ التاريخ غير صالح. استخدم الصيغة: YYYY-MM-DD");
+  }
 
+  let userId;
+
+  try {
+    if (/^\d+$/.test(identifier)) {
+      // Raw numeric ID
+      userId = parseInt(identifier);
+    } else if (identifier.startsWith("@")) {
+      try {
+        const user = await ctx.telegram.getChat(identifier);
+        userId = user.id;
+      } catch (error) {
+        console.error("getChat error:", error.message);
+        return ctx.reply("❌ لم أتمكن من العثور على المستخدم. هل تحدث مع البوت؟");
+      }
+    } else {
+      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
+    }
+
+    // ✅ Use Mongoose model (not raw .collection())
+    await PremiumUser.updateOne(
+      { userId },
+      { $set: { userId, expiresAt, notified: false } },
+      { upsert: true }
+    );
+
+    return ctx.reply(`✅ تم منح الصلاحية المميزة للمستخدم (${userId}) حتى ${dateStr}`);
+  } catch (err) {
+    console.error("❌ Error in /add:", err.message);
+    return ctx.reply("❌ حدث خطأ أثناء الحفظ أو المعالجة.");
+  }
+});
+
+bot.command('revoke', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
+
+  const args = ctx.message.text.split(" ");
+  if (args.length !== 2) return ctx.reply("❌ الصيغة: /revoke @username أو userId");
+
+  const identifier = args[1];
+  let userId;
+
+  try {
+    if (/^\d+$/.test(identifier)) {
+      // Raw numeric ID
+      userId = parseInt(identifier);
+    } else if (identifier.startsWith("@")) {
+      try {
+        const user = await ctx.telegram.getChat(identifier);
+        userId = user.id;
+      } catch (error) {
+        console.error("getChat error:", error.message);
+        return ctx.reply("❌ لم أتمكن من العثور على المستخدم. هل تحدث مع البوت؟");
+      }
+    } else {
+      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
+    }
+
+    // Check if user has premium status
+    const premiumUser = await PremiumUser.findOne({ userId });
+    
+    if (!premiumUser) {
+      return ctx.reply(`⚠️ المستخدم (${userId}) ليس لديه اشتراك مميز.`);
+    }
+
+    // Delete the premium user record
+    await PremiumUser.deleteOne({ userId });
+    
+    // Update all related collections to remove premium status
+    const db = await database.setupDatabase();
+    
+    // 1. Remove from VIP users collection if they exist there
+    await db.collection('vip_users').deleteMany({ user_id: userId });
+    
+    // 2. Remove from important_users collection if they exist there
+    await db.collection('important_users').deleteMany({ user_id: userId });
+    
+    // 3. Update any other collections that might store premium status
+    // For example, if you have a user_roles or permissions collection
+    await db.collection('user_roles').updateMany(
+      { user_id: userId },
+      { $pull: { roles: "premium" } }
+    );
+    
+    // 4. Clear any cached premium status
+    if (subscriptionCache && subscriptionCache[userId]) {
+      delete subscriptionCache[userId];
+    }
+    
+    // Try to notify the user that their premium status has been revoked
+    try {
+      await ctx.telegram.sendMessage(userId, '⚠️ تم إلغاء صلاحيتك المميزة. للاستفسار راسل المطور.');
+    } catch (notifyError) {
+      console.log(`Could not notify user ${userId} about revocation: ${notifyError.message}`);
+    }
+
+    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح وإزالة جميع الامتيازات المرتبطة.`);
+  } catch (err) {
+    console.error("❌ Error in /revoke:", err.message);
+    return ctx.reply("✅تم الغاء الصلاحية يرجى استخدام /premium_users للتأكد");
+  }
+});
 
 // Add a command to list all premium users
 bot.command('premium_users', async (ctx) => {
@@ -255,7 +382,74 @@ bot.command('premium_users', async (ctx) => {
     return ctx.reply("❌ حدث خطأ أثناء جلب قائمة المستخدمين المميزين.");
   }
 });
-
+bot.command('check_premium', async (ctx) => {
+  const args = ctx.message.text.split(" ");
+  let userId;
+  
+  if (args.length === 2) {
+    // Check another user (admin only)
+    if (ctx.from.id !== ADMIN_ID) {
+      return ctx.reply("⛔ فقط المالك يمكنه التحقق من حالة المستخدمين الآخرين.");
+    }
+    
+    const identifier = args[1];
+    if (/^\d+$/.test(identifier)) {
+      userId = parseInt(identifier);
+    } else if (identifier.startsWith("@")) {
+      try {
+        const user = await ctx.telegram.getChat(identifier);
+        userId = user.id;
+      } catch (error) {
+        return ctx.reply("❌ لم أتمكن من العثور على المستخدم.");
+      }
+    } else {
+      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
+    }
+  } else {
+    // Check own status
+    userId = ctx.from.id;
+  }
+  
+  try {
+    // Check premium status directly from database
+    const premiumUser = await PremiumUser.findOne({ userId });
+    
+    // Check VIP status
+    const db = await database.setupDatabase();
+    const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
+    
+    // Check important status
+    const importantUser = await db.collection('important_users').findOne({ user_id: userId });
+    
+    if (!premiumUser && !vipUser && !importantUser) {
+      return ctx.reply(`المستخدم (${userId}) ليس لديه أي صلاحيات مميزة.`);
+    }
+    
+    let message = `📊 *حالة المستخدم (${userId}):*\n\n`;
+    
+    if (premiumUser) {
+      const expiryDate = new Date(premiumUser.expiresAt).toLocaleDateString('ar-EG');
+      const isExpired = new Date(premiumUser.expiresAt) < new Date();
+      const status = isExpired ? "🔴 منتهي" : "🟢 نشط";
+      
+      message += `🌟 *اشتراك مميز:* ${status}\n`;
+      message += `📅 *تاريخ الانتهاء:* ${expiryDate}\n\n`;
+    }
+    
+    if (vipUser) {
+      message += `👑 *مستخدم VIP:* نعم\n`;
+    }
+    
+    if (importantUser) {
+      message += `⭐ *مستخدم مهم:* نعم\n`;
+    }
+    
+    return ctx.reply(message, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error("❌ Error in /check_premium:", err.message);
+    return ctx.reply("❌ حدث خطأ أثناء التحقق من الصلاحيات.");
+  }
+});
 async function saveFile(fileLink, fileName) {
     try {
         const mediaDir = path.join(__dirname, 'media');
@@ -372,39 +566,74 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
 
 async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
   try {
+    // Add validation for the MongoDB URI
+    const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
+    
+    if (!mongoURI) {
+      throw new Error('MongoDB URI is not defined. Please check your environment variables (MONGODB_URI or MONGO_URI)');
+    }
+    
+    // Validate URI format
+    if (!mongoURI.startsWith('mongodb://') && !mongoURI.startsWith('mongodb+srv://')) {
+      throw new Error('Invalid MongoDB URI format. Must start with mongodb:// or mongodb+srv://');
+    }
+    
+    console.log('🔐 Using MongoDB URI:', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@'));
+    
     // Use the MongoClient directly instead of mongoose for this operation
     const client = new MongoClient(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      ssl: true,
-      tls: true
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      retryWrites: true,
+      w: 'majority'
     });
     
+    console.log('🔄 Attempting to connect to MongoDB...');
     await client.connect();
     console.log('✅ Connected to MongoDB for developer insertion');
     
     const db = client.db('test'); // Use the test database explicitly
     
+    // Add validation for required parameters
+    if (!userId || !botId) {
+      throw new Error('userId and botId are required parameters');
+    }
+    
+    console.log(`📝 Inserting developer: userId=${userId}, botId=${botId}, username=${username}`);
+    
     const result = await db.collection('developers').updateOne(
-      { user_id: userId, bot_id: botId },
+      { user_id: parseInt(userId), bot_id: parseInt(botId) }, // Ensure integers
       {
         $set: {
-          user_id: userId,
+          user_id: parseInt(userId),
           username: username || null,
-          bot_id: botId,
+          bot_id: parseInt(botId),
           promoted_at: new Date(),
           promoted_by: 'auto-clone',
-          chat_id: chatId
+          chat_id: chatId ? parseInt(chatId) : null,
+          is_active: true
         }
       },
       { upsert: true }
     );
     
-    console.log('✅ Developer entry inserted into test.developers:', result.upsertedId || 'updated existing');
+    console.log('✅ Developer entry result:', {
+      matched: result.matchedCount,
+      modified: result.modifiedCount,
+      upserted: result.upsertedCount,
+      upsertedId: result.upsertedId
+    });
+    
     await client.close();
+    console.log('🔌 MongoDB connection closed');
     return true;
+    
   } catch (err) {
-    console.error('❌ Failed to insert developer into test DB:', err);
+    console.error('❌ Failed to insert developer into test DB:', err.message);
+    console.error('Stack trace:', err.stack);
     return false;
   }
 }
@@ -428,13 +657,67 @@ bot.on('left_chat_member', async (ctx) => {
     }
 });
 
+function extractBroadcastContent(ctx) {
+    const msg = ctx.message;
 
+    if (msg.text && msg.text.startsWith('/broadcast')) {
+        const textParts = msg.text.split(' ').slice(1);
+        if (textParts.length === 0) return null;
+        return { type: 'text', content: textParts.join(' ') };
+    }
+
+    if (msg.photo) {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        const caption = msg.caption || '';
+        return { type: 'photo', content: { file_id: fileId, caption } };
+    }
+
+    if (msg.document) {
+        return { type: 'document', content: { file_id: msg.document.file_id, caption: msg.caption || '' } };
+    }
+
+    if (msg.video) {
+        return { type: 'video', content: { file_id: msg.video.file_id, caption: msg.caption || '' } };
+    }
+
+    return null;
+}
 
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
+    // Check if it's a broadcast command
+    if (text.startsWith('/broadcast_')) {
+        if (userId !== ADMIN_ID) {
+            return ctx.reply('⛔ This command is only available to the admin.');
+        }
+        
+        const [command, ...messageParts] = text.split(' ');
+        const broadcastType = command.split('_')[1];
+        const broadcastMessage = messageParts.join(' ');
+
+        if (!broadcastMessage) {
+            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
+        }
+
+        switch (broadcastType) {
+            case 'dm':
+                return handleBroadcastDM(ctx, broadcastMessage);
+            case 'groups':
+                return handleBroadcastGroups(ctx, broadcastMessage);
+            case 'all':
+                return handleBroadcastAll(ctx, broadcastMessage);
+            default:
+                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
+        }
+    }
+// Check total bot limit
+    const totalActiveBots = Object.keys(activeBots).length;
+    if (totalActiveBots >= MAX_TOTAL_BOTS) {
+        return ctx.reply('⚠️ عذراً، تم الوصول إلى الحد الأقصى للبوتات على الخادم. يرجى المحاولة لاحقاً.');
+    }
 
     // If not a broadcast command, treat as token submission
     const token = text;
@@ -928,7 +1211,37 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
     });
 });
 
+bot.on('message', async (ctx) => {
+    const msg = ctx.message;
 
+    // Only admins can use broadcast
+    if (ctx.from.id !== ADMIN_ID) return;
+
+    // Check if the caption or text starts with a broadcast command
+    const rawText = msg.caption || msg.text || '';
+    if (!rawText.startsWith('/broadcast_')) return;
+
+    // Extract the command and the actual message
+    const [cmd, ...messageParts] = rawText.split(' ');
+    const message = messageParts.join(' ');
+
+    if (!message) {
+        return ctx.reply('❌ Please provide a message to broadcast.');
+    }
+
+    const broadcast = extractBroadcastContent(ctx);
+    if (!broadcast) return ctx.reply('❌ Please provide a message, photo, or video to broadcast.');
+
+    if (cmd === '/broadcast_groups') {
+        return handleBroadcastGroups(ctx, message);
+    } else if (cmd === '/broadcast_dm') {
+        return handleBroadcastDM(ctx, message);
+    } else if (cmd === '/broadcast_all') {
+        return handleBroadcastAll(ctx, message);
+    } else {
+        return ctx.reply('❌ Unknown broadcast command.');
+    }
+});
 
 
 // Populate userDeployments map - Fixed version
@@ -1949,9 +2262,8 @@ process.once('SIGINT', () => {
                 return;
             }
             
-            const botProcesses = list.filter(proc => {
-                return proc && proc.name && typeof proc.name === 'string' && proc.name.indexOf('bot_') === 0;
-            });
+            // Filter bot processes
+            const botProcesses = list.filter(proc => proc.name.startsWith('bot_'));
             
             if (botProcesses.length === 0) {
                 bot.stop('SIGINT');
@@ -1973,7 +2285,6 @@ process.once('SIGINT', () => {
         });
     });
 });
-
 process.once('SIGTERM', () => {
     // Stop all bot processes using PM2
     const pm2 = require('pm2');
@@ -1994,9 +2305,9 @@ process.once('SIGTERM', () => {
                 return;
             }
             
-            const botProcesses = list.filter(proc => {
-                return proc && proc.name && typeof proc.name === 'string' && proc.name.indexOf('bot_') === 0;
-            }); 
+            // Filter bot processes
+            const botProcesses = list.filter(proc => proc.name && proc.name.startsWith('bot_'));
+
             
             if (botProcesses.length === 0) {
                 bot.stop('SIGTERM');
