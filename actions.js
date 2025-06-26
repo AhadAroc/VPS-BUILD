@@ -4132,12 +4132,40 @@ async function getCustomQuestionsForChat(chatId) {
     }
 }
 bot.action('change_bot_name', async (ctx) => {
-    if (await isDeveloper(ctx, ctx.from.id)) {
+    try {
         await ctx.answerCbQuery();
-        await ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
-        ctx.session.awaitingBotName = true;
-    } else {
-        await ctx.answerCbQuery('عذرًا، هذا الأمر للمطورين فقط', { show_alert: true });
+        
+        // Make sure we have the chat ID before using it
+        const chatId = ctx.chat ? ctx.chat.id : ctx.callbackQuery.message.chat.id;
+        
+        // Store the chat ID in the context state for later use
+        ctx.session = ctx.session || {};
+        ctx.session.changingBotNameChatId = chatId;
+        
+        await ctx.editMessageText(
+            'الرجاء إرسال الاسم الجديد للبوت:',
+            {
+                reply_markup: {
+                    inline_keyboard: [[{ text: '🔙 إلغاء', callback_data: 'cancel_bot_name_change' }]]
+                }
+            }
+        );
+        
+        // Set a flag to indicate we're waiting for a new bot name
+        awaitingBotNameChange = true;
+    } catch (error) {
+        console.error('Error initiating bot name change:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء محاولة تغيير اسم البوت', { show_alert: true });
+    }
+});
+// Add a handler for the cancel action
+bot.action('cancel_bot_name_change', async (ctx) => {
+    try {
+        await ctx.answerCbQuery('تم إلغاء تغيير اسم البوت');
+        awaitingBotNameChange = false;
+        showBotNameMenu(ctx);
+    } catch (error) {
+        console.error('Error canceling bot name change:', error);
     }
 });
 async function checkBotNameAndReply(ctx) {
@@ -5863,33 +5891,26 @@ async function checkForAutomaticReply(ctx) {
         );
     });
     
-    bot.action('main_bot_dev', async (ctx) => {
-        try {
-            const db = await ensureDatabaseInitialized();
-            const mainDev = await db.collection('developers').findOne({});
-            
-            if (mainDev) {
-                await ctx.answerCbQuery();
-                await ctx.editMessageText(
-                    '👨‍💻 معلومات مطور البوت الأساسي:\n\n' +
-                    `🔹 الاسم: ${mainDev.username || 'غير محدد'}\n` +
-                    `🔸 معرف تيليجرام: @${mainDev.username || 'غير محدد'}\n` +
-                    `🔹 الرقم التعريفي: ${mainDev.user_id}\n\n` +
-                    '🌟 شكراً لجهوده في تطوير وإدارة البوت!',
-                    {
-                        reply_markup: {
-                            inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_source_menu' }]]
-                        }
-                    }
-                );
-            } else {
-                await ctx.answerCbQuery('لم يتم العثور على معلومات المطور الأساسي', { show_alert: true });
+bot.action('main_bot_dev', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        await ctx.editMessageText(
+            '👨‍💻 معلومات مطور البوت الأساسي:\n\n' +
+            '🔹 الاسم: المطور الأساسي\n' +
+            '🔸 معرف تيليجرام: @Lorisiv\n' +
+            '🔹 الرقم التعريفي: 5844382752\n\n' +
+            '🌟 شكراً لجهوده في تطوير وإدارة البوت!',
+            {
+                reply_markup: {
+                    inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'back_to_source_menu' }]]
+                }
             }
-        } catch (error) {
-            console.error('Error fetching main developer info:', error);
-            await ctx.answerCbQuery('حدث خطأ أثناء جلب معلومات المطور الأساسي', { show_alert: true });
-        }
-    });
+        );
+    } catch (error) {
+        console.error('Error displaying main developer info:', error);
+        await ctx.answerCbQuery('حدث خطأ أثناء عرض معلومات المطور الأساسي', { show_alert: true });
+    }
+});
     
     bot.action('source_programmer', async (ctx) => {
         await ctx.answerCbQuery();
