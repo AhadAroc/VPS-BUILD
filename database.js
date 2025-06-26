@@ -36,59 +36,74 @@ let client = null;
 let _mongoClient = null;
 let _mongoDbs = {};
 async function connectToMongoDB(customDbName = null) {
-  try {
-    console.log('📡 Attempting to connect to MongoDB...');
+    try {
+        console.log('📡 Attempting to connect to MongoDB...');
+        
+        // Validate environment first
+        validateEnvironment();
+        
+        const dbNameToUse = customDbName || process.env.DB_NAME || defaultDbName;
+        
+        // Use environment variable instead of config import
+        let uriToUse = process.env.MONGODB_URI;
+        
+        // Validate URI is not undefined
+        if (!uriToUse) {
+            throw new Error('MONGODB_URI environment variable is not defined');
+        }
+        
+        // Inject DB name into URI if missing
+        if (!uriToUse.includes(`/${dbNameToUse}`)) {
+            const [base, query] = uriToUse.split('?');
+            uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
+        }
 
-    const dbNameToUse = customDbName || defaultDbName;
+        const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+        console.log(`🔐 Connecting to: ${sanitizedUri}`);
 
-    // Inject DB name into URI if missing
-    let uriToUse = mongoUri;
-    if (!mongoUri.includes(`/${dbNameToUse}`)) {
-      const [base, query] = mongoUri.split('?');
-      uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
+        // If already connected to same DB
+        if (mongooseConnected && currentMongooseDb === dbNameToUse) {
+            console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
+            return db;
+        }
+
+        // Close existing connection if switching DB
+        if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
+            console.log('♻️ Closing existing mongoose connection...');
+            await mongoose.disconnect();
+            mongooseConnected = false;
+            currentMongooseDb = null;
+        }
+
+        // Race connection against timeout
+        const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
+        );
+
+        await Promise.race([connectPromise, timeoutPromise]);
+
+        mongooseConnected = true;
+        currentMongooseDb = dbNameToUse;
+        db = mongoose.connection.db;
+
+        console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
+        return db;
+    } catch (error) {
+        console.error('❌ MongoDB connection error:', error);
+        mongooseConnected = false;
+        currentMongooseDb = null;
+        return createMockDatabase();
     }
-
-    const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
-    console.log(`🔐 Connecting to: ${sanitizedUri}`);
-
-    // If already connected to same DB
-    if (mongooseConnected && currentMongooseDb === dbNameToUse) {
-      console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
-      return db;
-    }
-
-    // Close existing connection if switching DB
-    if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
-      console.log('♻️ Closing existing mongoose connection...');
-      await mongoose.disconnect();
-      mongooseConnected = false;
-      currentMongooseDb = null;
-    }
-
-    // Race connection against timeout
-    const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
-    );
-
-    await Promise.race([connectPromise, timeoutPromise]);
-
-    mongooseConnected = true;
-    currentMongooseDb = dbNameToUse;
-    db = mongoose.connection.db;
-
-    console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
-    return db;
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    mongooseConnected = false;
-    currentMongooseDb = null;
-    return createMockDatabase();
-  }
 }
 async function getDatabaseForBot(botId) {
     try {
-        const uri = process.env.MONGODB_URI || mongoUri;
+        // Validate environment
+        if (!process.env.MONGODB_URI) {
+            throw new Error('MONGODB_URI environment variable is not defined');
+        }
+        
+        const uri = process.env.MONGODB_URI;
         
         // Initialize native client if not already done
         if (!_mongoClient) {
@@ -102,7 +117,7 @@ async function getDatabaseForBot(botId) {
         }
 
         // Determine database name
-        const dbNameToUse = botId ? `bot_${botId}_db` : (process.env.DB_NAME || dbName);
+        const dbNameToUse = botId ? `bot_${botId}_db` : (process.env.DB_NAME || defaultDbName);
         
         // Get or create database connection
         if (!_mongoDbs[dbNameToUse]) {
@@ -808,30 +823,32 @@ async function getDevelopers() {
 
 // Add the isDeveloper function
 async function isDeveloper(ctx, userId) {
-    const botId = ctx.botInfo?.id;
-    if (!botId) {
-        console.warn('⚠️ Missing bot ID in ctx.botInfo');
-        return false;
-    }
-
-    // ✅ First: check global developer list
-    if (developerIds && developerIds.has && developerIds.has(userId.toString())) {
-        console.log(`✅ User ${userId} is a hardcoded developer`);
-        return true;
-    }
-
     try {
-        // ✅ Use native MongoClient to connect directly to test DB
-        if (!process.env.MONGO_URI) {
-            console.error('❌ Missing MONGO_URI environment variable');
+        const botId = ctx.botInfo?.id;
+        if (!botId) {
+            console.warn('⚠️ Missing bot ID in ctx.botInfo');
+            return false;
+        }
+
+        // First: check global developer list
+        if (developerIds && developerIds.has && developerIds.has(userId.toString())) {
+            console.log(`✅ User ${userId} is a hardcoded developer`);
+            return true;
+        }
+
+        // Validate MongoDB URI before proceeding
+        if (!process.env.MONGODB_URI) {
+            console.error('❌ Missing MONGODB_URI environment variable');
             return false;
         }
         
-        const client = await MongoClient.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
+        const client = new MongoClient(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 10000,
+            socketTimeoutMS: 10000,
+            connectTimeoutMS: 10000
         });
 
+        await client.connect();
         const db = client.db('test');
 
         console.log(`🔍 Checking developer roles for user ${userId} on bot ${botId}`);
