@@ -4360,7 +4360,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                 );
     
                 // Save a default reply for the new bot name
-               await db.collection('replies').updateOne(
+             await db.collection('replies').updateOne(
   { trigger_word: newBotName, chat_id: chatId },
   {
     $set: {
@@ -4368,18 +4368,18 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
       chat_id: chatId,
       type: "text_cycle",
       reply_texts: [
-        `عيونه 🙌: ${newBotName}`,
-        `وت ${newBotName}؟`,
-        `${newBotName} موجود؟`,
-        `احلى اسم هو ${newBotName}`,
-        `وينك يا ${newBotName}؟ 😎`
+        "عيونه 🙌",
+        "وت؟",
+        "موجود؟",
+        "احلى اسم هو",
+        "وينك؟ 😎"
       ],
-      reply_text: `عيونه 🙌: ${newBotName}`, // ✅ fallback to avoid error
       cycle_index: 0
     }
   },
   { upsert: true }
 );
+
 
 
     
