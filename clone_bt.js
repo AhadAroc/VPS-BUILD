@@ -225,122 +225,9 @@ bot.on('my_chat_member', async (ctx) => {
         console.log(`🚪 Bot left/kicked from '${chatTitle}' (${chatId}) — marked inactive`);
     }
 });
-bot.command('add', async (ctx) => {
-  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
 
-  const args = ctx.message.text.split(" ");
-  if (args.length !== 3) return ctx.reply("❌ الصيغة: /add @username أو userId YYYY-MM-DD");
 
-  const identifier = args[1];
-  const dateStr = args[2];
 
-  // Validate date
-  const expiresAt = new Date(`${dateStr}T23:59:59Z`);
-  if (isNaN(expiresAt.getTime())) {
-    return ctx.reply("❌ التاريخ غير صالح. استخدم الصيغة: YYYY-MM-DD");
-  }
-
-  let userId;
-
-  try {
-    if (/^\d+$/.test(identifier)) {
-      // Raw numeric ID
-      userId = parseInt(identifier);
-    } else if (identifier.startsWith("@")) {
-      try {
-        const user = await ctx.telegram.getChat(identifier);
-        userId = user.id;
-      } catch (error) {
-        console.error("getChat error:", error.message);
-        return ctx.reply("❌ لم أتمكن من العثور على المستخدم. هل تحدث مع البوت؟");
-      }
-    } else {
-      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
-    }
-
-    // ✅ Use Mongoose model (not raw .collection())
-    await PremiumUser.updateOne(
-      { userId },
-      { $set: { userId, expiresAt, notified: false } },
-      { upsert: true }
-    );
-
-    return ctx.reply(`✅ تم منح الصلاحية المميزة للمستخدم (${userId}) حتى ${dateStr}`);
-  } catch (err) {
-    console.error("❌ Error in /add:", err.message);
-    return ctx.reply("❌ حدث خطأ أثناء الحفظ أو المعالجة.");
-  }
-});
-
-bot.command('revoke', async (ctx) => {
-  if (ctx.from.id !== ADMIN_ID) return ctx.reply("⛔ الأمر فقط للمالك.");
-
-  const args = ctx.message.text.split(" ");
-  if (args.length !== 2) return ctx.reply("❌ الصيغة: /revoke @username أو userId");
-
-  const identifier = args[1];
-  let userId;
-
-  try {
-    if (/^\d+$/.test(identifier)) {
-      // Raw numeric ID
-      userId = parseInt(identifier);
-    } else if (identifier.startsWith("@")) {
-      try {
-        const user = await ctx.telegram.getChat(identifier);
-        userId = user.id;
-      } catch (error) {
-        console.error("getChat error:", error.message);
-        return ctx.reply("❌ لم أتمكن من العثور على المستخدم. هل تحدث مع البوت؟");
-      }
-    } else {
-      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
-    }
-
-    // Check if user has premium status
-    const premiumUser = await PremiumUser.findOne({ userId });
-    
-    if (!premiumUser) {
-      return ctx.reply(`⚠️ المستخدم (${userId}) ليس لديه اشتراك مميز.`);
-    }
-
-    // Delete the premium user record
-    await PremiumUser.deleteOne({ userId });
-    
-    // Update all related collections to remove premium status
-    const db = await database.setupDatabase();
-    
-    // 1. Remove from VIP users collection if they exist there
-    await db.collection('vip_users').deleteMany({ user_id: userId });
-    
-    // 2. Remove from important_users collection if they exist there
-    await db.collection('important_users').deleteMany({ user_id: userId });
-    
-    // 3. Update any other collections that might store premium status
-    // For example, if you have a user_roles or permissions collection
-    await db.collection('user_roles').updateMany(
-      { user_id: userId },
-      { $pull: { roles: "premium" } }
-    );
-    
-    // 4. Clear any cached premium status
-    if (subscriptionCache && subscriptionCache[userId]) {
-      delete subscriptionCache[userId];
-    }
-    
-    // Try to notify the user that their premium status has been revoked
-    try {
-      await ctx.telegram.sendMessage(userId, '⚠️ تم إلغاء صلاحيتك المميزة. للاستفسار راسل المطور.');
-    } catch (notifyError) {
-      console.log(`Could not notify user ${userId} about revocation: ${notifyError.message}`);
-    }
-
-    return ctx.reply(`✅ تم إلغاء الصلاحية المميزة للمستخدم (${userId}) بنجاح وإزالة جميع الامتيازات المرتبطة.`);
-  } catch (err) {
-    console.error("❌ Error in /revoke:", err.message);
-    return ctx.reply("✅تم الغاء الصلاحية يرجى استخدام /premium_users للتأكد");
-  }
-});
 
 // Add a command to list all premium users
 bot.command('premium_users', async (ctx) => {
@@ -382,74 +269,7 @@ bot.command('premium_users', async (ctx) => {
     return ctx.reply("❌ حدث خطأ أثناء جلب قائمة المستخدمين المميزين.");
   }
 });
-bot.command('check_premium', async (ctx) => {
-  const args = ctx.message.text.split(" ");
-  let userId;
-  
-  if (args.length === 2) {
-    // Check another user (admin only)
-    if (ctx.from.id !== ADMIN_ID) {
-      return ctx.reply("⛔ فقط المالك يمكنه التحقق من حالة المستخدمين الآخرين.");
-    }
-    
-    const identifier = args[1];
-    if (/^\d+$/.test(identifier)) {
-      userId = parseInt(identifier);
-    } else if (identifier.startsWith("@")) {
-      try {
-        const user = await ctx.telegram.getChat(identifier);
-        userId = user.id;
-      } catch (error) {
-        return ctx.reply("❌ لم أتمكن من العثور على المستخدم.");
-      }
-    } else {
-      return ctx.reply("❌ يرجى إدخال @username أو userId بشكل صحيح.");
-    }
-  } else {
-    // Check own status
-    userId = ctx.from.id;
-  }
-  
-  try {
-    // Check premium status directly from database
-    const premiumUser = await PremiumUser.findOne({ userId });
-    
-    // Check VIP status
-    const db = await database.setupDatabase();
-    const vipUser = await db.collection('vip_users').findOne({ user_id: userId });
-    
-    // Check important status
-    const importantUser = await db.collection('important_users').findOne({ user_id: userId });
-    
-    if (!premiumUser && !vipUser && !importantUser) {
-      return ctx.reply(`المستخدم (${userId}) ليس لديه أي صلاحيات مميزة.`);
-    }
-    
-    let message = `📊 *حالة المستخدم (${userId}):*\n\n`;
-    
-    if (premiumUser) {
-      const expiryDate = new Date(premiumUser.expiresAt).toLocaleDateString('ar-EG');
-      const isExpired = new Date(premiumUser.expiresAt) < new Date();
-      const status = isExpired ? "🔴 منتهي" : "🟢 نشط";
-      
-      message += `🌟 *اشتراك مميز:* ${status}\n`;
-      message += `📅 *تاريخ الانتهاء:* ${expiryDate}\n\n`;
-    }
-    
-    if (vipUser) {
-      message += `👑 *مستخدم VIP:* نعم\n`;
-    }
-    
-    if (importantUser) {
-      message += `⭐ *مستخدم مهم:* نعم\n`;
-    }
-    
-    return ctx.reply(message, { parse_mode: 'Markdown' });
-  } catch (err) {
-    console.error("❌ Error in /check_premium:", err.message);
-    return ctx.reply("❌ حدث خطأ أثناء التحقق من الصلاحيات.");
-  }
-});
+
 async function saveFile(fileLink, fileName) {
     try {
         const mediaDir = path.join(__dirname, 'media');
@@ -622,67 +442,13 @@ bot.on('left_chat_member', async (ctx) => {
     }
 });
 
-function extractBroadcastContent(ctx) {
-    const msg = ctx.message;
-
-    if (msg.text && msg.text.startsWith('/broadcast')) {
-        const textParts = msg.text.split(' ').slice(1);
-        if (textParts.length === 0) return null;
-        return { type: 'text', content: textParts.join(' ') };
-    }
-
-    if (msg.photo) {
-        const fileId = msg.photo[msg.photo.length - 1].file_id;
-        const caption = msg.caption || '';
-        return { type: 'photo', content: { file_id: fileId, caption } };
-    }
-
-    if (msg.document) {
-        return { type: 'document', content: { file_id: msg.document.file_id, caption: msg.caption || '' } };
-    }
-
-    if (msg.video) {
-        return { type: 'video', content: { file_id: msg.video.file_id, caption: msg.caption || '' } };
-    }
-
-    return null;
-}
 
 // Handle token submission
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
     const userId = ctx.from.id;
 
-    // Check if it's a broadcast command
-    if (text.startsWith('/broadcast_')) {
-        if (userId !== ADMIN_ID) {
-            return ctx.reply('⛔ This command is only available to the admin.');
-        }
-        
-        const [command, ...messageParts] = text.split(' ');
-        const broadcastType = command.split('_')[1];
-        const broadcastMessage = messageParts.join(' ');
-
-        if (!broadcastMessage) {
-            return ctx.reply('Please provide a message to broadcast. Usage: /broadcast_<type> <your message>');
-        }
-
-        switch (broadcastType) {
-            case 'dm':
-                return handleBroadcastDM(ctx, broadcastMessage);
-            case 'groups':
-                return handleBroadcastGroups(ctx, broadcastMessage);
-            case 'all':
-                return handleBroadcastAll(ctx, broadcastMessage);
-            default:
-                return ctx.reply('Invalid broadcast command. Use /broadcast_dm, /broadcast_groups, or /broadcast_all');
-        }
-    }
-// Check total bot limit
-    const totalActiveBots = Object.keys(activeBots).length;
-    if (totalActiveBots >= MAX_TOTAL_BOTS) {
-        return ctx.reply('⚠️ عذراً، تم الوصول إلى الحد الأقصى للبوتات على الخادم. يرجى المحاولة لاحقاً.');
-    }
+    
 
     // If not a broadcast command, treat as token submission
     const token = text;
@@ -1176,37 +942,6 @@ bot.action(/^delete_bot_(\d+)$/, async (ctx) => {
     });
 });
 
-bot.on('message', async (ctx) => {
-    const msg = ctx.message;
-
-    // Only admins can use broadcast
-    if (ctx.from.id !== ADMIN_ID) return;
-
-    // Check if the caption or text starts with a broadcast command
-    const rawText = msg.caption || msg.text || '';
-    if (!rawText.startsWith('/broadcast_')) return;
-
-    // Extract the command and the actual message
-    const [cmd, ...messageParts] = rawText.split(' ');
-    const message = messageParts.join(' ');
-
-    if (!message) {
-        return ctx.reply('❌ Please provide a message to broadcast.');
-    }
-
-    const broadcast = extractBroadcastContent(ctx);
-    if (!broadcast) return ctx.reply('❌ Please provide a message, photo, or video to broadcast.');
-
-    if (cmd === '/broadcast_groups') {
-        return handleBroadcastGroups(ctx, message);
-    } else if (cmd === '/broadcast_dm') {
-        return handleBroadcastDM(ctx, message);
-    } else if (cmd === '/broadcast_all') {
-        return handleBroadcastAll(ctx, message);
-    } else {
-        return ctx.reply('❌ Unknown broadcast command.');
-    }
-});
 
 
 // Populate userDeployments map - Fixed version
