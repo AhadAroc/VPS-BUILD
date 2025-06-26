@@ -6133,34 +6133,43 @@ bot.action('main_bot_dev', async (ctx) => {
     });
     
    bot.action('backup_data', async (ctx) => {
-    await ctx.answerCbQuery();
     try {
+        await ctx.answerCbQuery('جاري إنشاء نسخة احتياطية...');
+        
         const botId = ctx.botInfo.id;
-        console.log(`🔄 Generating backup for bot ID: ${botId}`);
+        console.log(`🔄 Creating backup for bot ID: ${botId}`);
         
         // Get database connection
         const db = await ensureDatabaseInitialized();
         
-        // Collect data from all relevant collections filtered by bot_id
+        // Create backup object with metadata
         const backupData = {
             timestamp: new Date().toISOString(),
-            bot_id: botId,
-            bot_username: ctx.botInfo.username,
+            bot_info: {
+                id: botId,
+                username: ctx.botInfo.username,
+                name: ctx.botInfo.first_name
+            },
             collections: {}
         };
         
-        // List of collections to backup with their bot_id field
+        // Define collections to backup with their bot_id field
         const collectionsToBackup = [
-            { name: 'replies', filter: { bot_id: botId } },
             { name: 'developers', filter: { bot_id: botId } },
             { name: 'secondary_developers', filter: { bot_id: botId } },
-            { name: 'primary_developers', filter: { bot_id: botId } },
+            { name: 'primary_creators', filter: { bot_id: botId } },
+            { name: 'bot_admins', filter: { bot_id: botId } },
+            { name: 'vip_users', filter: { bot_id: botId } },
+            { name: 'important_users', filter: { bot_id: botId } },
+            { name: 'muters', filter: { bot_id: botId } },
             { name: 'groups', filter: { bot_id: botId } },
             { name: 'active_groups', filter: { bot_id: botId } },
-            { name: 'users', filter: { bot_id: botId } },
+            { name: 'replies', filter: { bot_id: botId } },
             { name: 'quiz_scores', filter: { bot_id: botId } },
             { name: 'quiz_questions', filter: { bot_id: botId } },
-            { name: 'quiz_answers', filter: { bot_id: botId } }
+            { name: 'quiz_settings', filter: { bot_id: botId } },
+            { name: 'user_stats', filter: { bot_id: botId } },
+            { name: 'known_users', filter: { bot_id: botId } }
         ];
         
         // Fetch data from each collection
@@ -6175,60 +6184,36 @@ bot.action('main_bot_dev', async (ctx) => {
             }
         }
         
-        // Also check for bot-specific database
-        try {
-            const botDb = await database.getDatabaseForBot(botId);
-            if (botDb) {
-                const botSpecificCollections = await botDb.listCollections().toArray();
-                backupData.bot_specific_db = {};
-                
-                for (const collInfo of botSpecificCollections) {
-                    const collName = collInfo.name;
-                    const data = await botDb.collection(collName).find({}).toArray();
-                    backupData.bot_specific_db[collName] = data;
-                    console.log(`✅ Backed up ${data.length} documents from bot-specific collection ${collName}`);
-                }
-            }
-        } catch (error) {
-            console.error(`❌ Error backing up bot-specific database:`, error);
-            backupData.bot_specific_db = { error: error.message };
-        }
+        // Create a JSON file with the backup data
+        const backupJson = JSON.stringify(backupData, null, 2);
+        const fileName = `backup_${botId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
         
-        // Get bot info from groups collection (special document with type='bot_info')
-        try {
-            const botInfo = await db.collection('groups').findOne({ 
-                type: 'bot_info',
-                bot_id: botId 
-            });
-            
-            if (botInfo) {
-                backupData.bot_info = botInfo;
-                console.log(`✅ Backed up bot info document`);
-            }
-        } catch (error) {
-            console.error(`❌ Error backing up bot info:`, error);
-        }
-        
-        // Generate filename with bot ID and date
-        const date = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `backup_bot_${botId}_${date}.json`;
-        
-        // Send the backup file
+        // Send the backup file to the user
         await ctx.replyWithDocument(
-            { source: Buffer.from(JSON.stringify(backupData, null, 2)), filename },
+            { source: Buffer.from(backupJson), filename: fileName },
             { 
-                caption: `📦 نسخة احتياطية لبوت الحماية (${ctx.botInfo.username})\n` +
-                         `🤖 معرف البوت: ${botId}\n` +
-                         `📅 تاريخ النسخ: ${new Date().toLocaleDateString('ar-EG')}\n` +
-                         `⏱ وقت النسخ: ${new Date().toLocaleTimeString('ar-EG')}\n\n` +
-                         `تحتوي هذه النسخة على جميع بيانات البوت المخزنة في قاعدة البيانات.`
+                caption: `📦 نسخة احتياطية لبيانات البوت\n📅 تاريخ: ${new Date().toLocaleString('ar-SA')}\n🤖 معرف البوت: ${botId}` 
             }
         );
         
-        console.log(`✅ Backup completed and sent to user ${ctx.from.id}`);
+        // Also save backup stats to database
+        try {
+            await db.collection('backup_history').insertOne({
+                bot_id: botId,
+                created_by: ctx.from.id,
+                created_at: new Date(),
+                file_name: fileName,
+                collections_backed_up: Object.keys(backupData.collections),
+                total_documents: Object.values(backupData.collections)
+                    .reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0)
+            });
+        } catch (error) {
+            console.error('Error saving backup history:', error);
+        }
+        
     } catch (error) {
-        console.error('❌ Error generating backup:', error);
-        await ctx.reply('❌ حدث خطأ أثناء إنشاء النسخة الاحتياطية. الرجاء المحاولة مرة أخرى لاحقًا.');
+        console.error('Error creating backup:', error);
+        await ctx.reply('❌ حدث خطأ أثناء إنشاء النسخة الاحتياطية. الرجاء المحاولة مرة أخرى.');
     }
 });
     
