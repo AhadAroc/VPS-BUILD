@@ -4444,32 +4444,34 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         }
 
 
-    if (userState) {
-        if (userState.step === 'awaiting_trigger') {
-            userState.triggerWord = text;
-            userState.step = 'awaiting_response';
-            await ctx.reply(`تم استلام الكلمة "${text}". الآن أرسل الرد (نص أو وسائط):`);
-            return;
-        }
-        const db = await ensureDatabaseInitialized();
-        const trigger = text.toLowerCase();
-        const reply = await db.collection('replies').findOne({ trigger_word: trigger });
-        if (userState.step === 'awaiting_response') {
-            const db = await ensureDatabaseInitialized();
-            await db.collection('replies').insertOne({
-                bot_id: userState.botId,
-                trigger_word: userState.triggerWord,
-                type: 'text',
-                text: text,
-                created_by: userId,
-                created_at: new Date()
-            });
+   if (pendingReplies.has(userId)) {
+    const userState = pendingReplies.get(userId);
 
-            await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${userState.triggerWord}"`);
-            pendingReplies.delete(userId);
-            return;
-        }
+    if (userState.step === 'awaiting_trigger') {
+        userState.triggerWord = text;
+        userState.step = 'awaiting_response';
+        pendingReplies.set(userId, userState); // <- ✅ Ensure update is saved
+        await ctx.reply(`تم استلام الكلمة "${text}". الآن أرسل الرد (نص أو وسائط):`);
+        return;
     }
+
+    if (userState.step === 'awaiting_response') {
+        const db = await ensureDatabaseInitialized();
+        await db.collection('replies').insertOne({
+            bot_id: userState.botId,
+            trigger_word: userState.triggerWord,
+            type: 'text',
+            text: text,
+            created_by: userId,
+            created_at: new Date()
+        });
+
+        await ctx.reply(`✅ تم حفظ الرد النصي للكلمة "${userState.triggerWord}"`);
+        pendingReplies.delete(userId);
+        return;
+    }
+}
+
         try {
             console.log('Received message:', ctx.message.text);
             
