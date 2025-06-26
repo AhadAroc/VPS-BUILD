@@ -1431,8 +1431,8 @@ bot.use(stickerRestrictionMiddleware);
     bot.use(async (ctx, next) => {
     try {
         // Skip subscription check for non-command messages
-        const isCommand = ctx.message?.text?.startsWith('/') || 
-                         (ctx.callbackQuery && ctx.callbackQuery.data);
+       
+        
         
         // If it's not a command, proceed without checking subscription
         if (!isCommand) {
@@ -1514,7 +1514,7 @@ bot.use(stickerRestrictionMiddleware);
         console.log(`📥 /start triggered by ${userId} (${username}) in ${ctx.chat.type}`);
 
         console.log('🔍 Checking ranks...');
-        const isDev = await isDeveloper(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId); // this should be reffared to clone bot 
         //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         //const isBotOwn = await isBotOwner(ctx, userId);
