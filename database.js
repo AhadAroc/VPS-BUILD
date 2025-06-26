@@ -816,13 +816,18 @@ async function isDeveloper(ctx, userId) {
     }
 
     // ✅ First: check global developer list
-    if (developerIds.has(userId.toString())) {
+    if (developerIds && developerIds.has && developerIds.has(userId.toString())) {
         console.log(`✅ User ${userId} is a hardcoded developer`);
         return true;
     }
 
     try {
         // ✅ Use native MongoClient to connect directly to test DB
+        if (!process.env.MONGO_URI) {
+            console.error('❌ Missing MONGO_URI environment variable');
+            return false;
+        }
+        
         const client = await MongoClient.connect(process.env.MONGO_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true
@@ -849,7 +854,6 @@ async function isDeveloper(ctx, userId) {
         return false;
     }
 }
-
 async function addDeveloper(userId, username) {
     try {
         const result = await db.collection('developers').updateOne(
