@@ -36,74 +36,59 @@ let client = null;
 let _mongoClient = null;
 let _mongoDbs = {};
 async function connectToMongoDB(customDbName = null) {
-    try {
-        console.log('📡 Attempting to connect to MongoDB...');
-        
-        // Validate environment first
-        validateEnvironment();
-        
-        const dbNameToUse = customDbName || process.env.DB_NAME || defaultDbName;
-        
-        // Use environment variable instead of config import
-        let uriToUse = process.env.MONGODB_URI;
-        
-        // Validate URI is not undefined
-        if (!uriToUse) {
-            throw new Error('MONGODB_URI environment variable is not defined');
-        }
-        
-        // Inject DB name into URI if missing
-        if (!uriToUse.includes(`/${dbNameToUse}`)) {
-            const [base, query] = uriToUse.split('?');
-            uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
-        }
+  try {
+    console.log('📡 Attempting to connect to MongoDB...');
 
-        const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
-        console.log(`🔐 Connecting to: ${sanitizedUri}`);
+    const dbNameToUse = customDbName || defaultDbName;
 
-        // If already connected to same DB
-        if (mongooseConnected && currentMongooseDb === dbNameToUse) {
-            console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
-            return db;
-        }
-
-        // Close existing connection if switching DB
-        if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
-            console.log('♻️ Closing existing mongoose connection...');
-            await mongoose.disconnect();
-            mongooseConnected = false;
-            currentMongooseDb = null;
-        }
-
-        // Race connection against timeout
-        const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
-        );
-
-        await Promise.race([connectPromise, timeoutPromise]);
-
-        mongooseConnected = true;
-        currentMongooseDb = dbNameToUse;
-        db = mongoose.connection.db;
-
-        console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
-        return db;
-    } catch (error) {
-        console.error('❌ MongoDB connection error:', error);
-        mongooseConnected = false;
-        currentMongooseDb = null;
-        return createMockDatabase();
+    // Inject DB name into URI if missing
+    let uriToUse = mongoUri;
+    if (!mongoUri.includes(`/${dbNameToUse}`)) {
+      const [base, query] = mongoUri.split('?');
+      uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
     }
+
+    const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+    console.log(`🔐 Connecting to: ${sanitizedUri}`);
+
+    // If already connected to same DB
+    if (mongooseConnected && currentMongooseDb === dbNameToUse) {
+      console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
+      return db;
+    }
+
+    // Close existing connection if switching DB
+    if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
+      console.log('♻️ Closing existing mongoose connection...');
+      await mongoose.disconnect();
+      mongooseConnected = false;
+      currentMongooseDb = null;
+    }
+
+    // Race connection against timeout
+    const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
+    );
+
+    await Promise.race([connectPromise, timeoutPromise]);
+
+    mongooseConnected = true;
+    currentMongooseDb = dbNameToUse;
+    db = mongoose.connection.db;
+
+    console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
+    return db;
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    mongooseConnected = false;
+    currentMongooseDb = null;
+    return createMockDatabase();
+  }
 }
 async function getDatabaseForBot(botId) {
     try {
-        // Validate environment
-        if (!process.env.MONGODB_URI) {
-            throw new Error('MONGODB_URI environment variable is not defined');
-        }
-        
-        const uri = process.env.MONGODB_URI;
+        const uri = process.env.MONGODB_URI || mongoUri;
         
         // Initialize native client if not already done
         if (!_mongoClient) {
@@ -117,7 +102,7 @@ async function getDatabaseForBot(botId) {
         }
 
         // Determine database name
-        const dbNameToUse = botId ? `bot_${botId}_db` : (process.env.DB_NAME || defaultDbName);
+        const dbNameToUse = botId ? `bot_${botId}_db` : (process.env.DB_NAME || dbName);
         
         // Get or create database connection
         if (!_mongoDbs[dbNameToUse]) {
@@ -135,23 +120,6 @@ async function getDatabaseForBot(botId) {
 
 module.exports.getDatabaseForBot = getDatabaseForBot;
 
-function validateEnvironment() {
-    const requiredVars = ['MONGODB_URI', 'DB_NAME'];
-    const missing = requiredVars.filter(varName => !process.env[varName]);
-    
-    if (missing.length > 0) {
-        console.error('❌ Missing required environment variables:', missing);
-        throw new Error(`Missing environment variables: ${missing.join(', ')}`);
-    }
-    
-    // Validate MongoDB URI format
-    const uri = process.env.MONGODB_URI;
-    if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
-        throw new Error('Invalid MongoDB URI format. Must start with mongodb:// or mongodb+srv://');
-    }
-    
-    console.log('✅ Environment variables validated');
-}
 
 async function ensureDatabaseInitialized(botId = null) {
     try {
@@ -608,15 +576,31 @@ async function setupDatabase() {
         }
 
         // Create indexes safely - check if they exist first
-        const indexOperations = [
-            createIndexSafely(db.collection('quiz_questions'), { category: 1, difficulty: 1 }),
-            createIndexSafely(db.collection('quiz_scores'), { userId: 1 }),
-            createIndexSafely(db.collection('quiz_answers'), { userId: 1 }),
-            createIndexSafely(db.collection('replies'), { trigger_word: 1 }, { unique: true }),
-            createIndexSafely(db.collection('developers'), { user_id: 1 }, { unique: true }),
-            createIndexSafely(db.collection('groups'), { group_id: 1 }, { unique: true }),
-            createIndexSafely(db.collection('users'), { user_id: 1 }, { unique: true })
-        ];
+        const indexOperations = collections.map(collectionName => {
+            const collection = db.collection(collectionName);
+            if (!collection) {
+                console.error(`Collection ${collectionName} is not initialized.`);
+                return Promise.resolve(); // Skip index creation for this collection
+            }
+            switch (collectionName) {
+                case 'quiz_questions':
+                    return createIndexSafely(collection, { category: 1, difficulty: 1 });
+                case 'quiz_scores':
+                    return createIndexSafely(collection, { userId: 1 });
+                case 'quiz_answers':
+                    return createIndexSafely(collection, { userId: 1 });
+                case 'replies':
+                    return createIndexSafely(collection, { trigger_word: 1 }, { unique: true });
+                case 'developers':
+                    return createIndexSafely(collection, { user_id: 1 }, { unique: true });
+                case 'groups':
+                    return createIndexSafely(collection, { group_id: 1 }, { unique: true });
+                case 'users':
+                    return createIndexSafely(collection, { user_id: 1 }, { unique: true });
+                default:
+                    return Promise.resolve();
+            }
+        });
 
         await Promise.all(indexOperations);
 
@@ -627,27 +611,35 @@ async function setupDatabase() {
         throw error;
     }
 }
+
+
 async function createIndexSafely(collection, keys, options = {}) {
-  if (!collection || typeof collection.createIndex !== 'function') {
-    console.warn('⚠️ Skipping index creation: Invalid collection object.');
-    return;
-  }
+    try {
+        if (!collection) {
+            console.error('Collection is undefined, cannot create index.');
+            return;
+        }
 
-  try {
-    const indexName = Object.keys(keys).map(key => `${key}_${keys[key]}`).join('_');
-    const indexes = await collection.indexes();
-    if (!indexes.find(i => i.name === indexName)) {
-      await collection.createIndex(keys, options);
-      console.log(`✅ Created index ${indexName} on ${collection.collectionName}`);
-    } else {
-      console.log(`ℹ️ Index ${indexName} already exists on ${collection.collectionName}`);
+        // Generate the index name that MongoDB would use
+        const indexName = Object.keys(keys).map(key => `${key}_${keys[key]}`).join('_');
+        
+        // Check if index already exists
+        const indexes = await collection.indexes();
+        const existingIndex = indexes.find(idx => idx.name === indexName);
+        
+        if (existingIndex) {
+            console.log(`Index ${indexName} already exists on collection ${collection.collectionName}`);
+            return;
+        }
+        
+        // Create the index if it doesn't exist
+        await collection.createIndex(keys, options);
+        console.log(`Created index ${indexName} on collection ${collection.collectionName}`);
+    } catch (error) {
+        console.error(`Error creating index on collection ${collection.collectionName}:`, error);
+        // Don't throw the error to allow other operations to continue
     }
-  } catch (err) {
-    console.error(`❌ Failed to create index on ${collection?.collectionName}:`, err);
-  }
 }
-
-
 // Add a new function for quiz-related operations
 async function saveQuizScore(chatId, userId, firstName, lastName, username, score) {
     try {
@@ -840,32 +832,25 @@ async function getDevelopers() {
 
 // Add the isDeveloper function
 async function isDeveloper(ctx, userId) {
+    const botId = ctx.botInfo?.id;
+    if (!botId) {
+        console.warn('⚠️ Missing bot ID in ctx.botInfo');
+        return false;
+    }
+
+    // ✅ First: check global developer list
+    if (developerIds.has(userId.toString())) {
+        console.log(`✅ User ${userId} is a hardcoded developer`);
+        return true;
+    }
+
     try {
-        const botId = ctx.botInfo?.id;
-        if (!botId) {
-            console.warn('⚠️ Missing bot ID in ctx.botInfo');
-            return false;
-        }
-
-        // First: check global developer list
-        if (developerIds && developerIds.has && developerIds.has(userId.toString())) {
-            console.log(`✅ User ${userId} is a hardcoded developer`);
-            return true;
-        }
-
-        // Validate MongoDB URI before proceeding
-        if (!process.env.MONGODB_URI) {
-            console.error('❌ Missing MONGODB_URI environment variable');
-            return false;
-        }
-        
-        const client = new MongoClient(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 10000,
-            socketTimeoutMS: 10000,
-            connectTimeoutMS: 10000
+        // ✅ Use native MongoClient to connect directly to test DB
+        const client = await MongoClient.connect(process.env.MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
         });
 
-        await client.connect();
         const db = client.db('test');
 
         console.log(`🔍 Checking developer roles for user ${userId} on bot ${botId}`);
@@ -887,6 +872,7 @@ async function isDeveloper(ctx, userId) {
         return false;
     }
 }
+
 async function addDeveloper(userId, username) {
     try {
         const result = await db.collection('developers').updateOne(
