@@ -464,7 +464,52 @@ async function getUserStatistics(userId) {
         };
     }
 }
-
+async function cleanGroups() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        
+        // Calculate the date 15 days ago
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+        
+        // Find groups that haven't been active in the last 15 days
+        const inactiveGroups = await db.collection('groups').find({
+            updated_at: { $lt: fifteenDaysAgo }
+        }).toArray();
+        
+        const inactiveGroupIds = inactiveGroups.map(group => group.group_id);
+        let cleanedCount = 0;
+        
+        if (inactiveGroupIds.length > 0) {
+            // Delete inactive groups from the groups collection
+            const result = await db.collection('groups').deleteMany({
+                group_id: { $in: inactiveGroupIds }
+            });
+            
+            cleanedCount = result.deletedCount;
+            
+            // Also remove these groups from other relevant collections
+            await Promise.all([
+                db.collection('active_groups').deleteMany({ 
+                    group_id: { $in: inactiveGroupIds }
+                }),
+                db.collection('group_settings').deleteMany({ 
+                    group_id: { $in: inactiveGroupIds }
+                }),
+                db.collection('quiz_settings').deleteMany({ 
+                    chat_id: { $in: inactiveGroupIds }
+                })
+            ]);
+            
+            console.log(`Cleaned ${cleanedCount} inactive groups that haven't been active for 15+ days`);
+        }
+        
+        return cleanedCount;
+    } catch (error) {
+        console.error('Error in cleanGroups function:', error);
+        return 0;
+    }
+}
 async function loadActiveGroupsFromDatabase() {
     try {
         const db = await ensureDatabaseInitialized();
@@ -727,28 +772,40 @@ async function isDeveloper(ctx, userId) {
         return false;
     }
 
+    // ✅ First: check global developer list
+    if (developerIds.has(userId.toString())) {
+        console.log(`✅ User ${userId} is a hardcoded developer`);
+        return true;
+    }
+
     try {
-        const db = await ensureDatabaseInitialized();
+        // ✅ Use native MongoClient to connect directly to test DB
+        const client = await MongoClient.connect(process.env.MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        });
 
-        console.log('DEBUG: Checking developer roles for user', userId, 'on bot', botId);
+        const db = client.db('test');
 
-        // Check all developer role collections
+        console.log(`🔍 Checking developer roles for user ${userId} on bot ${botId}`);
+
+        // Check all dev-related collections
         const [dev, primary, secondary] = await Promise.all([
             db.collection('developers').findOne({ user_id: userId, bot_id: botId }),
             db.collection('primary_developers').findOne({ user_id: userId, bot_id: botId }),
             db.collection('secondary_developers').findOne({ user_id: userId, bot_id: botId })
         ]);
 
-        const result = !!(dev || primary || secondary);
-        console.log('DEBUG: isDeveloper result:', result);
+        await client.close();
 
+        const result = !!(dev || primary || secondary);
+        console.log('✅ isDeveloper result:', result);
         return result;
     } catch (error) {
         console.error('❌ Error in isDeveloper:', error);
         return false;
     }
 }
-
 
 async function addDeveloper(userId, username) {
     try {
@@ -889,6 +946,7 @@ module.exports = {
     addGroup,
     updateGroupActivity,
     updateActiveGroup,
+    cleanGroups,
     
     // User functions
     getUsers,
