@@ -135,6 +135,23 @@ async function getDatabaseForBot(botId) {
 
 module.exports.getDatabaseForBot = getDatabaseForBot;
 
+function validateEnvironment() {
+    const requiredVars = ['MONGODB_URI', 'DB_NAME'];
+    const missing = requiredVars.filter(varName => !process.env[varName]);
+    
+    if (missing.length > 0) {
+        console.error('❌ Missing required environment variables:', missing);
+        throw new Error(`Missing environment variables: ${missing.join(', ')}`);
+    }
+    
+    // Validate MongoDB URI format
+    const uri = process.env.MONGODB_URI;
+    if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
+        throw new Error('Invalid MongoDB URI format. Must start with mongodb:// or mongodb+srv://');
+    }
+    
+    console.log('✅ Environment variables validated');
+}
 
 async function ensureDatabaseInitialized(botId = null) {
     try {
