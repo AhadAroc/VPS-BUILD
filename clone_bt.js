@@ -16,7 +16,7 @@ const subscriptionCache = {};
 const mongoURI = process.env.MONGODB_URI;
 // Store user deployments
 const userDeployments = new Map();
-
+let mongooseConnection = null;
 //const Heroku = require('heroku-client');
 const mongoose = require('mongoose');
 mongoose.connect(mongoURI, {
@@ -93,7 +93,37 @@ mongoose.connect('mongodb+srv://Amr:NidisuSI@cluster0.ay6fa.mongodb.net/test?ret
 app.get('/', (req, res) => {
     res.send('Protection Bot Manager is running!');
 });
-
+async function getMongooseConnection() {
+  if (mongooseConnection && mongooseConnection.readyState === 1) {
+    return mongooseConnection;
+  }
+  
+  try {
+    console.log('📡 Setting up new MongoDB connection...');
+    
+    // Close any existing connection first
+    if (mongooseConnection) {
+      console.log('♻️ Closing existing mongoose connection...');
+      await mongoose.connection.close();
+    }
+    
+    // Connect with proper options
+    mongooseConnection = await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      ssl: true,
+      tls: true,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000
+    });
+    
+    console.log('✅ Connected to MongoDB successfully');
+    return mongooseConnection;
+  } catch (err) {
+    console.error('❌ MongoDB connection error:', err);
+    throw err;
+  }
+}
 // Your existing bot code
 bot.start((ctx) => {
     ctx.reply('🤖 أهلا بك! في بوت الصانع , يرجى الضغط على التعليمات لمعرفة طريقة الصنع واشياء اخرى.', Markup.inlineKeyboard([
@@ -535,34 +565,42 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
 }
 
 async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
-    try {
-        const client = await MongoClient.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-        });
-
-        const db = client.db('test'); // ✅ Use the "test" DB directly here
-
-        const result = await db.collection('developers').updateOne(
-            { user_id: userId, bot_id: botId },
-            {
-                $set: {
-                    user_id: userId,
-                    username: username || null,
-                    bot_id: botId,
-                    promoted_at: new Date(),
-                    promoted_by: 'auto-clone',
-                    chat_id: chatId
-                }
-            },
-            { upsert: true }
-        );
-
-        console.log('✅ Developer entry inserted into test.developers:', result);
-        await client.close();
-    } catch (err) {
-        console.error('❌ Failed to insert developer into test DB:', err);
-    }
+  try {
+    // Use the MongoClient directly instead of mongoose for this operation
+    const client = new MongoClient(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      ssl: true,
+      tls: true
+    });
+    
+    await client.connect();
+    console.log('✅ Connected to MongoDB for developer insertion');
+    
+    const db = client.db('test'); // Use the test database explicitly
+    
+    const result = await db.collection('developers').updateOne(
+      { user_id: userId, bot_id: botId },
+      {
+        $set: {
+          user_id: userId,
+          username: username || null,
+          bot_id: botId,
+          promoted_at: new Date(),
+          promoted_by: 'auto-clone',
+          chat_id: chatId
+        }
+      },
+      { upsert: true }
+    );
+    
+    console.log('✅ Developer entry inserted into test.developers:', result.upsertedId || 'updated existing');
+    await client.close();
+    return true;
+  } catch (err) {
+    console.error('❌ Failed to insert developer into test DB:', err);
+    return false;
+  }
 }
 
 // Mark groups inactive when bot is removed
@@ -1263,41 +1301,37 @@ function loadExistingBots() {
     });
 }
 // Store bot information in groups collection
-async function storeGroupInfo(botId, botUsername, botName, botToken) {
-    try {
-        const db = await database.setupDatabase();
-        
-        // Create a unique identifier for the bot info record
-        const infoId = `bot_info_${botId}`;
-        
-        // Store bot info in a special document with type='bot_info'
-        await db.collection('groups').updateOne(
-            { 
-                type: 'bot_info',
-                bot_id: botId 
-            },
-            {
-                $set: {
-                    type: 'bot_info',
-                    bot_id: botId,
-                    bot_username: botUsername,
-                    bot_name: botName,
-                    bot_token: botToken,
-                    updated_at: new Date()
-                },
-                $setOnInsert: {
-                    created_at: new Date()
-                }
-            },
-            { upsert: true }
-        );
-        
-        console.log(`✅ Bot info stored for @${botUsername} (${botId})`);
-        return true;
-    } catch (error) {
-        console.error('❌ Error storing group info:', error);
-        return false;
-    }
+async function storeGroupInfo(botId, botName, botUsername, botToken, ownerId) {
+  try {
+    // Use the database module's setupDatabase function which should handle connections properly
+    const db = await database.setupDatabase();
+    
+    // Store bot info in the groups collection
+    await db.collection('groups').updateOne(
+      { type: 'bot_info', bot_id: botId },
+      {
+        $set: {
+          type: 'bot_info',
+          bot_id: botId,
+          bot_name: botName,
+          bot_username: botUsername,
+          bot_token: botToken,
+          owner_id: ownerId,
+          updated_at: new Date()
+        },
+        $setOnInsert: {
+          created_at: new Date()
+        }
+      },
+      { upsert: true }
+    );
+    
+    console.log(`✅ Bot info stored for @${botUsername} (ID: ${botId})`);
+    return true;
+  } catch (err) {
+    console.error('❌ Failed to store bot info:', err);
+    return false;
+  }
 }
 async function ensureDatabaseInitialized(databaseName = 'test') {
     let db = database.getDb();
