@@ -6959,7 +6959,7 @@ async function sendReply(ctx, reply) {
 bot.action('check_subscription', forceCheckSubscription);
 
 
-
+module.exports = {updateUserActivity};
 
 
 
