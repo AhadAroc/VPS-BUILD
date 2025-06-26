@@ -754,6 +754,49 @@ async function updateActiveGroup(chatId, chatTitle, addedBy = null) {
         { upsert: true }
     );
 }
+
+
+async function getOverallStats() {
+    try {
+        const db = await ensureDatabaseInitialized();
+        const botId = global.botInfo.id; // Assuming botInfo is stored globally
+        
+        // Get count of subscribers (users who have interacted with the bot in private chats)
+        const subscribersCount = await db.collection('users').countDocuments({
+            bot_id: botId,
+            chat_type: 'private'
+        });
+        
+        // Get count of groups where the bot is active
+        const groupsCount = await db.collection('groups').countDocuments({
+            bot_id: botId,
+            is_active: true,
+            chat_type: { $in: ['group', 'supergroup'] }
+        });
+        
+        // Get total count of all users across private chats and groups
+        // Note: This might include some duplicates if users are in multiple groups
+        const totalUsersCount = await db.collection('known_users').countDocuments({
+            bot_id: botId
+        });
+        
+        return {
+            subscribers: subscribersCount,
+            groups: groupsCount,
+            total: totalUsersCount
+        };
+    } catch (error) {
+        console.error('Error getting overall stats:', error);
+        // Return default values in case of error
+        return {
+            subscribers: 0,
+            groups: 0,
+            total: 0
+        };
+    }
+}
+
+
 // Developer functions
 async function getDevelopers() {
     try {
@@ -947,6 +990,7 @@ module.exports = {
     updateGroupActivity,
     updateActiveGroup,
     cleanGroups,
+    getOverallStats,
     
     // User functions
     getUsers,
