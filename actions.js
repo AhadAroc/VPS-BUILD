@@ -4132,7 +4132,7 @@ async function getCustomQuestionsForChat(chatId) {
     }
 }
 bot.action('change_bot_name', async (ctx) => {
-      const chatId = ctx.chat.id;
+     
     if (await isDeveloper(ctx, ctx.from.id)) {
         await ctx.answerCbQuery();
         await ctx.reply('الرجاء إرسال الاسم الجديد للبوت:');
@@ -4350,7 +4350,7 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
         // Handle bot name change
         if (ctx.session?.awaitingBotName) {
             const newBotName = ctx.message.text.trim();
-            
+            const chatId = ctx.chat.id;
             try {
                 const db = await ensureDatabaseInitialized();
                 await db.collection('bot_names').updateOne(
