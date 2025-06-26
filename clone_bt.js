@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config(); // dumbass fucking file 
 const { Telegraf, Markup } = require('telegraf');
 const database = require('./database');
 const { fork } = require('child_process');
@@ -565,88 +565,41 @@ async function downloadAndSaveTelegramFile(fileId, botToken) {
 }
 
 async function insertDeveloperToTestDB({ userId, username, botId, chatId }) {
-  let client;
   try {
-    // Get MongoDB URI from environment
-    const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
-    
-    if (!mongoURI) {
-      throw new Error('MongoDB URI not found in environment variables');
-    }
-    
-    console.log('🔐 Connecting to MongoDB Atlas...');
-    
-    // Create MongoDB client
-    client = new MongoClient(mongoURI, {
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 30000
+    // Use the MongoClient directly instead of mongoose for this operation
+    const client = new MongoClient(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      ssl: true,
+      tls: true
     });
     
     await client.connect();
-    console.log('✅ Connected to MongoDB Atlas');
+    console.log('✅ Connected to MongoDB for developer insertion');
     
-    // Connect to test database and developers collection
-    const db = client.db('test');
-    const developersCollection = db.collection('developers');
+    const db = client.db('test'); // Use the test database explicitly
     
-    // Validate required parameters
-    if (!userId || !botId) {
-      throw new Error('userId and botId are required');
-    }
-    
-    console.log(`📝 Targeting developers collection for userId=${userId}, botId=${botId}`);
-    
-    // Insert/update developer record
-    const developerDoc = {
-      user_id: parseInt(userId),
-      username: username || null,
-      bot_id: parseInt(botId),
-      promoted_at: new Date(),
-      promoted_by: 'auto-clone',
-      chat_id: chatId ? parseInt(chatId) : null,
-      is_active: true,
-      role: 'developer'
-    };
-    
-    const result = await developersCollection.updateOne(
-      { user_id: parseInt(userId), bot_id: parseInt(botId) },
-      { $set: developerDoc },
+    const result = await db.collection('developers').updateOne(
+      { user_id: userId, bot_id: botId },
+      {
+        $set: {
+          user_id: userId,
+          username: username || null,
+          bot_id: botId,
+          promoted_at: new Date(),
+          promoted_by: 'auto-clone',
+          chat_id: chatId
+        }
+      },
       { upsert: true }
     );
     
-    console.log('✅ Developer record updated in test.developers:', {
-      matched: result.matchedCount,
-      modified: result.modifiedCount,
-      upserted: result.upsertedCount,
-      upsertedId: result.upsertedId
-    });
-    
-    // Also check if we should add to secondary_developers collection
-    const secondaryDevsCollection = db.collection('secondary_developers');
-    const secondaryResult = await secondaryDevsCollection.updateOne(
-      { user_id: parseInt(userId), bot_id: parseInt(botId) },
-      { $set: { ...developerDoc, role: 'secondary_developer' } },
-      { upsert: true }
-    );
-    
-    console.log('✅ Secondary developer record updated:', {
-      matched: secondaryResult.matchedCount,
-      modified: secondaryResult.modifiedCount,
-      upserted: secondaryResult.upsertedCount
-    });
-    
+    console.log('✅ Developer entry inserted into test.developers:', result.upsertedId || 'updated existing');
+    await client.close();
     return true;
-    
   } catch (err) {
-    console.error('❌ Failed to assign developer role to test DB:', err.message);
-    console.error('Error details:', err);
+    console.error('❌ Failed to insert developer into test DB:', err);
     return false;
-  } finally {
-    if (client) {
-      await client.close();
-      console.log('🔌 MongoDB connection closed');
-    }
   }
 }
 
