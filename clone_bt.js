@@ -18,22 +18,7 @@ const mongoURI = process.env.MONGODB_URI;
 const userDeployments = new Map();
 let mongooseConnection = null;
 //const Heroku = require('heroku-client');
-const mongoose = require('mongoose');
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  ssl: true,
-  tls: true,
-  tlsAllowInvalidCertificates: false,
-  connectTimeoutMS: 30000, // 30 seconds timeout
-  socketTimeoutMS: 45000   // 45 seconds timeout
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  // Implement a fallback or retry mechanism here
-  console.log('Attempting to continue without MongoDB connection...');
-});
+
 const activeGroups = new Map();
 // Add this at the top of your file with other imports
 const crypto = require('crypto');
@@ -77,7 +62,8 @@ const cloneSchema = new mongoose.Schema({
     // add any other fields you use
   });
   
-  const Clone = mongoose.model('Clone', cloneSchema);
+  const Clone = mongoose.models.Clone || mongoose.model('Clone', cloneSchema);
+
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
