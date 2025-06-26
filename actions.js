@@ -5169,6 +5169,62 @@ function getMediaTypeInArabic(mediaType) {
      // Replace the problematic message handler with this one
      
     bot.on('message', async (ctx, next) => {
+        try {
+        const userId = ctx.from.id;
+        const userState = userStates.get(userId);
+        
+        // Check if the user is in the process of adding a reply
+        if (userState && userState.action === 'adding_reply') {
+            if (userState.step === 'awaiting_trigger') {
+                // User sent the trigger word, now ask for the reply content
+                const triggerWord = ctx.message.text.trim();
+                
+                // Update user state
+                userStates.set(userId, {
+                    ...userState,
+                    step: 'awaiting_content',
+                    triggerWord: triggerWord
+                });
+                
+                // Ask for the reply content
+                await ctx.reply(`تم استلام الكلمة: "${triggerWord}"\n\nالآن أرسل الرد الذي سيظهر عند كتابة هذه الكلمة:`, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: 'إلغاء', callback_data: 'cancel_add_reply' }]
+                        ]
+                    }
+                });
+                
+            } else if (userState.step === 'awaiting_content') {
+                // User sent the reply content, save it to the database
+                const replyContent = ctx.message.text;
+                const { botId, triggerWord } = userState;
+                
+                // Save the reply to the database
+                const result = await addReplyToBotDatabase(botId, triggerWord, replyContent);
+                
+                if (result.success) {
+                    await ctx.reply(`✅ تم إضافة الرد بنجاح!\n\nالكلمة: ${triggerWord}\nالرد: ${replyContent}`);
+                } else {
+                    await ctx.reply('❌ حدث خطأ أثناء إضافة الرد. الرجاء المحاولة مرة أخرى.');
+                }
+                
+                // Clear user state
+                userStates.delete(userId);
+            }
+            
+            // Return to prevent other handlers from processing this message
+            return;
+        }
+        
+        // If we get here, the message wasn't part of adding a reply,
+        // so other handlers can process it
+        
+    } catch (error) {
+        console.error('Error processing message for adding reply:', error);
+        await ctx.reply('❌ حدث خطأ أثناء معالجة الرسالة. الرجاء المحاولة مرة أخرى.');
+    }
+
         await updateGroupInfo(ctx);
     next();
     try {
