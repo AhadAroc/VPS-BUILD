@@ -483,6 +483,7 @@ const isVIPUser = await isVIP(ctx, userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 const isDev = await isDeveloper(ctx, userId);
 const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev;
+const isGoofy = await isGoofyOwner(ctx, userId);
 
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
@@ -1431,8 +1432,8 @@ bot.use(stickerRestrictionMiddleware);
     bot.use(async (ctx, next) => {
     try {
         // Skip subscription check for non-command messages
-       
-        
+        const isCommand = ctx.message?.text?.startsWith('/') || 
+                         (ctx.callbackQuery && ctx.callbackQuery.data);
         
         // If it's not a command, proceed without checking subscription
         if (!isCommand) {
