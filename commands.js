@@ -463,6 +463,19 @@ async function isPrimaryCreator(ctx, userId) {
         return false;
     }
 }
+async function isGoofyOwner(ctx, userId) {
+    const db = await ensureDatabaseInitialized();
+    const botId = ctx.botInfo.id;
+    const chatId = ctx.chat.id;
+
+    const result = await db.collection('goofy_owners').findOne({
+        user_id: userId,
+        bot_id: botId,
+        chat_id: chatId
+    });
+
+    return !!result;
+}
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
@@ -3105,19 +3118,7 @@ bot.action('cancel_remove_all_vips', async (ctx) => {
     await ctx.answerCbQuery('✅ تم إلغاء العملية.', { show_alert: true });
     await listImportantUsers(ctx);
 });
-async function isGoofyOwner(ctx, userId) {
-    const db = await ensureDatabaseInitialized();
-    const botId = ctx.botInfo.id;
-    const chatId = ctx.chat.id;
 
-    const result = await db.collection('goofy_owners').findOne({
-        user_id: userId,
-        bot_id: botId,
-        chat_id: chatId
-    });
-
-    return !!result;
-}
 
 // Add this function to remove all VIP users
 async function removeAllVIPUsers(ctx) {
