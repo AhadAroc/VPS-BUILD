@@ -566,54 +566,54 @@ async function handleQuizAnswer(ctx) {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         const userAnswer = ctx.message.text.trim().toLowerCase();
-        const messageTimestamp = ctx.message.date;
-        const messageId = ctx.message.message_id; // Use message ID for ordering
+        const messageTimestamp = ctx.message.date; // Get the message timestamp
         
         // Check if there's an active quiz in this chat
-        const quiz = activeQuizzes.get(chatId);
-        if (!quiz || quiz.state !== QUIZ_STATE.ACTIVE) {
+        if (!activeQuizzes.has(chatId) || activeQuizzes.get(chatId).state !== QUIZ_STATE.ACTIVE) {
             return; // No active quiz, so exit
         }
         
+        const quiz = activeQuizzes.get(chatId);
         const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
+        
         if (!currentQuestion) {
             return; // No current question
         }
         
-        // Create a unique key for this question attempt
-        const questionKey = `${chatId}_${quiz.currentQuestionIndex}`;
-        const attemptKey = `${userId}_${quiz.currentQuestionIndex}`;
-        
-        // Initialize data structures atomically
-        if (!quiz.attempts) quiz.attempts = new Map();
-        if (!quiz.questionAnswers) quiz.questionAnswers = new Map();
-        if (!quiz.questionLocks) quiz.questionLocks = new Map();
-        if (!quiz.scores) quiz.scores = new Map();
-        
-        // Check if user already attempted this question (prevent spam)
-        if (quiz.attempts.has(attemptKey)) {
-            return; // User already attempted this question
+        // Initialize attempts tracking for this question if it doesn't exist
+        if (!quiz.attempts) {
+            quiz.attempts = new Map();
         }
         
-        // Mark attempt immediately to prevent duplicate processing
-        quiz.attempts.set(attemptKey, {
-            userId,
-            timestamp: messageTimestamp,
-            messageId: messageId,
-            answer: userAnswer,
-            processed: false
-        });
+        // Initialize answers tracking for this specific question if it doesn't exist
+        if (!quiz.questionAnswers) {
+            quiz.questionAnswers = new Map();
+        }
         
-        // Initialize question answers if needed
         if (!quiz.questionAnswers.has(quiz.currentQuestionIndex)) {
             quiz.questionAnswers.set(quiz.currentQuestionIndex, []);
         }
         
-        // Get the correct answer
+        // Check if this user has already attempted this question
+        const attemptKey = `${userId}_${quiz.currentQuestionIndex}`;
+        if (quiz.attempts.has(attemptKey)) {
+            return; // User already attempted this question
+        }
+        
+        // Mark that this user has attempted this question
+        quiz.attempts.set(attemptKey, {
+            userId,
+            timestamp: messageTimestamp,
+            answer: userAnswer
+        });
+        
+        // Get the correct answer based on the question format
         let correctAnswer;
         if (typeof currentQuestion.correctAnswer === 'number' && Array.isArray(currentQuestion.options)) {
+            // Multiple choice format
             correctAnswer = currentQuestion.options[currentQuestion.correctAnswer].toLowerCase();
         } else if (currentQuestion.answer) {
+            // Direct answer format
             correctAnswer = currentQuestion.answer.toLowerCase();
         } else {
             console.error('Question format error:', currentQuestion);
@@ -623,177 +623,108 @@ async function handleQuizAnswer(ctx) {
         // Check if the answer is correct
         const isCorrect = userAnswer === correctAnswer;
         
-        // Create answer object
-        const answerObj = {
+        // Add this answer to the question's answers list
+        quiz.questionAnswers.get(quiz.currentQuestionIndex).push({
             userId,
             username: ctx.from.username || '',
             firstName: ctx.from.first_name || '',
             timestamp: messageTimestamp,
-            messageId: messageId,
             answer: userAnswer,
             isCorrect
-        };
-        
-        // Add to answers list
-        quiz.questionAnswers.get(quiz.currentQuestionIndex).push(answerObj);
+        });
         
         if (isCorrect) {
-            // Use atomic lock to prevent race conditions for first correct answer
-            const lockKey = `first_correct_${questionKey}`;
+            // Check if this is the first correct answer for this question
+            const correctAnswers = quiz.questionAnswers.get(quiz.currentQuestionIndex)
+                .filter(a => a.isCorrect)
+                .sort((a, b) => a.timestamp - b.timestamp);
             
-            // Check if we already have a first correct answer
-            if (!quiz.questionLocks.has(lockKey)) {
-                // This is potentially the first correct answer
-                quiz.questionLocks.set(lockKey, {
-                    userId,
-                    messageId,
-                    timestamp: messageTimestamp,
-                    locked: true
-                });
-                
-                await handleFirstCorrectAnswer(ctx, quiz, answerObj, true);
-            } else {
-                // Check if this answer came before the locked one (edge case for simultaneous answers)
-                const lockedAnswer = quiz.questionLocks.get(lockKey);
-                const isEarlierMessage = messageId < lockedAnswer.messageId;
-                const isSameTimestamp = messageTimestamp === lockedAnswer.timestamp;
-                
-                if (isEarlierMessage && isSameTimestamp) {
-                    // This answer actually came first, update the lock
-                    quiz.questionLocks.set(lockKey, {
-                        userId,
-                        messageId,
-                        timestamp: messageTimestamp,
-                        locked: true
-                    });
-                    
-                    await handleFirstCorrectAnswer(ctx, quiz, answerObj, true);
+            const isFirstCorrect = correctAnswers[0].userId === userId;
+            
+            // Initialize scores if needed
+            if (!quiz.scores) {
+                quiz.scores = new Map();
+            }
+            
+            // Get current score
+            const currentScore = quiz.scores.get(userId) || 0;
+            
+            // Calculate points based on difficulty and position
+            let points = 1;
+            if (quiz.difficulty === 'medium') points = 2;
+            if (quiz.difficulty === 'hard') points = 3;
+            
+            // Add bonus for being first to answer correctly
+            if (isFirstCorrect) {
+                points += 2;
+            } else if (correctAnswers.length <= 3) {
+                // Add smaller bonus for being second or third
+                points += (4 - correctAnswers.length);
+            }
+            
+            // Update user's score
+            quiz.scores.set(userId, currentScore + points);
+            
+            // Get user info
+            const firstName = ctx.from.first_name || '';
+            const lastName = ctx.from.last_name || '';
+            const username = ctx.from.username || '';
+            
+            // Save the score to the database
+            try {
+                const { saveQuizScore } = require('./database');
+                if (typeof saveQuizScore === 'function') {
+                    await saveQuizScore(chatId, userId, firstName, lastName, username, points);
                 } else {
-                    // This is a subsequent correct answer
-                    await handleSubsequentCorrectAnswer(ctx, quiz, answerObj);
+                    console.error('saveQuizScore is not a function');
                 }
+            } catch (dbError) {
+                console.error('Error saving quiz score:', dbError);
+                // Continue even if database save fails
+            }
+            
+            // Send congratulatory message with position info
+            let positionText = '';
+            if (isFirstCorrect) {
+                positionText = '🥇 أول من أجاب بشكل صحيح! ';
+            } else if (correctAnswers.length === 2) {
+                positionText = '🥈 ثاني من أجاب بشكل صحيح! ';
+            } else if (correctAnswers.length === 3) {
+                positionText = '🥉 ثالث من أجاب بشكل صحيح! ';
+            }
+            
+            await ctx.reply(`✅ ${positionText}إجابة صحيحة من ${firstName}! (+${points} نقطة)`, {
+                reply_to_message_id: ctx.message.message_id
+            });
+            
+            // If this is the first correct answer, move to the next question after a delay
+            if (isFirstCorrect) {
+                // Clear any pending timeouts for this question
+                while (quiz.timeouts && quiz.timeouts.length) {
+                    clearTimeout(quiz.timeouts.pop());
+                }
+                
+                // Set a timeout to move to the next question
+                const nextQuestionTimeout = setTimeout(async () => {
+                    // Move to the next question
+                    quiz.currentQuestionIndex++;
+                    
+                    // Check if we've reached the end of the quiz
+                    if (quiz.currentQuestionIndex >= quiz.questions.length) {
+                        await endQuiz(ctx, chatId);
+                    } else {
+                        // Ask the next question
+                        await askNextQuestion(chatId, ctx.telegram);
+                    }
+                }, 3000); // Wait 3 seconds before moving to the next question
+                
+                // Store the timeout
+                if (!quiz.timeouts) quiz.timeouts = [];
+                quiz.timeouts.push(nextQuestionTimeout);
             }
         }
-        
-        // Mark as processed
-        quiz.attempts.get(attemptKey).processed = true;
-        
     } catch (error) {
         console.error('Error handling quiz answer:', error);
-    }
-}
-async function handleFirstCorrectAnswer(ctx, quiz, answerObj, isFirst = false) {
-    const { userId, firstName } = answerObj;
-    const chatId = ctx.chat.id;
-    
-    // Calculate points
-    let points = calculatePoints(quiz.difficulty, 1); // Position 1 for first
-    
-    // Update score
-    const currentScore = quiz.scores.get(userId) || 0;
-    quiz.scores.set(userId, currentScore + points);
-    
-    // Save to database
-    await saveScoreToDatabase(chatId, ctx.from, points);
-    
-    // Send congratulatory message
-    await ctx.reply(`✅ 🥇 أول من أجاب بشكل صحيح! إجابة صحيحة من ${firstName}! (+${points} نقطة)`, {
-        reply_to_message_id: ctx.message.message_id
-    });
-    
-    // Move to next question after delay
-    await scheduleNextQuestion(ctx, quiz, chatId);
-}
-async function handleSubsequentCorrectAnswer(ctx, quiz, answerObj) {
-    const { userId, firstName } = answerObj;
-    const chatId = ctx.chat.id;
-    
-    // Get position among correct answers
-    const correctAnswers = quiz.questionAnswers.get(quiz.currentQuestionIndex)
-        .filter(a => a.isCorrect)
-        .sort((a, b) => {
-            // Sort by timestamp first, then by message ID
-            if (a.timestamp !== b.timestamp) {
-                return a.timestamp - b.timestamp;
-            }
-            return a.messageId - b.messageId;
-        });
-    
-    const position = correctAnswers.findIndex(a => a.userId === userId) + 1;
-    
-    // Only reward top 3
-    if (position <= 3) {
-        const points = calculatePoints(quiz.difficulty, position);
-        
-        // Update score
-        const currentScore = quiz.scores.get(userId) || 0;
-        quiz.scores.set(userId, currentScore + points);
-        
-        // Save to database
-        await saveScoreToDatabase(chatId, ctx.from, points);
-        
-        // Send position-based message
-        const positionEmojis = ['🥇', '🥈', '🥉'];
-        const positionTexts = ['أول', 'ثاني', 'ثالث'];
-        
-        await ctx.reply(`✅ ${positionEmojis[position - 1]} ${positionTexts[position - 1]} من أجاب بشكل صحيح! إجابة صحيحة من ${firstName}! (+${points} نقطة)`, {
-            reply_to_message_id: ctx.message.message_id
-        });
-    }
-}
-function calculatePoints(difficulty, position) {
-    let basePoints = 1;
-    if (difficulty === 'medium') basePoints = 2;
-    if (difficulty === 'hard') basePoints = 3;
-    
-    // Bonus points for position
-    let positionBonus = 0;
-    if (position === 1) positionBonus = 2;
-    else if (position === 2) positionBonus = 1;
-    else if (position === 3) positionBonus = 0.5;
-    
-    return basePoints + positionBonus;
-}
-async function scheduleNextQuestion(ctx, quiz, chatId) {
-    // Clear any existing timeouts for this question
-    if (quiz.questionTimeout) {
-        clearTimeout(quiz.questionTimeout);
-    }
-    
-    // Set new timeout
-    quiz.questionTimeout = setTimeout(async () => {
-        try {
-            // Move to the next question
-            quiz.currentQuestionIndex++;
-            
-            // Check if we've reached the end of the quiz
-            if (quiz.currentQuestionIndex >= quiz.questions.length) {
-                await endQuiz(ctx, chatId);
-            } else {
-                // Ask the next question
-                await askNextQuestion(chatId, ctx.telegram);
-            }
-        } catch (error) {
-            console.error('Error in scheduled next question:', error);
-        }
-    }, 3000);
-}
-async function saveScoreToDatabase(chatId, userInfo, points) {
-    try {
-        const { saveQuizScore } = require('./database');
-        if (typeof saveQuizScore === 'function') {
-            await saveQuizScore(
-                chatId, 
-                userInfo.id, 
-                userInfo.first_name || '', 
-                userInfo.last_name || '', 
-                userInfo.username || '', 
-                points
-            );
-        }
-    } catch (dbError) {
-        console.error('Error saving quiz score:', dbError);
-        // Don't throw - continue with quiz even if DB save fails
     }
 }
 // Add this function to get database for specific bot
@@ -848,51 +779,46 @@ async function checkForAutomaticReply(ctx) {
 
 async function handleCorrectQuizAnswer(ctx, chatId, userId) {
     const quiz = activeQuizzes.get(chatId);
-    if (!quiz) return;
-    
     const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-    if (!currentQuestion) return;
-    
-    const questionKey = quiz.currentQuestionIndex;
-    
-    // Initialize tracking
-    if (!quiz.attempts) quiz.attempts = new Map();
-    if (!quiz.questionFirstAnswers) quiz.questionFirstAnswers = new Map();
-    
-    // Check if this is the first correct answer for this question
-    const firstAnswerKey = `first_${questionKey}`;
-    
-    if (!quiz.questionFirstAnswers.has(firstAnswerKey)) {
-        // This is the first correct answer
-        quiz.questionFirstAnswers.set(firstAnswerKey, {
-            userId,
-            timestamp: Date.now(),
-            messageId: ctx.message.message_id
-        });
-        
-        // Calculate and award points
+
+    // Initialize attempts tracking for this question if it doesn't exist
+    if (!quiz.attempts.has(quiz.currentQuestionIndex)) {
+        quiz.attempts.set(quiz.currentQuestionIndex, new Set());
+    }
+
+    const questionAttempts = quiz.attempts.get(quiz.currentQuestionIndex);
+
+    // Check if the user has already answered correctly
+    if (!questionAttempts.has(userId)) {
+        // Mark this user as having answered correctly
+        questionAttempts.add(userId);
+
+        // Update user's score
+        if (!quiz.scores.has(userId)) {
+            quiz.scores.set(userId, 0);
+        }
+
+        // Add points based on difficulty
         let points = 1;
         if (quiz.difficulty === 'medium') points = 2;
         if (quiz.difficulty === 'hard') points = 3;
-        points += 2; // First answer bonus
-        
-        // Update score
-        if (!quiz.scores) quiz.scores = new Map();
-        const currentScore = quiz.scores.get(userId) || 0;
-        quiz.scores.set(userId, currentScore + points);
-        
-        // Send response
-        await ctx.reply(`✅ 🥇 أول إجابة صحيحة! حصلت على ${points} نقطة.`, {
+
+        quiz.scores.set(userId, quiz.scores.get(userId) + points);
+
+        // Reply to the user
+        await ctx.reply(`✅ إجابة صحيحة! حصلت على ${points} نقطة.`, {
             reply_to_message_id: ctx.message.message_id
         });
-        
-        // Schedule next question
+
+        // Move to the next question after a short delay
         setTimeout(async () => {
             quiz.currentQuestionIndex++;
-            
+
+            // Check if we've reached the end of the quiz
             if (quiz.currentQuestionIndex >= quiz.questions.length) {
                 await endQuiz(ctx, chatId);
             } else {
+                // Show the next question
                 await askNextQuestion(chatId, ctx.telegram);
             }
         }, 2000);
