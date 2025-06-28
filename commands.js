@@ -496,7 +496,7 @@ const isVIPUser = await isVIP(ctx, userId);
 //const isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 const isDev = await isDeveloper(ctx, userId);
-const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev;
+const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev || isGoofy; 
 const isGoofy = await isGoofyOwner(ctx, userId);
 
 
@@ -3230,7 +3230,7 @@ bot.hears('بدء', async (ctx) => {
                 assigned_at: new Date()
             });
 
-            await ctx.reply(`🤡 تم تعيينك كـ "goofy owner" لأنك مالك المجموعة، لكن بصلاحيات محدودة.`);
+            await ctx.reply(`تم تفعيل البوت في مجموعتك ✅`);
             console.log(`🤡 User ${userId} assigned as goofy owner`);
         }
 
