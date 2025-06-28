@@ -496,8 +496,9 @@ const isVIPUser = await isVIP(ctx, userId);
 //const isBotAdm = await isBotAdmin(userId);
 const isPrimary = await isPrimaryCreator(ctx, userId); // 👈 Add this line
 const isDev = await isDeveloper(ctx, userId);
-const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev || isGoofy; 
 const isGoofy = await isGoofyOwner(ctx, userId);
+const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev || isGoofy; 
+
 
 
         const photoUrl = 'https://i.postimg.cc/R0jjs1YY/bot.jpg';
