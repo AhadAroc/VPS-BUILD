@@ -665,6 +665,55 @@ async function getLeaderboard(groupId) {
         return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
     }
 }
+async function isSecondaryDeveloper(ctx, userId) {
+    try {
+        if (!userId) {
+            console.error('Error in isSecondaryDeveloper: userId is undefined');
+            return false;
+        }
+
+        const db = await ensureDatabaseInitialized();
+        const botId = ctx?.botInfo?.id;
+
+        // 1. Check by user_id and bot_id
+        const secDevById = await db.collection('secondary_developers').findOne({ 
+            user_id: parseInt(userId),
+            bot_id: botId
+        });
+        
+        if (secDevById) {
+            console.log(`Secondary developer check for user ${userId} by ID: true`);
+            return true;
+        }
+
+        // 2. Fallback: Check by username
+        const username = ctx?.from?.username;
+        if (username) {
+            const secDevByUsername = await db.collection('secondary_developers').findOne({ 
+                username: username,
+                bot_id: botId
+            });
+            
+            if (secDevByUsername) {
+                console.log(`Secondary developer check for @${username} by username: true`);
+                
+                // Update the record with the user_id for future checks
+                await db.collection('secondary_developers').updateOne(
+                    { _id: secDevByUsername._id },
+                    { $set: { user_id: parseInt(userId) } }
+                );
+                
+                return true;
+            }
+        }
+
+        console.log(`Secondary developer check for user ${userId}: false`);
+        return false;
+    } catch (error) {
+        console.error('Error checking secondary developer status:', error);
+        return false;
+    }
+}
 async function isPremiumUser(userId) {
     try {
         // Always check the database directly, don't rely on cached values
@@ -721,31 +770,30 @@ async function showQuizMenu(ctx) {
         //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-        const isBotAdm = await isBotAdmin(ctx, userId);
-        const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isBotAdm = await isBotAdmin(userId);
+        const isSecDev = await isSecDeveloper(userId);
         console.log(`Quiz menu permissions for user ${userId}:`, {
             isAdmin,
             isVIPUser,
             isPremium,
-            isBotAdm,
-            isSecDev
+            isBotAdm
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isAdmin && !isVIPUser && !isPremium && !isSecDev && !isBotAdm) {
+        if (!isAdmin && !isVIPUser && !isPremium &&!isSecDev) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
-                [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
-                [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
-                [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
-                [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
-                [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
-            ]
-        }
+              const keyboard = {
+    inline_keyboard: [
+        [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
+        [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
+        [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
+        [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
+        [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
+        [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+    ]
+}
 
         const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
         const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
