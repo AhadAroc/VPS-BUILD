@@ -773,6 +773,7 @@ async function showQuizMenu(ctx) {
         const isPremium = await isPremiumUser(userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
+        const isGoofy = await isGoofy(ctx, userId);
         console.log(`Quiz menu permissions for user ${userId}:`, {
             
             isVIPUser,
@@ -781,8 +782,8 @@ async function showQuizMenu(ctx) {
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isBotAdm && !isVIPUser && !isPremium &&!isSecDev) {
-            return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
+        if (!isBotAdm && !isVIPUser && !isPremium &&!isSecDev &&!isGoofy) {
+            return ctx.reply('❌ليس لديك صلاحيات كافية ');
         }
 
               const keyboard = {
