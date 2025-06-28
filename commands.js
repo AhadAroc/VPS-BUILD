@@ -542,7 +542,7 @@ const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev || isGoofy;
             // ✅ Admins, SecDev, VIPs, and Bot Admins get the full menu
             keyboard = {
                 inline_keyboard: [
-                    [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: 'القناة الاساسية', url: 'https://t.me/T0_PC' }],
                     [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                     [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
                     [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
@@ -553,7 +553,7 @@ const isSpecialUser =  isSecDev || isVIPUser ||  isPrimary ||isDev || isGoofy;
             keyboard = {
                 inline_keyboard: [
                     [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                    [{ text: '📢 تابع قناة البوت', url: 'https://t.me/ctrlsrc' }]
+                    [{ text: '📢 تابع قناة البوت', url: 'https://t.me/T0_PC' }]
                 ]
             };
         }
@@ -1650,7 +1650,7 @@ bot.use(stickerRestrictionMiddleware);
             const welcomeMessage = 'مرحبا بك في البوت! الرجاء إضافة البوت في مجموعتك الخاصة لغرض الاستخدام.';
             const keyboard = [
                 [{ text: '➕ أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                [{ text: '📢 قناة السورس', url: 'https://t.me/ctrlsrc' }],
+                [{ text: '📢 قناة السورس', url: 'https://t.me/T0_PC' }],
                 [{ text: '📢 القناة الرسمية', url: 'https://t.me/T0_B7' }]
             ];
             return ctx.reply(welcomeMessage, { reply_markup: { inline_keyboard: keyboard } });
@@ -1941,11 +1941,11 @@ bot.action('back_to_main', async (ctx) => {
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: 'القناة الاساسية', url: 'https://t.me/T0_PC' }],
                         [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                         
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
+                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_PC' }]
                     ]
                 }
             }
@@ -4492,7 +4492,7 @@ async function loadStickerRestrictions() {
                     [{ text: '📊 الاحصائيات', callback_data: 'dev_statistics' }],
                     [{ text: '💻 المطورين', callback_data: 'dev_developers' }],
                     [{ text: '👀 قريبا', callback_data: 'dev_welcome' }],
-                    [{ text: ' ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: ' T0_PC', url: 'https://t.me/T0_PC' }],
                     [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
                 ]
             };
@@ -4547,7 +4547,7 @@ async function loadStickerRestrictions() {
                     [{ text: '📊 الاحصائيات', callback_data: 'dev_statistics' }],
                     [{ text: '💻 المطورين', callback_data: 'dev_developers' }],
                     [{ text: '👀 قريبا', callback_data: 'dev_welcome' }],
-                    [{ text: ' ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: ' T0_OC', url: 'https://t.me/T0_PC' }],
                     [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
                 ]
             };
