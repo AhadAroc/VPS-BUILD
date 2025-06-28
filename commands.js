@@ -476,6 +476,39 @@ async function isGoofyOwner(ctx, userId) {
 
     return !!result;
 }
+async function isBotAdmin(ctx, userId) {
+    try {
+        if (!userId) {
+            console.error('Error in isBotAdmin: userId is undefined');
+            return false;
+        }
+
+        const db = await ensureDatabaseInitialized();
+
+        // 1. Check by user_id
+        const botAdminById = await db.collection('bot_admins').findOne({ user_id: parseInt(userId) });
+        if (botAdminById) {
+            console.log(`Bot admin check for user ${userId} by ID: true`);
+            return true;
+        }
+
+        // 2. Fallback: Check by username
+        const username = ctx.from?.username;
+        if (username) {
+            const botAdminByUsername = await db.collection('bot_admins').findOne({ username: username });
+            if (botAdminByUsername) {
+                console.log(`Bot admin check for @${username} by username: true`);
+                return true;
+            }
+        }
+
+        console.log(`Bot admin check for user ${userId}: false`);
+        return false;
+    } catch (error) {
+        console.error('Error checking bot admin status:', error);
+        return false;
+    }
+}
 async function hasRequiredPermissions(ctx, userId) {
     const isAdmin = await isAdminOrOwner(ctx, userId);
     const isSecDev = await isSecondaryDeveloper(ctx, userId);
@@ -595,39 +628,7 @@ async function showHelp(ctx) {
         await ctx.reply('❌ حدث خطأ أثناء عرض المساعدة. يرجى المحاولة مرة أخرى لاحقًا.');
     }
 }
-async function isBotAdmin(ctx, userId) {
-    try {
-        if (!userId) {
-            console.error('Error in isBotAdmin: userId is undefined');
-            return false;
-        }
 
-        const db = await ensureDatabaseInitialized();
-
-        // 1. Check by user_id
-        const botAdminById = await db.collection('bot_admins').findOne({ user_id: parseInt(userId) });
-        if (botAdminById) {
-            console.log(`Bot admin check for user ${userId} by ID: true`);
-            return true;
-        }
-
-        // 2. Fallback: Check by username
-        const username = ctx.from?.username;
-        if (username) {
-            const botAdminByUsername = await db.collection('bot_admins').findOne({ username: username });
-            if (botAdminByUsername) {
-                console.log(`Bot admin check for @${username} by username: true`);
-                return true;
-            }
-        }
-
-        console.log(`Bot admin check for user ${userId}: false`);
-        return false;
-    } catch (error) {
-        console.error('Error checking bot admin status:', error);
-        return false;
-    }
-}
 
 async function getLeaderboard(groupId) {
     try {
