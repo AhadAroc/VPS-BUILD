@@ -465,7 +465,7 @@ async function setupCyclingReply(ctx, triggerWord, texts) {
 // Add this function to check subscription status directly
 async function checkSubscriptionStatus(ctx, userId) {
     try {
-        const channelUsername = 'ctrlsrc'; // Your channel username without @
+        const channelUsername = 'T0_PC'; // Your channel username without @
         
         // Try to get the user's status in the channel
         const member = await ctx.telegram.getChatMember(`@${channelUsername}`, userId);
@@ -527,7 +527,7 @@ async function forceCheckSubscription(ctx) {
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '1. اشترك في القناة', url: 'https://t.me/ctrlsrc' }],
+                        [{ text: '1. اشترك في القناة', url: 'https://t.me/T0_PC' }],
                         [{ text: '2. تحقق من الاشتراك', callback_data: 'confirm_subscription' }]
                     ]
                 }
@@ -548,7 +548,7 @@ async function confirmSubscription(ctx) {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: 'أضفني إلى مجموعتك', url: 'https://t.me/' + ctx.botInfo.username + '?startgroup=true' }],
-                    [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                    [{ text: 'قناة السورس', url: 'https://t.me/T0_PC' }]
                 ]
             }
         });
@@ -1476,7 +1476,7 @@ async function showDevPanel(ctx) {
                     [{ text: '📊 الاحصائيات', callback_data: 'dev_statistics' }],
                     [{ text: '💻 المطورين', callback_data: 'dev_developers' }],
                     [{ text: '👀 قريبا', callback_data: 'dev_welcome' }],
-                    [{ text: ' ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                    [{ text: ' T0_PC', url: 'https://t.me/T0_PC' }],
                     [{ text: '📂 عرض المجموعات النشطة', callback_data: 'show_active_groups' }],
             ]
         };
@@ -1526,7 +1526,7 @@ async function showDevPanel(ctx) {
                 [{ text: '• مطور البوت الأساسي •', callback_data: 'main_bot_dev' }],
                 [{ text: '• مبرمج السورس •', callback_data: 'source_programmer' }],
                 [{ text: '• قناة السورس •', callback_data: 'source_channel' }],
-                [{ text: 'ctrlsrc', url: 'https://t.me/ctrlsrc' }],
+                [{ text: 'T0_PC', url: 'https://t.me/T0_PC' }],
                 [{ text: '🔙 رجوع', callback_data: 'back_to_dev_panel' }]
             ]
         };
@@ -1653,7 +1653,7 @@ function adminOnly(handler) {
                 return ctx.reply('يرجى الاشتراك بقناة البوت للاستخدام', {
                     reply_markup: {
                         inline_keyboard: [
-                            [{ text: 'اشترك الآن', url: 'https://t.me/ctrlsrc' }],
+                            [{ text: 'اشترك الآن', url: 'https://t.me/T0_PC' }],
                             [{ text: 'تحقق من الاشتراك', callback_data: 'check_subscription' }]
                         ]
                     }
@@ -1666,7 +1666,7 @@ function adminOnly(handler) {
                     reply_markup: {
                         inline_keyboard: [
                             [{ text: 'أضفني إلى مجموعتك', url: `https://t.me/${ctx.botInfo.username}?startgroup=true` }],
-                            [{ text: 'قناة السورس', url: 'https://t.me/ctrlsrc' }]
+                            [{ text: 'قناة السورس', url: 'https://t.me/T0_PC' }]
                         ]
                     }
                 });
@@ -5851,11 +5851,11 @@ async function checkForAutomaticReply(ctx) {
             '🔸 هذه النسخة ليس لها اشتراك\n\n' +
             'للحصول على النسخة الكاملة المدفوعة، يرجى مراجعة قناة السورس.\n' +
             'قناة سورس توباك\n' +
-            '🔹 https://t.me/T0_B7',
+            '🔹 https://t.me/T0_PC',
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🔗 قناة السورس', url: 'https://t.me/T0_B7' }],
+                        [{ text: '🔗 قناة السورس', url: 'https://t.me/T0_PC' }],
                         [{ text: '🔙 رجوع', callback_data: 'back_to_source_menu' }]
                     ]
                 },
@@ -5922,7 +5922,7 @@ bot.action('main_bot_dev', async (ctx) => {
         await ctx.answerCbQuery();
         await ctx.editMessageText(
             '📢 قناة السورس الرسمية\n\n' +
-            '🔗 الرابط: https://t.me/ctrlsrc\n\n' +
+            '🔗 الرابط: https://t.me/T0_PC\n\n' +
             '🌟 انضم الآن للحصول على:\n' +
             '• آخر التحديثات والإصدارات الجديدة\n' +
             '• نصائح وحيل لاستخدام البوت بشكل أفضل\n' +
@@ -6743,7 +6743,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
                             [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
                             [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                             [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                            [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
+                            [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_PC' }]
                         ]
                     }
                 }
@@ -6756,7 +6756,7 @@ bot.action('delete_secondary_developers', async (ctx) => {
                         [{ text: 'القناة الاساسية', url: 'https://t.me/ctrlsrc' }],
                         [{ text: '📜🚨  الحماية و الأوامر', callback_data: 'show_commands' }],
                         [{ text: '🎮 بوت المسابقات', callback_data: 'quiz_bot' }],
-                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_pc' }]
+                        [{ text: 'تابـع جديدنا', url: 'https://t.me/T0_PC' }]
                     ]
                 }
             });
