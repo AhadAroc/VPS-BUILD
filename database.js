@@ -11,7 +11,9 @@ const mongooseOptions = {
     socketTimeoutMS: 15000,           // Reduced from 45000
     connectTimeoutMS: 10000           // Reduced from 30000
 };
-
+// Track mongoose connection state
+let mongooseConnected = false;
+let currentMongooseDb = null;
 // MongoDB connection
 let db = null;
 let client = null;
@@ -38,30 +40,52 @@ async function connectToMongoDB(customDbName = null) {
     console.log('📡 Attempting to connect to MongoDB...');
 
     const dbNameToUse = customDbName || defaultDbName;
-    const uri = process.env.MONGO_URI || mongoUri;
 
-    if (!_mongoClient) {
-      _mongoClient = new MongoClient(uri, {
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 15000,
-        connectTimeoutMS: 10000
-      });
-      await _mongoClient.connect();
-      console.log('✅ Native MongoClient connected');
+    // Inject DB name into URI if missing
+    let uriToUse = mongoUri;
+    if (!mongoUri.includes(`/${dbNameToUse}`)) {
+      const [base, query] = mongoUri.split('?');
+      uriToUse = `${base.replace(/\/$/, '')}/${dbNameToUse}${query ? `?${query}` : ''}`;
     }
 
-    if (!_mongoDbs[dbNameToUse]) {
-      _mongoDbs[dbNameToUse] = _mongoClient.db(dbNameToUse);
-      console.log(`✅ Using MongoDB database: ${dbNameToUse}`);
+    const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+    console.log(`🔐 Connecting to: ${sanitizedUri}`);
+
+    // If already connected to same DB
+    if (mongooseConnected && currentMongooseDb === dbNameToUse) {
+      console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
+      return db;
     }
 
-    return _mongoDbs[dbNameToUse];
+    // Close existing connection if switching DB
+    if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
+      console.log('♻️ Closing existing mongoose connection...');
+      await mongoose.disconnect();
+      mongooseConnected = false;
+      currentMongooseDb = null;
+    }
+
+    // Race connection against timeout
+    const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
+    );
+
+    await Promise.race([connectPromise, timeoutPromise]);
+
+    mongooseConnected = true;
+    currentMongooseDb = dbNameToUse;
+    db = mongoose.connection.db;
+
+    console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
+    return db;
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
+    mongooseConnected = false;
+    currentMongooseDb = null;
     return createMockDatabase();
   }
 }
-
 async function getDatabaseForBot(botId) {
     try {
         const uri = process.env.MONGODB_URI || mongoUri;
@@ -143,6 +167,41 @@ function createMockDatabase() {
 }
 
 
+async function getDatabaseForBot(botId) {
+    try {
+        // If no botId is provided, return the main database
+        if (!botId) {
+            return await ensureDatabaseInitialized();
+        }
+        
+        // For specific bot databases, use a naming convention
+        const dbName = `bot_${botId}_db`;
+        
+        // Use the MongoClient for direct connection
+        if (!_mongoClient) {
+            _mongoClient = new MongoClient(mongoUri, {
+                useNewUrlParser: true,
+                useUnifiedTopology: true,
+                serverSelectionTimeoutMS: 30000,
+                socketTimeoutMS: 45000,
+                connectTimeoutMS: 30000
+            });
+            await _mongoClient.connect();
+            console.log('✅ Native MongoClient connected to cluster');
+        }
+
+        if (!_mongoDbs[dbName]) {
+            _mongoDbs[dbName] = _mongoClient.db(dbName);
+            console.log(`✅ Native MongoDB database selected: ${dbName}`);
+        }
+
+        return _mongoDbs[dbName];
+    } catch (error) {
+        console.error(`Error getting database for bot ${botId}:`, error);
+        // Fallback to main database
+        return await ensureDatabaseInitialized();
+    }
+}
 
 async function addQuizQuestion(question) {
     try {
