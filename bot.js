@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { Telegraf, session, Scenes } = require('telegraf');
 const express = require('express');
-const mongoose = require('mongoose');
 const { token } = require('./config');
 const database = require('./database');
 const { setupActions,updateUserActivity } = require('./actions');
@@ -20,17 +19,6 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const bot = new Telegraf(token);
 const app = express(); // Create Express app
 
-// Define the Clone model
-const CloneSchema = new mongoose.Schema({
-    botToken: String,
-    userId: String,
-    username: String,
-    createdAt: Date,
-    statistics: {
-        messagesProcessed: Number,
-        commandsExecuted: Number
-    }
-});
 
 
 async function initializeApp() {
@@ -61,37 +49,39 @@ async function initializeApp() {
 }
 
 async function getBotData() {
-    try {
-        console.log('Attempting to fetch bot data...');
-        let botData = await Clone.findOne({ botToken: BOT_TOKEN }).exec();
-        
-        if (!botData) {
-            console.log('No clone data found for this bot token. Creating new entry...');
-            botData = new Clone({
-                botToken: BOT_TOKEN,
-                userId: 'default_user_id',
-                username: 'default_username',
-                createdAt: new Date(),
-                statistics: { messagesProcessed: 0, commandsExecuted: 0 }
-            });
-            await botData.save();
-            console.log('Created new database entry for this bot');
-        } else {
-            console.log('Bot data found:', botData);
-        }
-    
-        return botData;
-    } catch (error) {
-        console.error('Error fetching bot data:', error);
-        throw error;
-    }
+try {
+console.log('Attempting to fetch bot data...');
+const db = await database.connectToMongoDB();
+
+let botData = await db.collection('clones').findOne({ botToken: BOT_TOKEN });
+
+if (!botData) {
+  console.log('No clone data found for this bot token. Creating new entry...');
+  botData = {
+    botToken: BOT_TOKEN,
+    userId: 'default_user_id',
+    username: 'default_username',
+    createdAt: new Date(),
+    statistics: { messagesProcessed: 0, commandsExecuted: 0 }
+  };
+  await db.collection('clones').insertOne(botData);
+  console.log('Created new database entry for this bot');
+} else {
+  console.log('Bot data found:', botData);
+}
+
+return botData;
+} catch (error) {
+console.error('Error fetching bot data:', error);
+throw error;
+}
 }
 
 
 async function updateBotStats(stat, increment = 1) {
     try {
-        const CloneModel = mongoose.model('Clone');
-        await CloneModel.findOneAndUpdate(
+        const db = await database.connectToMongoDB();
+        await db.collection('clones').updateOne(
             { botToken: BOT_TOKEN },
             { $inc: { [`statistics.${stat}`]: increment } }
         );
