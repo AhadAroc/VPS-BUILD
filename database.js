@@ -28,6 +28,7 @@ let client = null;
  * @param {number} question.difficulty - Question difficulty (1-5)
  * @param {string} question.addedBy - User ID of who added the question
  * @returns {Promise<Object>} - The added question with its ID
+ * @param {string} customDbName
  */
 
 
@@ -35,11 +36,27 @@ let client = null;
 
 let _mongoClient = null;
 let _mongoDbs = {};
+let _connectionPromise = null; // Add this to track ongoing connection attempts
 async function connectToMongoDB(customDbName = null) {
   try {
-    console.log('📡 Attempting to connect to MongoDB...');
-
     const dbNameToUse = customDbName || defaultDbName;
+
+    // If already connected to the same DB, return it immediately
+    if (mongooseConnected && currentMongooseDb === dbNameToUse && db) {
+      return db;
+    }
+    
+    // If there's an ongoing connection attempt, wait for it
+    if (_connectionPromise) {
+      await _connectionPromise;
+      
+      // After waiting, check if we're now connected to the requested DB
+      if (mongooseConnected && currentMongooseDb === dbNameToUse && db) {
+        return db;
+      }
+    }
+
+    console.log('📡 Attempting to connect to MongoDB...');
 
     // Inject DB name into URI if missing
     let uriToUse = mongoUri;
@@ -51,12 +68,6 @@ async function connectToMongoDB(customDbName = null) {
     const sanitizedUri = uriToUse.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
     console.log(`🔐 Connecting to: ${sanitizedUri}`);
 
-    // If already connected to same DB
-    if (mongooseConnected && currentMongooseDb === dbNameToUse) {
-      console.log(`✅ Already connected to MongoDB database: ${dbNameToUse}`);
-      return db;
-    }
-
     // Close existing connection if switching DB
     if (mongooseConnected && currentMongooseDb !== dbNameToUse) {
       console.log('♻️ Closing existing mongoose connection...');
@@ -65,20 +76,36 @@ async function connectToMongoDB(customDbName = null) {
       currentMongooseDb = null;
     }
 
-    // Race connection against timeout
-    const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
-    );
+    // Create a connection promise and store it
+    _connectionPromise = (async () => {
+      try {
+        // Race connection against timeout
+        const connectPromise = mongoose.connect(uriToUse, mongooseOptions);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('MongoDB connection timed out')), 10000)
+        );
 
-    await Promise.race([connectPromise, timeoutPromise]);
+        await Promise.race([connectPromise, timeoutPromise]);
 
-    mongooseConnected = true;
-    currentMongooseDb = dbNameToUse;
-    db = mongoose.connection.db;
+        mongooseConnected = true;
+        currentMongooseDb = dbNameToUse;
+        db = mongoose.connection.db;
 
-    console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
-    return db;
+        console.log(`✅ Connected to MongoDB database: ${dbNameToUse}`);
+        return db;
+      } catch (error) {
+        console.error('❌ MongoDB connection error:', error);
+        mongooseConnected = false;
+        currentMongooseDb = null;
+        throw error;
+      } finally {
+        // Clear the connection promise when done
+        _connectionPromise = null;
+      }
+    })();
+
+    // Wait for the connection to complete
+    return await _connectionPromise;
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
     mongooseConnected = false;
