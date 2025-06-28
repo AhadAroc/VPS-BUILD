@@ -666,7 +666,7 @@ async function getLeaderboard(groupId) {
         return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
     }
 }
-async function isSecDeveloper(ctx, userId) {
+async function isSecondaryDeveloper(ctx, userId) {
     try {
         if (!userId) {
             console.error('Error in isSecondaryDeveloper: userId is undefined');
@@ -771,10 +771,10 @@ async function showQuizMenu(ctx) {
         //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-        const isBotAdm = await isBotAdmin(userId);
-        const isSecDev = await isSecDeveloper(userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
         console.log(`Quiz menu permissions for user ${userId}:`, {
-            isAdmin,
+            
             isVIPUser,
             isPremium,
             isBotAdm
