@@ -780,7 +780,7 @@ async function showQuizMenu(ctx) {
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isAdmin && !isVIPUser && !isPremium &&!isSecDev) {
+        if (!isBotAdm && !isVIPUser && !isPremium &&!isSecDev) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
