@@ -1961,8 +1961,8 @@ async function listUsersByRole(ctx, roleType) {
         const isDev = await isDeveloper(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
-        
-        if (!isAdmin && !isDev && !isSecDev && !isPrimary) {
+        const isGoofy = await isGoofyOwner(ctx, userId);
+        if (!isAdmin && !isDev && !isSecDev && !isPrimary &&!isGoofy) {
             return await ctx.reply('❌ ليس لديك صلاحية لعرض هذه القائمة.');
         }
         
@@ -2091,9 +2091,9 @@ bot.hears('منع الصور', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await disablePhotoSharing(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2113,9 +2113,9 @@ bot.hears('فتح الصور', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await enablePhotoSharing(ctx);
         } else {
             await ctx.reply('❌لا توجد رتبة صالحة ');
@@ -2137,9 +2137,9 @@ bot.hears('منع فيديو', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await disableVideoSharing(ctx);
         } else {
             await ctx.reply('❌لا توجد رتبة صالحة ');
@@ -2159,9 +2159,9 @@ bot.hears('فتح فيديو', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await enableVideoSharing(ctx);
         } else {
             await ctx.reply('❌لا توجد رتبة صالحة ');
@@ -2182,9 +2182,9 @@ bot.hears('منع متحركة', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await disableGifSharing(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2204,9 +2204,9 @@ bot.hears('فتح متحركة', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await enableGifSharing(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2227,9 +2227,9 @@ bot.hears('منع ملصقات', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await disableStickerSharing(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2249,9 +2249,9 @@ bot.hears('فتح ملصقات', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await enableStickerSharing(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2273,9 +2273,9 @@ bot.hears(/^منع توجيه$/, async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy    ) {
             await disableForwarding(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2295,9 +2295,9 @@ bot.hears(/^فتح توجيه$/, async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy    ) {
             await enableForwarding(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2318,9 +2318,9 @@ bot.hears('منع روابط', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await disableLinkSharing(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2340,9 +2340,9 @@ bot.hears('فتح روابط', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await enableLinkSharing(ctx);
         } else {
             await ctx.reply('❌لا توجد رتبة صالحة ');
@@ -2364,9 +2364,9 @@ bot.hears('تثبيت', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await pinMessage(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2386,9 +2386,9 @@ bot.hears('مسح سحكة', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await deleteLatestMessage(ctx);
         } else {
             await ctx.reply('❌لا توجد رتبة صالحة ');
@@ -2409,9 +2409,9 @@ bot.hears('مسح الصور', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await deleteLatestPhotos(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2432,9 +2432,9 @@ bot.hears('طرد', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await kickUser(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2455,9 +2455,9 @@ bot.hears('ازالة الروابط', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await removeLinks(ctx);
         } else {
             await ctx.reply('❌لا توجد رتبة صالحة ');
@@ -2479,9 +2479,10 @@ bot.hears('نداء الجميع', async (ctx) => {
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
+        const isGoofy = await isGoofyOwner(ctx, userId);
         
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm) {
+        if (isDev || isSecDev || isPrimary || isBotAdm|| isGoofy) {
             await callEveryone(ctx, true);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2504,9 +2505,9 @@ bot.hears(['الأوامر', 'اوامر', 'الاوامر'], async (ctx) => {
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
-        
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Allow the command for all ranks including VIP users
-        if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser) {
+        if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser || isGoofy) {
             await sendCommandListTelegraf(ctx);
         } else {
             await ctx.reply('❌ لا توجد رتبة صالحة ');
@@ -2604,8 +2605,9 @@ bot.command('stop', async (ctx) => {
         const isBotAdm = await isBotAdmin(ctx, userId);
         const isBotOwn = await isBotOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
+        const isGoofy = await isGoofyOwner(ctx, userId);
         // Only allow bot admins and owners to stop quizzes
-        if (!isAdmin && !isBotAdm && !isBotOwn) {
+        if (!isAdmin && !isBotAdm && !isBotOwn && isGoofy) {
             return ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمشرفين ومالك البوت.');
         }
         
@@ -2753,9 +2755,10 @@ bot.hears('ايدي', async (ctx) => {
         const isPrimary = await isPrimaryCreator(ctx, userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
+        const isGoofy = await isGoofyOwner(ctx, userId);
         
         // Allow the command only for specific ranks
-        if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser) {
+        if (isDev || isSecDev || isPrimary || isBotAdm || isVIPUser || isGoofy) {
             await showUserId(ctx);
         } else {
             await ctx.reply('❌ عذراً، هذا الأمر متاح فقط للمطورين والمشرفين والأعضاء المميزين.');
@@ -5680,15 +5683,6 @@ async function getGroupLink(ctx) {
 
 
 
-// Command handler for "ترقية_ثانوي"
-bot.command('', promoteToSecondaryDeveloper);
-
-// Text handler for "ترقية ثانوي" (without underscore)
-//t.hears(/^رفع ثانوي/, promoteToSecondaryDeveloper);
-
-// Additional handler for flexibility
-//t.hears(/^رفع مطور ثانوي/, promoteToSecondaryDeveloper);
-
 
 
 
@@ -5743,13 +5737,7 @@ bot.start(async (ctx) => {
     }
 });
 
-
    
-
-
-
-
-
 }
 
 
