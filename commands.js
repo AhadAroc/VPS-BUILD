@@ -665,7 +665,7 @@ async function getLeaderboard(groupId) {
         return "❌ حدث خطأ أثناء جلب قائمة المتصدرين.";
     }
 }
-async function isSecondaryDeveloper(ctx, userId) {
+async function isSecDeveloper(ctx, userId) {
     try {
         if (!userId) {
             console.error('Error in isSecondaryDeveloper: userId is undefined');
