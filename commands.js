@@ -718,7 +718,7 @@ async function showQuizMenu(ctx) {
         const userId = ctx.from.id;
         
         // Check if the user is an admin, owner, or VIP
-        const isAdmin = await isAdminOrOwner(ctx, userId);
+        //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
         const isBotAdm = await isBotAdmin(userId);
@@ -731,7 +731,7 @@ async function showQuizMenu(ctx) {
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isAdmin && !isVIPUser && !isBotAdm && !isPremium &&!isSecDev) {
+        if (!isAdmin && !isVIPUser && !isPremium &&!isSecDev) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
