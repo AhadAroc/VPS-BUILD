@@ -482,7 +482,8 @@ async function hasRequiredPermissions(ctx, userId) {
     const isBotAdm = await isBotAdmin(userId);
     const isPremium = await isPremiumUser(userId);
     const isPrimary = await isPrimaryCreator(ctx, userId);
-    return isAdmin || isSecDev || isVIPUser ||  isPrimary;
+    const isGoofy = await isGoofyOwner(ctx, userId);
+    return isAdmin || isSecDev || isVIPUser || isPrimary || isGoofy;
 }
 // ✅ Display main menu
 async function showMainMenu(ctx) {
