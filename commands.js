@@ -774,7 +774,7 @@ async function showQuizMenu(ctx) {
         const isPremium = await isPremiumUser(userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
         const isSecDev = await isSecondaryDeveloper(ctx, userId);
-        const isGoofy = await isGoofy(ctx, userId);
+        const isGoofy = await isGoofyOwner(ctx, userId);
         console.log(`Quiz menu permissions for user ${userId}:`, {
             
             isVIPUser,
