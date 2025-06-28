@@ -731,7 +731,7 @@ async function showQuizMenu(ctx) {
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isAdmin && !isVIPUser && !isBotAdm && !isPremium) {
+        if (!isAdmin && !isVIPUser && !isBotAdm && !isPremium &&!isSecDev) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
@@ -5676,17 +5676,6 @@ async function getGroupLink(ctx) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 bot.command('تنزيل مطور', async (ctx) => {
     if (!(await isOwner(ctx, ctx.from.id))) {
         return ctx.reply('❌ هذا الأمر مخصص للمالك فقط.');
@@ -5742,4 +5731,3 @@ bot.start(async (ctx) => {
 
 
 module.exports = { setupCommands, isAdminOrOwner,showMainMenu,showQuizMenu,getLeaderboard,getDifficultyLevels,updateGroupActivity, getQuestionsForDifficulty,isSecondaryDeveloper,isVIP,chatBroadcastStates,awaitingBroadcastPhoto,updateActiveGroups,handleCommandCallbacks,isBotOwner,isBotAdmin,isSubscribed,isPrimaryCreator };
-
