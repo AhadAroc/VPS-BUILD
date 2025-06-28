@@ -769,6 +769,7 @@ async function showQuizMenu(ctx) {
         
         // Check if the user is an admin, owner, or VIP
         //const isAdmin = await isAdminOrOwner(ctx, userId);
+        const isDev = await isDeveloper(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
         const isBotAdm = await isBotAdmin(ctx, userId);
@@ -782,7 +783,7 @@ async function showQuizMenu(ctx) {
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isBotAdm && !isVIPUser && !isPremium &&!isSecDev &&!isGoofy) {
+        if (!isBotAdm && !isVIPUser && !isPremium &&!isSecDev &&!isGoofy &&isDev) {
             return ctx.reply('❌ليس لديك صلاحيات كافية ');
         }
 
