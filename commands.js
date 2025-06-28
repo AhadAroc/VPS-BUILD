@@ -721,30 +721,31 @@ async function showQuizMenu(ctx) {
         //const isAdmin = await isAdminOrOwner(ctx, userId);
         const isVIPUser = await isVIP(ctx, userId);
         const isPremium = await isPremiumUser(userId);
-        const isBotAdm = await isBotAdmin(userId);
-        const isSecDev = await isSecDeveloper(userId);
+        const isBotAdm = await isBotAdmin(ctx, userId);
+        const isSecDev = await isSecondaryDeveloper(ctx, userId);
         console.log(`Quiz menu permissions for user ${userId}:`, {
             isAdmin,
             isVIPUser,
             isPremium,
-            isBotAdm
+            isBotAdm,
+            isSecDev
         });
         
         // Consider including isBotAdm in the permission check
-        if (!isAdmin && !isVIPUser && !isPremium &&!isSecDev) {
+        if (!isAdmin && !isVIPUser && !isPremium && !isSecDev && !isBotAdm) {
             return ctx.reply('❌ هذا القسم مخصص للمشرفين والأعضاء المميزين فقط.');
         }
 
-              const keyboard = {
-    inline_keyboard: [
-        [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
-        [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
-        [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
-        [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
-        [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
-        [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
-    ]
-}
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '🎮 بدء مسابقة جديدة', callback_data: 'start_quiz' }],
+                [{ text: '🏆 قائمة المتصدرين', callback_data: 'show_leaderboard' }],
+                [{ text: '📊 إحصائياتي', callback_data: 'show_stats' }],
+                [{ text: '⚙️ إعدادات المسابقة', callback_data: 'configure_quiz' }],
+                [{ text: 'اضافة اسئلة خاصة ➕', callback_data: 'add_custom_questions' }],
+                [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
+            ]
+        }
 
         const photoUrl = 'https://postimg.cc/QBJ4V7hg/5c655f5c'; // Replace with your actual emoji cloud image URL
         const caption = '🎮 مرحبًا بك في نظام المسابقات! اختر من القائمة أدناه:';
