@@ -4319,6 +4319,12 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                     // Mark that this user has attempted this question
                     quiz.attempts.set(`${userId}_${quiz.currentQuestionIndex}`, true);
                     
+                    // Record the timestamp of this user's answer attempt
+                    if (!quizAnswerTimestamps.has(chatId)) {
+                    quizAnswerTimestamps.set(chatId, new Map());
+                    }
+                    quizAnswerTimestamps.get(chatId).set(userId, Date.now());
+                    
                     // Check if the answer is correct (case insensitive comparison)
                     const correctAnswer = currentQuestion.answer.toLowerCase();
                     const isCorrect = userAnswer === correctAnswer;
@@ -4797,6 +4803,13 @@ if (reply) {
             const currentScore = quiz.scores.get(userId) || 0;
             quiz.scores.set(userId, currentScore + 1);
             
+// Update timestamp of answer
+if (!quizAnswerTimestamps.has(chatId)) {
+    quizAnswerTimestamps.set(chatId, new Map());
+}
+quizAnswerTimestamps.get(chatId).set(userId, Date.now());
+
+
             // Get user info for the leaderboard
             const firstName = ctx.from.first_name || '';
             const lastName = ctx.from.last_name || '';
