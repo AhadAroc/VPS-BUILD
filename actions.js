@@ -70,7 +70,12 @@ if (!fs.existsSync(mediaDir)) {
 
 
 
-
+    lastActivityTimestamps.set(chatId, Date.now());
+setInactivityTimeout(chatId, () => {
+    quizAnswerTimestamps.delete(chatId);
+    activeQuizzes.delete(chatId);
+    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
+});
 
 
 
@@ -5277,12 +5282,7 @@ if (await isDeveloper(ctx, userId)) {
             // If a photo is received but we're not awaiting a reply, ignore it
             return;
         }
-     lastActivityTimestamps.set(chatId, Date.now());
-setInactivityTimeout(chatId, () => {
-    quizAnswerTimestamps.delete(chatId);
-    activeQuizzes.delete(chatId);
-    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
-});
+ 
         // Handle animations (GIFs)
                 // Handle animations (GIFs)
         if (ctx.message.animation && awaitingReplyResponse) {
