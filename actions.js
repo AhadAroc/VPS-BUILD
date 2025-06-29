@@ -67,6 +67,7 @@ const mediaDir = path.join(__dirname, 'media');
 if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
+const lastActivityTimestamps = new Map();
 
 const inactivityTimers = new Map();
 
