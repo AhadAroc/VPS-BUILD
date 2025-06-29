@@ -4360,7 +4360,14 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
                 return; // Stop processing this message further
             }
         }
-        
+     lastActivityTimestamps.set(chatId, Date.now());
+setInactivityTimeout(chatId, () => {
+    quizAnswerTimestamps.delete(chatId);
+    activeQuizzes.delete(chatId);
+    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
+});
+
+
         // Continue with other text message handling...
         
     } catch (error) {
@@ -4765,7 +4772,8 @@ if (reply) {
             
             // Update last interaction for the user
             updateLastInteraction(userId);
-            
+            const quiz = activeQuizzes.get(chatId);
+
             // If in a group, update the group's active status
             if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
                 updateActiveGroups(ctx);
