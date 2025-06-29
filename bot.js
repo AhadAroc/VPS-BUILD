@@ -131,6 +131,7 @@ bot.use(async (ctx, next) => {
 process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-initializeApp();
+initializeApp(CUSTOM_PORT);
+
 
 module.exports = { bot, updateBotStats };
