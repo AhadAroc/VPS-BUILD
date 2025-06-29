@@ -1,11 +1,9 @@
 
-
-
-
-
 const { MongoClient } = require('mongodb');
 const { mongoUri, dbName } = require('./config');
 const { getDevelopers, getReplies, addReply, updateReply } = require('./database');
+const lastActivityTimestamps = new Map(); // chatId → timestamp
+const inactivityTimers = new Map();       // chatId → timeout ref
 
 const developerIds = new Set(['7308214106']);
 const gifRestrictionStatus = new Map();
@@ -25,6 +23,18 @@ let tempReplyWord = '';
 
 
 
+function setInactivityTimeout(chatId, cleanupFn) {
+    if (inactivityTimers.has(chatId)) {
+        clearTimeout(inactivityTimers.get(chatId));
+    }
+
+    const timeout = setTimeout(() => {
+        console.log(`⏳ Chat ${chatId} inactive for 20s — cleaning up memory`);
+        cleanupFn();
+    }, 20000);
+
+    inactivityTimers.set(chatId, timeout);
+}
 
  
 
@@ -57,7 +67,9 @@ function adminOnly(commandFunction) {
         if (await isAdminOrOwner(ctx, ctx.from.id)) {
             return commandFunction(ctx);
         } else {
-            return ctx.reply('❌ عذرًا، هذا الأمر مخصص للمشرفين فقط.');
+            return ctx.reply('❌يرجى الحصول على الصلاحيات الكافية لغرض الاستخدام');
+
+
         }
     };
 }
