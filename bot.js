@@ -28,7 +28,7 @@ const CloneSchema = new mongoose.Schema({
   }
 });
 
-async function initializeApp() {
+async function initializeApp(customPort = null) {
   try {
     const db = await database.connectToMongoDB();
     if (!db) throw new Error('❌ DB init failed');
@@ -47,8 +47,9 @@ async function initializeApp() {
     await bot.telegram.setWebhook(`${DOMAIN}${WEBHOOK_PATH}`);
     console.log(`🚀 Webhook set: ${DOMAIN}${WEBHOOK_PATH}`);
 
-    app.listen(PORT, () => {
-      console.log(`🌐 Express server listening on port ${PORT}`);
+    const portToUse = customPort || process.env.PORT || 3000;
+    app.listen(portToUse, () => {
+      console.log(`🌐 Express server listening on port ${portToUse}`);
     });
 
   } catch (error) {
@@ -56,6 +57,7 @@ async function initializeApp() {
     process.exit(1);
   }
 }
+
 
 async function getBotData() {
   try {
