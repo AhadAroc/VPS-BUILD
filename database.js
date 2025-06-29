@@ -37,6 +37,9 @@ let client = null;
 let _mongoClient = null;
 let _mongoDbs = {};
 let _connectionPromise = null; // Add this to track ongoing connection attempts
+let lastDbAccess = Date.now();
+let dbInactivityTimer = null;
+
 async function connectToMongoDB(customDbName = null) {
   try {
     const dbNameToUse = customDbName || defaultDbName;
@@ -113,6 +116,22 @@ async function connectToMongoDB(customDbName = null) {
     return createMockDatabase();
   }
 }
+lastDbAccess = Date.now();
+
+if (dbInactivityTimer) clearTimeout(dbInactivityTimer);
+
+dbInactivityTimer = setTimeout(async () => {
+  try {
+    console.log('⏳ No DB activity detected — disconnecting from MongoDB');
+    await mongoose.disconnect();
+    mongooseConnected = false;
+    currentMongooseDb = null;
+    db = null;
+  } catch (err) {
+    console.error('Error disconnecting from MongoDB after idle timeout:', err);
+  }
+}, 30000); // 30 seconds
+
 async function getDatabaseForBot(botId) {
     try {
         const uri = process.env.MONGODB_URI || mongoUri;
