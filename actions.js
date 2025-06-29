@@ -5,6 +5,8 @@ let tempReplyWord = '';
 let tempBotId = null;
 const userStates = new Map();
 const pendingReplies = new Map(); // { userId: { triggerWord, botId } }
+// Add this Map to store answer timestamps at the top of your file with other state variables
+const quizAnswerTimestamps = new Map(); // Format: chatId -> Map<userId, timestamp>
 // Declare ownerId at the top of your file
 let ownerId = null;
 let state = {}; // or appropriate initial value
@@ -561,12 +563,14 @@ async function confirmSubscription(ctx) {
     }
 }
 // Add this function to handle quiz answers
+
 async function handleQuizAnswer(ctx) {
     try {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         const userAnswer = ctx.message.text.trim().toLowerCase();
-        const messageTimestamp = ctx.message.date; // Get the message timestamp
+        // Use message.date which is the server timestamp (more reliable than client-side time)
+        const messageTimestamp = ctx.message.date * 1000; // Convert to milliseconds
         
         // Check if there's an active quiz in this chat
         if (!activeQuizzes.has(chatId) || activeQuizzes.get(chatId).state !== QUIZ_STATE.ACTIVE) {
@@ -623,7 +627,7 @@ async function handleQuizAnswer(ctx) {
         // Check if the answer is correct
         const isCorrect = userAnswer === correctAnswer;
         
-        // Add this answer to the question's answers list
+        // Add this answer to the question's answers list with precise timestamp
         quiz.questionAnswers.get(quiz.currentQuestionIndex).push({
             userId,
             username: ctx.from.username || '',
@@ -633,13 +637,17 @@ async function handleQuizAnswer(ctx) {
             isCorrect
         });
         
+        // Log the answer for debugging
+        console.log(`Quiz answer from ${ctx.from.first_name} (${userId}): "${userAnswer}" - ${isCorrect ? 'Correct' : 'Incorrect'} at timestamp ${messageTimestamp}`);
+        
         if (isCorrect) {
-            // Check if this is the first correct answer for this question
+            // Get all correct answers for this question, sorted by timestamp
             const correctAnswers = quiz.questionAnswers.get(quiz.currentQuestionIndex)
                 .filter(a => a.isCorrect)
-                .sort((a, b) => a.timestamp - b.timestamp);
+                .sort((a, b) => a.timestamp - b.timestamp); // Sort by timestamp ascending
             
-            const isFirstCorrect = correctAnswers[0].userId === userId;
+            // Check if this is the first correct answer for this question
+            const isFirstCorrect = correctAnswers.length > 0 && correctAnswers[0].userId === userId;
             
             // Initialize scores if needed
             if (!quiz.scores) {
@@ -657,9 +665,11 @@ async function handleQuizAnswer(ctx) {
             // Add bonus for being first to answer correctly
             if (isFirstCorrect) {
                 points += 2;
+                console.log(`User ${userId} gets first answer bonus (+2 points)`);
             } else if (correctAnswers.length <= 3) {
                 // Add smaller bonus for being second or third
                 points += (4 - correctAnswers.length);
+                console.log(`User ${userId} gets position ${correctAnswers.length} bonus (+${4 - correctAnswers.length} points)`);
             }
             
             // Update user's score
@@ -700,8 +710,10 @@ async function handleQuizAnswer(ctx) {
             // If this is the first correct answer, move to the next question after a delay
             if (isFirstCorrect) {
                 // Clear any pending timeouts for this question
-                while (quiz.timeouts && quiz.timeouts.length) {
-                    clearTimeout(quiz.timeouts.pop());
+                if (quiz.timeouts && quiz.timeouts.length) {
+                    while (quiz.timeouts.length) {
+                        clearTimeout(quiz.timeouts.pop());
+                    }
                 }
                 
                 // Set a timeout to move to the next question
@@ -829,7 +841,7 @@ async function showQuestion(ctx, chatId) {
     try {
         const quiz = activeQuizzes.get(chatId);
         const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-        
+         quizAnswerTimestamps.delete(chatId);
         // Create the question message
         const questionNumber = quiz.currentQuestionIndex + 1;
         const totalQuestions = quiz.questions.length;
@@ -882,6 +894,7 @@ async function startAddingCustomQuestions(ctx) {
 async function endQuiz(ctx, chatId) {
     try {
         const quiz = activeQuizzes.get(chatId);
+        quizAnswerTimestamps.delete(chatId);
         if (!quiz) return;
         
         // Clear all timeouts
