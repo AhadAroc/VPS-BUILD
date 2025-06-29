@@ -68,14 +68,21 @@ if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir);
 }
 
+const inactivityTimers = new Map();
 
+function setInactivityTimeout(chatId, callback, timeout = 20000) {
+    if (inactivityTimers.has(chatId)) {
+        clearTimeout(inactivityTimers.get(chatId));
+    }
 
-    lastActivityTimestamps.set(chatId, Date.now());
-setInactivityTimeout(chatId, () => {
-    quizAnswerTimestamps.delete(chatId);
-    activeQuizzes.delete(chatId);
-    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
-});
+    const timer = setTimeout(() => {
+        callback();
+        inactivityTimers.delete(chatId);
+    }, timeout);
+
+    inactivityTimers.set(chatId, timer);
+}
+
 
 
 
@@ -4317,7 +4324,13 @@ bot.on(['photo', 'document', 'animation', 'sticker'], async (ctx) => {
             
             const quiz = activeQuizzes.get(chatId);
             const currentQuestion = quiz.questions[quiz.currentQuestionIndex];
-            
+            lastActivityTimestamps.set(chatId, Date.now());
+setInactivityTimeout(chatId, () => {
+    quizAnswerTimestamps.delete(chatId);
+    activeQuizzes.delete(chatId);
+    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
+});
+
             if (currentQuestion) {
                 // Check if this user has already attempted this question
                 if (!quiz.attempts.has(`${userId}_${quiz.currentQuestionIndex}`)) {
@@ -5233,7 +5246,12 @@ function getMediaTypeInArabic(mediaType) {
         const username = ctx.from.username;
         const message = ctx.message;
         const chatId = ctx.chat.id;
-
+lastActivityTimestamps.set(chatId, Date.now());
+setInactivityTimeout(chatId, () => {
+    quizAnswerTimestamps.delete(chatId);
+    activeQuizzes.delete(chatId);
+    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
+});
         // Update last interaction for the user
         updateLastInteraction(userId, username, ctx.from.first_name, ctx.from.last_name);
         
@@ -5425,6 +5443,12 @@ async function handleTextMessage(ctx) {
         await handleQuizAnswer(ctx, chatId, userId, userAnswer);
         return;
     }
+lastActivityTimestamps.set(chatId, Date.now());
+setInactivityTimeout(chatId, () => {
+    quizAnswerTimestamps.delete(chatId);
+    activeQuizzes.delete(chatId);
+    console.log(`🧹 Cleared memory for inactive quiz in chat ${chatId}`);
+});
 
     // Check for automatic replies
     // ✅ Only scan replies in private chats
