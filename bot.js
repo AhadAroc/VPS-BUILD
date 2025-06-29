@@ -16,6 +16,9 @@ const WEBHOOK_PATH = `/webhook/${BOT_TOKEN}`;
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
+const argv = require('process').argv;
+const cliPortArg = argv.find(arg => arg.startsWith('--port='));
+const CUSTOM_PORT = cliPortArg ? parseInt(cliPortArg.split('=')[1], 10) : null;
 
 const CloneSchema = new mongoose.Schema({
   botToken: String,
