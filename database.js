@@ -1012,6 +1012,18 @@ async function updateUserActivity(userId) {
         console.error('Error updating user activity:', error);
     }
 }
+async function disconnectBot(botId) {
+    const dbName = `bot_${botId}_db`;
+    if (_mongoDbs[dbName]) {
+        delete _mongoDbs[dbName];
+        console.log(`🧊 DB connection cleared for ${dbName}`);
+    }
+    if (_mongoClient) {
+        await _mongoClient.close();
+        _mongoClient = null;
+        console.log(`❎ MongoClient closed`);
+    }
+}
 
 // Export the functions and objects
 module.exports = {
@@ -1021,7 +1033,7 @@ module.exports = {
     setupDatabase,
     ensureDatabaseInitialized,
     getDatabaseForBot,
-    
+    disconnectBot,
     // Reply functions
     getReplies,
     getReply,
